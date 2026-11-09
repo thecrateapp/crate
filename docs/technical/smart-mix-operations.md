@@ -114,7 +114,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | ---------------------------------- | -------------------- | ----------------------------------------------------- |
 | `API_CONTRACT_VERSION`             | `2026-08`            | Advertised integration and capabilities contract      |
 | `PROFILE_SCHEMA_VERSION`           | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`                 | `smart-mix-audio-v8` | Target generation of profile analysis                 |
+| `ANALYZER_VERSION`                 | `smart-mix-audio-v9` | Target generation of profile analysis                 |
 | `MEASUREMENT_VERSION`              | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
 | `BEAT_GRID_FORMAT`                 | `delta-ms-v1`        | Beat grid format                                      |
 | `PLANNER_IDENTIFIER`               | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
@@ -148,6 +148,54 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
 | `activeEndMs`              | Musical end, by the same rule (for long tracks, over the last 120 s). A fade or reverb tail continues after it, so it falls 1-6 s before a -60 dB end of sound such as Mixxx's. It is not a silence threshold                                                                                                                           |
 | `introCueMs`, `outroCueMs` | Suggested mix points: the first beat at or after `activeStartMs` and the last beat 4 s before `activeEndMs`                                                                                                                                                                                                                             |
 | `beatPhaseOffsetMs`        | Plan field, beatmatch only. In output time and below one outgoing beat: the incoming track starts this much after `incomingCueMs` when the outgoing reaches `outgoingCueMs`. In incoming track time, start at `incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio` (`NativeTransitionPlan.startIncomingCueMs()`); never subtract it |
+
+### Analyzer v9
+
+`smart-mix-audio-v9` fixes two defects found while building the stems evaluation sets
+(399 tracks: electronic, phrase, industrial, metal and punk) on the v8 profiles production
+writes:
+
+- **m4a at twice its length.** symphonia's MP4 demuxer sets the channel count only for PCM
+  sample entries, so an AAC track in an `.m4a` has none in its codec parameters. `crate-cli`
+  read its interleaved stereo frames as mono: the audio came out twice as long, at half speed
+  and an octave down, and the profile had twice the real duration, a grid, cues and phrases
+  on that timeline and no loudness. 2,207 of the 2,226 `.m4a` of the development copy of the
+  library (every AAC one; the ALAC ones were right) had a profile of twice their duration,
+  in every analyzer version. The library analysis (`analyze`: BPM, key, loudness, energy)
+  and PANNs read the same slowed audio. Both decoders now mix to mono by the channel count
+  of each decoded buffer. Beat This! never ran on them either: libsndfile cannot open AAC
+  in MP4, and librosa reads files only through it; ffmpeg now decodes them (see
+  [Beats and downbeats](#beats-and-downbeats)).
+- **Tracks without bars.** The bar anchor required one grid phase to hold 60 % of every model
+  downbeat inside the grid, the ones more than 70 ms from every beat included. Beat This!
+  slides half a beat off the grid in some sections, so tracks whose on-grid downbeats all
+  agreed lost their downbeat and every phrase. The winning phase now needs 60 % of the
+  downbeats that land on the grid, and at least half the downbeats inside the grid must land
+  on it.
+
+| 399 tracks of the stems evaluation sets            | v8                 | v9                 |
+| -------------------------------------------------- | ------------------ | ------------------ |
+| Without phrases (electronic, phrase, ind., m/p)    | 45 (11, 5, 17, 12) | 30 (6, 2, 9, 13)   |
+| Tracks with phrases whose profile changes          | -                  | 0 of 350 (non-m4a) |
+| `.m4a` duration, Ministry "Fear (Is Big Business)" | 583,656 ms         | 291,828 ms         |
+
+Every anchor of the old rule is the same anchor under the new one, so the 350 tracks that
+had phrases and are not `.m4a` keep their profile byte for byte; the 16 tracks that gain a
+bar change only `downbeatAnchorMs`, `timeSignature`, `phrases`, `energyCurve` and
+`structureConfidence`. The 30 left without phrases are tracks the DBN hears in 3/4 (10,
+SM3-D16) and tracks whose bar phase moves during the track (20): odd bars in the music, which
+madmom confirms on two of the four it was checked on, or model slips. A fixed `.m4a` profile
+matches the profile of a FLAC copy of the same file in grid, downbeat and phrases. Two
+offsets remain between symphonia, which `crate-cli` decodes with, and players: it keeps the
+encoder delay an MP4 edit list trims (about 46 ms on gapless AAC) and decodes HE-AAC without
+its SBR band (about 22 ms). The grid comes from Beat This!'s beats, decoded by ffmpeg as
+players decode, so only `crate-cli`'s own readings move: `bpmConfidence` was 0.78 on one
+gapless AAC file against 0.90 on its FLAC copy.
+
+Readers accept v9, v8, v7, v6 and v5 profiles (`READABLE_ANALYZER_VERSIONS`); writers, the
+backfill and Admin coverage target v9. v9 keeps `beat-this-small0-dbn` and `yamnet-2`, so a
+track analysed by v8 or v7 is recomputed from its stored signals, except the `.m4a` ones,
+which have no stored beats (see [Running the v9 backfill](#running-the-v9-backfill)).
 
 ### Analyzer v8
 
@@ -776,9 +824,71 @@ therefore often below the night limit, and by day listeners can hold it below th
 as long as they listen. To run all eight at night, raise `max_load_ratio` in the runtime policy;
 the same threshold also applies by day.
 
+### Running the v9 backfill
+
+Production holds a `paused` campaign with `target` `smart-mix-audio-v8`, paused on
+2026-11-09 after 4,779 batches and 12,505 claims, with 12,717 v8 profiles; the rest of the
+library still holds v7, v6 and v5 profiles. v9 replaces that target, so after the release
+with v9 is deployed through the normal process, a new v9 campaign recomputes the library.
+The queues do not change: the coordinator and each analysis run on `heavy`.
+
+1. **Check the starting point.** Open Admin, Analysis, Smart Mix, or call
+   `GET /api/admin/smart-mix/status` with an account that has `library.analysis.manage`.
+   Expect `analyzerVersion` `smart-mix-audio-v9`, `profileVersion` `1`, `controlState`
+   `idle` (a campaign of another target claims nothing), `campaign.target`
+   `smart-mix-audio-v8` with `campaign.status` `paused`, and `activeTask` null. If
+   `refreshedAt` is null or older than ten minutes, the call queues a coverage refresh: read
+   it again a minute later. Coverage starts at 0 %, and `versions` lists the v8, v7, v6 and
+   v5 profiles still being served. If `activeTask` is not null, wait for it to finish (a
+   coordinator of the v8 campaign exits as `superseded` without claiming) or cancel it from
+   Tasks.
+2. **Keep the night limit.** `ANALYSIS_WORKER_PROCESSES=8` in `.env` since the v7 backfill
+   (see [Night window](#night-window)); the governor's `max_load_ratio` is 1.5 in the runtime
+   policy since 2026-11-07.
+3. **Start the campaign.** Press **Start backfill** (batch size 25, 3 attempts), or call
+   `POST /api/admin/smart-mix/backfill` with `{"batchSize": 25, "maxAttempts": 3}`. The answer
+   is `{"status": "queued", "taskId": "…"}`. The paused v8 campaign is not resumed:
+   starting, or resuming, opens a campaign with `target` `smart-mix-audio-v9`,
+   `profile_version` `1`, `status` `running` and `batches` and `claimed` `0`, whose `sequence`
+   continues the v8 campaign's so no batch reuses a v8 dedup key.
+4. **Watch it.** `controlState` `running`; `campaign.batches` and `campaign.claimed` grow;
+   `currentProfiles` and `coveragePercent` rise; `processing.active`, `failed` and `exhausted`
+   show the work and its errors; `GET /api/admin/smart-mix/activity` gives
+   `tracksPerMinute`. The campaign claims every profile that is not v9, in the same order as
+   the v8 one, so the 12,717 v8 profiles come first. v9 is another generation, so a track the
+   v8 campaign finished or gave up on starts a new retry budget. Each rewritten track is
+   claimed once.
+5. **The v8 and v7 rows are cheap; the `.m4a` ones are not.** v9 keeps
+   `beat-this-small0-dbn` and `yamnet-2`, so a track whose file has not changed since its v8
+   or v7 analysis finds its beats and voice in `track_mix_signals` (see
+   [Stored model signals](#stored-model-signals)): neither Beat This! nor YAMNet runs, only
+   decoding, `crate-cli` (about 2 s of CPU) and the phrase voice from the stored bytes. The
+   12,717 v8 rows take about seven hours of CPU in all. Beat This! never ran on an `.m4a`
+   (libsndfile cannot open it), so those tracks have voice but no stored beats: about 2,280
+   in production (1.6 % of the library) run Beat This! now, 14.7-25.4 s each, about 13 hours
+   of CPU in all. v6 and v5 profiles predate the stored signals and cost a whole profile, as
+   they would have under v8.
+6. **Pause, resume or cancel.** **Pause backfill** or `POST /api/admin/smart-mix/backfill/pause`
+   (only from `running`, 409 otherwise); **Resume backfill** or
+   `POST /api/admin/smart-mix/backfill/resume` with the same body as the start, which keeps
+   the counters; **Cancel backfill** or `POST /api/admin/smart-mix/backfill/cancel` (from
+   `running` or `paused`). None of them interrupts analyses already handed to the heavy queue.
+   Starting again after a cancel opens a new v9 campaign that only claims what is still not
+   v9.
+7. **Close it.** The campaign turns `completed` when a pass claims nothing and nothing is in
+   flight. Then check `processing.exhausted` and the track list filters `outdated` and
+   `failed`, and use **Reanalyze track** for the ones worth retrying. Once the backfill has
+   finished, a later release can drop v8, v7, v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
+8. **The library analysis of the `.m4a`.** The v9 profiles fix the Smart Mix side only. The
+   BPM, key, loudness and mood the library analysis stored for the AAC `.m4a` came from the
+   same slowed audio; their reanalysis runs apart, on the library analysis tasks.
+
 ### Running the v8 backfill
 
-Production holds a `paused` campaign with `target` `smart-mix-audio-v7`, which had written
+Superseded by [Running the v9 backfill](#running-the-v9-backfill) on 2026-11-09; kept for
+reference.
+
+Production held a `paused` campaign with `target` `smart-mix-audio-v7`, which had written
 about 2,710 v7 profiles; the rest of the library still holds v6 and v5 profiles. v8 replaces
 that target, so after the release with v8 is deployed through the normal process, a new v8
 campaign recomputes the library. The queues do not change: the coordinator and each analysis

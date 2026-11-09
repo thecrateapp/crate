@@ -169,9 +169,12 @@ def test_readers_accept_the_previous_analyzer_while_writers_target_the_new_one()
     None
 ):
     assert versions.READABLE_ANALYZER_VERSIONS[0] == versions.ANALYZER_VERSION
-    assert versions.ANALYZER_VERSION == "smart-mix-audio-v8"
-    # v8 only changes how model-beat stability is measured, and v7 only added
-    # structure; v7, v6 and v5 profiles keep serving until the backfill rewrites them.
+    assert versions.ANALYZER_VERSION == "smart-mix-audio-v9"
+    # v9 decodes m4a at its real length and lets off-grid model downbeats abstain from
+    # the bar, v8 only changed how model-beat stability is measured, and v7 only added
+    # structure; v8, v7, v6 and v5 profiles keep serving until the backfill rewrites
+    # them.
+    assert "smart-mix-audio-v8" in versions.READABLE_ANALYZER_VERSIONS
     assert "smart-mix-audio-v7" in versions.READABLE_ANALYZER_VERSIONS
     assert "smart-mix-audio-v6" in versions.READABLE_ANALYZER_VERSIONS
     assert "smart-mix-audio-v5" in versions.READABLE_ANALYZER_VERSIONS

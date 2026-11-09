@@ -566,12 +566,12 @@ def test_recomputes_voice_windows_of_another_file(monkeypatch) -> None:
     assert harness.published[0].vocal_presence == bytes([255, 255, 255])
 
 
-def test_v8_reuses_the_signals_stored_with_a_v7_profile(
+def test_v9_reuses_the_signals_stored_with_a_v8_profile(
     pg_db, monkeypatch, tmp_path
 ) -> None:
-    # v8 changes how the analyzers measure the model's beats, not the models: the beats
-    # and voice windows stored for this file under v7 serve the v8 profile, so a v7
-    # track is recomputed without running Beat This! or YAMNet.
+    # v9 changes how the analyzers read the model's downbeats and decode m4a, not the
+    # models: the beats and voice windows stored for this file under v8 serve the v9
+    # profile, so a v8 track is recomputed without running Beat This! or YAMNet.
     del pg_db
     from sqlalchemy import text
 
@@ -590,7 +590,7 @@ def test_v8_reuses_the_signals_stored_with_a_v7_profile(
             text("SELECT path FROM library_tracks WHERE id = :id"), {"id": track_id}
         ).scalar_one()
     source = capture_smart_mix_source(track_id, path)
-    previous = replace(_draft(phrases=True), analyzer_version="smart-mix-audio-v7")
+    previous = replace(_draft(phrases=True), analyzer_version="smart-mix-audio-v8")
     assert str(publish_smart_mix_profile(source, previous)) == "published"
     windows = vocals.voice_window_bytes(_voice([1.0] * 34 + [1e-4] * 34 + [1.0] * 34))
     store_track_mix_beats(
@@ -629,7 +629,7 @@ def test_v8_reuses_the_signals_stored_with_a_v7_profile(
     monkeypatch.setattr(analysis, "refresh_live_smart_mix_coverage", lambda: None)
 
     result = analysis._handle_compute_smart_mix_profile(
-        "task-v8", {"track_id": track_id}, {}
+        "task-v9", {"track_id": track_id}, {}
     )
 
     assert result["stored"] is True
