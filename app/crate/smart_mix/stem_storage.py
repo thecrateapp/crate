@@ -2,7 +2,8 @@
 
 Separation writes its scratch audio, and the stem files Crate Decks downloads, to one
 directory on the music volume, ``CRATE_STEMS_DIR`` (``/stems`` in the Compose files,
-``${MEDIA_DIR}/smart-mix-stems`` on the host). Never to ``/tmp`` or the root disk: a
+``STEMS_DIR`` on the host, ``${MEDIA_DIR}/smart-mix-stems`` by default). Never to
+``/tmp`` or the root disk: a
 five-minute track decodes to about 100 MB and separates into four stems of the same
 size, and the server's root disk has a few gigabytes free.
 

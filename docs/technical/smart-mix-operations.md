@@ -730,13 +730,18 @@ Runtime CPU (STEM-D3). There is no PyTorch in the separation. The code is
   the drum beats.
 
 - **Disk.** Separation writes only to `CRATE_STEMS_DIR` (`/stems` in the Compose files,
-  `${MEDIA_DIR}/smart-mix-stems` on the host), and only after checking that it is on the
-  library's filesystem: the music volume, never `/tmp`, a `tmpfs` or the container's
-  disk. Create the host directory, owned by `PUID:PGID`, before deploying: Docker
-  would create a missing one owned by root. Scratch goes to `.scratch` inside it: ffmpeg
-  decodes the track to float32 (about 106 MB for five minutes), the overlap-add writes
-  one float32 file per stem (four times that), and the directory is removed when the
-  stems are no longer needed, on success and on failure.
+  `STEMS_DIR` on the host, `${MEDIA_DIR}/smart-mix-stems` by default), and only after
+  checking that it is on the library's filesystem: the music volume, never `/tmp`, a
+  `tmpfs` or the container's disk. When the music lives on another filesystem than
+  `MEDIA_DIR`, as on the project server (`media/music` links to `/mnt/music`), set
+  `STEMS_DIR` to a hidden directory below the music mount, like `CACHE_DIR`
+  (`/mnt/music/.smart-mix-stems`): the library scanner and watcher ignore hidden path
+  components, and slskd does not share hidden directories. Create the host directory,
+  owned by `PUID:PGID`, before deploying: Docker would create a missing one owned by
+  root. Scratch goes to `.scratch` inside it: ffmpeg decodes the track to float32 (about
+  106 MB for five minutes), the overlap-add writes one float32 file per stem (four times
+  that), and the directory is removed when the stems are no longer needed, on success and
+  on failure.
 - **Memory.** Nothing holds a whole track: the normalisation reads the decoded file in
   blocks, and the overlap-add streams, writing each segment's final samples as soon as no
   later segment can touch them. What stays in memory is ONNX Runtime with the graph and a
@@ -858,7 +863,8 @@ the stems of Smart Mix playlists`; analyses it already queued finish. Once the
   thread.
 - **After the deploy.** Before integration, the Crate Decks release asset
   `models-htdemucs-onnx-1/htdemucs-onnx-1.onnx` must exist (the analysis image downloads
-  it), and `${MEDIA_DIR}/smart-mix-stems` must exist on the host, owned by `PUID:PGID`.
+  it), and the stems directory (`STEMS_DIR`, `${MEDIA_DIR}/smart-mix-stems` by default) must
+  exist on the music volume, owned by `PUID:PGID`.
   Then time a 50-track Smart Mix playlist on the server and record it here.
 
 ### Measurement of the structure
