@@ -414,37 +414,43 @@ function PlaylistRow({
           </div>
         )}
       </TableCell>
-      <TableCell className="text-xs text-text-muted">
-        <div className="flex flex-wrap items-center gap-1">
-          {counts.analyzing ? (
-            <InfoBadge tone="accent">{counts.analyzing} separating</InfoBadge>
+      <TableCell>
+        <div className="text-xs text-text-muted">
+          <div className="flex flex-wrap items-center gap-1">
+            {counts.analyzing ? (
+              <InfoBadge tone="accent">{counts.analyzing} separating</InfoBadge>
+            ) : null}
+            {counts.pending ? (
+              <InfoBadge>{counts.pending} pending</InfoBadge>
+            ) : null}
+            {counts.failed ? (
+              <InfoBadge tone="warning">{counts.failed} failed</InfoBadge>
+            ) : null}
+            {!counts.analyzing && !counts.pending && !counts.failed ? (
+              <span>{playlist.enabled ? "Done" : "—"}</span>
+            ) : null}
+          </div>
+          {playlist.estimatedSecondsLeft != null ? (
+            <div className="mt-1">
+              {duration(playlist.estimatedSecondsLeft)} left
+            </div>
           ) : null}
-          {counts.pending ? (
-            <InfoBadge>{counts.pending} pending</InfoBadge>
-          ) : null}
-          {counts.failed ? (
-            <InfoBadge tone="warning">{counts.failed} failed</InfoBadge>
-          ) : null}
-          {!counts.analyzing && !counts.pending && !counts.failed ? (
-            <span>{playlist.enabled ? "Done" : "—"}</span>
+          {failure?.lastError ? (
+            <p className="mt-1 max-w-sm whitespace-normal wrap-anywhere text-state-warning-text">
+              {[failure.title, failure.lastError].filter(Boolean).join(" · ")}
+            </p>
           ) : null}
         </div>
-        {playlist.estimatedSecondsLeft != null ? (
-          <div className="mt-1">
-            {duration(playlist.estimatedSecondsLeft)} left
-          </div>
-        ) : null}
-        {failure?.lastError ? (
-          <p className="mt-1 max-w-sm whitespace-normal wrap-anywhere text-state-warning-text">
-            {[failure.title, failure.lastError].filter(Boolean).join(" · ")}
-          </p>
-        ) : null}
       </TableCell>
-      <TableCell className="text-xs text-text-secondary tabular-nums">
-        {gib(playlist.fileBytes)}
+      <TableCell>
+        <span className="text-xs text-text-secondary tabular-nums">
+          {gib(playlist.fileBytes)}
+        </span>
       </TableCell>
-      <TableCell className="text-xs text-text-muted">
-        {moment(playlist.lastUsedAt)}
+      <TableCell>
+        <span className="text-xs text-text-muted">
+          {moment(playlist.lastUsedAt)}
+        </span>
       </TableCell>
       <TableCell className="text-right">
         <Button
@@ -483,7 +489,7 @@ function TrackStates({
       closeLabel="Close track states"
       size="2xl"
     >
-      <ModalBody className="min-w-0 px-5 py-5">
+      <ModalBody className="min-w-0">
         {loading && !data ? (
           <LoadingState label="Loading track states" />
         ) : error || !data ? (
@@ -535,11 +541,15 @@ function TrackStates({
                       {STATE_NAMES[track.state]}
                     </InfoBadge>
                   </TableCell>
-                  <TableCell className="text-xs tabular-nums">
-                    {track.attempts}
+                  <TableCell>
+                    <span className="text-xs tabular-nums">
+                      {track.attempts}
+                    </span>
                   </TableCell>
-                  <TableCell className="text-xs text-text-muted">
-                    {moment(track.finishedAt)}
+                  <TableCell>
+                    <span className="text-xs text-text-muted">
+                      {moment(track.finishedAt)}
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}

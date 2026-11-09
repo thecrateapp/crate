@@ -24,6 +24,21 @@ function Reading({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** A mono note on its own line under a reading's value. */
+function ReadingNote({
+  wrap = false,
+  children,
+}: {
+  wrap?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className={wrap ? "mt-1 whitespace-normal" : "mt-1"}>
+      <MonoLabel as="div">{children}</MonoLabel>
+    </div>
+  );
+}
+
 const JOB_LABELS = {
   pending: "Pending",
   analyzing: "Separating",
@@ -56,17 +71,13 @@ function SourcePanel({ model }: { model: StemsTabModel }) {
           <Reading label="Source">
             {analysis.kind === "server" ? "Crate server" : "Crate Decks upload"}
             {analysis.contributedBy ? (
-              <MonoLabel as="span" className="mt-1 block">
-                by {analysis.contributedBy}
-              </MonoLabel>
+              <ReadingNote>by {analysis.contributedBy}</ReadingNote>
             ) : null}
           </Reading>
           <Reading label="Producer">{analysis.producer}</Reading>
           <Reading label="Separator">
             {analysis.separatorModel}
-            <MonoLabel as="span" className="mt-1 block">
-              {analysis.separatorVersion}
-            </MonoLabel>
+            <ReadingNote>{analysis.separatorVersion}</ReadingNote>
           </Reading>
           <Reading label="Source revision">
             <span className="mr-2">{analysis.sourceRevision.slice(0, 8)}</span>
@@ -76,9 +87,7 @@ function SourcePanel({ model }: { model: StemsTabModel }) {
               <InfoBadge tone="warning">Stale</InfoBadge>
             )}
             {!analysis.current && analysis.fileChangedAt ? (
-              <MonoLabel as="span" className="mt-1 block">
-                file changed {analysis.fileChangedAt}
-              </MonoLabel>
+              <ReadingNote>file changed {analysis.fileChangedAt}</ReadingNote>
             ) : null}
           </Reading>
           <Reading label="Analysed">{analysis.analysedAt}</Reading>
@@ -114,9 +123,7 @@ function ServerPanel({ model }: { model: StemsTabModel }) {
               ) : (
                 JOB_LABELS[job.state]
               )}
-              <MonoLabel as="span" className="mt-1 block">
-                {job.detail}
-              </MonoLabel>
+              <ReadingNote>{job.detail}</ReadingNote>
               {model.canManage && job.lastError ? (
                 <p
                   data-slot="stem-job-error"
@@ -129,9 +136,7 @@ function ServerPanel({ model }: { model: StemsTabModel }) {
           ) : (
             <>
               None
-              <MonoLabel as="span" className="mt-1 block">
-                in no Smart Mix playlist
-              </MonoLabel>
+              <ReadingNote>in no Smart Mix playlist</ReadingNote>
             </>
           )}
         </Reading>
@@ -139,16 +144,12 @@ function ServerPanel({ model }: { model: StemsTabModel }) {
           {files.stored ? (
             <>
               {files.size}
-              <MonoLabel as="span" className="mt-1 block">
-                {files.streams}
-              </MonoLabel>
+              <ReadingNote>{files.streams}</ReadingNote>
             </>
           ) : (
             <>
               Not stored
-              <MonoLabel as="span" className="mt-1 block whitespace-normal">
-                {files.note}
-              </MonoLabel>
+              <ReadingNote wrap>{files.note}</ReadingNote>
             </>
           )}
         </Reading>
