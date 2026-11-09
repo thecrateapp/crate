@@ -126,18 +126,18 @@ Backfill campaign -> batch claims -> heavy tasks per track
 These values come from the reviewed code; they were not discovered from a live instance.
 `test_smart_mix_versions.py` checks that this table follows the implemented identifiers.
 
-| Identifier                         | Value                | Meaning                                               |
-| ---------------------------------- | -------------------- | ----------------------------------------------------- |
-| `API_CONTRACT_VERSION`             | `2026-08`            | Advertised integration and capabilities contract      |
-| `PROFILE_SCHEMA_VERSION`           | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`                 | `smart-mix-audio-v9` | Target generation of profile analysis                 |
-| `MEASUREMENT_VERSION`              | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
-| `BEAT_GRID_FORMAT`                 | `delta-ms-v1`        | Beat grid format                                      |
-| `PLANNER_IDENTIFIER`               | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
-| `PLANNER_POLICY_VERSION`           | `2`                  | Numeric version of each individual plan               |
-| `PLANNER_POLICY.rules_revision`    | `7`                  | Internal rules revision included in the cache key     |
-| `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`       | Planner on the stored phrases (SM3-D3)                |
-| `PLANNER_POLICY_V3.rules_revision` | `5`                  | Rules revision of v3, in its cache key                |
+| Identifier                         | Value                 | Meaning                                               |
+| ---------------------------------- | --------------------- | ----------------------------------------------------- |
+| `API_CONTRACT_VERSION`             | `2026-08`             | Advertised integration and capabilities contract      |
+| `PROFILE_SCHEMA_VERSION`           | `1`                   | Schema of the persisted and serialized profile        |
+| `ANALYZER_VERSION`                 | `smart-mix-audio-v10` | Target generation of profile analysis                 |
+| `MEASUREMENT_VERSION`              | `bs1770-v1`           | Loudness and true peak provenance used by the planner |
+| `BEAT_GRID_FORMAT`                 | `delta-ms-v1`         | Beat grid format                                      |
+| `PLANNER_IDENTIFIER`               | `smart-mix-v2`        | Identifier for plan batches and capabilities          |
+| `PLANNER_POLICY_VERSION`           | `2`                   | Numeric version of each individual plan               |
+| `PLANNER_POLICY.rules_revision`    | `7`                   | Internal rules revision included in the cache key     |
+| `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`        | Planner on the stored phrases (SM3-D3)                |
+| `PLANNER_POLICY_V3.rules_revision` | `5`                   | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
 includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
@@ -164,6 +164,29 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
 | `activeEndMs`              | Musical end, by the same rule (for long tracks, over the last 120 s). A fade or reverb tail continues after it, so it falls 1-6 s before a -60 dB end of sound such as Mixxx's. It is not a silence threshold                                                                                                                           |
 | `introCueMs`, `outroCueMs` | Suggested mix points: the first beat at or after `activeStartMs` and the last beat 4 s before `activeEndMs`                                                                                                                                                                                                                             |
 | `beatPhaseOffsetMs`        | Plan field, beatmatch only. In output time and below one outgoing beat: the incoming track starts this much after `incomingCueMs` when the outgoing reaches `outgoingCueMs`. In incoming track time, start at `incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio` (`NativeTransitionPlan.startIncomingCueMs()`); never subtract it |
+
+### Analyzer v10
+
+`smart-mix-audio-v10` asks a second model before giving a track bars of three (see
+**Meter** under [Beats and downbeats](#beats-and-downbeats)). Beat This!'s DBN hears fast
+4/4 punk and metal in three, and since SM3-D16 such tracks get no downbeat and no phrases.
+On the 399 tracks of the stems evaluation sets, the DBN picks three on 10:
+
+| Tracks                                                                    | v9                      | v10                                             |
+| ------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------- |
+| The DBN picks three (Sepultura, Cannibal Corpse, Tragedy, THRICE, Swans…) | 10, all without phrases | 8 take four and gain 5-19 phrases; 2 keep three |
+| Without phrases (all sets)                                                | 30                      | 22                                              |
+| Four-beat sample (30 tracks): beats and downbeats as stored               | -                       | 30 of 30 identical                              |
+
+The two that keep three (Azu Tiwaline "Izen Zaren", Movements "Submerge") are the ones
+both models hear in three, likely in 6/8. Swans "Coward", a live-drums control, takes four
+and 19 phrases, which may be less reliable on irregular drums. Nobody has listened to these
+tracks. The arbiter took 86-249 s per three-beat track on the development machine (shared
+with other jobs), and a four-beat track costs what it did under v9.
+
+Readers accept v10, v9, v8, v7, v6 and v5 profiles (`READABLE_ANALYZER_VERSIONS`); writers,
+the backfill and Admin coverage target v10. Stored four-beat signals stay valid (see
+[Running the v10 backfill](#running-the-v10-backfill)).
 
 ### Analyzer v9
 
@@ -1201,6 +1224,37 @@ track in its place: its slot stays empty until it runs. The real concurrency at 
 therefore often below the night limit, and by day listeners can hold it below the day limit for
 as long as they listen. To run all eight at night, raise `max_load_ratio` in the runtime policy;
 the same threshold also applies by day.
+
+### Running the v10 backfill
+
+v10 changes only tracks whose DBN chose bars of three, but the publisher keeps a profile
+of the same version and quality, so a new version is the way to reach them. Production
+runs the v9 campaign (started 2026-11-09 at 19:00 UTC). v10 supersedes it whatever its
+state: after the release with v10 is deployed through the normal process, a new v10
+campaign recomputes the library, and a v9 coordinator still queued exits as `superseded`
+without claiming.
+
+1. **Check the starting point** as for v9: `analyzerVersion` `smart-mix-audio-v10`,
+   `controlState` `idle`, `campaign.target` `smart-mix-audio-v9` (running or paused) and
+   `activeTask` null or a v9 coordinator about to exit. Migration 159 adds
+   `meter_margin` and `meter_arbiter` to `track_mix_signals`; existing rows read null.
+2. **Start the campaign** with **Start backfill** (batch size 25, 3 attempts) or
+   `POST /api/admin/smart-mix/backfill`. It opens a v10 campaign whose `sequence`
+   continues the v9 one; the night window settings carry over.
+3. **What each row costs.**
+   - **Rewritten by v9, four beats to the bar:** about 97.5 % of them. The stored
+     beats stay valid, so only decoding, `crate-cli` (about 2 s of CPU) and the phrase
+     voice from the stored bytes run, as for the v8 rows under v9 (about 31 tracks a
+     minute by day with four in flight).
+   - **Rewritten by v9, three beats to the bar:** about 2.5 %. Their stored beats
+     predate the arbiter, so Beat This! runs again (15-25 s) and madmom's network after
+     it (50-60 s).
+   - **Not yet reached by v9** (v5 and v6 profiles): a whole profile, as under v9, plus
+     the arbiter on the 2.5 % that the DBN hears in three.
+   - In all, v10 adds about 4 s of CPU per row v9 has already rewritten, and about
+     2 s per row it has not, over what v9 would have cost.
+4. **Watch, pause, resume, cancel and close it** as for v9 below. Once it has finished,
+   a later release can drop v9 and older versions from `READABLE_ANALYZER_VERSIONS`.
 
 ### Running the v9 backfill
 

@@ -26,19 +26,19 @@ CANCELLED_V6_CAMPAIGN = {
     "claimed": 38_865,
     "sequence": 1_600,
 }
-# v9 decodes m4a at its real length and lets off-grid model downbeats abstain from the
-# bar; production holds a paused v8 campaign that had claimed 12,505 tracks in 4,779
-# batches when v9 shipped. The sequence is illustrative.
-PREVIOUS_ANALYZER_VERSION = "smart-mix-audio-v8"
-PAUSED_V8_CAMPAIGN = {
+# v10 asks madmom before giving a track bars of three; production runs the v9 campaign
+# (started 2026-11-09 with sequence 10,277), which v10 supersedes whatever its state.
+# The counters are illustrative.
+PREVIOUS_ANALYZER_VERSION = "smart-mix-audio-v9"
+PREVIOUS_CAMPAIGN = {
     "target": PREVIOUS_ANALYZER_VERSION,
     "profile_version": 1,
     "status": "paused",
     "batch_size": 25,
     "max_attempts": 3,
-    "batches": 4_779,
-    "claimed": 12_505,
-    "sequence": 6_600,
+    "batches": 9_000,
+    "claimed": 30_000,
+    "sequence": 19_277,
 }
 
 
@@ -2235,12 +2235,12 @@ def test_a_freshly_written_current_profile_is_never_claimed_again(
     )
 
 
-def test_v8_profiles_are_claimed_once_for_v9(pg_db, tmp_path: Path) -> None:
+def test_v9_profiles_are_claimed_once_for_v10(pg_db, tmp_path: Path) -> None:
     del pg_db
     track_ids = _create_tracks(tmp_path, count=3)
     for track_id in track_ids:
         _insert_profile(track_id, analyzer_version=PREVIOUS_ANALYZER_VERSION)
-        # Finished by the v8 campaign with its retry budget spent: v9 is a new
+        # Finished by the v9 campaign with its retry budget spent: v10 is a new
         # generation, so the budget starts again.
         _insert_processing(
             track_id,
@@ -2250,7 +2250,7 @@ def test_v8_profiles_are_claimed_once_for_v9(pg_db, tmp_path: Path) -> None:
         )
 
     claimed = claim_smart_mix_backfill_batch(
-        limit=10, max_attempts=3, claimed_by="task:v9"
+        limit=10, max_attempts=3, claimed_by="task:v10"
     )
 
     assert sorted(row["id"] for row in claimed) == sorted(track_ids)
@@ -2267,14 +2267,14 @@ def test_v8_profiles_are_claimed_once_for_v9(pg_db, tmp_path: Path) -> None:
         claim_smart_mix_backfill_batch(
             limit=10,
             max_attempts=3,
-            claimed_by="task:v9",
+            claimed_by="task:v10",
             promote_python_profiles=True,
         )
         == []
     )
 
 
-def test_starting_v9_over_the_paused_v8_campaign_starts_a_new_one(pg_db) -> None:
+def test_starting_v10_over_the_v9_campaign_starts_a_new_one(pg_db) -> None:
     del pg_db
     from crate.db.jobs.smart_mix_backfill import (
         campaign_targets_current,
@@ -2283,7 +2283,7 @@ def test_starting_v9_over_the_paused_v8_campaign_starts_a_new_one(pg_db) -> None
         start_smart_mix_campaign,
     )
 
-    save_smart_mix_campaign(dict(PAUSED_V8_CAMPAIGN))
+    save_smart_mix_campaign(dict(PREVIOUS_CAMPAIGN))
     assert campaign_targets_current(get_smart_mix_campaign()) is False
 
     campaign = start_smart_mix_campaign(batch_size=25, max_attempts=3)
@@ -2305,7 +2305,7 @@ def test_starting_v9_over_the_paused_v8_campaign_starts_a_new_one(pg_db) -> None
         "batches": 0,
         "claimed": 0,
         # The sequence keeps growing, so the new batches never reuse a dedup key.
-        "sequence": 6_600,
+        "sequence": 19_277,
     }
     assert campaign_targets_current(get_smart_mix_campaign()) is True
 
@@ -2391,7 +2391,7 @@ def test_campaigns_of_another_target_never_claim_for_the_current_one(
 ) -> None:
     for stale in (
         {**CANCELLED_V6_CAMPAIGN, "status": "running"},
-        {**PAUSED_V8_CAMPAIGN, "status": "running"},
+        {**PREVIOUS_CAMPAIGN, "status": "running"},
         _running_campaign(target="smart-mix-audio-v6"),
         _running_campaign(profile_version=PROFILE_SCHEMA_VERSION - 1),
         # Campaigns written before the schema was recorded targeted schema 1.
