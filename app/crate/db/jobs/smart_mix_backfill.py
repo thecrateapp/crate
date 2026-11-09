@@ -6,6 +6,7 @@ import json
 import os
 import socket
 import uuid
+from datetime import UTC, datetime
 from typing import Any, Sequence
 
 from sqlalchemy import text
@@ -16,6 +17,7 @@ from crate.db.tx import optional_scope, read_scope
 from crate.smart_mix.backfill_window import merge_backfill_window_settings
 from crate.smart_mix.versions import (
     ANALYZER_VERSION,
+    MODEL_BEATS_MAX_SECONDS,
     PROFILE_SCHEMA_VERSION,
     PYTHON_ANALYZER,
 )
@@ -133,8 +135,9 @@ _CLAIMABLE_JOINS_SQL = """
        AND processing.pipeline = :pipeline
 """
 # Claimable: an album that is not quarantined, a profile that is not at the target
-# analyzer and schema, current and usable (or a Python one to promote), and no
-# claim in flight or retry budget spent for this generation.
+# analyzer and schema, current and usable (or a Python one to promote, or, when this
+# worker can run Beat This!, one built on the analyzer's own beats: a new import or a
+# library reanalysis), and no claim in flight or retry budget spent for this generation.
 _CLAIMABLE_SQL = """
     la.quarantined_at IS NULL
     AND (
@@ -144,6 +147,11 @@ _CLAIMABLE_SQL = """
         OR profile.quality = 'unavailable'
         OR profile.source_stale_at IS NOT NULL
         OR (:promote_python_profiles AND profile.analyzer = :python_analyzer)
+        OR (
+            :upgrade_own_tracker
+            AND profile.beat_tracker IS NULL
+            AND COALESCE(lt.duration, 0) <= :model_beats_max_seconds
+        )
     )
     AND (
         processing.track_id IS NULL
@@ -341,9 +349,15 @@ def claim_smart_mix_backfill_batch(
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     claimed_by: str | None = None,
     promote_python_profiles: bool = False,
+    upgrade_own_tracker: bool = False,
     session=None,
 ) -> list[dict[str, Any]]:
     """Claim up to ``limit`` tracks for the backfill, in priority order.
+
+    With ``upgrade_own_tracker`` (the worker can run Beat This!) a profile at the
+    target built on the analyzer's own beats is claimable too, within the model's
+    length limit and the same retry budget, so new imports and library reanalyses
+    end up with the model's beats.
 
     With ``max_in_flight`` the claim counts what is in flight and takes only the
     free slots, under a transaction lock, so concurrent coordinators cannot
@@ -370,6 +384,8 @@ def claim_smart_mix_backfill_batch(
         "max_attempts": retry_limit,
         "promote_python_profiles": bool(promote_python_profiles),
         "python_analyzer": PYTHON_ANALYZER,
+        "upgrade_own_tracker": bool(upgrade_own_tracker),
+        "model_beats_max_seconds": MODEL_BEATS_MAX_SECONDS,
     }
     with optional_scope(session) as active_session:
         lock_sql = (
@@ -724,7 +740,7 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                 text(
                     """
                     WITH eligible AS MATERIALIZED (
-                        SELECT track.id
+                        SELECT track.id, track.duration
                         FROM library_tracks track
                         LEFT JOIN library_albums album ON album.id = track.album_id
                         WHERE album.quarantined_at IS NULL
@@ -733,11 +749,19 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                         SELECT
                             eligible.id,
                             profile.quality,
+                            -- At the target but on the analyzer's own beats,
+                            -- within the length Beat This! runs on: the backfill
+                            -- still owes it the model's beats.
                             profile.track_id IS NOT NULL
                                 AND profile.quality <> 'unavailable'
                                 AND profile.profile_version = :profile_version
                                 AND profile.analyzer_version = :analyzer_version
                                 AND profile.source_stale_at IS NULL
+                                AND NOT (
+                                    profile.beat_tracker IS NULL
+                                    AND COALESCE(eligible.duration, 0)
+                                        <= :model_beats_max_seconds
+                                )
                                 AS is_current,
                             profile.track_id IS NOT NULL
                                 AND profile.quality <> 'unavailable'
@@ -745,6 +769,11 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                     profile.profile_version <> :profile_version
                                     OR profile.analyzer_version <> :analyzer_version
                                     OR profile.source_stale_at IS NOT NULL
+                                    OR (
+                                        profile.beat_tracker IS NULL
+                                        AND COALESCE(eligible.duration, 0)
+                                            <= :model_beats_max_seconds
+                                    )
                                 )
                                 AS is_stale,
                             profile.track_id IS NOT NULL
@@ -753,6 +782,11 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                 AND (
                                     profile.profile_version <> :profile_version
                                     OR profile.analyzer_version <> :analyzer_version
+                                    OR (
+                                        profile.beat_tracker IS NULL
+                                        AND COALESCE(eligible.duration, 0)
+                                            <= :model_beats_max_seconds
+                                    )
                                 )
                                 AS is_outdated,
                             profile.track_id IS NOT NULL
@@ -830,6 +864,7 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                     "analyzer_version": SMART_MIX_ANALYZER_VERSION,
                     "target_generation": smart_mix_target_generation(),
                     "max_attempts": max(1, int(max_attempts)),
+                    "model_beats_max_seconds": MODEL_BEATS_MAX_SECONDS,
                 },
             )
             .mappings()
@@ -1029,14 +1064,97 @@ def queue_next_smart_mix_batch(*, batches: int = 0, claimed: int = 0) -> str | N
 
 
 def complete_smart_mix_campaign() -> bool:
+    """Mark the running campaign completed, with when: the wake-up looks for profiles
+    written after it (``wake_smart_mix_backfill``)."""
     return (
         _update_smart_mix_campaign(
-            "payload_json || jsonb_build_object('status', 'completed')",
+            "payload_json || jsonb_build_object("
+            "'status', 'completed', 'completed_at', CAST(:completed_at AS text))",
             "payload_json->>'status' = 'running'",
-            {},
+            {"completed_at": datetime.now(UTC).isoformat()},
         )
         is not None
     )
+
+
+def record_smart_mix_model_availability(available: bool) -> None:
+    """Keep in the campaign whether the coordinator's worker can run Beat This!.
+
+    Only the analysis worker can tell; the wake-up in the service loop reads it here,
+    so a setup without the model never reopens its campaign by itself. Written only
+    when it changes.
+    """
+    _update_smart_mix_campaign(
+        "payload_json || jsonb_build_object("
+        "'beat_model_available', CAST(:available AS boolean))",
+        "(payload_json->'beat_model_available') IS DISTINCT FROM "
+        "to_jsonb(CAST(:available AS boolean))",
+        {"available": bool(available)},
+    )
+
+
+# The service loop checks this often for tracks that became claimable after the
+# campaign completed: new imports and library reanalyses on the analyzer's own beats.
+WAKE_CHECK_SQL = f"""
+    SELECT lt.id
+    FROM track_mix_profiles profile
+    JOIN library_tracks lt ON lt.id = profile.track_id
+    LEFT JOIN library_albums la ON la.id = lt.album_id
+    LEFT JOIN track_processing_state processing
+        ON processing.track_id = lt.id
+       AND processing.pipeline = :pipeline
+    WHERE profile.updated_at > CAST(:since AS timestamptz)
+      AND {_CLAIMABLE_SQL}
+    LIMIT 1
+"""
+
+
+def wake_smart_mix_backfill() -> str | None:
+    """Reopen a completed campaign when a profile written since became claimable.
+
+    Only a campaign of this target that completed, whose last pass ran where Beat
+    This! can run: a paused, cancelled or running campaign, another target, or a setup
+    without the model is left alone, and an explicit pause keeps stopping it. The
+    check reads the profiles written since the campaign completed (the
+    ``updated_at`` index), one row at most. The reopened campaign runs the usual
+    coordinator, under its night window, load checks and retry budget, and completes
+    again when nothing is left. Returns the queued coordinator task, or None.
+    """
+    campaign = get_smart_mix_campaign()
+    if (
+        campaign is None
+        or not campaign_targets_current(campaign)
+        or campaign.get("status") != "completed"
+        or campaign.get("beat_model_available") is not True
+        or not campaign.get("completed_at")
+    ):
+        return None
+    params = {
+        "pipeline": SMART_MIX_PIPELINE,
+        "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
+        "target_generation": smart_mix_target_generation(),
+        "max_attempts": max(
+            1, min(int(campaign.get("max_attempts") or DEFAULT_MAX_ATTEMPTS), 10)
+        ),
+        "promote_python_profiles": False,
+        "python_analyzer": PYTHON_ANALYZER,
+        "upgrade_own_tracker": True,
+        "model_beats_max_seconds": MODEL_BEATS_MAX_SECONDS,
+        "since": campaign["completed_at"],
+    }
+    with read_scope() as session:
+        found = session.execute(text(WAKE_CHECK_SQL), params).first()
+    if found is None:
+        return None
+    reopened = _update_smart_mix_campaign(
+        "payload_json || jsonb_build_object('status', 'running')",
+        "payload_json->>'status' = 'completed' AND payload_json->>'target' = :target",
+        {"target": SMART_MIX_ANALYZER_VERSION},
+    )
+    if reopened is None:
+        return None
+    return queue_next_smart_mix_batch()
 
 
 def _update_smart_mix_campaign(
@@ -1074,12 +1192,14 @@ __all__ = [
     "PASS_COVERAGE_MAX_AGE_SECONDS",
     "RANKING_MAX_AGE_SECONDS",
     "RANKING_STATE_KEY",
+    "WAKE_CHECK_SQL",
     "campaign_targets_current",
     "claim_smart_mix_backfill_batch",
     "complete_smart_mix_campaign",
     "count_smart_mix_in_flight",
     "get_smart_mix_campaign",
     "queue_next_smart_mix_batch",
+    "record_smart_mix_model_availability",
     "refresh_smart_mix_coverage",
     "refresh_smart_mix_coverage_after_pass",
     "release_dead_smart_mix_claims",
@@ -1090,4 +1210,5 @@ __all__ = [
     "set_smart_mix_campaign_status",
     "smart_mix_target_generation",
     "start_smart_mix_campaign",
+    "wake_smart_mix_backfill",
 ]

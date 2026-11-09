@@ -123,6 +123,8 @@ class TrackMixSignalsRow(Base):
     beats_ms: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     downbeats_ms: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     beats_per_bar: Mapped[int | None] = mapped_column(SmallInteger)
+    meter_margin: Mapped[float | None] = mapped_column(REAL)
+    meter_arbiter: Mapped[str | None] = mapped_column(Text)
     vocal_detector: Mapped[str | None] = mapped_column(Text)
     voice_hop_ms: Mapped[int | None] = mapped_column(SmallInteger)
     voice_scores: Mapped[bytes | None] = mapped_column(LargeBinary)

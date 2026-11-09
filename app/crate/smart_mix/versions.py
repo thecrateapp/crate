@@ -5,7 +5,11 @@ from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3
 
 API_CONTRACT_VERSION = "2026-08"
 PROFILE_SCHEMA_VERSION = 1
-ANALYZER_VERSION = "smart-mix-audio-v9"
+# Beat This! skips longer tracks (crate.smart_mix.beat_model): their profile keeps the
+# analyzer's own beats and is complete without the model's. Here, numpy-free, so the
+# backfill and Admin queries can read it.
+MODEL_BEATS_MAX_SECONDS = 600
+ANALYZER_VERSION = "smart-mix-audio-v10"
 # Readers count profiles of these analyzer versions as current, so moving to a new
 # analyzer does not empty playlists, flags or reports before the backfill campaign
 # recomputes the library. Profiles are written, and backfill claims target, only
@@ -14,6 +18,7 @@ ANALYZER_VERSION = "smart-mix-audio-v9"
 # the moment it ships or every recomputed track would drop out of those readers.
 READABLE_ANALYZER_VERSIONS = (
     ANALYZER_VERSION,
+    "smart-mix-audio-v9",
     "smart-mix-audio-v8",
     "smart-mix-audio-v7",
     "smart-mix-audio-v6",
@@ -46,6 +51,7 @@ __all__ = [
     "API_CONTRACT_VERSION",
     "BEAT_GRID_FORMAT",
     "MEASUREMENT_VERSION",
+    "MODEL_BEATS_MAX_SECONDS",
     "PLANNER_IDENTIFIER",
     "PLANNER_IDENTIFIERS",
     "PLANNER_POLICY_VERSION",

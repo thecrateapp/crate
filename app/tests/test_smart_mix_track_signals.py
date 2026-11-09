@@ -93,6 +93,53 @@ def test_signals_of_one_source_revision_share_the_row(pg_db) -> None:
     )
 
 
+def test_signals_keep_the_meter_evidence(pg_db) -> None:
+    # The DBN's margin between bars of three and four, and madmom's verdict when it was
+    # asked, go with the beats: a later version knows which three-beat tracks were
+    # never checked by the arbiter.
+    del pg_db
+    track_id, _uid = _create_track("signals-meter")
+
+    store_track_mix_beats(
+        track_id,
+        "revision-a",
+        tracker="beat-this-small0-dbn",
+        beats_ms=BEATS,
+        downbeats_ms=DOWNBEATS,
+        beats_per_bar=4,
+        meter_margin=30.125,
+        meter_arbiter="madmom-dbn-4",
+    )
+    store_track_mix_voice(
+        track_id, "revision-a", detector="yamnet-2", hop_ms=480, scores=bytes([7])
+    )
+
+    stored = get_track_mix_signals(track_id)
+    assert stored is not None
+    assert (stored.meter_margin, stored.meter_arbiter) == (
+        pytest.approx(30.125),
+        "madmom-dbn-4",
+    )
+
+    # Beats stored without the evidence (an older worker) clear it.
+    store_track_mix_beats(
+        track_id,
+        "revision-a",
+        tracker="beat-this-small0-dbn",
+        beats_ms=BEATS,
+        downbeats_ms=DOWNBEATS,
+        beats_per_bar=3,
+    )
+    stored = get_track_mix_signals(track_id)
+    assert stored is not None
+    assert (stored.beats_per_bar, stored.meter_margin, stored.meter_arbiter) == (
+        3,
+        None,
+        None,
+    )
+    assert stored.voice_scores == bytes([7])
+
+
 def test_signals_of_a_new_source_revision_replace_the_row(pg_db) -> None:
     del pg_db
     track_id, _uid = _create_track("signals-replace")
@@ -422,6 +469,8 @@ def _kept_beats(source_revision: str = SOURCE) -> tuple:
             "beats_ms": BEATS,
             "downbeats_ms": DOWNBEATS,
             "beats_per_bar": 4,
+            "meter_margin": None,
+            "meter_arbiter": None,
         },
     )
 
@@ -489,6 +538,49 @@ def test_recomputes_when_tracker_changes(monkeypatch) -> None:
 
     assert harness.model_calls == [PATH]
     assert harness.kept_beats == [_kept_beats()]
+
+
+def test_recomputes_bars_of_three_the_arbiter_never_checked(monkeypatch) -> None:
+    # Stored before the meter arbiter: Beat This!'s DBN chose three on its own, which on
+    # fast 4/4 punk and metal is usually wrong, so the models run again.
+    harness = _profile_task(
+        monkeypatch,
+        stored=replace(_stored_beats(), beats_per_bar=3),
+        model_beats=_model_track(),
+    )
+
+    assert harness.model_calls == [PATH]
+    assert harness.kept_beats == [_kept_beats()]
+
+
+def test_reuses_bars_of_three_the_arbiter_confirmed(monkeypatch) -> None:
+    stored = replace(
+        _stored_beats(),
+        beats_per_bar=3,
+        meter_margin=64.0,
+        meter_arbiter="madmom-dbn-3",
+    )
+
+    harness = _profile_task(monkeypatch, stored=stored)
+
+    assert harness.model_calls == []
+    assert harness.kept_beats == []
+    [beats] = harness.analysed
+    assert beats is not None
+    assert (beats.beats_per_bar, beats.meter_margin, beats.meter_arbiter) == (
+        3,
+        64.0,
+        "madmom-dbn-3",
+    )
+
+
+def test_stores_the_meter_evidence_with_the_beats(monkeypatch) -> None:
+    model = replace(_model_track(), meter_margin=-12.5, meter_arbiter=None)
+
+    harness = _profile_task(monkeypatch, stored=None, model_beats=model)
+
+    [(_track, _source, values)] = harness.kept_beats
+    assert (values["meter_margin"], values["meter_arbiter"]) == (-12.5, None)
 
 
 def test_a_track_without_model_beats_stores_nothing(monkeypatch) -> None:
@@ -566,12 +658,12 @@ def test_recomputes_voice_windows_of_another_file(monkeypatch) -> None:
     assert harness.published[0].vocal_presence == bytes([255, 255, 255])
 
 
-def test_v9_reuses_the_signals_stored_with_a_v8_profile(
+def test_v10_reuses_the_signals_stored_with_a_v9_profile(
     pg_db, monkeypatch, tmp_path
 ) -> None:
-    # v9 changes how the analyzers read the model's downbeats and decode m4a, not the
-    # models: the beats and voice windows stored for this file under v8 serve the v9
-    # profile, so a v8 track is recomputed without running Beat This! or YAMNet.
+    # v10 only asks madmom when the DBN chose bars of three: the four-beat beats and
+    # the voice windows stored for this file under v9 serve the v10 profile, so a v9
+    # track in four is recomputed without running Beat This! or YAMNet.
     del pg_db
     from sqlalchemy import text
 
@@ -590,7 +682,7 @@ def test_v9_reuses_the_signals_stored_with_a_v8_profile(
             text("SELECT path FROM library_tracks WHERE id = :id"), {"id": track_id}
         ).scalar_one()
     source = capture_smart_mix_source(track_id, path)
-    previous = replace(_draft(phrases=True), analyzer_version="smart-mix-audio-v8")
+    previous = replace(_draft(phrases=True), analyzer_version="smart-mix-audio-v9")
     assert str(publish_smart_mix_profile(source, previous)) == "published"
     windows = vocals.voice_window_bytes(_voice([1.0] * 34 + [1e-4] * 34 + [1.0] * 34))
     store_track_mix_beats(
@@ -629,7 +721,7 @@ def test_v9_reuses_the_signals_stored_with_a_v8_profile(
     monkeypatch.setattr(analysis, "refresh_live_smart_mix_coverage", lambda: None)
 
     result = analysis._handle_compute_smart_mix_profile(
-        "task-v9", {"track_id": track_id}, {}
+        "task-v10", {"track_id": track_id}, {}
     )
 
     assert result["stored"] is True
