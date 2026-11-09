@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import sys
 import types
 from pathlib import Path
@@ -22,6 +23,8 @@ from crate.smart_mix.beat_model import BeatTrack
 from crate.smart_mix.models import MAX_BEAT_TRACKER
 
 SAMPLE_RATE = 22_050
+# Three seconds of stereo AAC-LC in MP4 (ffmpeg's encoder), which libsndfile cannot open.
+STEREO_AAC = Path(__file__).parent / "fixtures" / "smart_mix" / "stereo_aac_3s.m4a"
 
 
 class _FakeModel:
@@ -355,6 +358,41 @@ def test_file_beats_decode_mono_at_the_model_rate(tmp_path) -> None:
     ((samples, rate),) = model.calls
     assert rate == beat_model.MODEL_SAMPLE_RATE == 22_050
     assert abs(samples - 6 * 22_050) <= 2
+
+
+def _needs_ffmpeg() -> None:
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        pytest.skip("ffmpeg decodes what libsndfile cannot; the worker images ship it")
+
+
+def test_file_beats_decode_m4a_with_ffmpeg(caplog) -> None:
+    # libsndfile cannot open AAC in MP4, and librosa reads files through it: before
+    # ffmpeg, every .m4a fell back to the analyzer's own beat tracker.
+    _needs_ffmpeg()
+    model = _FakeModel(beats=[0.5, 1.0, 1.5], downbeats=[0.5])
+
+    with caplog.at_level(logging.WARNING, logger=beat_model.__name__):
+        track = beat_model.track_file_beats(STEREO_AAC, model=model)
+
+    assert track is not None and track.beats_ms == (500, 1_000, 1_500)
+    ((samples, rate),) = model.calls
+    assert rate == beat_model.MODEL_SAMPLE_RATE
+    # Both channels in one mono stream: three seconds, not six.
+    assert abs(samples - 3 * beat_model.MODEL_SAMPLE_RATE) <= 0.05 * rate
+    assert _records(caplog) == []
+
+
+def test_file_beats_skip_long_m4a_before_decoding(monkeypatch, caplog) -> None:
+    _needs_ffmpeg()
+    monkeypatch.setattr(beat_model, "BEAT_MODEL_MAX_SECONDS", 2)
+    model = _FakeModel(beats=[0.5], downbeats=[0.5])
+
+    with caplog.at_level(logging.INFO, logger=beat_model.__name__):
+        assert beat_model.track_file_beats(STEREO_AAC, model=model) is None
+
+    assert model.calls == []
+    assert _levels(caplog) == {logging.INFO}
+    assert "skips" in _messages(caplog)
 
 
 def test_unreadable_files_return_none_with_a_warning(tmp_path, caplog) -> None:

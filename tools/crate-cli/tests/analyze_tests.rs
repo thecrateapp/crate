@@ -2,9 +2,18 @@
 
 mod common;
 
+use std::path::{Path, PathBuf};
+
 use common::{create_test_wav, create_test_wav_with_amplitude};
-use crate_cli::analyze::analyze_track;
+use crate_cli::analyze::{analyze_track, decode_audio_bounded};
 use tempfile::TempDir;
+
+/// Three seconds of AAC-LC in MP4, as ffmpeg encodes it: a 440 Hz sine peaking at 0.64
+/// on the left channel and silence on the right.
+fn stereo_aac_fixture() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../app/tests/fixtures/smart_mix/stereo_aac_3s.m4a")
+}
 
 #[test]
 fn test_analyze_loudness() {
@@ -265,4 +274,45 @@ fn analyze_cli_rejects_an_unreadable_beats_file() {
 
     // A failure, so the worker falls back to the Python analyzer with the same beats.
     assert!(!output.status.success());
+}
+
+#[test]
+fn stereo_aac_in_mp4_decodes_at_its_real_length() {
+    // The MP4 demuxer gives no channel count for AAC: read as mono, the interleaved
+    // stereo frames came out twice as long, an octave down and half as fast.
+    let decoded = decode_audio_bounded(&stereo_aac_fixture(), 600, 120).unwrap();
+
+    // Three seconds plus the encoder's priming and padding, which the demuxer keeps.
+    assert!(
+        (3_000..=3_100).contains(&decoded.duration_ms),
+        "duration {} ms",
+        decoded.duration_ms
+    );
+    let seconds = decoded.head.len() as f64 / f64::from(decoded.sample_rate);
+    assert!((3.0..=3.1).contains(&seconds), "{seconds} s of mono audio");
+    assert!(decoded.tail.is_none());
+    // Both channels go into the mono mix: half the left channel's peak over a silent
+    // right (read as mono, the left samples kept their full 0.64).
+    let peak = decoded
+        .head
+        .iter()
+        .fold(0.0_f32, |peak, sample| peak.max(sample.abs()));
+    assert!((0.28..0.36).contains(&peak), "mono peak {peak}");
+    // The loudness meter reads the decoder's layout too.
+    let loudness = decoded.loudness.expect("loudness of a stereo AAC file");
+    assert!(loudness.integrated_lufs.is_some());
+}
+
+#[test]
+fn stereo_aac_in_mp4_gets_a_mix_profile_of_its_real_duration() {
+    let result = analyze_track(&stereo_aac_fixture());
+
+    assert!(result.error.is_none(), "{:?}", result.error);
+    let profile = result.mix_profile.expect("a mix profile");
+    assert!(
+        (3_000..=3_100).contains(&profile.duration_ms),
+        "duration {} ms",
+        profile.duration_ms
+    );
+    assert!(profile.integrated_lufs.is_some());
 }

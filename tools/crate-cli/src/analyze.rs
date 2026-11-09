@@ -119,7 +119,6 @@ pub fn decode_audio_bounded(
         .codec_params
         .sample_rate
         .ok_or_else(|| "no sample rate".to_string())?;
-    let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(1);
 
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
@@ -129,7 +128,10 @@ pub fn decode_audio_bounded(
         head_seconds as usize * sample_rate as usize,
         tail_seconds as usize * sample_rate as usize,
     );
-    let mut meter = LoudnessMeter::new(channels, sample_rate);
+    // The meter takes the layout of the first decoded buffer (see `mix_to_mono`) and
+    // stops measuring if a later buffer changes it.
+    let mut layout: Option<(usize, u32)> = None;
+    let mut meter: Option<LoudnessMeter> = None;
 
     loop {
         let packet = match format.next_packet() {
@@ -156,7 +158,12 @@ pub fn decode_audio_bounded(
         let mut sample_buf = SampleBuffer::<f32>::new(num_frames as u64, spec);
         sample_buf.copy_interleaved_ref(decoded);
         let samples = sample_buf.samples();
-        if (spec.channels.count(), spec.rate) != (channels, sample_rate) {
+        let channels = spec.channels.count();
+        let first = *layout.get_or_insert_with(|| {
+            meter = LoudnessMeter::new(channels, spec.rate);
+            (channels, spec.rate)
+        });
+        if (channels, spec.rate) != first {
             meter = None;
         }
         if let Some(active_meter) = meter.as_mut() {
@@ -164,19 +171,7 @@ pub fn decode_audio_bounded(
                 meter = None;
             }
         }
-
-        // Mix to mono
-        if channels > 1 {
-            for frame in 0..num_frames {
-                let mut sum = 0.0f32;
-                for ch in 0..channels {
-                    sum += samples[frame * channels + ch];
-                }
-                capture.push(sum / channels as f32);
-            }
-        } else {
-            samples.iter().for_each(|sample| capture.push(*sample));
-        }
+        mix_to_mono(samples, channels, |sample| capture.push(sample));
     }
 
     let loudness = meter.map(LoudnessMeter::finish);
@@ -200,6 +195,22 @@ pub fn decode_audio_bounded(
         duration_ms: total_frames as u64 * 1_000 / u64::from(sample_rate),
         loudness,
     })
+}
+
+/// Average the interleaved frames of a decoded buffer into mono samples.
+///
+/// The channel count is the decoded buffer's own, never the codec parameters': the MP4
+/// demuxer (symphonia 0.5) sets channels only for PCM sample entries, so an AAC track in
+/// an `.m4a` has none, and reading its interleaved stereo frames as mono doubled its
+/// length (twice the duration, half the tempo, an octave down).
+fn mix_to_mono(samples: &[f32], channels: usize, mut push: impl FnMut(f32)) {
+    if channels <= 1 {
+        samples.iter().for_each(|sample| push(*sample));
+        return;
+    }
+    for frame in samples.chunks_exact(channels) {
+        push(frame.iter().sum::<f32>() / channels as f32);
+    }
 }
 
 pub struct DecodedAudio {
@@ -307,7 +318,6 @@ fn decode_audio_original(path: &Path, max_seconds: usize) -> Result<(Vec<f32>, u
         .codec_params
         .sample_rate
         .ok_or_else(|| "no sample rate".to_string())?;
-    let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(1);
 
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
@@ -340,19 +350,9 @@ fn decode_audio_original(path: &Path, max_seconds: usize) -> Result<(Vec<f32>, u
         let num_frames = decoded.frames();
         let mut sample_buf = SampleBuffer::<f32>::new(num_frames as u64, spec);
         sample_buf.copy_interleaved_ref(decoded);
-        let samples = sample_buf.samples();
-
-        if channels > 1 {
-            for frame in 0..num_frames {
-                let mut sum = 0.0f32;
-                for ch in 0..channels {
-                    sum += samples[frame * channels + ch];
-                }
-                all_samples.push(sum / channels as f32);
-            }
-        } else {
-            all_samples.extend_from_slice(samples);
-        }
+        mix_to_mono(sample_buf.samples(), spec.channels.count(), |sample| {
+            all_samples.push(sample)
+        });
     }
 
     Ok((all_samples, sample_rate))
@@ -771,7 +771,8 @@ fn cue_downbeat_ms(
 }
 
 /// The bar downbeat nearest a cue from the model downbeats around it: the window of
-/// `cue_downbeat_ms` and the phase rule of the anchor (SM3-D14).
+/// `cue_downbeat_ms` and the former phase rule of the anchor (SM3-D14), where every
+/// downbeat inside the window counts.
 fn model_cue_downbeat_ms(
     beat_grid_ms: &[u64],
     downbeats_ms: &[u64],
@@ -784,7 +785,7 @@ fn model_cue_downbeat_ms(
     let nearest = nearest_beat(beat_grid_ms, cue_ms);
     let count = CUE_DOWNBEAT_BEATS.min(beat_grid_ms.len());
     let start = window_start(beat_grid_ms.len(), nearest, count);
-    let phase = beat_tracking::downbeat_phase_from_model(
+    let phase = beat_tracking::cue_downbeat_phase_from_model(
         &beat_grid_ms[start..start + count],
         downbeats_ms,
     )?;
