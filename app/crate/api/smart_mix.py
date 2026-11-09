@@ -393,7 +393,7 @@ def _plan_transition_edges(
         entity_uids, include_structure=False
     )
     stems = _applicable_stem_analyses(entity_uids, profiles, policy)
-    genre_priors = _genre_priors(unique_edges, stems)
+    genre_priors = _genre_priors(unique_edges, stems, policy)
     edge_profiles = _edge_profiles(unique_edges, entity_uids, profiles)
     cache_keys = [
         _plan_cache_key(
@@ -501,7 +501,9 @@ def _stems_of_edges(
         if not all(uid in stems for uid in pair):
             continue
         if policy is not None and not stems_layer_applies(
-            policy, *((genre_priors or {}).get(uid) for uid in pair)
+            policy,
+            *((genre_priors or {}).get(uid) for uid in pair),
+            source=edge.context.source,
         ):
             continue
         result.update((uid, stems[uid]) for uid in pair)
@@ -509,12 +511,17 @@ def _stems_of_edges(
 
 
 def _genre_priors(
-    edges: list[TransitionEdgeRequest], stems: Mapping[str, StemAnalysis]
+    edges: list[TransitionEdgeRequest],
+    stems: Mapping[str, StemAnalysis],
+    policy: PlannerPolicy,
 ) -> dict[str, float | None]:
-    """The gate prior (``stems_gate_prior``) of the tracks of edges with stems on
-    both, which keeps the stems layer to the beatmatch family (STEM-G1): one bounded
-    query of their album and artist genres, none when no edge has stems on both."""
-    uids = list(_stems_of_edges(edges, stems))
+    """The gate prior (``stems_gate_prior``) of the tracks of the edges the stems layer
+    may score: a client it serves (Crate Decks) and stems on both tracks (STEM-G1). One
+    bounded query of their album and artist genres, none when no edge qualifies."""
+    served = [
+        edge for edge in edges if edge.context.source in policy.stems_layer_sources
+    ]
+    uids = list(_stems_of_edges(served, stems))
     if not uids:
         return {}
     genres = get_track_genres(uids)
@@ -808,12 +815,16 @@ def _plan_cache_key(
         outgoing_stems is not None
         and incoming_stems is not None
         and stems_layer_applies(
-            policy, priors.get(outgoing_uid), priors.get(incoming_uid)
+            policy,
+            priors.get(outgoing_uid),
+            priors.get(incoming_uid),
+            source=edge.context.source,
         )
     ):
         # Only edges the stems layer scores carry these, so other keys keep their
-        # shape; the genres gate it (STEM-G1), so a genre that moves an edge into
-        # or out of the beatmatch family changes its key.
+        # shape; the client and the genres gate it (STEM-G1). The key carries the
+        # context's source, and a genre that moves an edge into or out of the
+        # beatmatch family changes it.
         cache_identity["outgoingStems"] = _stem_identity(outgoing_stems)
         cache_identity["incomingStems"] = _stem_identity(incoming_stems)
     canonical = json.dumps(

@@ -5,9 +5,10 @@ analyses that apply to both tracks of its edge, and attaches the stems layer to 
 profiles it plans with. ``stemsUsed`` appears only when the layer scored a plan, so v3
 plans without stems and every smart-mix-v2 plan keep their shape.
 
-Since STEM-G1 (rules revision 3) the layer scores only edges of the beatmatch family:
-the batch reads the album genres of the tracks of edges with stems on both, once, and
-both tracks' genre beatmatch priors must be at least 0.5.
+Since STEM-G1 the layer scores only Crate Decks requests (``source: "decks"``, rules
+revision 5) on edges of the beatmatch family: the batch reads the genres of the tracks
+of those edges with stems on both, once, and both tracks' gate priors must be at least
+0.5.
 """
 
 from __future__ import annotations
@@ -110,7 +111,7 @@ def _edge(planner_context: dict | None = None) -> dict:
         "incomingTrackEntityUid": INCOMING_UID,
         "context": planner_context
         or {
-            "source": "playlist",
+            "source": "decks",
             "automatic": True,
             "offline": False,
             "preferredDurationMs": 12_000,
@@ -178,7 +179,15 @@ def batch(test_app, monkeypatch):
         assert response.status_code == 200, response.text
         return response.json()["plans"][0]
 
+    def post_edge(edge: dict, planner: str = "smart-mix-v3") -> dict:
+        response = test_app.post(
+            PATH, json={"plannerVersion": planner, "edges": [edge]}
+        )
+        assert response.status_code == 200, response.text
+        return response.json()["plans"][0]
+
     state["post"] = post
+    state["post_edge"] = post_edge
     return state
 
 
@@ -396,3 +405,36 @@ def test_live_drum_extreme_metal_stays_out(batch) -> None:
     }
 
     assert batch["post"]() == plain
+
+
+@pytest.mark.parametrize("source", ["playlist", "radio", "infinite"])
+def test_only_crate_decks_gets_the_stems_layer(batch, source) -> None:
+    # Rules revision 5 (STEM-G1): Listen and Android sources plan without stems, read
+    # no genres and key their plans without them.
+    context = {**_edge()["context"], "source": source}
+
+    def post() -> dict:
+        response = batch["post_edge"]({**_edge(), "context": context})
+        return response
+
+    plain = post()
+    batch["plans"].clear()
+    batch["analyses"] = {uid: [_analysis(uid)] for uid in REVISIONS}
+    with_analyses = post()
+
+    assert with_analyses == plain
+    assert "stemsUsed" not in with_analyses
+    assert batch["genre_reads"] == []
+    edge = TransitionEdgeRequest.model_validate({**_edge(), "context": context})
+    tracks = _profiles()
+    both = {uid: _analysis(uid) for uid in REVISIONS}
+    assert smart_mix._plan_cache_key(
+        edge,
+        tracks[OUTGOING_UID],
+        tracks[INCOMING_UID],
+        PLANNER_POLICY_V3,
+        stems=both,
+        genre_priors=IN_FAMILY,
+    ) == smart_mix._plan_cache_key(
+        edge, tracks[OUTGOING_UID], tracks[INCOMING_UID], PLANNER_POLICY_V3
+    )

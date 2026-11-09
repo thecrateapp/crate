@@ -274,7 +274,7 @@ def test_v3_plans_the_edge_set_as_the_api_does() -> None:
     assert records[1]["structureUsed"] is False
     assert records[1]["plan"] == v2[1]["plan"]
     assert summary["structureUsed"] == {"edges": 1, "rate": 0.5}
-    assert PLANNER_RULES["smart-mix-v3"] == 4
+    assert PLANNER_RULES["smart-mix-v3"] == 5
     json.dumps(records)
 
 
@@ -739,3 +739,33 @@ def test_genre_priors_come_from_the_album_and_artist_genres(monkeypatch) -> None
     )
 
     assert load_genre_priors([OUT, IN, OTHER]) == {OUT: 0.95, IN: 0.15, OTHER: 1.0}
+
+
+def test_the_dj_context_is_crate_decks_and_listen_gets_no_stems() -> None:
+    # Rules revision 5 (STEM-G1): the stems layer serves Crate Decks only, so the
+    # harness's dj context asks as Decks does and Listen's never gets the layer.
+    from run_eval import attach_stem_layers
+
+    assert CONTEXTS["dj"].source == "decks"
+    assert CONTEXTS["listen"].source == "playlist"
+    profiles, _counts = attach_stem_layers(
+        _structured_pair(),
+        {uid: _stem_analysis(p) for uid, p in _structured_pair().items()},
+    )
+    rows = [_row("e0001", OUT, IN, "electronic/0-2")]
+    techno = {OUT: 0.95, IN: 0.95}
+
+    listen = evaluate_dataset(
+        rows,
+        profiles,
+        planner="smart-mix-v3",
+        context=CONTEXTS["listen"],
+        genre_priors=techno,
+    )
+    plain = evaluate_dataset(
+        rows, _structured_pair(), planner="smart-mix-v3", context=CONTEXTS["listen"]
+    )
+
+    assert listen[0]["stemsUsed"] is False
+    assert listen[0]["stemsGate"] is False
+    assert listen[0]["plan"] == plain[0]["plan"]

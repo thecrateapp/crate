@@ -167,7 +167,8 @@ vocals, bass and drums (`vocalPresent`, `bassPresent`, `drumsPresent`; cuts in
 `docs/technical/smart-mix-operations.md`, "Stem analyses"). The summary profile
 never carries it, because the Go read plane serves the summary natively.
 `smart-mix-v3` scores with the layer when both tracks of an edge have one and
-the edge belongs to the beatmatch family (both tracks' genre priors at least 0.5,
+the request is Crate Decks' (`source: "decks"`; no other client gets the layer)
+and the edge belongs to the beatmatch family (both tracks' genre priors at least 0.5,
 with the machine-drum industrial family in, STEM-G1), and says so with
 `stemsUsed: true` on the plan.
 

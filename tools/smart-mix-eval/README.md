@@ -203,8 +203,9 @@ incoming_uid) -> TransitionPlan`, or a `PlannedTransition` like v3's; each v3 ed
 `report.json` also says whether it was planned on the stored phrases (`structureUsed`) and how
 many candidates its menu had. `--context` picks the transition context:
 
-- `dj` (default): playlist, automatic, 12 s preferred, beatmatch with tempo adjustment, long
-  beatmatch and bass handoff allowed. What Crate Decks asks for, and what exercises all of v2.
+- `dj` (default): source `decks`, automatic, 12 s preferred, beatmatch with tempo adjustment,
+  long beatmatch and bass handoff allowed. What Crate Decks asks for, and what exercises all of
+  v2; the only context the stems layer serves (STEM-G1, rules revision 5).
 - `listen`: Listen's defaults: 6 s, beatmatch with tempo adjustment, no long blend or bass
   handoff.
 

@@ -180,9 +180,10 @@ PLANNER_RULES = {
 CONTEXTS = {
     # What a DJ client allows: beatmatch with tempo adjustment, the longest
     # blends and the bass handoff. The default, because Smart Mix 3 serves
-    # Crate Decks first.
+    # Crate Decks first, and asked as Crate Decks asks (source "decks"), the only
+    # client the stems layer serves (STEM-G1, rules revision 5).
     "dj": TransitionContext(
-        source="playlist",
+        source="decks",
         automatic=True,
         offline=False,
         preferred_duration_ms=12_000,
@@ -328,7 +329,9 @@ def evaluate_dataset(
         if stem_metrics is not None:
             record["stemMetrics"] = stem_metrics
             # Whether the edge is of the beatmatch family the layer applies to.
-            record["stemsGate"] = stems_layer_applies(PLANNER_POLICY_V3, *priors)
+            record["stemsGate"] = stems_layer_applies(
+                PLANNER_POLICY_V3, *priors, source=context.source
+            )
         if refiner is not None and isinstance(planned, PlannedTransition):
             prompt_genres = (
                 (genres or {}).get(outgoing_uid),

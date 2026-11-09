@@ -45,9 +45,10 @@ before it is clamped to [0, 1]; ties keep the later outgoing phrase, the earlier
 incoming phrase, the longer mix, the bass handoff and v2's curve.
 
 With ``policy.stems_layer``, a stems layer on both profiles (Smart Mix Stems,
-STEM-D5) and an edge of the beatmatch family (``stems_layer_applies``: both tracks'
-genre beatmatch priors known and at least ``policy.stems_layer_min_genre_prior``,
-STEM-G1), on the phrase menu:
+STEM-D5), a Crate Decks request and an edge of the beatmatch family
+(``stems_layer_applies``: ``context.source`` in ``policy.stems_layer_sources`` and both
+tracks' gate priors known and at least ``policy.stems_layer_min_genre_prior``, STEM-G1),
+on the phrase menu:
 
 - the vocal penalty counts the phrases where the vocal stem or YAMNet's stored byte
   hears voice (rules revision 3; the stem alone without YAMNet's bytes);
@@ -60,8 +61,8 @@ STEM-G1), on the phrase menu:
   phrase without vocals is added.
 
 Vocals in the last two terms follow the same either-detector rule. The terms go in
-``CandidateScore.stems``. Without stems on both tracks, or outside the beatmatch
-family, every candidate and score is the one of rules revision 1.
+``CandidateScore.stems``. Without stems on both tracks, for another client or outside
+the beatmatch family, every candidate and score is the one of rules revision 1.
 
 Without phrases on both tracks (profiles before v7, tracks the analyzer could not
 segment, segmentations under ``minimum_structure_confidence``) the menu is the bar
@@ -299,7 +300,9 @@ def plan_transition_candidates(
     ):
         return [_single(baseline, policy)]
     edge = _edge(outgoing, incoming, context, policy, baseline)
-    stems = stems_layer_applies(policy, outgoing_genre_prior, incoming_genre_prior)
+    stems = stems_layer_applies(
+        policy, outgoing_genre_prior, incoming_genre_prior, source=context.source
+    )
     outgoing_phrases = _timeline(outgoing, policy, stems=stems)
     incoming_phrases = _timeline(incoming, policy, stems=stems)
     if outgoing_phrases is not None and incoming_phrases is not None:
@@ -442,12 +445,16 @@ def stems_layer_applies(
     policy: PlannerPolicy,
     outgoing_genre_prior: float | None,
     incoming_genre_prior: float | None,
+    *,
+    source: str,
 ) -> bool:
-    """Whether the stems layer scores an edge (STEM-G1): the policy has it and both
-    tracks belong to the beatmatch family, their genre beatmatch priors known and at
-    least ``policy.stems_layer_min_genre_prior``. Rock, metal and punk (0.1-0.15) and
-    tracks without a known genre stay on rules revision 1's menu."""
-    if not policy.stems_layer:
+    """Whether the stems layer scores an edge (STEM-G1): the policy has it, the request
+    comes from a client it serves (``policy.stems_layer_sources``: Crate Decks, rules
+    revision 5) and both tracks belong to the beatmatch family, their gate priors
+    (``stems_gate_prior``) known and at least ``policy.stems_layer_min_genre_prior``.
+    Other clients, live-drum rock, metal and punk and tracks without a known genre stay
+    on rules revision 1's menu."""
+    if not policy.stems_layer or source not in policy.stems_layer_sources:
         return False
     floor = policy.stems_layer_min_genre_prior
     return all(

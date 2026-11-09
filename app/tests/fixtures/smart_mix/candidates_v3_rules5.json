@@ -2779,10 +2779,11 @@
    }
   ]
  },
- "description": "smart-mix-v3 menus (TransitionCandidate.to_dict) of rules revision 3 for the phrased golden cases of candidates_v3_rules1.json, both tracks with a fixed stems layer (test_candidates_stems._patterned) and in the beatmatch family",
+ "description": "smart-mix-v3 menus (TransitionCandidate.to_dict) of rules revision 5 for the phrased golden cases of candidates_v3_rules1.json, asked by Crate Decks (source decks), both tracks with a fixed stems layer (test_candidates_stems._patterned) and in the beatmatch family",
  "priors": [
   0.95,
   0.95
  ],
- "rulesRevision": 3
+ "rulesRevision": 5,
+ "source": "decks"
 }

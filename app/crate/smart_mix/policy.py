@@ -159,6 +159,10 @@ class PlannerPolicy:
     # and ambient 0.2, pop and soul 0.4, trip-hop and IDM 0.45) to the beatmatch ones
     # (dub 0.5, hip-hop and synthwave 0.6, dance 0.75 and up).
     stems_layer_min_genre_prior: float = 0.5
+    # STEM-G1, rules revision 5 (Diego: "los stems que vayan solo si el cliente es
+    # Decks"): the context sources the layer serves. Listen's short blends measured
+    # worse with it on the industrial set; Android and VirtualDJ never ask for it.
+    stems_layer_sources: tuple[str, ...] = ("decks",)
 
 
 PLANNER_POLICY = PlannerPolicy()
@@ -166,12 +170,13 @@ PLANNER_POLICY = PlannerPolicy()
 # safety limits (tempo, gain, true peak, durations) are v2's and must stay so.
 # Revision 2 added the stems layer (Smart Mix Stems, ST3); revision 3 (STEM-G1) keeps
 # it to the beatmatch family and takes voice from the vocal stem or YAMNet; revision 4
-# lets the machine-drum industrial family in (candidates.stems_gate_prior). Without
-# stems on both tracks, or outside the family, its menus are revision 1's.
+# lets the machine-drum industrial family in (candidates.stems_gate_prior); revision 5
+# serves the layer to Crate Decks only. Without stems on both tracks, outside the family
+# or for any other client, its menus are revision 1's.
 PLANNER_POLICY_V3 = replace(
     PLANNER_POLICY,
     identifier="smart-mix-v3",
-    rules_revision=4,
+    rules_revision=5,
     stems_layer=True,
 )
 

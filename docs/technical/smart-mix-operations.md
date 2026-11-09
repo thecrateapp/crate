@@ -137,7 +137,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | `PLANNER_POLICY_VERSION`           | `2`                  | Numeric version of each individual plan               |
 | `PLANNER_POLICY.rules_revision`    | `7`                  | Internal rules revision included in the cache key     |
 | `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`       | Planner on the stored phrases (SM3-D3)                |
-| `PLANNER_POLICY_V3.rules_revision` | `4`                  | Rules revision of v3, in its cache key                |
+| `PLANNER_POLICY_V3.rules_revision` | `5`                  | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
 includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
@@ -1433,10 +1433,13 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 - **Safety**: every candidate goes through `TransitionPlan` and the planner policy
   (`evaluation.policy_violations`); v3 copies v2's limits on tempo, gain, true peak and
   durations.
-- **Stems layer** (Smart Mix Stems ST3, rules revision 4, STEM-D5 and STEM-G1). When both
+- **Stems layer** (Smart Mix Stems ST3, rules revision 5, STEM-D5 and STEM-G1). When the
+  request comes from Crate Decks (`context.source = "decks"`, `stems_layer_sources`), both
   tracks have a stem analysis of their current file (Smart Mix playlists, or a Crate Decks
   upload), the policy's `stems_layer` is on and the edge belongs to the beatmatch family, the
-  phrase menu is scored with the stems layer:
+  phrase menu is scored with the stems layer. Listen, Android, VirtualDJ and every other source
+  get revision 1's menu (Diego, revision 5: Listen's short blends measured worse with the layer
+  on the industrial set):
 
   - a phrase has voice when the vocal stem or YAMNet's stored byte (`VOCAL_THRESHOLD`) says so;
     the vocal penalty counts those phrases, and so do the two bonuses below;
@@ -1461,9 +1464,10 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
   (80 %), against 32 % for extreme metal and 56-57 % for punk and rock; the rule lets in all of
   Godflesh, Ministry, Fear Factory and Author & Punisher, 0.5 % of extreme metal, 1.0 % of punk
   and hardcore and 1.1 % of rock (albums tagged industrial), and no other metal. Tracks without
-  genres keep the layer off. Outside the family, or without stems on both tracks, every candidate
-  and score is revision 1's (golden test `app/tests/fixtures/smart_mix/candidates_v3_rules1.json`);
-  the menus with stems have their own (`candidates_v3_rules3.json`, unchanged by revision 4).
+  genres keep the layer off. For another client, outside the family or without stems on both
+  tracks, every candidate and score is revision 1's (golden test
+  `app/tests/fixtures/smart_mix/candidates_v3_rules1.json`); Crate Decks' menus with stems have
+  their own (`candidates_v3_rules5.json`).
   Revision 2 (stem vocals instead of YAMNet's, on every edge) was never released; the ST3
   evaluation in the Crate Decks repository (`docs/plans/2026-11-09-smart-mix-stems-evaluation.md`)
   has the measurements behind STEM-G1.
@@ -1471,7 +1475,7 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 - **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases, and
   `stemsUsed: true` when the stems layer scored it (absent otherwise). The batch reads
   profiles without structure and the stem analyses of its tracks (one bounded `ANY` query),
-  then, only when some edge has an analysis on both tracks, those tracks' album and artist genres
+  then, only when some Crate Decks edge has an analysis on both tracks, those tracks' album and artist genres
   (one more bounded query, `get_track_genres`), to build the cache keys: an edge the layer scores
   keys on both analyses too, so a genre that moves an edge into or out of the family changes
   its key. It reads the structure only for the edges it has to plan, with the beat grid when a
