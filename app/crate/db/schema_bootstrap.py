@@ -154,3 +154,13 @@ def create_schema(cur):
     )
 
     create_ai_openai_compatible_v153_schema(cur)
+    from crate.db.schema_sections.error_fix_runs_v154 import (
+        create_error_fix_runs_v154_schema,
+    )
+
+    create_error_fix_runs_v154_schema(cur)
+    from crate.db.schema_sections.smart_mix_backfill_candidates_v155 import (
+        create_smart_mix_backfill_candidates_v155_schema,
+    )
+
+    create_smart_mix_backfill_candidates_v155_schema(cur)

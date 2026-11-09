@@ -242,6 +242,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/observability.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/error-fix-executors.md": () =>
+    import("../../../docs/technical/error-fix-executors.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/metrics-reference.md": () =>
     import("../../../docs/technical/metrics-reference.md?raw").then(
       (module) => module.default,

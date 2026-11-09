@@ -1,5 +1,6 @@
-"""Launch fix (E3): the API queues `dispatch_error_fix`, the task dispatches the
-autofix workflow once per issue every 24 hours with only the short id and the note.
+"""Launch fix (E3): the API queues `dispatch_error_fix`, the task opens a fix run and
+dispatches the autofix workflow once per issue every 24 hours with only the short id
+and the note.
 
 GitHub is always the `FakeGitHub` transport; nothing reaches the network.
 """
@@ -131,8 +132,34 @@ def _fix_tasks() -> list[dict]:
         ]
 
 
+def _fix_runs(issue_id: str) -> list[dict]:
+    with _scope() as session:
+        rows = session.execute(
+            text(
+                "SELECT id::text AS id, status, executor, repository, base_ref, "
+                "requested_by, error_code FROM error_fix_runs "
+                "WHERE issue_id = CAST(:id AS uuid) ORDER BY requested_at"
+            ),
+            {"id": issue_id},
+        ).mappings()
+        return [dict(row) for row in rows]
+
+
+def _finish_runs(issue_id: str) -> None:
+    """What the tracker does to a run that never opened a pull request."""
+    with _scope() as session:
+        session.execute(
+            text(
+                "UPDATE error_fix_runs SET status = 'expired', finished_at = now() "
+                "WHERE issue_id = CAST(:id AS uuid) "
+                "AND status IN ('requested', 'running', 'pr_open')"
+            ),
+            {"id": issue_id},
+        )
+
+
 def _dispatch(fake: FakeGitHub, params: dict, task_id: str = "task-fix-1") -> dict:
-    from crate.worker_handlers.error_inbox import dispatch_fix
+    from crate.worker_handlers.error_fixes import dispatch_fix
 
     return dispatch_fix(task_id, params, client_factory=fake.factory)
 
@@ -173,12 +200,22 @@ def test_dedup_within_24h(api):
     available_at = datetime.fromisoformat(fix["available_at"])
     assert timedelta(hours=23) < available_at - datetime.now(timezone.utc)
 
-    # After 24 hours the issue can be dispatched again.
+    # After 24 hours the issue can be dispatched again, once its run has ended.
     _age_request(issue_id, 24.5)
     assert api.get(f"{BASE}/{issue_id}").json()["fix"]["available_at"] is None
-    third = _dispatch(fake, _params(issue_id, actor), task_id="task-fix-3")
+    in_progress = _dispatch(fake, _params(issue_id, actor), task_id="task-fix-3")
+    assert in_progress["error_code"] == "ERROR_FIX_IN_PROGRESS"
+    assert in_progress["expected"] is True
+    refused = api.post(f"{BASE}/{issue_id}/fix", json={})
+    assert refused.status_code == 409
+    assert _code(refused) == "ERROR_FIX_IN_PROGRESS"
+    assert len(fake.requests) == 1
+
+    _finish_runs(issue_id)
+    third = _dispatch(fake, _params(issue_id, actor), task_id="task-fix-4")
     assert third["status"] == "succeeded", third
     assert len(fake.requests) == 2
+    assert [run["status"] for run in _fix_runs(issue_id)] == ["expired", "requested"]
 
 
 def test_records_request_and_audits(api):
@@ -206,6 +243,16 @@ def test_records_request_and_audits(api):
     columns = _fix_columns(issue_id)
     assert columns["fix_requested_by"] == actor
     assert columns["fix_requested_at"] == datetime.fromisoformat(result["requested_at"])
+    [run] = _fix_runs(issue_id)
+    assert run == {
+        "id": result["run_id"],
+        "status": "requested",
+        "executor": "github_actions",
+        "repository": "thecrateapp/crate",
+        "base_ref": "main",
+        "requested_by": actor,
+        "error_code": None,
+    }
     [audit] = _audit_rows()
     assert audit["target_type"] == "error_issue"
     assert audit["target_name"] == "CRATE-API-1"
@@ -215,6 +262,8 @@ def test_records_request_and_audits(api):
         "issue_id": issue_id,
         "provider": "sentry",
         "external_id": "1",
+        "run_id": result["run_id"],
+        "executor": "github_actions",
         "repository": "thecrateapp/crate",
         "workflow": "error-autofix.yml",
         "ref": "main",
@@ -227,6 +276,15 @@ def test_records_request_and_audits(api):
     assert detail["fix_requested_by"] == actor
     assert detail["fix_requested_by_name"]
     assert detail["fix_requested_at"] is not None
+    assert detail["fix_status"] == "requested"
+    [shown] = detail["fix_runs"]
+    assert shown["id"] == result["run_id"]
+    assert shown["requested_by_name"] == detail["fix_requested_by_name"]
+    assert shown["review"] == {
+        "can_merge": False,
+        "blockers": ["FIX_RUN_NOT_OPEN"],
+        "can_discard": True,
+    }
 
 
 def test_hidden_when_not_configured(api):
@@ -256,6 +314,7 @@ def test_hidden_when_not_configured(api):
     assert fix == {
         "repository": "thecrateapp/crate",
         "workflow": "error-autofix.yml",
+        "executor": "github_actions",
         "actions_url": (
             "https://github.com/thecrateapp/crate/actions/workflows/error-autofix.yml"
         ),
@@ -342,6 +401,10 @@ def test_failed_dispatch_releases_the_claim(api):
         "fix_requested_by": None,
     }
     assert _audit_rows() == []
+    # The failed attempt stays visible in the detail, with GitHub's answer.
+    [run] = _fix_runs(issue_id)
+    assert run["id"] == result["run_id"]
+    assert (run["status"], run["error_code"]) == ("failed", "GITHUB_FORBIDDEN")
 
     # Nothing blocks the next attempt once the token is fixed.
     retry = _dispatch(FakeGitHub(), _params(issue_id, actor), task_id="task-fix-2")
@@ -355,6 +418,7 @@ def test_failed_dispatch_keeps_an_older_request(api):
     actor = _admin_id()
     assert _dispatch(FakeGitHub(), _params(issue_id, actor))["status"] == "succeeded"
     _age_request(issue_id, 30)
+    _finish_runs(issue_id)
     before = _fix_columns(issue_id)
 
     result = _dispatch(FakeGitHub(status=422), _params(issue_id, actor), "task-fix-2")
@@ -377,6 +441,7 @@ def test_unsupported_short_ids_are_refused(api):
     assert result["error_code"] == "ERROR_FIX_UNSUPPORTED_ISSUE"
     assert fake.requests == []
     assert _fix_columns(issue_id)["fix_requested_at"] is None
+    assert _fix_runs(issue_id) == []
 
 
 def test_invalid_task_params_are_refused(pg_db):
@@ -411,6 +476,7 @@ def test_put_connection_stores_fix_settings_and_a_write_only_token(api):
     assert saved.json()["fix"] == {
         **fix,
         "ref": "main",
+        "executor": "github_actions",
         "has_token": True,
         "actions_url": (
             "https://github.com/thecrateapp/crate/actions/workflows/error-autofix.yml"

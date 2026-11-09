@@ -636,11 +636,82 @@ fn local_beat(
     let nearest = nearest_beat(beat_grid_ms, cue_ms);
     let count = mix_window_beats(beat_grid_ms).min(beat_grid_ms.len());
     let start = window_start(beat_grid_ms.len(), nearest, count);
-    let mut beats: Vec<(f64, f64)> = beat_grid_ms[start..start + count]
+    let beats: Vec<(f64, f64)> = beat_grid_ms[start..start + count]
         .iter()
         .enumerate()
         .map(|(offset, time)| ((start + offset) as f64, *time as f64))
         .collect();
+    let jitter = interval_jitter(&frame_intervals_ms(
+        &beat_frames[start..start + count],
+        sample_rate,
+    ));
+    let half_frame_ms = 0.5 * HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate);
+    fit_local_beat(beats, nearest as f64, jitter, half_frame_ms)
+}
+
+/// `local_beat` for model beats (SM3-D14). On a constant grid the window is the mix window
+/// of grid beats around the cue, and each model beat counts by its grid beat: a stretch
+/// where the DBN holds half the tempo, or skips a beat, keeps the grid's tempo instead of
+/// halving it. Without a constant grid it is the model beats around the cue. Jitter comes
+/// from the model beats, forgiving their 20 ms frames, and not from the onset peaks near
+/// them: attacks scatter around a steady pulse, and the model's beats are the pulse.
+fn model_local_beat(
+    beats_ms: &[u64],
+    grid: Option<&ConstantGrid>,
+    grid_ms: &[u64],
+    cue_ms: Option<u64>,
+) -> Option<LocalBeat> {
+    let cue_ms = cue_ms?;
+    let (window, nearest) = match grid {
+        Some(grid) if !grid_ms.is_empty() => {
+            let nearest = nearest_beat(grid_ms, cue_ms);
+            let count = mix_window_beats(grid_ms).min(grid_ms.len());
+            let start = window_start(grid_ms.len(), nearest, count);
+            let from = grid_ms[start] as f64 - grid.period_ms / 2.0;
+            let to = grid_ms[start + count - 1] as f64 + grid.period_ms / 2.0;
+            let window: Vec<(f64, f64)> = tempo_grid::model_beat_points(beats_ms, Some(grid))
+                .into_iter()
+                .filter(|(_, time)| (from..=to).contains(time))
+                .collect();
+            (window, grid.beat_number(grid_ms[nearest] as f64))
+        }
+        _ => {
+            if beats_ms.len() < 4 {
+                return None;
+            }
+            let nearest = nearest_beat(beats_ms, cue_ms);
+            let count = mix_window_beats(beats_ms).min(beats_ms.len());
+            let start = window_start(beats_ms.len(), nearest, count);
+            let window: Vec<(f64, f64)> =
+                tempo_grid::model_beat_points(&beats_ms[start..start + count], None)
+                    .into_iter()
+                    .map(|(offset, time)| (start as f64 + offset, time))
+                    .collect();
+            (window, nearest as f64)
+        }
+    };
+    let intervals: Vec<f32> = tempo_grid::step_intervals(&window)
+        .into_iter()
+        .map(|interval| interval as f32)
+        .collect();
+    fit_local_beat(
+        window,
+        nearest,
+        interval_jitter(&intervals),
+        tempo_grid::MODEL_BEAT_RESOLUTION_MS,
+    )
+}
+
+/// The regression of `local_beat` over the beats of a cue window, given as (beat number,
+/// time in ms) pairs, with the beat reference taken at beat number `nearest`. `jitter`
+/// is the interval jitter of the window's beats, of which `resolution_ms` (half the time
+/// step the beats are quantised to) is forgiven.
+fn fit_local_beat(
+    mut beats: Vec<(f64, f64)>,
+    nearest: f64,
+    jitter: Option<f32>,
+    resolution_ms: f64,
+) -> Option<LocalBeat> {
     let mut fit = fit_beats(&beats)?;
     while beats.len() > LOCAL_TEMPO_MIN_BEATS {
         let residuals: Vec<f64> = beats
@@ -668,17 +739,11 @@ fn local_beat(
         (Some(first), Some(second)) => (first.period - second.period).abs() / fit.period,
         _ => 1.0,
     };
-    let half_frame_ratio = (0.5 * HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate)) / fit.period;
-    let jitter = (interval_jitter(&frame_intervals_ms(
-        &beat_frames[start..start + count],
-        sample_rate,
-    ))
-    .unwrap_or(1.0)
-        - half_frame_ratio as f32)
-        .max(0.0);
+    let resolution_ratio = resolution_ms / fit.period;
+    let jitter = (jitter.unwrap_or(1.0) - resolution_ratio as f32).max(0.0);
     let stability =
         (1.0 - (drift / LOCAL_DRIFT_LIMIT) as f32 - jitter / LOCAL_JITTER_LIMIT).clamp(0.0, 1.0);
-    let reference = fit.time_at(nearest as f64);
+    let reference = fit.time_at(nearest);
     Some(LocalBeat {
         bpm: (60_000.0 / fit.period) as f32,
         beat_ms: (reference >= 0.0).then(|| reference.round() as u64),
@@ -1092,9 +1157,17 @@ pub fn analyze_smart_mix_segments_with_beats(
         }
     };
     let tempo = tempo_features(&beat_frames, onsets, sample_rate);
-    let tempo_stability = tempo.stability;
     let tempo_fit = tempo_grid::fit_tempo(&tracked_ms, &features, sample_rate);
     let constant_grid = tempo_fit.as_ref().and_then(|fit| fit.grid.clone());
+    // Model beats are measured on the track's constant grid and to the model's resolution,
+    // as in the Python analyzer: a half-tempo intro or 20 ms frames are not an unsteady
+    // tempo, and the onset peaks near the beats are not the beats.
+    let tempo_stability = match beats {
+        Some(_) => {
+            tempo_grid::model_beat_stability(&tracked_ms, constant_grid.as_ref()).unwrap_or(0.0)
+        }
+        None => tempo.stability,
+    };
     let (beat_grid_ms, grid_frames) = published_grid(
         constant_grid.as_ref(),
         &tracked_ms,
@@ -1138,9 +1211,13 @@ pub fn analyze_smart_mix_segments_with_beats(
             sample_rate,
         ),
     };
-    let intro_tracked = local_beat(&tracked_ms, &beat_frames, sample_rate, intro_cue_ms);
+    let cue_beat = |cue_ms: Option<u64>| match beats {
+        Some(_) => model_local_beat(&tracked_ms, constant_grid.as_ref(), &beat_grid_ms, cue_ms),
+        None => local_beat(&tracked_ms, &beat_frames, sample_rate, cue_ms),
+    };
+    let intro_tracked = cue_beat(intro_cue_ms);
     let outro_tracked = if tail.is_none() {
-        local_beat(&tracked_ms, &beat_frames, sample_rate, outro_cue_ms)
+        cue_beat(outro_cue_ms)
     } else {
         None
     };

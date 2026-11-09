@@ -387,6 +387,11 @@ def test_error_inbox_tasks_have_handler_pool_and_registry():
         "test_error_tracking_connection": TaskPoolConfig("fast", 0, 30, 0),
         # One GitHub workflow_dispatch; never retried, or a run could start twice.
         "dispatch_error_fix": TaskPoolConfig("fast", 0, 30, 0),
+        # Scheduled tracking of fix runs; it may merge an approved pull request.
+        "track_error_fixes": TaskPoolConfig("maintenance", 2, 120, 0),
+        # Approve & merge and Discard change GitHub: never retried.
+        "merge_error_fix": TaskPoolConfig("fast", 0, 60, 0),
+        "discard_error_fix": TaskPoolConfig("fast", 0, 60, 0),
     }
     for task_type, pool in expected.items():
         assert TASK_POOL_CONFIG[task_type] == pool

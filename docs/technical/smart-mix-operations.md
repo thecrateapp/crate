@@ -34,6 +34,7 @@ sources:
   - app/crate/db/jobs/analysis_storage.py
   - app/crate/db/jobs/smart_mix_backfill.py
   - app/crate/db/migrations/versions/147_smart_mix_structure.py
+  - app/crate/db/schema_sections/smart_mix_backfill_candidates_v155.py
   - app/crate/smart_mix/backfill_window.py
   - app/ui/src/components/SmartMixBackfillSettings.tsx
   - app/crate/db/queries/smart_mix_admin_tracks.py
@@ -62,6 +63,8 @@ sources:
   - tools/vdj-plugin/src/client/smart_mix_client.cpp
   - app/readplane/internal/routes/smart_mix.go
   - tools/crate-cli/src/mix_profile.rs
+  - tools/crate-cli/src/tempo_grid.rs
+  - tools/crate-cli/src/analyze.rs
   - app/tests/test_smart_mix_versions.py
   - app/tests/test_smart_mix_planner.py
   - app/tests/test_smart_mix_publication.py
@@ -111,7 +114,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | ---------------------------------- | -------------------- | ----------------------------------------------------- |
 | `API_CONTRACT_VERSION`             | `2026-08`            | Advertised integration and capabilities contract      |
 | `PROFILE_SCHEMA_VERSION`           | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`                 | `smart-mix-audio-v7` | Target generation of profile analysis                 |
+| `ANALYZER_VERSION`                 | `smart-mix-audio-v8` | Target generation of profile analysis                 |
 | `MEASUREMENT_VERSION`              | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
 | `BEAT_GRID_FORMAT`                 | `delta-ms-v1`        | Beat grid format                                      |
 | `PLANNER_IDENTIFIER`               | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
@@ -146,12 +149,64 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
 | `introCueMs`, `outroCueMs` | Suggested mix points: the first beat at or after `activeStartMs` and the last beat 4 s before `activeEndMs`                                                                                                                                                                                                                             |
 | `beatPhaseOffsetMs`        | Plan field, beatmatch only. In output time and below one outgoing beat: the incoming track starts this much after `incomingCueMs` when the outgoing reaches `outgoingCueMs`. In incoming track time, start at `incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio` (`NativeTransitionPlan.startIncomingCueMs()`); never subtract it |
 
+### Analyzer v8
+
+`smart-mix-audio-v8` keeps every v7 measurement, the grid, the downbeats and the phrases,
+and changes how both analyzers measure the steadiness of Beat This!'s beats, which v7 read as
+if they came from the analyzers' own trackers. On the electronic set of the SM5 evaluation
+(120 tracks of drum and bass, techno, house and other dance music), v7 marked 33 profiles
+`full` where production's v5 and v6 profiles had 67, and the planners refused to beatmatch 73
+of its 112 electronic edges. Most of that drop came from the v6 rules (`clear_phase`,
+`grid_holds`) and was right: of the 80 `full` grids v5 gives these tracks, 25 match madmom's
+beats and Beat This!'s at both cues, 24 miss them at a cue where the two agree, and the other
+31 cannot be judged because the two disagree there. Three effects of v7's
+measurement were not:
+
+- **Cue jitter read onset peaks.** The Rust cue windows took the jitter of the onset frame
+  next to each model beat (`model_beat_frames`), which follows the attacks. Attacks scatter
+  around a steady pulse, and the model's beats are the pulse: with the analyzer's own tracker
+  the cue jitter was 0 in 200 of 240 cue windows, with Beat This! in 87.
+- **Half-tempo stretches.** Beat This!'s DBN can hold half the tempo through an intro or a
+  break. Counted one after another, those beats halved the cue tempo, failed the 1 % grid
+  check and drifted, and over the whole track they dropped `tempoStability` to 0 when the
+  stretch covered the first third (several drum and bass tracks read 0.0-0.33).
+- **20 ms frames.** Model beats sit on Beat This!'s 20 ms frames: a 470 ms pulse gives 460
+  and 480 ms intervals, and a perfectly steady pulse read 0.89 in the Python analyzer, below
+  the 0.9 the long beatmatch needs.
+
+v8 measures model beats on the track's constant grid, in both analyzers alike
+(`model_beat_stability` in `tempo_grid.py` and `tempo_grid.rs`): each beat counts by its grid
+beat, so a skipped beat is not a tempo change; the tempo of the first and the last third is a
+regression over their beats; and one 20 ms frame (`MODEL_BEAT_RESOLUTION_MS`) is forgiven of
+the median interval jitter. The Rust cue windows take the mix window on the grid and the
+jitter of the model beats themselves (`model_local_beat`). The limits do not change (0.25
+drift and 0.20 jitter over the track, 0.10 and 0.20 at the cues), the analyzers' own tracker
+is measured as before, and a track whose tempo really moves stays `partial`.
+
+| 120 electronic tracks (SM5)                                             | v7                | v8                 |
+| ----------------------------------------------------------------------- | ----------------- | ------------------ |
+| `full` (drum and bass, techno, house, other dance)                      | 33 (8, 4, 11, 10) | 47 (13, 7, 13, 14) |
+| Median `bpmConfidence` and `tempoStability`                             | 0.85 and 0.84     | 0.92 and 1.00      |
+| SM5 electronic edges the planners beatmatch                             | 39 of 112         | 53 of 112          |
+| `full` grids right and wrong at both cues (madmom and Beat This! agree) | 27 and 2          | 36 and 1           |
+
+On the 145 tracks of the SMB.PR3 set, mostly rock and post-punk, `full` goes from 37 to 67;
+where madmom and All-In-One agree, 44 of those grids are right at both cues and 2 are wrong
+(v7: 32 and 1), and 21 cannot be judged because the two references disagree. The grid, the
+downbeats and the phrases are v7's, so the structure figures of
+[Measurement of the structure](#measurement-of-the-structure) hold, and `crate-cli` takes the
+same CPU per track (about 2 s).
+
+Readers accept v8, v7, v6 and v5 profiles (`READABLE_ANALYZER_VERSIONS`); writers, the
+backfill and Admin coverage target v8. v8 keeps `beat-this-small0-dbn` and `yamnet-2`, so a
+track analysed by v7 is recomputed from its stored signals (see
+[Running the v8 backfill](#running-the-v8-backfill)).
+
 ### Analyzer v7
 
 `smart-mix-audio-v7` keeps every v6 measurement and adds the structure of Smart Mix 3
 (SM3-D2): phrases of 8, 16 or 32 bars with a heuristic kind, one energy byte per bar
-and `structureConfidence`. Readers accept v7, v6 and v5 profiles
-(`READABLE_ANALYZER_VERSIONS`); writers, the backfill and Admin coverage target v7.
+and `structureConfidence`. v8 keeps that structure unchanged, and v7 profiles stay readable.
 
 Phrases follow a novelty curve at bar boundaries (`structure.py`, mirrored by
 `structure.rs`). Each bar gets its mean RMS level from the cue-detection RMS frames that lie
@@ -203,7 +258,7 @@ and the schema together, so a later schema bump needs no other server change.
 
 ### Models, licences and cost
 
-The v7 profile task runs two models next to the analyzer's own signal processing. Both
+Since v7 the profile task runs two models next to the analyzer's own signal processing. Both
 outputs carry the name of what produced them, so a reader or a later analyzer knows where
 a stored beat or voice byte came from, and both are kept per track (see "Stored model
 signals" below).
@@ -212,7 +267,7 @@ signals" below).
 | --------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Beat This! `small0` with madmom's DBN (SM3-D14)           | Beat This! MIT (code and weights); madmom code BSD | Beats, downbeats and beats per bar; `beat_tracker` = `beat-this-small0-dbn` | 12.8 s on a 237 s track, 21.1 s on a 367 s one, plus 0.8-1.0 s for the DBN |
 | YAMNet, Google's weights in a PyTorch port (SM3-D13)      | Apache-2.0                                         | Voice per 0.48 s patch and per phrase; `vocal_detector` = `yamnet-2`        | About 0.7 s per minute of audio                                            |
-| None: harmony and timbre novelty of the phrases (SM3-D17) | —                                                  | Phrase boundaries, under `analyzerVersion` `smart-mix-audio-v7`             | About 6 ms (Python) and 4 ms (Rust)                                        |
+| None: harmony and timbre novelty of the phrases (SM3-D17) | —                                                  | Phrase boundaries, since `analyzerVersion` `smart-mix-audio-v7`             | About 6 ms (Python) and 4 ms (Rust)                                        |
 
 Two more models serve only the offline measurement and never run in the worker: All-In-One
 (MIT), the reference for sections and downbeats, and madmom's downbeat networks (CC
@@ -280,7 +335,8 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   broken image and log a warning.
 - **Storage.** Migration 149 adds `beat_tracker` (`beat-this-small0-dbn`: the checkpoint
   and the post-processing), null with the analyzer's own tracker. It is part of the
-  profile revision. Beat This! ships inside `smart-mix-audio-v7`: a draft that brings a
+  profile revision. Beat This! ships inside the analyzer version (since
+  `smart-mix-audio-v7`): a draft that brings a
   tracker the stored profile lacks, or another one (`beat-this-small0-dbn` over the
   `beat-this-small0` of the first, peak-picking builds), replaces it at the same quality,
   and a run without the model never replaces a profile whose beats came from it.
@@ -331,10 +387,10 @@ spoken voice, so a transition can avoid laying one voice over another.
   fails above 1.5 s.
 - **Storage.** Migration 148 adds `vocal_detector` (`yamnet-2`; `yamnet-1` stored the share
   of patches above a fixed score and only ever existed in development), set together with
-  `vocal_presence` or not at all. Voice ships inside `smart-mix-audio-v7`, so a draft that
-  brings a detector the stored profile lacks replaces it at the same quality, and a run
-  without the model never strips stored voice. Reanalyzing a v7 track from Admin therefore
-  adds its voice; changing the detector name recomputes every profile through the backfill
+  `vocal_presence` or not at all. Voice ships inside the analyzer version (since
+  `smart-mix-audio-v7`), so a draft that brings a detector the stored profile lacks replaces
+  it at the same quality, and a run without the model never strips stored voice.
+  Reanalyzing a track of the current version from Admin therefore adds its voice; changing the detector name recomputes every profile through the backfill
   without a new analyzer version.
 
 ### Stored model signals
@@ -378,7 +434,8 @@ with its beats stored, a backfill of the library takes about 3 days instead of 1
 - **How a later version uses them.** A new analyzer version that keeps
   `beat-this-small0-dbn` and `yamnet-2` reanalyses the library through the backfill as
   usual, and every profile task finds the signals of its track: only decoding, the Rust
-  analysis and the phrase voice from the stored bytes run. Changing the checkpoint, the
+  analysis and the phrase voice from the stored bytes run. v8 is the first such version:
+  the tracks v7 analysed keep their signals, while v6 and v5 profiles predate them. Changing the checkpoint, the
   post-processing or the detector changes the name, and each track runs that model again
   on its next profile.
 - **Phrase voice.** A phrase byte is the mean of its patch bytes whether YAMNet ran or not,
@@ -564,8 +621,9 @@ unless its profile is at the target analyzer and profile schema, current and usa
 profile the backfill just wrote is never claimed again. `target_generation` is the analyzer
 version (with `+schemaN` appended for schemas above 1), so a new analyzer version or schema
 makes attempts from the previous generation eligible again. It prioritizes the play queue,
-supplied offline IDs, favorites and collections, and listening history before everything else.
-It can promote Python profiles when the Rust CLI is available, within `maxAttempts`.
+supplied offline IDs, favorites and collections, and listening history before everything else,
+from a stored ranking (see [How a pass claims](#how-a-pass-claims)). It can promote Python
+profiles when the Rust CLI is available, within `maxAttempts`.
 
 The campaign is persisted under `smart_mix:backfill_campaign`, with the states `running`,
 `paused`, `cancelled` and `completed`. `controlState=idle` also covers a missing campaign and
@@ -580,6 +638,48 @@ creates a new campaign for the deployed target with zeroed counters. A campaign 
 completes has exhausted the claimable work in that pass; it can still leave exhausted errors or
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
+
+### How a pass claims
+
+Ranking the whole library is expensive, and since the night window a pass only claims its free
+slots, often one to four tracks. The claim used to rank every track on every pass: on a copy of
+the production library (about 136K tracks) that took 4 to 8 s on a development machine, and
+about 13 s in production, holding the claim lock. The claim now keeps the ranking in
+`smart_mix_backfill_candidates` (migration 155), one row per claimable track with its priority
+and whether it is a Python promotion:
+
+| Step  | When it runs                                                                         | Cost (dev machine, ~136K tracks) |
+| ----- | ------------------------------------------------------------------------------------ | -------------------------------- |
+| Rank  | First claim, inputs changed, ranking older than 10 minutes, or it cannot fill a pass | About 1 s                        |
+| Claim | Every pass                                                                           | About 5 ms                       |
+
+- **Order.** The same as before: Python promotions last, then priority, then track id. The
+  priorities are 1 the play queue (the current track and the queued items of every device), 2
+  supplied offline IDs, 3 favorites and collections (liked tracks, saved albums, playlists and
+  followed artists), 4 listening history and 5 the rest. The ranking stores 3 to 5. Every pass
+  looks up 1 and 2 again and claims them first, among the tracks still in the ranking.
+- **Checks.** Each row a pass takes is checked against the claim rules above (target analyzer
+  and schema, quality, `target_generation`, attempts, claims in flight, quarantined albums),
+  under `FOR UPDATE SKIP LOCKED`, and leaves the ranking once claimed. A row that is no longer
+  claimable, for example because a manual reanalysis wrote a current profile, is skipped.
+- **Refresh.** The ranking is rebuilt when its inputs change (analyzer version, schema,
+  `maxAttempts` or Python promotion), when it is older than 10 minutes and when it cannot fill a
+  pass. Because of the last rule, a pass that claims nothing, which completes the campaign if
+  nothing is in flight, always comes from a fresh ranking.
+- **What waits for the next ranking.** A track that becomes claimable between rankings (a failed
+  attempt with retries left, a dead claim settled as failed, an import, a changed source) or
+  changes tier (a new like or play) waits up to 10 minutes, or until the ranking runs out. Before,
+  a failed attempt was retried on the next pass.
+- **Locking.** Counting, ranking and claiming run under the claim lock that every coordinator
+  takes, so two coordinators never rank at once or exceed the window. A claim without a limit,
+  which only tests use, ranks the library inline when another transaction holds the lock.
+- **Crashes.** The table is an unlogged cache of about 130K small rows: a crash empties it and the
+  next claim ranks again.
+- **Long play queues.** Every pass reads the play queues: a pass costs about 25 ms with 1,500
+  queued items and 120 ms with 10,000.
+- **Coverage.** A pass that claims refreshes the coverage at most once a minute, because the
+  refresh aggregates the whole library (about a second). Finished analyses also refresh it, and
+  the pass that completes the campaign always does.
 
 ### Night window
 
@@ -666,46 +766,57 @@ therefore often below the night limit, and by day listeners can hold it below th
 as long as they listen. To run all eight at night, raise `max_load_ratio` in the runtime policy;
 the same threshold also applies by day.
 
-### Running the v7 backfill (Smart Mix 3)
+### Running the v8 backfill
 
-Production holds a `cancelled` campaign with `target` `smart-mix-audio-v6`. After the release
-with v7 and migrations 147 to 153 is deployed through the normal process, recompute the library
-like this. The queues do not change: the coordinator and each analysis run on `heavy`.
+Production holds a `paused` campaign with `target` `smart-mix-audio-v7`, which had written
+about 2,710 v7 profiles; the rest of the library still holds v6 and v5 profiles. v8 replaces
+that target, so after the release with v8 is deployed through the normal process, a new v8
+campaign recomputes the library. The queues do not change: the coordinator and each analysis
+run on `heavy`.
 
 1. **Check the starting point.** Open Admin, Analysis, Smart Mix, or call
    `GET /api/admin/smart-mix/status` with an account that has `library.analysis.manage`.
-   Expect `analyzerVersion` `smart-mix-audio-v7`, `profileVersion` `1`, `controlState`
-   `idle`, `campaign.target` `smart-mix-audio-v6` with `campaign.status` `cancelled`, and
-   `activeTask` null. If `refreshedAt` is null or older than ten minutes, the call queues a
-   coverage refresh: read it again a minute later. Coverage starts close to 0 % and `versions`
-   lists the v6 and v5 profiles still being served. If `activeTask` is not null, wait for it
-   to finish (it exits at once for a cancelled campaign) or cancel it from Tasks.
+   Expect `analyzerVersion` `smart-mix-audio-v8`, `profileVersion` `1`, `controlState`
+   `idle` (a campaign of another target claims nothing), `campaign.target`
+   `smart-mix-audio-v7` with `campaign.status` `paused`, and `activeTask` null. If
+   `refreshedAt` is null or older than ten minutes, the call queues a coverage refresh: read
+   it again a minute later. Coverage starts at 0 %, and `versions` lists the v7, v6 and v5
+   profiles still being served. If `activeTask` is not null, wait for it to finish (a
+   coordinator of the v7 campaign exits as `superseded` without claiming) or cancel it from
+   Tasks.
 2. **Set the night limit.** On the project server set `ANALYSIS_WORKER_PROCESSES=8` in `.env`
    and recreate `crate-analysis-worker` (see [Night window](#night-window)).
 3. **Start the campaign.** Press **Start backfill** (batch size 25, 3 attempts), or call
    `POST /api/admin/smart-mix/backfill` with `{"batchSize": 25, "maxAttempts": 3}`. The answer
-   is `{"status": "queued", "taskId": "…"}` and the campaign becomes `target`
-   `smart-mix-audio-v7`, `profile_version` `1`, `status` `running`, `batches` and `claimed`
-   `0`. Raise `batchSize` (up to 100) only if the heavy worker keeps up.
+   is `{"status": "queued", "taskId": "…"}`. The paused v7 campaign is not resumed:
+   starting, or resuming, opens a campaign with `target` `smart-mix-audio-v8`,
+   `profile_version` `1`, `status` `running` and `batches` and `claimed` `0`, whose `sequence`
+   continues the v7 campaign's so no batch reuses a v7 dedup key. Raise `batchSize` (up to 100) only if the heavy worker keeps up.
 4. **Watch it.** `controlState` `running`; `campaign.batches` and `campaign.claimed` grow;
    `currentProfiles` and `coveragePercent` rise; `processing.active`, `failed` and `exhausted`
    show the work and its errors; `GET /api/admin/smart-mix/activity` gives
-   `tracksPerMinute`. The campaign claims every profile that is not v7: the v6 profiles the
-   cancelled campaign rewrote, v5 profiles, tracks without a profile, `unavailable` and
-   source-changed profiles. Claims the v6 campaign left in `analyzing` have no live child
-   task, so the first pass marks them `failed` and, being of another generation, claims them
-   again at once. Each rewritten track is claimed once.
-5. **Pause, resume or cancel.** **Pause backfill** or `POST /api/admin/smart-mix/backfill/pause`
+   `tracksPerMinute`. The campaign claims every profile that is not v8: the v7 profiles, v6
+   and v5 profiles, tracks without a profile, `unavailable` and source-changed profiles. v8 is
+   another generation, so a track the v7 campaign finished or gave up on starts a new retry
+   budget. Each rewritten track is claimed once.
+5. **The v7 rows are cheap.** v8 keeps `beat-this-small0-dbn` and `yamnet-2`, so a track whose
+   file has not changed since its v7 analysis finds its beats and voice in
+   `track_mix_signals` (see [Stored model signals](#stored-model-signals)): neither Beat
+   This! nor YAMNet runs, only decoding, `crate-cli` (about 2 s of CPU) and the phrase voice
+   from the stored bytes. The 2,710 v7 rows take about two hours of CPU in all, where
+   running Beat This! again would add 11-19 hours (14.7-25.4 s each). v6 and v5 profiles
+   predate the stored signals and cost a whole profile, as they would have under v7.
+6. **Pause, resume or cancel.** **Pause backfill** or `POST /api/admin/smart-mix/backfill/pause`
    (only from `running`, 409 otherwise); **Resume backfill** or
    `POST /api/admin/smart-mix/backfill/resume` with the same body as the start, which keeps
    the counters; **Cancel backfill** or `POST /api/admin/smart-mix/backfill/cancel` (from
    `running` or `paused`). None of them interrupts analyses already handed to the heavy queue.
-   Starting again after a cancel opens a new v7 campaign that only claims what is still not
-   v7.
-6. **Close it.** The campaign turns `completed` when a pass claims nothing and nothing is in
+   Starting again after a cancel opens a new v8 campaign that only claims what is still not
+   v8.
+7. **Close it.** The campaign turns `completed` when a pass claims nothing and nothing is in
    flight. Then check `processing.exhausted` and the track list filters `outdated` and
    `failed`, and use **Reanalyze track** for the ones worth retrying. Once the backfill has
-   finished, a later release can drop v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
+   finished, a later release can drop v7, v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
 
 ## AI worker lanes and sizing
 
@@ -859,6 +970,20 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 
 ### AI refinement (SM4)
 
+**Status: evaluated and left off.** The SM5 evaluation (2026-11-07) ran Gemini 3.8 Flash and
+3.1 Pro on 184 phrase edges and 112 electronic edges, with automatic listening metrics on the
+rendered transitions. Once the bass handoff menu was fixed (prompt `sm3-refine-2`: each candidate
+lists the bass handoffs it accepts), rejections fell to 0–3 %. The refined plans still improved
+none of the evaluation criteria, and made the electronic transitions measurably worse (5 better,
+16 worse). Gate SG3 closed as no-go:
+
+- `smart_mix_ai_enabled` stays off;
+- the capability reports `ai_assisted` unavailable;
+- no admin panel is built for it.
+
+The action, the prompt and `tools/smart-mix-eval --refine` stay in the tree, so a later
+experiment can rerun the same evaluation.
+
 A model may choose another plan from the v3 menu (SM3-D1). It never writes times, ratios or
 gains: it answers a candidate index, a shift of the outgoing or incoming phrase (-1, 0, 1), a
 step to the previous or next phrase length, the bass handoff, a reason, a confidence and up to
@@ -876,9 +1001,10 @@ deterministic plan.
   `vdj.smart_mix.ai`. A missing grant is `unavailable` with `permission_denied` or
   `scope_missing`, never a 403.
 - **What leaves the server (SM3-D6).** `llm/prompts/smart_mix_transition.py`
-  (`sm3-refine-1`) sends tempo, Camelot key, energy, danceability, valence, loudness, the last
+  (`sm3-refine-3`) sends tempo, Camelot key, energy, danceability, valence, loudness, the last
   outgoing and first incoming phrases with their energy per bar and voice, the set history,
-  the context rules and the candidates. The genre slug goes only while
+  the context rules and the candidates, each with the bass handoff answers it accepts
+  (`balanced` only on a beatmatch candidate when the context allows it). The genre slug goes only while
   `smart_mix_ai_send_genre` is on (default). Never titles, artists, paths, track or profile
   IDs, the user or an address. The prompt and the answer are neither stored nor logged.
 - **Response.** v3 plans of flagged edges add `refinement`: `ready` with the refined `plan`,

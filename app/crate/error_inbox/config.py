@@ -5,9 +5,11 @@ self-hosted installs. Self-hosted hosts get the same guard as Ollama discovery:
 private and loopback addresses are allowed, metadata and link-local ones are not,
 and the client re-checks every resolved address before it connects.
 
-`fix` configures Launch fix (E3): the GitHub repository, workflow file and ref that
-`dispatch_error_fix` dispatches, and a fine-grained GitHub token stored like the
-Sentry one. Both tokens live in `credential_secrets`; `settings` only keeps refs.
+`fix` configures Launch fix (E3): the executor that works on the issue
+(`fix.executor`, `github_actions` by default; see `crate.error_inbox.executors`),
+the GitHub repository, workflow file and ref it dispatches, and a fine-grained
+GitHub token stored like the Sentry one. Both tokens live in `credential_secrets`;
+`settings` only keeps refs.
 """
 
 from __future__ import annotations
@@ -27,6 +29,11 @@ from crate.db.repositories.error_tracking_settings import (
     SENTRY_TOKEN_SCOPE,
     read_error_tracking_settings,
     save_error_tracking_settings,
+)
+from crate.error_inbox.fix_runs import (
+    AVAILABLE_EXECUTORS,
+    DEFAULT_EXECUTOR,
+    EXECUTORS,
 )
 
 SENTRY_CLOUD_HOSTS = frozenset({"sentry.io", "us.sentry.io", "de.sentry.io"})
@@ -70,6 +77,7 @@ class FixSettings:
     workflow: str
     ref: str = "main"
     secret_ref: str | None = None
+    executor: str = DEFAULT_EXECUTOR
 
     @property
     def has_token(self) -> bool:
@@ -124,6 +132,7 @@ class ErrorTrackingConfig:
                 "workflow": self.fix.workflow,
                 "ref": self.fix.ref,
                 "secret_ref": self.fix.secret_ref,
+                "executor": self.fix.executor,
             },
         }
 
@@ -247,11 +256,17 @@ def _fix(value: Any) -> FixSettings | None:
         raise _invalid("fix.workflow must be a workflow file name")
     if not isinstance(ref, str) or not _REF.match(ref) or ".." in ref:
         raise _invalid("Invalid fix.ref")
+    executor = value.get("executor") or DEFAULT_EXECUTOR
+    if executor not in EXECUTORS:
+        raise _invalid(f"fix.executor must be one of {', '.join(EXECUTORS)}")
+    if executor not in AVAILABLE_EXECUTORS:
+        raise _invalid(f"The {executor} executor is not available yet")
     return FixSettings(
         repository=repository,
         workflow=workflow,
         ref=ref,
         secret_ref=_optional_ref(value.get("secret_ref")),
+        executor=executor,
     )
 
 
@@ -370,7 +385,7 @@ def load_sentry_token(config: ErrorTrackingConfig, *, session=None) -> str:
 
 
 def load_github_token(config: ErrorTrackingConfig, *, session=None) -> str:
-    """The fine-grained GitHub token of Launch fix; only `dispatch_error_fix` reads it."""
+    """The fine-grained GitHub token of Launch fix; only the error fix tasks read it."""
     if config.fix is None or not config.fix.secret_ref:
         raise ErrorTrackingConfigError(
             "ERROR_FIX_NOT_CONFIGURED", "Launch fix is not configured"

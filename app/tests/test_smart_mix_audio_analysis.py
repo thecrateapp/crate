@@ -152,7 +152,7 @@ def test_python_fallback_never_publishes_unmeasured_loudness(tmp_path: Path) -> 
 
     profile = analyze_mix_profile(track)
 
-    assert profile.analyzer_version == ANALYZER_VERSION == "smart-mix-audio-v7"
+    assert profile.analyzer_version == ANALYZER_VERSION == "smart-mix-audio-v8"
     assert profile.intro_lufs is None
     assert profile.outro_lufs is None
     assert profile.integrated_lufs is None
@@ -358,6 +358,66 @@ def test_external_beats_replace_tracker_and_pick_downbeat(
     assert heuristic.beat_tracker is None
 
 
+def _model_track(times, downbeats=None, beats_per_bar=4):
+    """Beat This! beats and downbeats on its 20 ms frames."""
+    from crate.smart_mix.beat_model import BeatTrack
+
+    def frames(values) -> tuple[int, ...]:
+        return tuple(sorted({round(value / 20.0) * 20 for value in values}))
+
+    return BeatTrack(
+        tracker="beat-this-test",
+        beats_ms=frames(times),
+        downbeats_ms=frames(downbeats if downbeats is not None else times[::4]),
+        beats_per_bar=beats_per_bar,
+    )
+
+
+def test_model_beats_stay_steady_through_a_half_tempo_intro(tmp_path: Path) -> None:
+    from crate.smart_mix.analyzer import analyze_mix_profile
+
+    # One tempo throughout; Beat This!'s DBN holds half of it for the first 48 beats,
+    # and 470 ms falls between two of its 20 ms frames.
+    period = 470.0
+    track = tmp_path / "half-tempo-intro.wav"
+    _write_click_track(
+        track,
+        bpm=60_000.0 / period,
+        duration_seconds=60.0,
+        leading_silence_seconds=1.0,
+    )
+    pulse = [1_000.0 + index * period for index in range(int(58_000 / period))]
+    heard = [time for index, time in enumerate(pulse) if index >= 48 or index % 2 == 0]
+
+    profile = analyze_mix_profile(track, beats=_model_track(heard, pulse[::4]))
+
+    assert profile.tempo_stability >= 0.99
+    assert profile.bpm_confidence >= 0.75
+    assert profile.quality == "full"
+
+
+def test_model_beats_of_a_drifting_track_stay_partial(tmp_path: Path) -> None:
+    from crate.smart_mix.analyzer import analyze_mix_profile
+
+    track = tmp_path / "drifting-model.wav"
+    _write_click_track(
+        track,
+        bpm=120.0,
+        end_bpm=140.0,
+        duration_seconds=60.0,
+        leading_silence_seconds=1.0,
+    )
+    times, time = [], 1_000.0
+    while time < 59_000.0:
+        times.append(time)
+        time += 60_000.0 / (120.0 + 20.0 * time / 60_000.0)
+
+    profile = analyze_mix_profile(track, beats=_model_track(times))
+
+    assert profile.tempo_stability < 0.8
+    assert profile.quality == "partial"
+
+
 def test_model_downbeats_without_a_clear_bar_leave_no_downbeat(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -447,6 +507,7 @@ def test_profile_analysis_passes_model_beats_to_rust(
 ) -> None:
     import crate.audio_analysis as audio_analysis
     from crate import crate_cli
+    from crate.smart_mix.versions import ANALYZER_VERSION
 
     beats = _model_beats(2)
     calls: list[dict] = []
@@ -459,7 +520,7 @@ def test_profile_analysis_passes_model_beats_to_rust(
         return {
             "mixProfile": {
                 "analyzer": "crate-rust",
-                "analyzerVersion": "smart-mix-audio-v7",
+                "analyzerVersion": ANALYZER_VERSION,
                 "durationMs": 20_000,
                 "quality": "partial",
                 "beatTracker": "beat-this-test",

@@ -40,11 +40,19 @@ const MONO_CELL = `${CELL} font-mono text-label text-text-secondary`;
 const NUMERIC_CELL = `${MONO_CELL} text-right tabular-nums`;
 
 function IssueState({ issue }: { issue: ErrorIssueSummary }) {
-  if (issue.status !== "unresolved")
-    return <StatusBadge>{STATUS_LABEL[issue.status]}</StatusBadge>;
-  const label = substatusLabel(issue.substatus) ?? STATUS_LABEL.unresolved;
+  const label =
+    issue.status !== "unresolved"
+      ? STATUS_LABEL[issue.status]
+      : (substatusLabel(issue.substatus) ?? STATUS_LABEL.unresolved);
+  const tone =
+    issue.status !== "unresolved" ? "neutral" : substatusTone(issue.substatus);
   return (
-    <StatusBadge tone={substatusTone(issue.substatus)}>{label}</StatusBadge>
+    <span className="inline-flex flex-wrap gap-1.5">
+      <StatusBadge tone={tone}>{label}</StatusBadge>
+      {issue.fix_status === "pr_open" ? (
+        <StatusBadge tone="warning">Pending review</StatusBadge>
+      ) : null}
+    </span>
   );
 }
 

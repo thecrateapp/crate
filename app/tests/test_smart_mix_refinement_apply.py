@@ -365,3 +365,41 @@ def test_refined_plan_never_violates_policy(seed):
             assert ctx.allow_long_beatmatch and plan.curve == "dj-blend"
     # Both branches are exercised.
     assert outcomes["ready"] > 100 and outcomes["rejected"] > 100
+
+
+def test_bass_answers_match_what_the_prompt_offers():
+    # The validation stays strict: a bass_handoff the candidate's bassOk does not
+    # list is rejected, and every value it lists passes the bass check.
+    from crate.llm.prompts.smart_mix_transition import build_refinement_input
+
+    fast = profile(INCOMING_UID, layout=INCOMING_LAYOUT, bpm=140.0)
+    cases = [
+        *edge_cases(),
+        (
+            "crossfade_dj",
+            profile(OUTGOING_UID, layout=OUTGOING_LAYOUT),
+            fast,
+            context(),
+        ),
+    ]
+    checked = 0
+    for name, outgoing, incoming, ctx in cases:
+        if outgoing is None or incoming is None:
+            continue
+        candidates = _menu(outgoing, incoming, ctx)
+        items = build_refinement_input(
+            outgoing, incoming, candidates, policy=POLICY, context=ctx
+        )["candidates"]
+        for index, item in enumerate(items):
+            for value in ("keep", "none", "balanced"):
+                outcome = apply_refinement(
+                    candidates,
+                    Choice(candidate_index=index, bass_handoff=value),
+                    (outgoing, incoming),
+                    POLICY,
+                    context=ctx,
+                )
+                refused = outcome.code == "bass_handoff_not_allowed"
+                assert refused == (value not in item["bassOk"]), (name, index, value)
+                checked += 1
+    assert checked > 50

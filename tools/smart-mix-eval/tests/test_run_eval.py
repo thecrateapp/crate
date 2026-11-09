@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from dataclasses import replace
 from datetime import UTC, datetime
 
@@ -295,3 +296,282 @@ def test_reports_summarize_the_music_a_mix_leaves_out() -> None:
     assert group["unplayedMsMean"] == pytest.approx(sum(unplayed) / len(unplayed))
     assert "Outgoing music after the mix (ms)" in markdown
     assert "Unplayed ms" in markdown
+
+
+# --- AI refinement (SM5) ------------------------------------------------------
+
+
+class FakeRefiner:
+    """Answers each edge with a fixed outcome; records the jobs it was given."""
+
+    def __init__(self, outcomes) -> None:
+        self.outcomes = outcomes
+        self.jobs = []
+
+    def refine_many(self, jobs, *, concurrency=1):
+        self.jobs.extend(jobs)
+        return [self.outcomes[job.edge_id](job) for job in jobs]
+
+
+def _ready(index: int, **values):
+    from refine import EdgeRefinement
+
+    def outcome(job):
+        return EdgeRefinement(
+            status="ready",
+            code=None,
+            called=True,
+            candidate_index=index,
+            plan=job.candidates[index].to_plan(),
+            confidence=0.8,
+            reason="Phrase-aligned.",
+            **values,
+        )
+
+    return outcome
+
+
+def _rejected(code: str, **values):
+    from refine import EdgeRefinement
+
+    return lambda job: EdgeRefinement(status="rejected", code=code, **values)
+
+
+def _refined_records(outcomes, *, rows=None, genres=None):
+    profiles = _structured_pair()
+    rows = rows or [
+        _row("e0001", OUT, IN, "pool/0-2"),
+        _row("e0002", IN, OUT, "pool/2-4"),
+        _row("e0003", OUT, "00000000-0000-4000-8000-000000000009", "pool/0-2"),
+    ]
+    refiner = FakeRefiner(outcomes)
+    records = evaluate_dataset(
+        rows,
+        profiles,
+        planner="smart-mix-v3",
+        context=CONTEXTS["dj"],
+        refiner=refiner,
+        genres=genres or {OUT: "techno", IN: "deep-house"},
+        genre_root=lambda slug: {
+            "techno": "electronic",
+            "deep-house": "electronic",
+        }.get(slug or "", "unknown"),
+    )
+    return records, refiner
+
+
+def test_refinement_serves_the_ready_plan_and_keeps_the_deterministic_one() -> None:
+    records, refiner = _refined_records(
+        {"e0001": _ready(1), "e0002": _rejected("low_confidence", called=True)}
+    )
+
+    # Only edges with both profiles reach the model, with the prompt's genres.
+    assert [job.edge_id for job in refiner.jobs] == ["e0001", "e0002"]
+    assert refiner.jobs[0].genres == ("techno", "deep-house")
+    first, second, missing = records
+    menu = refiner.jobs[0].candidates
+    assert first["plan"] == menu[1].to_plan().to_dict()
+    assert first["deterministic"]["plan"] == menu[0].to_plan().to_dict()
+    assert first["refinement"]["status"] == "ready"
+    assert first["refinement"]["changed"] is True
+    assert first["refinement"]["candidates"] == len(menu)
+    assert first["metrics"] != first["deterministic"]["metrics"]
+    # A rejection leaves the client on the deterministic plan.
+    assert second["plan"] == second["deterministic"]["plan"]
+    assert second["refinement"]["changed"] is False
+    assert second["refinement"]["code"] == "low_confidence"
+    assert missing["refinement"]["status"] == "unavailable"
+    assert missing["refinement"]["code"] == "missing_profile"
+    # A pool edge is grouped by the genre the prompt carried.
+    assert first["genreRoot"] == "electronic"
+    assert missing["genreRoot"] == "electronic"
+    json.dumps(records)
+
+
+def test_genre_root_keeps_the_dataset_genre_outside_pools() -> None:
+    records, _refiner = _refined_records(
+        {"e0001": _ready(0)}, rows=[_row("e0001", OUT, IN, "rock/0-2")]
+    )
+    assert records[0]["genreRoot"] == "rock"
+    assert records[0]["refinement"]["changed"] is False
+
+
+def test_refinement_summary_reports_rejections_latency_tokens_and_cost() -> None:
+    from run_eval import refinement_summary
+
+    usage = {"input_tokens": 3_000, "output_tokens": 100, "thought_tokens": 300}
+    records, _refiner = _refined_records(
+        {
+            "e0001": _ready(1, latency_ms=2_000, usage=usage, cost_usd=0.004),
+            "e0002": _rejected(
+                "low_confidence",
+                called=True,
+                latency_ms=4_000,
+                usage=usage,
+                cost_usd=0.006,
+            ),
+        }
+    )
+
+    summary = refinement_summary(records)
+
+    assert summary["edges"] == 3
+    assert summary["statuses"] == {"ready": 1, "rejected": 1, "unavailable": 1}
+    assert summary["codes"] == {"low_confidence": 1, "missing_profile": 1}
+    assert summary["calls"] == 2
+    assert summary["rejectionRate"] == 0.5
+    assert summary["failureRate"] == 0.0
+    assert summary["changedRate"] == pytest.approx(1 / 3, abs=1e-4)
+    assert summary["latencyMs"]["p50"] == pytest.approx(3_000)
+    assert summary["latencyMs"]["p95"] == pytest.approx(3_900)
+    assert summary["tokens"]["input"]["mean"] == 3_000
+    assert summary["tokens"]["output"]["mean"] == 400
+    assert summary["cost"]["totalUsd"] == pytest.approx(0.01)
+    assert summary["cost"]["perTransitionUsd"] == pytest.approx(0.005)
+    assert summary["candidateIndex"] == {"1": 1}
+    delta = summary["delta"]["overall"]
+    # Paired deltas keep the edge count instead of a difference of counts.
+    assert delta["n"] == 3
+    assert set(summary["delta"]) >= {"overall", "byTempoBand", "byGenreRoot", "changed"}
+    assert summary["delta"]["changed"]["n"] == 1
+    assert summary["delta"]["byTempoBand"]["0-2"]["n"] == 2
+    assert summary["deterministic"]["n"] == 3
+    assert summary["refined"]["n"] == 3
+
+
+def test_single_candidate_menus_do_not_count_as_rejected_answers() -> None:
+    from run_eval import refinement_summary
+
+    records, _refiner = _refined_records(
+        {"e0001": _ready(0, latency_ms=1_000), "e0002": _rejected("single_candidate")}
+    )
+    summary = refinement_summary(records)
+    assert summary["calls"] == 1
+    assert summary["rejectionRate"] == 0.0
+
+
+def test_sg3_criteria_compare_served_and_deterministic_plans() -> None:
+    from run_eval import sg3_criteria
+
+    deterministic = {
+        "phraseFullyAlignedRate": 0.2,
+        "phraseAlignedFraction": 0.5,
+        "bassOverlapMsMean": 2_000.0,
+        "harmonicClashMsMean": 4_000.0,
+        "energyStepMean": 0.05,
+        "vocalClashMsMean": 70.0,
+    }
+    refined = {
+        **deterministic,
+        "phraseFullyAlignedRate": 0.25,
+        "bassOverlapMsMean": 2_500.0,
+        "vocalClashMsMean": None,
+    }
+    stats = {
+        "readyViolations": 0,
+        "rejectionRate": 0.12,
+        "latencyMs": {"p50": 3_000, "p95": 25_000},
+    }
+
+    criteria = {
+        item["id"]: item
+        for item in sg3_criteria(deterministic, refined, stats, provider_kind="cloud")
+    }
+
+    assert criteria["policy_violations"]["pass"] is True
+    assert criteria["phrase_alignment"]["pass"] is True
+    assert criteria["bass_overlap"]["pass"] is False
+    assert criteria["harmonic_clash"]["pass"] is True
+    assert criteria["energy_continuity"]["pass"] is True
+    assert criteria["vocal_clash"]["pass"] is None
+    assert criteria["rejection_rate"]["pass"] is False
+    assert criteria["latency"]["pass"] is True
+    local = {
+        item["id"]: item
+        for item in sg3_criteria(deterministic, refined, stats, provider_kind="local")
+    }
+    assert local["latency"]["pass"] is False
+
+
+def test_refined_report_markdown_has_the_ai_section() -> None:
+    from run_eval import refinement_summary
+
+    records, _refiner = _refined_records(
+        {"e0001": _ready(1, latency_ms=2_000), "e0002": _rejected("low_confidence")}
+    )
+    report = build_report(
+        records,
+        meta={
+            "planner": "smart-mix-v3",
+            "context": "dj",
+            "dataset": {},
+            "refine": {
+                "model": "gemini/gemini-3.8-flash",
+                "providerKind": "cloud",
+                "price": {
+                    "source": "https://example.test/pricing",
+                    "date": "2026-11-07",
+                },
+            },
+        },
+    )
+    assert report["refinement"] == {
+        **refinement_summary(records),
+        "criteria": report["refinement"]["criteria"],
+    }
+    markdown = render_markdown(report)
+    for text in (
+        "## AI refinement: gemini/gemini-3.8-flash",
+        "Rejection rate",
+        "Latency",
+        "Tokens per transition",
+        "## SG3 criteria",
+        "## Served minus deterministic",
+        "By genre",
+        "https://example.test/pricing",
+    ):
+        assert text in markdown
+    # Delta tables keep the edge count unsigned.
+    assert "| all edges | 3 |" in markdown
+
+
+def test_refine_needs_the_v3_planner() -> None:
+    from run_eval import parse_args
+
+    base = ["--dsn", "postgresql://crate@localhost/crate", "--dataset", "d.jsonl"]
+    with pytest.raises(SystemExit):
+        parse_args([*base, "--output", "out", "--refine", "gemini/gemini-3.8-flash"])
+    args = parse_args(
+        [
+            *base,
+            "--output",
+            "out",
+            "--planner",
+            "smart-mix-v3",
+            "--refine",
+            "gemini/gemini-3.8-flash",
+            "--max-usd",
+            "2.5",
+        ]
+    )
+    assert args.refine == "gemini/gemini-3.8-flash"
+    assert args.max_usd == 2.5
+    assert args.concurrency == 1
+    # One ledger for every cache: a repeat run in its own cache still counts.
+    assert args.ledger == args.refine_cache / "ledger.jsonl"
+    shared = parse_args(
+        [
+            *base,
+            "--output",
+            "out",
+            "--planner",
+            "smart-mix-v3",
+            "--refine",
+            "gemini/gemini-3.8-flash",
+            "--refine-cache",
+            "repeat",
+            "--ledger",
+            "spend.jsonl",
+        ]
+    )
+    assert shared.ledger == Path("spend.jsonl")

@@ -5,6 +5,7 @@
 
 import type {
   Digest,
+  ErrorFixRun,
   ErrorIssueDetail,
   ErrorIssueFix,
   ErrorIssueSummary,
@@ -280,6 +281,8 @@ export function sampleSummary(
     regressed_24h: open.filter((issue) => issue.substatus === "regressed")
       .length,
     untriaged: open.filter((issue) => !issue.classification).length,
+    pending_review: issues.filter((issue) => issue.fix_status === "pr_open")
+      .length,
     last_synced_at: minutesAgo(3),
     services: [...services.values()].sort((a, b) =>
       a.service.localeCompare(b.service),
@@ -303,6 +306,7 @@ export const NOT_CONFIGURED_SUMMARY: ErrorSummary = {
   new_24h: 0,
   regressed_24h: 0,
   untriaged: 0,
+  pending_review: 0,
   last_synced_at: null,
   services: [],
   top_critical: [],
@@ -441,6 +445,49 @@ export function sampleDetail(
     auto_triage_queued_at: null,
     write_access: true,
     fix: null,
+    fix_runs: [],
+    ...overrides,
+  };
+}
+
+/** A fix run whose draft pull request waits for review, checks skipped. */
+export function sampleFixRun(
+  overrides: Partial<ErrorFixRun> = {},
+): ErrorFixRun {
+  return {
+    id: "f1a00000-0000-4000-8000-000000000001",
+    executor: "github_actions",
+    status: "pr_open",
+    repository: "thecrateapp/crate",
+    base_ref: "main",
+    external_run_id: "18800000001",
+    external_run_url:
+      "https://github.com/thecrateapp/crate/actions/runs/18800000001",
+    branch: "autofix/crate-api-1-18800000001",
+    pr_number: 412,
+    pr_url: "https://github.com/thecrateapp/crate/pull/412",
+    pr_state: "open",
+    pr_draft: true,
+    pr_mergeable: true,
+    pr_mergeable_state: "draft",
+    pr_head_sha: "3b1f0c9d2e4a5b6c7d8e9f00112233445566778a",
+    pr_author: "crate-error-autofix[bot]",
+    pr_labeled: true,
+    ci_state: "success",
+    requested_by: 1,
+    requested_by_name: "Diego",
+    requested_at: minutesAgo(50),
+    started_at: minutesAgo(45),
+    pr_opened_at: minutesAgo(20),
+    merge_requested_by_name: null,
+    merge_requested_at: null,
+    ready_at: null,
+    finished_at: null,
+    checked_at: minutesAgo(2),
+    error_code: null,
+    summary: null,
+    cleanup_state: "none",
+    review: { can_merge: true, blockers: [], can_discard: true },
     ...overrides,
   };
 }
@@ -481,6 +528,7 @@ export function sampleFix(
   return {
     repository: "thecrateapp/crate",
     workflow: "error-autofix.yml",
+    executor: "github_actions",
     actions_url: ACTIONS_URL,
     supported: true,
     available_at: null,
@@ -496,6 +544,7 @@ export function sampleFixConnection(
     repository: "thecrateapp/crate",
     workflow: "error-autofix.yml",
     ref: "main",
+    executor: "github_actions",
     has_token: true,
     actions_url: ACTIONS_URL,
     ...overrides,

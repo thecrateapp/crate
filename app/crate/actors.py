@@ -203,8 +203,13 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "sync_error_issues": TaskPoolConfig("maintenance", 1, 120, 0),
     "update_error_issue_status": TaskPoolConfig("fast", 0, 30, 0),
     "test_error_tracking_connection": TaskPoolConfig("fast", 0, 30, 0),
-    # Launch fix: one workflow_dispatch to GitHub, never retried.
+    # Launch fix: one submission to the fix executor, never retried.
     "dispatch_error_fix": TaskPoolConfig("fast", 0, 30, 0),
+    # Fix runs: scheduled tracking of their pull requests (it merges approved ones
+    # once green); Approve & merge and Discard change GitHub, so none retries.
+    "track_error_fixes": TaskPoolConfig("maintenance", 2, 120, 0),
+    "merge_error_fix": TaskPoolConfig("fast", 0, 60, 0),
+    "discard_error_fix": TaskPoolConfig("fast", 0, 60, 0),
     "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
     "promote_due_releases": TaskPoolConfig("maintenance", 2, 900, 0),
     "scan": TaskPoolConfig("maintenance", 2, 1800, 0),

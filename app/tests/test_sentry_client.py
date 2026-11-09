@@ -266,6 +266,70 @@ def test_get_issue_and_latest_event_paths():
     assert event["eventID"] == "e" * 32
 
 
+def _release_object(version: str) -> dict:
+    """A release as Retrieve an Issue serializes `firstRelease` and `lastRelease`."""
+    return {
+        "id": 1,
+        "version": version,
+        "shortVersion": version,
+        "status": "open",
+        "versionInfo": {"package": None, "version": {"raw": version}},
+        "ref": None,
+        "url": None,
+        "dateReleased": None,
+        "dateCreated": "2026-10-06T15:40:00Z",
+        "data": {},
+        "newGroups": 0,
+        "owner": None,
+        "commitCount": 0,
+        "lastCommit": None,
+        "deployCount": 0,
+        "lastDeploy": None,
+        "authors": [],
+        "projects": [],
+        "firstEvent": None,
+        "lastEvent": None,
+        "currentProjectMeta": {},
+        "userAgent": None,
+    }
+
+
+def test_releases_come_from_the_issue_detail_not_the_listing():
+    listed = _issue(42)
+    # List an Organization's Issues has no release fields at all.
+    del listed["firstRelease"], listed["lastRelease"]
+    details = {
+        "42": _issue(
+            42, firstRelease=_release_object("crate-8ba478ac"), lastRelease=None
+        ),
+        "43": _issue(
+            43,
+            firstRelease=_release_object("crate-8ba478ac"),
+            lastRelease=_release_object("crate-4ba9e59a"),
+        ),
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/organizations/ninja-development/issues/"):
+            return httpx.Response(200, json=[listed])
+        return httpx.Response(200, json=details[request.url.path.split("/")[-2]])
+
+    client = _client(handler)
+    [issue] = client.list_unresolved().issues
+
+    assert (issue["first_release"], issue["last_release"]) == (None, None)
+    first_only = client.get_issue("42")
+    assert (first_only["first_release"], first_only["last_release"]) == (
+        "crate-8ba478ac",
+        None,
+    )
+    both = client.get_issue("43")
+    assert (both["first_release"], both["last_release"]) == (
+        "crate-8ba478ac",
+        "crate-4ba9e59a",
+    )
+
+
 def test_resolve_short_id_reads_the_org_scoped_endpoint():
     seen: list[httpx.Request] = []
 

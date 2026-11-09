@@ -224,3 +224,63 @@ def test_render_bass_handoff_cuts_the_incoming_low_end(tmp_path: Path) -> None:
 
     assert 20 * np.log10(incoming_cut) < -18
     assert 20 * np.log10(outgoing_cut) < -18
+
+
+def test_stem_filtergraph_keeps_one_deck_at_unity() -> None:
+    plan = _plan(bass_handoff="balanced", curve="dj-blend")
+    window = render_window(plan, seconds=30)
+
+    outgoing = build_filtergraph(plan, window, SAMPLE_RATE, stem="outgoing")
+    incoming = build_filtergraph(plan, window, SAMPLE_RATE, stem="incoming")
+
+    # No crossfade, staging or bass shelf: the deck's own audio, on the mix's clock.
+    for graph in (outgoing, incoming):
+        assert "volume=" not in graph.graph
+        assert "lowshelf" not in graph.graph
+        assert graph.commands == {}
+        assert graph.graph.endswith("[mix]")
+    assert "[1:a]" not in outgoing.graph
+    assert "[0:a]" not in incoming.graph
+    assert "adelay" in incoming.graph and "atempo=1.04" in incoming.graph
+    with pytest.raises(ValueError):
+        build_filtergraph(plan, window, SAMPLE_RATE, stem="both")
+
+
+def test_render_stems_play_each_deck_alone_on_the_mix_clock(tmp_path: Path) -> None:
+    ffmpeg = _ffmpeg()
+    plan = _plan()
+    outgoing = tmp_path / "outgoing.wav"
+    incoming = tmp_path / "incoming.wav"
+    _write_tone(outgoing, seconds=90, tone_hz=220, pips=((2_000, 60.0),))
+    _write_tone(incoming, seconds=60, tone_hz=330, pips=((3_000, 24.264),))
+
+    renders = {
+        stem: render_pair(
+            plan,
+            outgoing,
+            incoming,
+            tmp_path / f"{stem}-stem.wav",
+            seconds=30,
+            sample_rate=SAMPLE_RATE,
+            ffmpeg=ffmpeg,
+            stem=stem,
+        )
+        for stem in ("outgoing", "incoming")
+    }
+    out_audio, rate = _read_mono(tmp_path / "outgoing-stem.wav")
+    in_audio, _rate = _read_mono(tmp_path / "incoming-stem.wav")
+
+    assert out_audio.size == in_audio.size == 30 * SAMPLE_RATE
+    assert renders["outgoing"].transition_start_ms == 11_000
+    assert _peak_seconds(out_audio, rate, 2_000) == pytest.approx(11.0, abs=0.015)
+    assert _peak_seconds(in_audio, rate, 3_000) == pytest.approx(15.0, abs=0.025)
+    # Unity gain through the mix: no fade on the outgoing deck before its end.
+    assert _rms(out_audio, rate, 17.0, 18.8, 220) == pytest.approx(
+        0.2 / np.sqrt(2), rel=0.1
+    )
+    assert _rms(out_audio, rate, 19.5, 29.0, 220) < 0.003
+    assert _rms(in_audio, rate, 1.0, 10.5, 330) < 0.003
+    assert _rms(in_audio, rate, 11.5, 13.0, 330) == pytest.approx(
+        0.2 / np.sqrt(2), rel=0.1
+    )
+    assert _rms(out_audio, rate, 1.0, 10.5, 330) < 0.003

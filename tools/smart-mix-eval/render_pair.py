@@ -18,6 +18,10 @@ transition the way the Android engine plays it:
 The incoming track keeps the mix tempo after the transition; Android ramps it
 back to 1.0 over 4 s, which this render leaves out.
 
+``stem="outgoing"`` or ``"incoming"`` renders one deck alone, on the same clock as
+the mix and at unity gain (no crossfade, staging or bass shelf): what that deck
+plays, for measurements that need each track separately (``listen_metrics.py``).
+
 usage:
     render_pair.py --plan plan.json --outgoing a.flac --incoming b.flac --output pair.wav
     render_pair.py --report report.json --edge e0001 --outgoing a.flac ...
@@ -34,7 +38,7 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from common import ensure_app_on_path
 
@@ -63,6 +67,9 @@ COMMAND_STEP_MS = 10
 FRAME_SAMPLES = 256
 SHELF_Q = 0.7071
 INCOMING_MARGIN_SECONDS = 0.5
+STEMS = ("outgoing", "incoming")
+
+Stem = Literal["outgoing", "incoming"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,12 +136,17 @@ def build_filtergraph(
     plan: TransitionPlan,
     window: RenderWindow,
     sample_rate: int,
+    *,
+    stem: str | None = None,
 ) -> Filtergraph:
     """The ``-filter_complex`` graph and the bass handoff command files.
 
     Command files are referenced by bare name (``outgoing.cmd``,
     ``incoming.cmd``); ``render_pair`` writes them next to where FFmpeg runs.
+    With ``stem`` the graph plays that deck alone at unity gain.
     """
+    if stem is not None and stem not in STEMS:
+        raise ValueError(f"Unknown stem {stem!r}")
     ratio = incoming_tempo(plan)
     curve = effective_curve(plan)
     handoff = bass_handoff_engaged(plan)
@@ -153,7 +165,7 @@ def build_filtergraph(
     )
     outgoing_bass = incoming_bass = ""
     commands: dict[str, str] = {}
-    if handoff and window.duration_ms > 0:
+    if handoff and window.duration_ms > 0 and stem is None:
         outgoing_bass = _shelf("outgoing", initial_db=0.0)
         incoming_bass = _shelf("incoming", initial_db=BASS_CUT_DB)
         commands = _bass_commands(plan, window)
@@ -164,20 +176,28 @@ def build_filtergraph(
         duration_seconds, curve, plan.incoming_gain_db
     )
     pre_samples = round(window.pre_ms * sample_rate / 1_000)
-    graph = ";".join(
-        (
-            f"[0:a]{prepare},{frames}{outgoing_bass},"
-            f"volume='{outgoing_volume}':eval=frame[outgoing]",
-            f"[1:a]{prepare}{tempo},{frames}{incoming_bass},"
-            f"volume='{incoming_volume}':eval=frame,"
-            f"adelay=delays={pre_samples}S:all=1[incoming]",
-            "[outgoing][incoming]amix=inputs=2:normalize=0:duration=longest,"
-            f"apad,atrim=end_sample={total_samples},"
-            f"afade=t=in:st=0:d={EDGE_FADE_SECONDS},"
-            f"afade=t=out:st={total_seconds - EDGE_FADE_SECONDS:.6f}:"
-            f"d={EDGE_FADE_SECONDS}[mix]",
-        )
+    delay = f"adelay=delays={pre_samples}S:all=1"
+    ending = (
+        f"apad,atrim=end_sample={total_samples},"
+        f"afade=t=in:st=0:d={EDGE_FADE_SECONDS},"
+        f"afade=t=out:st={total_seconds - EDGE_FADE_SECONDS:.6f}:"
+        f"d={EDGE_FADE_SECONDS}[mix]"
     )
+    if stem == "outgoing":
+        graph = f"[0:a]{prepare},{frames},{ending}"
+    elif stem == "incoming":
+        graph = f"[1:a]{prepare}{tempo},{frames},{delay},{ending}"
+    else:
+        graph = ";".join(
+            (
+                f"[0:a]{prepare},{frames}{outgoing_bass},"
+                f"volume='{outgoing_volume}':eval=frame[outgoing]",
+                f"[1:a]{prepare}{tempo},{frames}{incoming_bass},"
+                f"volume='{incoming_volume}':eval=frame,{delay}[incoming]",
+                "[outgoing][incoming]amix=inputs=2:normalize=0:duration=longest,"
+                + ending,
+            )
+        )
     return Filtergraph(
         graph=graph,
         commands=commands,
@@ -197,10 +217,11 @@ def render_pair(
     seconds: float | None = None,
     sample_rate: int = DEFAULT_SAMPLE_RATE,
     ffmpeg: str = "ffmpeg",
+    stem: Stem | None = None,
 ) -> RenderResult:
-    """Render the transition to a 16-bit stereo WAV and return its timing."""
+    """Render the transition (or one deck's ``stem``) to a 16-bit stereo WAV."""
     window = render_window(plan, seconds=seconds)
-    filtergraph = build_filtergraph(plan, window, sample_rate)
+    filtergraph = build_filtergraph(plan, window, sample_rate, stem=stem)
     output_path = Path(output_path).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="smart-mix-render-") as scratch:

@@ -1,7 +1,9 @@
 """Read models for the error inbox: list, detail, summary and sync helpers.
 
 The critical lane matches `crate.error_inbox.priority.is_critical`: a score at or
-above the threshold, or a confident critical triage of the current digest.
+above the threshold, or a confident critical triage of the current digest. The
+pending review lane holds issues whose latest fix run has an open pull request
+(`error_fix_runs`, see `crate.error_inbox.fix_runs`).
 """
 
 from __future__ import annotations
@@ -43,6 +45,21 @@ _CRITICAL = """
         FALSE
     )
 """
+# The status of the issue's latest fix run, or NULL when it never had one.
+_FIX_STATUS = """
+    (
+        SELECT r.status
+        FROM error_fix_runs r
+        WHERE r.issue_id = i.id
+        ORDER BY r.requested_at DESC
+        LIMIT 1
+    )
+"""
+_PENDING_REVIEW = """
+    EXISTS (
+        SELECT 1 FROM error_fix_runs r WHERE r.issue_id = i.id AND r.status = 'pr_open'
+    )
+"""
 _LIST_COLUMNS = """
     i.id::text AS id, i.short_id, i.title, i.culprit, i.service, i.project_slug,
     i.level, i.status, i.substatus, i.issue_category, i.sentry_priority,
@@ -80,6 +97,7 @@ def list_issues(
     status: str = "unresolved",
     service: str | None = None,
     critical_only: bool = False,
+    pending_review: bool = False,
     classification: str | None = None,
     release: str | None = None,
     limit: int = 50,
@@ -110,8 +128,10 @@ def list_issues(
         where.append("(i.last_release = :release OR i.first_release = :release)")
     if critical_only:
         where.append(_CRITICAL)
+    if pending_review:
+        where.append(_PENDING_REVIEW)
     sql = f"""
-        SELECT {_LIST_COLUMNS}, {_CRITICAL} AS critical
+        SELECT {_LIST_COLUMNS}, {_CRITICAL} AS critical, {_FIX_STATUS} AS fix_status
         FROM error_issues i
         {_CURRENT_TRIAGE}
         WHERE {" AND ".join(where)}
@@ -369,16 +389,24 @@ def _state_params() -> dict[str, str]:
     }
 
 
+# Issues whose fix pull request waits for a person, whatever their status.
+_PENDING_REVIEW_COUNT = """
+    (SELECT count(DISTINCT issue_id) FROM error_fix_runs WHERE status = 'pr_open')
+"""
+
+
 def inbox_overview(
     *, now: datetime | None = None, top: int = 3, session: Session | None = None
 ) -> dict[str, Any]:
     """`summary()` plus the stored settings value and the last sync state, in one query.
 
-    `settings` is the raw stored value (JSON text, parsed by the caller) and
-    `sync_state` the `error_inbox` runtime payload.
+    `settings` is the raw stored value (JSON text, parsed by the caller),
+    `sync_state` the `error_inbox` runtime payload and `pending_review` the number
+    of issues whose fix pull request is open.
     """
     sql = _summary_sql(
         f", {_STORED_SETTINGS} AS settings, {_STORED_SYNC} AS sync_state"
+        f", {_PENDING_REVIEW_COUNT} AS pending_review"
     )
     params = {**_summary_params(now, top), **_state_params()}
 
@@ -386,6 +414,7 @@ def inbox_overview(
         row = current.execute(text(sql), params).mappings().one()
         return {
             **_summary_counts(row),
+            "pending_review": int(row["pending_review"]),
             "settings": row["settings"],
             "sync_state": coerce_json(row["sync_state"]),
         }
@@ -486,6 +515,56 @@ def sync_state(
             params,
         ).mappings()
         return {row["external_id"]: dict(row) for row in rows}
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def release_candidates(
+    external_ids: Sequence[str],
+    *,
+    exclude: Sequence[str] = (),
+    limit: int,
+    provider: str = "sentry",
+    session: Session | None = None,
+) -> list[dict[str, str]]:
+    """Listed open issues whose first release is unknown, highest score first.
+
+    Only issues whose latest event carries a release qualify: Sentry knows a first
+    release for those, so one issue detail fills it. `exclude` holds the issues
+    already asked without an answer.
+    """
+    ids = list(dict.fromkeys(str(value) for value in external_ids))
+    if not ids or limit <= 0:
+        return []
+    params = {
+        "ids": ids,
+        "exclude": [str(value) for value in exclude],
+        "provider": provider,
+        "limit": int(limit),
+    }
+
+    def _impl(current: Session) -> list[dict[str, str]]:
+        rows = current.execute(
+            text(
+                """
+                SELECT id::text AS id, external_id
+                FROM error_issues
+                WHERE provider = :provider
+                  AND status = 'unresolved'
+                  AND first_release IS NULL
+                  AND COALESCE(digest ->> 'release', '') <> ''
+                  AND external_id = ANY(CAST(:ids AS text[]))
+                  AND NOT (external_id = ANY(CAST(:exclude AS text[])))
+                ORDER BY crate_score DESC, last_seen DESC NULLS LAST, external_id ASC
+                LIMIT :limit
+                """
+            ),
+            params,
+        ).mappings()
+        return [dict(row) for row in rows]
 
     if session is not None:
         return _impl(session)
@@ -820,6 +899,7 @@ __all__ = [
     "issue_ids_by_short_id",
     "list_issues",
     "open_ids_not_in",
+    "release_candidates",
     "summary",
     "sync_state",
     "untriaged_open",

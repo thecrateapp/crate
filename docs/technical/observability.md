@@ -222,8 +222,10 @@ request calls Sentry, so a slow or unavailable Sentry never slows the page down.
 - **Duplicates.** Issues with the same exception type and innermost application
   frame share a group key and collapse into one row with their combined counts;
   the row expands to the individual issues.
-- **Filters.** Lane, status, service, classification and release, kept in the page
-  address so a filtered view can be shared.
+- **Filters.** Lane (all, critical or **pending review**: issues whose fix pull
+  request is open), status, service, classification and release, kept in the page
+  address so a filtered view can be shared. Issues with an open fix pull request
+  carry a _Pending review_ badge, and the header counts them.
 - **Detail.** Each issue shows its counts, first and last seen, releases, the
   exception chain, the application frames with the source lines Sentry stored for
   the failing release (innermost first, the failing line marked), allowlisted
@@ -233,7 +235,9 @@ request calls Sentry, so a slow or unavailable Sentry never slows the page down.
   the buttons wait until it finishes. _Open in Sentry_ links to the issue.
   _Investigate_ asks the AI model for a cause and a next step
   ([AI triage and investigation](#ai-triage-and-investigation)). _Launch fix_ asks
-  GitHub Actions to try a fix ([Launch fix](#launch-fix)).
+  a fixer to try a fix; the **Fix** panel then follows its pull request, with
+  _Open PR_, _Approve & merge_ and _Discard_
+  ([Reviewing a fix](#reviewing-a-fix)).
 - **Triage and investigation.** The detail shows the AI triage and investigation of
   the latest event: classification, severity, confidence, summary, hypothesis,
   next step, the suspected frames (also marked in the stack trace) and the model
@@ -256,10 +260,17 @@ Sentry runs nothing.
 - It lists unresolved issues of the **error** category only, 100 per page and at
   most 5 pages per pass. A truncated pass is recorded and the page says so.
 - It downloads the latest event of at most 25 issues per pass, highest score
-  first, and keeps a sanitized **digest** of it, never the raw event.
+  first, and keeps a sanitized **digest** of it, never the raw event. The event's
+  release becomes the issue's **last release**.
+- Sentry's issues listing carries no releases, so the **first release** comes from
+  the issue detail (Retrieve an Issue), which also refreshes the last release. It
+  is read once per open issue whose latest event has a release: at most 25 per
+  pass, highest score first, so issues without a first release fill in over the
+  next passes. An issue whose detail has no first release is not read again while
+  it stays listed. A listing never clears a release Crate already has.
 - Issues still open in Crate that no longer appear in the listing are checked one
-  by one, at most 50 per pass, so issues resolved or ignored in Sentry close in
-  Crate too.
+  by one, so issues resolved or ignored in Sentry close in Crate too. These checks
+  and the release lookups share 50 issue reads per pass; the lookups go first.
 - Resolved and ignored issues are forgotten 30 days after they close.
 - The result of each pass (status, error code, counts, truncation) is stored in
   the runtime state the page and the tile read.
@@ -275,11 +286,11 @@ breadcrumbs go first, then source lines.
 
 ### Permissions
 
-| Capability           | Grants                                                               |
-| -------------------- | -------------------------------------------------------------------- |
-| `ops.errors.view`    | The Errors page, the issue detail and the Errors entry in navigation |
-| `ops.errors.manage`  | Resolve, Ignore, Reopen, Investigate, Triage backlog and Launch fix  |
-| `ops.runtime.manage` | The connection drawer: Sentry, AI triage and Launch fix settings     |
+| Capability           | Grants                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| `ops.errors.view`    | The Errors page, the issue detail and the Errors entry in navigation                          |
+| `ops.errors.manage`  | Resolve, Ignore, Reopen, Investigate, Triage backlog, Launch fix, Approve & merge and Discard |
+| `ops.runtime.manage` | The connection drawer: Sentry, AI triage and Launch fix settings                              |
 
 System Health stays open to `ops.health.view`; its tile links to the inbox only
 for people who can open it.
@@ -388,11 +399,14 @@ the evaluation sends and how it stays inside the AI lanes.
 
 ### Launch fix
 
-_Launch fix_ hands one issue to the autofix workflow of the Crate repository,
-`.github/workflows/error-autofix.yml`. An agent there tries to reproduce the error
+_Launch fix_ hands one issue to a fixer through the executor `fix.executor`
+names. Today that is `github_actions`, the autofix workflow of the Crate repository,
+`.github/workflows/error-autofix.yml`: an agent there tries to reproduce the error
 with a failing test, fixes it and opens a **draft** pull request with
-`Fixes <SHORT-ID>`; a person reviews and merges it like any other. Crate never
-merges, and neither a model nor the triage can launch a fix: only a person can.
+`Fixes <SHORT-ID>`. The Crate Software Factory is the next executor;
+[Error fix executors](error-fix-executors.md) is the contract every fixer follows.
+Crate merges only when a person approves ([Reviewing a fix](#reviewing-a-fix)), and
+neither a model nor the triage can launch a fix: only a person can.
 
 1. Someone with `ops.errors.manage` presses **Launch fix** in the issue detail. A
    confirmation warns that the repository is public: the short id and the optional
@@ -402,16 +416,17 @@ merges, and neither a model nor the triage can launch a fix: only a person can.
    fix was launched for the issue in the last 24 hours. It then queues
    `dispatch_error_fix` (fast queue, 30 s, no retries) and answers `202`. It never
    calls GitHub itself.
-3. The task claims the issue (`fix_requested_at`, `fix_requested_by`), so a second
-   launch within 24 hours is refused even if two tasks race. It sends one
+3. The task claims the issue (`fix_requested_at`, `fix_requested_by`) and opens a
+   **fix run**, so a second launch within 24 hours, or while a run is open, is
+   refused even if two tasks race (`ERROR_FIX_IN_PROGRESS`). It sends one
    `workflow_dispatch` with only two inputs, `sentry_issue` and `note`, and writes
    an `error_issue.fix.dispatch` entry to the audit log with ids and settings,
-   never the note or event text. If GitHub refuses, the claim is released and the
-   task fails with a typed code (`GITHUB_AUTH`, `GITHUB_FORBIDDEN`,
-   `GITHUB_NOT_FOUND`, `GITHUB_VALIDATION`, ...).
-4. The detail shows "Fix requested by X at HH:MM", when the button is available
-   again and a link to the workflow runs on GitHub. Viewers without
-   `ops.errors.manage` see the state and the link, not the button.
+   never the note or event text. If GitHub refuses, the claim is released, the run
+   fails with GitHub's code and the task fails with a typed code (`GITHUB_AUTH`,
+   `GITHUB_FORBIDDEN`, `GITHUB_NOT_FOUND`, `GITHUB_VALIDATION`, ...).
+4. The detail shows the **Fix** panel with the run and, once it exists, its pull
+   request. Viewers without `ops.errors.manage` see the state and the links, not
+   the buttons.
 
 The workflow reads the event from Sentry with its own read-only secret; Crate's
 Sentry token and the issue digest never reach GitHub. The workflow does nothing
@@ -424,7 +439,8 @@ the settings:
 - **Repository** (`owner/name`), **workflow** (the file name) and **branch** the
   run starts from: `thecrateapp/crate`, `error-autofix.yml` and `main`.
 - **GitHub token**: a fine-grained personal access token limited to that
-  repository with Actions read and write
+  repository with Actions read and write to launch fixes, plus the read and write
+  permissions that tracking and review need
   ([operations](operations.md#launch-fix-token)). Classic tokens (`ghp_`) are
   refused because they cannot be limited that way. It is stored encrypted like the
   Sentry token, never shown again and only replaced when a new one is typed.
@@ -432,6 +448,33 @@ the settings:
   button disappears from every issue.
 
 The button only appears when the settings and a token are stored.
+
+### Reviewing a fix
+
+`track_error_fixes` follows every open fix run on GitHub every 5 minutes, and only
+while Launch fix is configured and a run needs it. It finds the workflow run and
+then the pull request (branch `autofix/<short id>-<run id>`, label `autofix`,
+`Fixes <SHORT-ID>`), and records its state, whether it is a draft, whether GitHub
+can merge it and the combined state of its checks. A run without a pull request
+after 6 hours expires; a run that finished without one failed.
+
+The **Fix** panel of the issue detail shows that state and, for `ops.errors.manage`:
+
+- **Open PR**: the pull request on GitHub.
+- **Approve & merge**: only for a pull request opened by the fixer's GitHub App with
+  the `autofix` label, on its fix branch, mergeable, and with green checks when it
+  is ready for review. It asks for confirmation and runs as a worker task. A draft is
+  marked ready for review first, so CI runs on it; Crate then merges the approved
+  commit once those checks pass. New commits, a failed check or 3 hours without
+  green checks cancel the approval. GitHub's branch protection always applies.
+- **Discard**: closes the pull request and deletes its branch, or stops the run when
+  there is no pull request yet.
+
+Merged and closed pull requests end the run and Crate deletes the fix branch. Every
+approval, merge and discard is in the audit log with the person who asked. The
+inbox's **Pending review** lane lists the issues whose fix waits for a person.
+[Error fix executors](error-fix-executors.md) has the full state machine and the
+rules.
 
 ### From fix to release
 

@@ -191,6 +191,7 @@ function Filters({
           items={[
             { value: "all", label: "All" },
             { value: "critical", label: "Critical" },
+            { value: "review", label: "Pending review" },
           ]}
         />
       </div>
@@ -378,6 +379,11 @@ export function Errors() {
           {data.critical_open > 0 ? (
             <InfoBadge tone="warning">
               {formatCount(data.critical_open)} critical
+            </InfoBadge>
+          ) : null}
+          {data.pending_review ? (
+            <InfoBadge>
+              {formatCount(data.pending_review)} pending review
             </InfoBadge>
           ) : null}
         </>

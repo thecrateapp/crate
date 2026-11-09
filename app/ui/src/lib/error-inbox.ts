@@ -1,6 +1,6 @@
 // Error Inbox admin API (/api/admin/errors). The admin reads PostgreSQL through
-// these endpoints; status changes, the connection test and Launch fix enqueue
-// worker tasks.
+// these endpoints; status changes, the connection test, Launch fix and the
+// review of fix pull requests (Approve & merge, Discard) enqueue worker tasks.
 
 import type { StatusTone } from "@/components/admin/StatusBadge";
 
@@ -18,6 +18,18 @@ export type IssueClassification =
   | "client_environment"
   | "noise";
 export type IssueSeverity = "critical" | "high" | "medium" | "low";
+/** Lifecycle of a fix run (`crate.error_inbox.fix_runs`). */
+export type FixRunStatus =
+  | "requested"
+  | "running"
+  | "pr_open"
+  | "merged"
+  | "closed"
+  | "failed"
+  | "cancelled"
+  | "expired";
+export type CiState = "pending" | "success" | "failure" | "none";
+export type FixExecutor = "github_actions" | "factory";
 
 export interface ErrorIssueSummary {
   id: string;
@@ -47,6 +59,8 @@ export interface ErrorIssueSummary {
   synced_at: string;
   classification: IssueClassification | null;
   severity: IssueSeverity | null;
+  /** Status of the latest fix run; `pr_open` means its pull request waits. */
+  fix_status?: FixRunStatus | null;
 }
 
 export interface DigestFrame {
@@ -107,12 +121,62 @@ export interface ErrorTriage {
 export interface ErrorIssueFix {
   repository: string;
   workflow: string;
+  executor?: FixExecutor;
   /** The workflow's runs on GitHub. */
   actions_url: string;
   /** False when the workflow does not accept this issue's short id. */
   supported: boolean;
   /** Set while the 24-hour window after the last request is open. */
   available_at: string | null;
+}
+
+/** What a person with ops.errors.manage can do with a fix run now. */
+export interface FixRunReview {
+  can_merge: boolean;
+  /** Why Approve & merge is unavailable (see `blockerText`). */
+  blockers: string[];
+  can_discard: boolean;
+}
+
+/** One attempt to fix the issue and its pull request, as last seen on GitHub. */
+export interface ErrorFixRun {
+  id: string;
+  executor: FixExecutor;
+  status: FixRunStatus;
+  repository: string;
+  base_ref: string | null;
+  external_run_id: string | null;
+  external_run_url: string | null;
+  branch: string | null;
+  pr_number: number | null;
+  pr_url: string | null;
+  pr_state: "open" | "closed" | "merged" | null;
+  pr_draft: boolean | null;
+  pr_mergeable: boolean | null;
+  pr_mergeable_state: string | null;
+  pr_head_sha: string | null;
+  pr_author: string | null;
+  pr_labeled: boolean | null;
+  ci_state: CiState | null;
+  requested_by: number | null;
+  requested_by_name: string | null;
+  requested_at: string;
+  started_at: string | null;
+  pr_opened_at: string | null;
+  merge_requested_by_name: string | null;
+  merge_requested_at: string | null;
+  ready_at: string | null;
+  finished_at: string | null;
+  checked_at: string | null;
+  error_code: string | null;
+  summary: string | null;
+  cleanup_state: "none" | "pending" | "done" | "failed";
+  review: FixRunReview;
+}
+
+export interface FixMergeRequest {
+  /** The commit the person reviewed; the merge only goes ahead on it. */
+  head_sha: string;
 }
 
 export interface ErrorIssueDetail extends ErrorIssueSummary {
@@ -132,6 +196,8 @@ export interface ErrorIssueDetail extends ErrorIssueSummary {
   /** The token's Sentry write scope: false means status actions are unavailable. */
   write_access: boolean | null;
   fix: ErrorIssueFix | null;
+  /** The latest fix runs, newest first (at most five). */
+  fix_runs: ErrorFixRun[];
 }
 
 /** What a sync pass queued for automatic triage. */
@@ -163,6 +229,8 @@ export interface ErrorSummary {
   regressed_24h: number;
   /** Open issues with an event summary and no triage of it. */
   untriaged: number;
+  /** Issues whose fix pull request is open and waits for a person. */
+  pending_review?: number;
   last_synced_at: string | null;
   services: Array<{
     service: string;
@@ -194,6 +262,7 @@ export interface FixConnection {
   repository: string;
   workflow: string;
   ref: string;
+  executor?: FixExecutor;
   /** The GitHub token itself is never returned. */
   has_token: boolean;
   actions_url: string;
@@ -284,7 +353,7 @@ export const TRIAGE_BACKLOG_LIMIT = 100;
 
 // -- filters ------------------------------------------------------------------
 
-export type LaneFilter = "all" | "critical";
+export type LaneFilter = "all" | "critical" | "review";
 export type StatusFilter = IssueStatus | "all";
 export type ClassFilter = IssueClassification | "all";
 
@@ -317,7 +386,7 @@ function oneOf<T extends string>(
 /** Filters from the page URL; unknown values fall back to the defaults. */
 export function filtersFromParams(params: URLSearchParams): IssueFilters {
   return {
-    lane: oneOf(params.get("lane"), ["all", "critical"], "all"),
+    lane: oneOf(params.get("lane"), ["all", "critical", "review"], "all"),
     status: oneOf(
       params.get("status"),
       ["unresolved", "resolved", "ignored", "all"],
@@ -363,6 +432,14 @@ export function issueUrl(id: string): string {
 
 export function fixUrl(id: string): string {
   return `${issueUrl(id)}/fix`;
+}
+
+export function fixRunUrl(
+  issueId: string,
+  runId: string,
+  action: "merge" | "discard",
+): string {
+  return `${issueUrl(issueId)}/fix-runs/${encodeURIComponent(runId)}/${action}`;
 }
 
 export function investigateUrl(id: string): string {
@@ -573,10 +650,140 @@ export function fixProblemText(code: string | null | undefined): string {
       return "The autofix workflow only accepts Crate short ids such as CRATE-API-1F.";
     case "ERROR_FIX_RECENTLY_REQUESTED":
       return "A fix for this issue was launched less than 24 hours ago.";
+    case "ERROR_FIX_IN_PROGRESS":
+      return "This issue already has a fix in progress. Discard it first.";
     case "ERROR_ISSUE_NOT_FOUND":
       return "This issue is no longer in the inbox.";
     default:
       return "Could not launch the fix. Try again.";
+  }
+}
+
+// -- fix runs ---------------------------------------------------------------------
+
+const OPEN_FIX_STATUSES: readonly FixRunStatus[] = [
+  "requested",
+  "running",
+  "pr_open",
+];
+
+export function isOpenFix(status: FixRunStatus | null | undefined): boolean {
+  return OPEN_FIX_STATUSES.includes(status as FixRunStatus);
+}
+
+export const FIX_STATUS_LABEL: Record<FixRunStatus, string> = {
+  requested: "Requested",
+  running: "Running",
+  pr_open: "Pending review",
+  merged: "Merged",
+  closed: "Closed",
+  failed: "Failed",
+  cancelled: "Discarded",
+  expired: "Expired",
+};
+
+export function fixStatusTone(status: FixRunStatus): StatusTone {
+  switch (status) {
+    case "pr_open":
+      return "warning";
+    case "merged":
+      return "success";
+    case "requested":
+    case "running":
+      return "info";
+    default:
+      return "neutral";
+  }
+}
+
+export const EXECUTOR_LABEL: Record<FixExecutor, string> = {
+  github_actions: "GitHub Actions",
+  factory: "Crate Software Factory",
+};
+
+export function ciText(state: CiState | null | undefined): string {
+  switch (state) {
+    case "success":
+      return "Passing";
+    case "failure":
+      return "Failing";
+    case "pending":
+      return "Running";
+    case "none":
+      return "No checks";
+    default:
+      return "Unknown";
+  }
+}
+
+/** What the run is doing, in a sentence, for the fix panel. */
+export function fixRunStateText(run: ErrorFixRun): string {
+  switch (run.status) {
+    case "requested":
+      return "Waiting for the fixer to start.";
+    case "running":
+      return "The fixer is working on it. Crate checks GitHub every 5 minutes.";
+    case "pr_open":
+      if (run.merge_requested_at)
+        return `Approved by ${run.merge_requested_by_name ?? "someone"}. Crate merges it once the checks of the approved commit pass.`;
+      return run.pr_draft
+        ? "A draft pull request waits for review."
+        : "A pull request waits for review.";
+    case "merged":
+      return "The pull request was merged.";
+    case "closed":
+      return "The pull request was closed without merging.";
+    case "cancelled":
+      return "The fix was discarded.";
+    case "expired":
+      return "No pull request appeared within 6 hours.";
+    case "failed":
+      return "The fix did not produce a pull request.";
+  }
+}
+
+const BLOCKER_TEXT: Record<string, string> = {
+  FIX_RUN_NOT_OPEN: "There is no pull request to merge yet.",
+  PR_NOT_OPEN: "The pull request is no longer open.",
+  PR_NOT_FROM_FIXER:
+    "The pull request was not opened by the fixer's GitHub account.",
+  PR_NOT_LABELLED: "The pull request does not carry the autofix label.",
+  PR_BRANCH_UNEXPECTED: "The pull request is not on a fix branch.",
+  PR_CONFLICTS: "The pull request has conflicts.",
+  PR_MERGEABILITY_UNKNOWN: "GitHub has not worked out whether it can merge.",
+  CHECKS_PENDING: "The checks have not passed yet.",
+  CHECKS_FAILED: "A check failed.",
+  ALREADY_APPROVED: "It is already approved.",
+};
+
+/** Why Approve & merge is unavailable, one sentence per reason. */
+export function blockerText(blockers: string[]): string {
+  return blockers
+    .map((code) => BLOCKER_TEXT[code] ?? `Not available (${code}).`)
+    .join(" ");
+}
+
+/** Why the API refused Approve & merge or Discard. */
+export function fixRunProblemText(
+  code: string | null | undefined,
+  action: "merge" | "discard",
+): string {
+  switch (code) {
+    case "ERROR_FIX_HEAD_CHANGED":
+      return "The pull request changed since this page loaded. Review it again.";
+    case "ERROR_FIX_NOT_MERGEABLE":
+      return "The pull request cannot be merged from Crate now.";
+    case "ERROR_FIX_RUN_CLOSED":
+      return "This fix has already ended.";
+    case "ERROR_FIX_NOT_CONFIGURED":
+      return "Launch fix is not configured. Set it up in the Sentry connection.";
+    case "ERROR_FIX_RUN_NOT_FOUND":
+    case "ERROR_ISSUE_NOT_FOUND":
+      return "This fix is no longer in the inbox.";
+    default:
+      return action === "merge"
+        ? "Could not approve the merge. Try again."
+        : "Could not discard the fix. Try again.";
   }
 }
 

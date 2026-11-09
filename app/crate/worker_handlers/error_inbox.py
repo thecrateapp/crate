@@ -1,7 +1,8 @@
-"""Error inbox tasks: the Sentry sync, status changes, the connection test and the
-Launch fix dispatch.
+"""Error inbox tasks: the Sentry sync, status changes, the connection test and AI
+triage. Launch fix and the review of fix pull requests live in
+`crate.worker_handlers.error_fixes`.
 
-Only these tasks talk to Sentry or GitHub (EI-D3); the admin reads PostgreSQL. No
+Only these tasks talk to Sentry (EI-D3); the admin reads PostgreSQL. No
 HTTP call runs inside a database transaction: every repository call opens and closes
 its own scope between requests. Tokens are handed to the clients and nothing else:
 they never reach a log line, a task result or the runtime state, and neither do
@@ -13,11 +14,18 @@ write-access check live in `crate.error_inbox.state`:
 - `error_inbox`, written by every sync pass (see `_SyncReport.state`): `status`
   (`ok`, `partial` or `failed`), `started_at`, `finished_at`, `last_success_at`,
   the typed `error_code` of the pass, `counts` (`listed`, `listed_recent`,
-  `upserted`, `digests_fetched`, `status_refreshed`, `purged`), `pages`,
-  `truncated` (`full`, `recent`), `budget_exhausted` and `cancelled`.
+  `upserted`, `digests_fetched`, `releases_fetched`, `status_refreshed`,
+  `purged`), `pages`, `truncated` (`full`, `recent`), `budget_exhausted` and
+  `cancelled`.
 - `error_inbox_access`: `read` and `write` (true, false or null when unknown),
   `credential` (a hash of the token's secret ref, never the token), `source`
   (`sync` or `connection_test`), `checked_at` and `error_code`.
+
+Releases: Sentry's issues listing carries none. `last_release` comes from the
+latest event the sync already downloads and `first_release` from the issue detail,
+read once per issue (`refresh_releases`); a listing never clears either. Only the
+sync uses a third key, `error_inbox_release_checks`: the listed issues whose detail
+had no first release, so it is not read again.
 
 Write access (EI-D4) comes from `check_scopes`. The connection test records it every
 time it runs; each sync pass records it when the scope check succeeds or the token
@@ -26,11 +34,6 @@ change. `update_error_issue_status` refuses without calling Sentry only when the
 recorded access belongs to the current token and says `write: false`. Unknown access
 (never checked, a different token, or Sentry did not report scopes) lets Sentry
 decide, and a 403 comes back as `SENTRY_FORBIDDEN`.
-
-`dispatch_error_fix` (Launch fix, E3) starts `.github/workflows/error-autofix.yml`
-for one issue with only its short id and the person's note. It claims the issue
-first (`fix_requested_at`, at most once every 24 hours), dispatches once without
-retries, and audits the request; a failed dispatch gives the claim back.
 
 AI triage (E2): with `triage.automatic` on, each sync pass ends by queuing
 `triage_error_issue` for the open issues that need it (`queue_automatic_triage`,
@@ -68,37 +71,28 @@ from crate.db.queries.error_issues import (
     auto_triage_plan,
     get_issue,
     open_ids_not_in,
+    release_candidates,
     sync_state,
 )
 from crate.db.repositories.error_issues import (
     TRIAGE_ORIGINS,
-    audit_fix_request,
     mark_status,
     purge_closed,
     queue_triages,
-    record_fix_request,
     record_status_change,
-    release_fix_request,
     set_digest,
+    set_releases,
     upsert_issues,
-)
-from crate.error_inbox.autofix import (
-    MAX_NOTE_LENGTH,
-    REQUEST_COOLDOWN,
-    AutofixInputError,
-    workflow_inputs,
 )
 from crate.error_inbox.config import (
     ErrorTrackingConfig,
     ErrorTrackingConfigError,
     load_config,
-    load_github_token,
     load_sentry_token,
 )
 from crate.error_inbox.digest import build_digest, digest_hash, group_key, service_tag
 from crate.error_inbox.evaluation import run_evaluation
 from crate.error_inbox.evidence import fetch_evidence
-from crate.error_inbox.github_client import GitHubAPIError, GitHubClient
 from crate.error_inbox.priority import crate_score
 from crate.error_inbox.state import (
     ACCESS_STATE_KEY,
@@ -132,11 +126,14 @@ from crate.worker_handlers import TaskHandler, is_cancelled
 log = logging.getLogger(__name__)
 
 ClientFactory = Callable[[ErrorTrackingConfig, str], SentryClient]
-GitHubClientFactory = Callable[[str], GitHubClient]
 
 MAX_LIST_PAGES = 5
 MAX_EVENT_FETCHES = 25
+# Issue details read one by one per pass, release lookups and status checks together.
 MAX_STATUS_REFRESHES = 50
+# The share of those reads release lookups may take; status checks keep the rest.
+MAX_RELEASE_LOOKUPS = 25
+RELEASE_CHECKS_KEY = "error_inbox_release_checks"
 # Leaves room under the 120 s task limit to write what was fetched and the state.
 SYNC_BUDGET_SECONDS = 90.0
 ISSUE_STATUSES = frozenset({"resolved", "ignored", "unresolved"})
@@ -155,22 +152,10 @@ def _now() -> datetime:
 # listed and are still reported.
 EXPECTED_FAILURE_CODES = frozenset(
     {
-        "ERROR_FIX_NOT_CONFIGURED",
-        "ERROR_FIX_RECENTLY_REQUESTED",
-        "ERROR_FIX_UNSUPPORTED_ISSUE",
         "ERROR_ISSUE_NOT_FOUND",
         "ERROR_TRACKING_INVALID",
         "ERROR_TRACKING_NOT_CONFIGURED",
         "ERROR_TRACKING_TOKEN_MISSING",
-        "GITHUB_AUTH",
-        "GITHUB_FORBIDDEN",
-        "GITHUB_NOT_FOUND",
-        "GITHUB_RATE_LIMITED",
-        "GITHUB_REDIRECT",
-        "GITHUB_SERVER",
-        "GITHUB_TIMEOUT",
-        "GITHUB_UNAVAILABLE",
-        "GITHUB_VALIDATION",
         "SENTRY_AUTH",
         "SENTRY_FORBIDDEN",
         "SENTRY_HOST_DISALLOWED",
@@ -219,6 +204,7 @@ class _SyncReport:
             "listed_recent": 0,
             "upserted": 0,
             "digests_fetched": 0,
+            "releases_fetched": 0,
             "status_refreshed": 0,
             "purged": 0,
         }
@@ -334,6 +320,26 @@ def _event_id(digest: Mapping[str, Any]) -> str | None:
     return value or None
 
 
+def _release_checks() -> set[str]:
+    state = get_ops_runtime_state(RELEASE_CHECKS_KEY) or {}
+    ids = state.get("external_ids")
+    if not isinstance(ids, list):
+        return set()
+    return {value for value in ids if isinstance(value, str)}
+
+
+def _record_release_checks(
+    previous: set[str], answered: set[str], listed: Sequence[str]
+) -> None:
+    # Only listed issues can be looked up again, so the others are dropped.
+    checks = (previous | answered) & set(listed)
+    if checks != previous:
+        set_ops_runtime_state(
+            RELEASE_CHECKS_KEY,
+            {"version": STATE_VERSION, "external_ids": sorted(checks)},
+        )
+
+
 class _Pass:
     def __init__(
         self,
@@ -350,6 +356,7 @@ class _Pass:
         self.cancelled = cancelled
         self.clock = clock
         self.deadline = clock() + SYNC_BUDGET_SECONDS
+        self.issue_reads = 0
 
     def should_stop(self) -> bool:
         if self.cancelled():
@@ -398,9 +405,12 @@ class _Pass:
         rows = _scored(issues, stored)
         report.counts["upserted"] = upsert_issues(rows, synced_at=report.started_at)
 
+        listed = [row["external_id"] for row in rows]
         error_code = self.refresh_digests(rows, stored)
         if error_code is None:
-            error_code = self.refresh_missing([row["external_id"] for row in rows])
+            error_code = self.refresh_releases(listed)
+        if error_code is None:
+            error_code = self.refresh_missing(listed)
         if error_code is not None:
             log.warning("Error inbox sync stopped early: %s", error_code)
             report.interrupt(error_code)
@@ -444,19 +454,62 @@ class _Pass:
                 group_key=group_key(digest),
                 service=tag,
                 crate_score=score,
+                last_release=digest.get("release"),
             )
             self.report.counts["digests_fetched"] += 1
         return None
 
+    def refresh_releases(self, listed: Sequence[str]) -> str | None:
+        """First and last release of listed issues that lack a first one, capped.
+
+        The listing carries no releases; the issue detail does. Candidates are open
+        issues whose latest event has a release, highest score first. A detail read
+        fills the issue for good, so it is read once; one without a first release is
+        remembered and not read again while the issue stays listed.
+        """
+        room = min(MAX_RELEASE_LOOKUPS, MAX_STATUS_REFRESHES - self.issue_reads)
+        checked = _release_checks()
+        candidates = release_candidates(listed, exclude=sorted(checked), limit=room)
+        answered: set[str] = set()
+        error_code: str | None = None
+        for item in candidates:
+            if self.should_stop():
+                break
+            self.issue_reads += 1
+            try:
+                issue = self.client.get_issue(item["external_id"])
+            except SentryNotFoundError:
+                answered.add(item["external_id"])
+                continue
+            except SentryAPIError as error:
+                error_code = error.code
+                break
+            set_releases(
+                item["id"],
+                first_release=issue.get("first_release"),
+                last_release=issue.get("last_release"),
+            )
+            self.report.counts["releases_fetched"] += 1
+            if not issue.get("first_release"):
+                answered.add(item["external_id"])
+        _record_release_checks(checked, answered, listed)
+        return error_code
+
     def refresh_missing(self, listed: Sequence[str]) -> str | None:
-        """Status of open local issues the listing no longer returns, capped."""
-        missing = open_ids_not_in(listed, limit=MAX_STATUS_REFRESHES)
+        """Status of open local issues the listing no longer returns, capped.
+
+        The details read for releases this pass count against the same cap.
+        """
+        missing = open_ids_not_in(
+            listed, limit=max(MAX_STATUS_REFRESHES - self.issue_reads, 0)
+        )
         fetched: list[dict[str, Any]] = []
         gone: list[str] = []
         error_code: str | None = None
         for item in missing:
             if self.should_stop():
                 break
+            self.issue_reads += 1
             try:
                 fetched.append(self.client.get_issue(item["external_id"]))
             except SentryNotFoundError:
@@ -702,116 +755,6 @@ def check_connection(*, client_factory: ClientFactory | None = None) -> dict[str
     return {"status": "succeeded", "access": access}
 
 
-# -- Launch fix (E3) ----------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class _FixRequest:
-    issue_id: str
-    note: str
-    actor_id: int
-
-
-def _fix_request(params: Mapping[str, Any]) -> _FixRequest:
-    issue_id = params.get("issue_id")
-    note = params.get("note", "")
-    actor_id = params.get("actor_id")
-    if (
-        not isinstance(issue_id, str)
-        or not isinstance(note, str)
-        or len(note) > MAX_NOTE_LENGTH
-        or isinstance(actor_id, bool)
-        or not isinstance(actor_id, int)
-    ):
-        raise ValueError("Invalid fix request")
-    return _FixRequest(issue_id=issue_id, note=note, actor_id=actor_id)
-
-
-def dispatch_fix(
-    task_id: str,
-    params: Mapping[str, Any],
-    *,
-    client_factory: GitHubClientFactory | None = None,
-) -> dict[str, Any]:
-    """Dispatch the autofix workflow for one issue, at most once every 24 hours.
-
-    The issue is claimed before GitHub is called, so a second dispatch of the same
-    issue cannot pass while the first is in flight; a failed dispatch releases the
-    claim. Only the short id and the note leave Crate.
-    """
-    try:
-        request = _fix_request(params)
-    except ValueError:
-        return _failed("ERROR_FIX_INVALID_REQUEST", "Invalid fix request")
-    issue = get_issue(request.issue_id)
-    if issue is None:
-        return _failed("ERROR_ISSUE_NOT_FOUND", "The issue is no longer in the inbox")
-    try:
-        config = load_config()
-        if config is None or config.fix is None:
-            return _failed("ERROR_FIX_NOT_CONFIGURED", "Launch fix is not configured")
-        fix = config.fix
-        inputs = workflow_inputs(issue["short_id"], request.note)
-        token = load_github_token(config)
-    except (ErrorTrackingConfigError, AutofixInputError) as error:
-        return _failed(error.code, error.message)
-
-    requested_at = _now()
-    if not record_fix_request(
-        request.issue_id,
-        user_id=request.actor_id,
-        at=requested_at,
-        cooldown=REQUEST_COOLDOWN,
-    ):
-        return _failed(
-            "ERROR_FIX_RECENTLY_REQUESTED",
-            "A fix for this issue was launched less than 24 hours ago",
-        )
-
-    def release() -> None:
-        release_fix_request(
-            request.issue_id,
-            requested_at=requested_at,
-            previous_at=issue.get("fix_requested_at"),
-            previous_by=issue.get("fix_requested_by"),
-        )
-
-    try:
-        with (client_factory or GitHubClient)(token) as client:
-            client.dispatch_workflow(fix.repository, fix.workflow, fix.ref, inputs)
-    except GitHubAPIError as error:
-        # Includes timeouts, where GitHub may have started the run: the person can
-        # try again at once and the workflow's concurrency group queues a repeat.
-        log.warning("Launch fix dispatch failed: %s", error.code)
-        release()
-        return _failed(error.code, str(error))
-    except Exception:
-        release()
-        raise
-    audit_fix_request(
-        request.issue_id,
-        actor_id=request.actor_id,
-        task_id=task_id,
-        at=requested_at,
-        details={
-            "issue_id": request.issue_id,
-            "provider": issue["provider"],
-            "external_id": issue["external_id"],
-            "repository": fix.repository,
-            "workflow": fix.workflow,
-            "ref": fix.ref,
-            "has_note": bool(request.note),
-        },
-    )
-    return {
-        "status": "succeeded",
-        "issue_id": request.issue_id,
-        "short_id": issue["short_id"],
-        "requested_at": requested_at.isoformat(),
-        "actions_url": fix.actions_url,
-    }
-
-
 # -- AI triage and investigation tasks (E2) ---------------------------------------
 
 ACTION_LABEL = {
@@ -1014,10 +957,6 @@ def _handle_test_error_tracking_connection(
     return check_connection()
 
 
-def _handle_dispatch_error_fix(task_id: str, params: dict, config: dict) -> dict:
-    return dispatch_fix(task_id, params)
-
-
 # The AI-lane handlers name the structured executor themselves: that makes them the
 # roots of the model-calling chain tests/test_ai_architecture.py checks.
 def _handle_triage_error_issue(task_id: str, params: dict, config: dict) -> dict:
@@ -1059,7 +998,6 @@ ERROR_INBOX_TASK_HANDLERS: dict[str, TaskHandler] = {
     "sync_error_issues": _handle_sync_error_issues,
     "update_error_issue_status": _handle_update_error_issue_status,
     "test_error_tracking_connection": _handle_test_error_tracking_connection,
-    "dispatch_error_fix": _handle_dispatch_error_fix,
     "triage_error_issue": _handle_triage_error_issue,
     "investigate_error_issue": _handle_investigate_error_issue,
     "evaluate_error_triage": _handle_evaluate_error_triage,
@@ -1074,7 +1012,6 @@ __all__ = [
     "SYNC_STATE_KEY",
     "ai_problem_text",
     "check_connection",
-    "dispatch_fix",
     "known_write_access",
     "queue_automatic_triage",
     "run_triage_task",

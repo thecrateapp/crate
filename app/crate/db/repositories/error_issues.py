@@ -47,8 +47,10 @@ _UPSERT_SQL = """
         users_24h = EXCLUDED.users_24h,
         first_seen = EXCLUDED.first_seen,
         last_seen = EXCLUDED.last_seen,
-        first_release = EXCLUDED.first_release,
-        last_release = EXCLUDED.last_release,
+        -- The issues listing never carries releases: keep what an issue detail
+        -- or the latest event gave rather than clear it.
+        first_release = COALESCE(EXCLUDED.first_release, error_issues.first_release),
+        last_release = COALESCE(EXCLUDED.last_release, error_issues.last_release),
         permalink = EXCLUDED.permalink,
         crate_score = EXCLUDED.crate_score,
         closed_at = CASE
@@ -113,7 +115,9 @@ def upsert_issues(
     """Insert or refresh issues from a sync pass.
 
     `service`, the digest and fix requests survive a refresh: the service comes from
-    the latest event's tag, which only `set_digest` knows.
+    the latest event's tag, which only `set_digest` knows. A release the row does not
+    carry keeps its stored value: Sentry's issues listing has none, only the issue
+    detail (`set_releases`) and the latest event (`set_digest`) do.
     """
     if not rows:
         return 0
@@ -233,8 +237,13 @@ def set_digest(
     group_key: str,
     service: str | None = None,
     crate_score: int | None = None,
+    last_release: str | None = None,
     session: Session | None = None,
 ) -> bool:
+    """Store the digest of the latest event; its release becomes `last_release`.
+
+    A None `service`, `crate_score` or `last_release` keeps the stored value.
+    """
     with optional_scope(session) as current:
         result = current.execute(
             text(
@@ -245,7 +254,8 @@ def set_digest(
                     digest_hash = :digest_hash,
                     group_key = :group_key,
                     service = COALESCE(CAST(:service AS text), service),
-                    crate_score = COALESCE(CAST(:crate_score AS integer), crate_score)
+                    crate_score = COALESCE(CAST(:crate_score AS integer), crate_score),
+                    last_release = COALESCE(CAST(:last_release AS text), last_release)
                 WHERE id = CAST(:id AS uuid)
                 """
             ),
@@ -257,6 +267,34 @@ def set_digest(
                 "group_key": group_key,
                 "service": service,
                 "crate_score": crate_score,
+                "last_release": last_release or None,
+            },
+        )
+        return cast(CursorResult, result).rowcount == 1
+
+
+def set_releases(
+    issue_id: str,
+    *,
+    first_release: str | None,
+    last_release: str | None,
+    session: Session | None = None,
+) -> bool:
+    """Store the releases an issue detail gave; a None keeps the stored value."""
+    with optional_scope(session) as current:
+        result = current.execute(
+            text(
+                """
+                UPDATE error_issues
+                SET first_release = COALESCE(CAST(:first_release AS text), first_release),
+                    last_release = COALESCE(CAST(:last_release AS text), last_release)
+                WHERE id = CAST(:id AS uuid)
+                """
+            ),
+            {
+                "id": _uuid(issue_id),
+                "first_release": first_release or None,
+                "last_release": last_release or None,
             },
         )
         return cast(CursorResult, result).rowcount == 1
@@ -568,6 +606,7 @@ __all__ = [
     "release_fix_request",
     "save_triage",
     "set_digest",
+    "set_releases",
     "triage_dedup_key",
     "upsert_issues",
 ]

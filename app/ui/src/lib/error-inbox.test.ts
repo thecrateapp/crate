@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   sampleDetail,
+  sampleFixRun,
   sampleIssue,
   sampleIssues,
   sampleTriage,
@@ -11,6 +12,8 @@ import {
   DEFAULT_FILTERS,
   aiProblemText,
   apiErrorCode,
+  blockerText,
+  ciText,
   currentAssessments,
   investigateUrl,
   previousAssessment,
@@ -18,7 +21,11 @@ import {
   clockText,
   filtersFromParams,
   fixProblemText,
+  fixRunProblemText,
+  fixRunStateText,
+  fixRunUrl,
   fixUrl,
+  isOpenFix,
   filtersToParams,
   hasActiveFilters,
   issuesUrl,
@@ -89,6 +96,12 @@ describe("filters", () => {
     });
     expect(hasActiveFilters(DEFAULT_FILTERS)).toBe(false);
     expect(hasActiveFilters(filtersFromParams(params))).toBe(true);
+  });
+
+  it("keeps the pending review lane", () => {
+    const params = new URLSearchParams("lane=review");
+    expect(filtersFromParams(params).lane).toBe("review");
+    expect(issuesUrl(filtersFromParams(params))).toContain("lane=review");
   });
 
   it("falls back to defaults for unknown values", () => {
@@ -235,5 +248,50 @@ describe("triagePassText", () => {
     );
     expect(triagePassText({ ...pass, status: "off" })).toBeNull();
     expect(triagePassText(null)).toBeNull();
+  });
+});
+
+describe("fix runs", () => {
+  it("builds the review URLs and reads open states", () => {
+    expect(fixRunUrl("issue 1", "run/2", "merge")).toBe(
+      "/api/admin/errors/issue%201/fix-runs/run%2F2/merge",
+    );
+    expect(isOpenFix("pr_open")).toBe(true);
+    expect(isOpenFix("merged")).toBe(false);
+    expect(isOpenFix(undefined)).toBe(false);
+  });
+
+  it("explains blockers and refusals in plain words", () => {
+    expect(blockerText(["PR_CONFLICTS", "CHECKS_FAILED"])).toBe(
+      "The pull request has conflicts. A check failed.",
+    );
+    expect(blockerText(["SOMETHING_NEW"])).toBe(
+      "Not available (SOMETHING_NEW).",
+    );
+    expect(fixRunProblemText("ERROR_FIX_RUN_CLOSED", "discard")).toBe(
+      "This fix has already ended.",
+    );
+    expect(fixRunProblemText(null, "merge")).toBe(
+      "Could not approve the merge. Try again.",
+    );
+    expect(fixProblemText("ERROR_FIX_IN_PROGRESS")).toMatch(/Discard it first/);
+    expect(ciText("failure")).toBe("Failing");
+  });
+
+  it("describes each state of a run", () => {
+    expect(fixRunStateText(sampleFixRun())).toBe(
+      "A draft pull request waits for review.",
+    );
+    expect(
+      fixRunStateText(
+        sampleFixRun({
+          merge_requested_at: "2026-11-08T10:00:00Z",
+          merge_requested_by_name: "Diego",
+        }),
+      ),
+    ).toMatch(/^Approved by Diego\./);
+    expect(fixRunStateText(sampleFixRun({ status: "expired" }))).toBe(
+      "No pull request appeared within 6 hours.",
+    );
   });
 });

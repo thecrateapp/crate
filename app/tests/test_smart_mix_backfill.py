@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import json
 from pathlib import Path
 import uuid
 
@@ -24,6 +25,20 @@ CANCELLED_V6_CAMPAIGN = {
     "batches": 1_555,
     "claimed": 38_865,
     "sequence": 1_600,
+}
+# v8 measures model-beat stability on the track's grid; production holds a paused v7
+# campaign that had written about 2,710 v7 profiles when v8 shipped. The counters are
+# illustrative.
+PREVIOUS_ANALYZER_VERSION = "smart-mix-audio-v7"
+PAUSED_V7_CAMPAIGN = {
+    "target": PREVIOUS_ANALYZER_VERSION,
+    "profile_version": 1,
+    "status": "paused",
+    "batch_size": 25,
+    "max_attempts": 3,
+    "batches": 109,
+    "claimed": 2_710,
+    "sequence": 1_750,
 }
 
 
@@ -307,6 +322,281 @@ def test_a_claim_takes_only_the_free_slots(pg_db, tmp_path: Path) -> None:
     assert {row["id"] for row in claimed} <= set(free)
 
 
+def _coordinator_claim(**kwargs) -> list[int]:
+    kwargs.setdefault("max_in_flight", 25)
+    kwargs.setdefault("claimed_by", "task:coordinator")
+    return [int(row["id"]) for row in claim_smart_mix_backfill_batch(**kwargs)]
+
+
+def _age_ranking(*, seconds: int) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE ops_runtime_state
+                SET updated_at = NOW() - make_interval(secs => :seconds)
+                WHERE key = :key
+                """
+            ),
+            {"key": smart_mix_backfill.RANKING_STATE_KEY, "seconds": seconds},
+        )
+
+
+def _like(track_id: int) -> None:
+    user_id = _create_user()
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO user_liked_tracks (user_id, track_id, created_at)
+                VALUES (:user_id, :track_id, NOW())
+                """
+            ),
+            {"user_id": user_id, "track_id": track_id},
+        )
+
+
+def test_a_pass_claims_from_the_stored_ranking_until_it_is_refreshed(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    first, second, third, liked = _create_tracks(tmp_path, count=4)
+
+    assert _coordinator_claim(limit=1) == [first]
+    # A like moves the track up, but passes keep the stored order instead of
+    # ranking the whole library again.
+    _like(liked)
+    assert _coordinator_claim(limit=1) == [second]
+
+    _age_ranking(seconds=smart_mix_backfill.RANKING_MAX_AGE_SECONDS + 1)
+    assert _coordinator_claim(limit=2) == [liked, third]
+
+
+def test_the_play_queue_and_offline_ids_go_first_without_a_new_ranking(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    first, _second, queued, offline = _create_tracks(tmp_path, count=4)
+
+    assert _coordinator_claim(limit=1) == [first]
+    _mark_current_queue(queued)
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=2,
+        max_in_flight=25,
+        offline_track_ids=[offline],
+        claimed_by="task:coordinator",
+    )
+
+    assert [(row["id"], row["priority"]) for row in claimed] == [
+        (queued, 1),
+        (offline, 2),
+    ]
+
+
+def _queue_items(items: list[dict]) -> None:
+    """Store a play queue of these items on a new device."""
+    user_id = _create_user()
+    device_id = f"device-{uuid.uuid4().hex}"
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO user_devices (
+                    user_id, device_id, device_type, created_at, updated_at
+                )
+                VALUES (:user_id, :device_id, 'test', NOW(), NOW())
+                """
+            ),
+            {"user_id": user_id, "device_id": device_id},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO user_playback_device_states (
+                    user_id, device_id, status, queue_json
+                )
+                VALUES (:user_id, :device_id, 'paused', CAST(:queue AS jsonb))
+                """
+            ),
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                "queue": json.dumps(items),
+            },
+        )
+
+
+def test_a_long_play_queue_is_claimed_in_order_chunk_by_chunk(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    del pg_db
+    monkeypatch.setattr(smart_mix_backfill, "_LIVE_CHUNK_SIZE", 2)
+    _unqueued, *queued = _create_tracks(tmp_path, count=6)
+    for track_id in (queued[0], queued[2]):
+        _insert_profile(track_id, analyzer_version=ANALYZER_VERSION)
+    _queue_items([{"id": str(track_id)} for track_id in reversed(queued)])
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=3, max_in_flight=25, claimed_by="task:coordinator"
+    )
+
+    assert [(row["id"], row["priority"]) for row in claimed] == [
+        (queued[1], 1),
+        (queued[3], 1),
+        (queued[4], 1),
+    ]
+
+
+def test_queued_items_as_listen_stores_them_go_first(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    from crate.db.repositories.playback_state import sanitize_queue_snapshot
+
+    _first, by_id, by_uid, _rest = _create_tracks(tmp_path, count=4)
+    with read_scope() as session:
+        uid = session.execute(
+            text("SELECT entity_uid::text FROM library_tracks WHERE id = :id"),
+            {"id": by_uid},
+        ).scalar_one()
+    # Listen keeps track_id and track_entity_uid (libraryTrackId and entity_uid
+    # become those) and drops every other key.
+    queue = sanitize_queue_snapshot(
+        [{"libraryTrackId": by_id, "id": "x"}, {"entity_uid": uid, "id": "y"}]
+    )
+    assert queue == [{"track_id": by_id}, {"track_entity_uid": uid}]
+    _queue_items(queue)
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=2, max_in_flight=25, claimed_by="task:coordinator"
+    )
+
+    assert [(row["id"], row["priority"]) for row in claimed] == [
+        (by_id, 1),
+        (by_uid, 1),
+    ]
+
+
+def test_an_exhausted_ranking_ranks_again_before_the_claim_gives_up(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    [retried] = _create_tracks(tmp_path, count=1)
+    assert _coordinator_claim(limit=1) == [retried]
+    # Its child was lost and a track arrived after the ranking: both are
+    # claimable although the stored ranking has run out.
+    _age_claim(retried, hours=3)
+    [imported] = _create_tracks(tmp_path, count=1)
+
+    assert sorted(_coordinator_claim(limit=4)) == sorted([retried, imported])
+    assert _processing_row(retried)["attempts"] == 2
+    assert _coordinator_claim(limit=4) == []
+
+
+def test_a_change_of_retry_budget_ranks_again(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    [track_id] = _create_tracks(tmp_path, count=1)
+    _insert_processing(
+        track_id, state="failed", attempts=3, target_generation=ANALYZER_VERSION
+    )
+
+    assert _coordinator_claim(limit=1, max_attempts=3) == []
+    assert _coordinator_claim(limit=1, max_attempts=4) == [track_id]
+
+
+def test_a_stored_track_that_stopped_being_claimable_is_skipped(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    first, reanalyzed, third = _create_tracks(tmp_path, count=3)
+    assert _coordinator_claim(limit=1) == [first]
+    # A manual reanalysis wrote a current profile after the ranking.
+    _insert_profile(reanalyzed, analyzer_version=ANALYZER_VERSION)
+
+    assert _coordinator_claim(limit=1) == [third]
+
+
+def test_the_stored_ranking_keeps_promotions_after_every_other_track(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    queued_python, missing, liked_python, played = _create_tracks(tmp_path, count=4)
+    for track_id in (queued_python, liked_python):
+        _insert_profile(
+            track_id,
+            analyzer_version=ANALYZER_VERSION,
+            analyzer="crate-python",
+            quality="partial",
+        )
+        _insert_processing(
+            track_id, state="done", attempts=1, target_generation=ANALYZER_VERSION
+        )
+    _mark_current_queue(queued_python)
+    _like(liked_python)
+    _mark_played(played)
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=10,
+        max_in_flight=25,
+        claimed_by="task:coordinator",
+        promote_python_profiles=True,
+    )
+
+    # Python promotions go last, as in the whole-library order: promotion,
+    # priority, track id.
+    assert [(row["id"], row["priority"]) for row in claimed] == [
+        (played, 4),
+        (missing, 5),
+        (queued_python, 1),
+        (liked_python, 3),
+    ]
+
+
+def test_two_coordinators_racing_never_exceed_the_limit(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    import threading
+
+    from crate.db.jobs.smart_mix_backfill import count_smart_mix_in_flight
+
+    track_ids = _create_tracks(tmp_path, count=20)
+    claimed: list[int] = []
+    errors: list[BaseException] = []
+
+    def race(limit: int) -> None:
+        start = threading.Barrier(2)
+
+        def coordinator(name: str) -> None:
+            try:
+                start.wait(timeout=10)
+                claimed.extend(
+                    _coordinator_claim(
+                        limit=25, max_in_flight=limit, claimed_by=f"task:{name}"
+                    )
+                )
+            except BaseException as error:  # noqa: BLE001 - reraised below
+                errors.append(error)
+
+        threads = [
+            threading.Thread(target=coordinator, args=(name,))
+            for name in ("first", "second")
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+        assert not any(thread.is_alive() for thread in threads)
+        assert errors == []
+
+    # Both rank the empty store at once, then both refresh a stale ranking.
+    race(4)
+    assert len(claimed) == 4
+    _age_ranking(seconds=smart_mix_backfill.RANKING_MAX_AGE_SECONDS + 1)
+    race(8)
+
+    assert len(claimed) == len(set(claimed)) == 8
+    assert set(claimed) <= set(track_ids)
+    assert count_smart_mix_in_flight() == 8
+
+
 def _allow_by_governor(monkeypatch) -> list:
     from crate.resource_governor import ResourceDecision
 
@@ -540,6 +830,99 @@ def test_live_coverage_refresh_is_throttled_while_work_is_in_flight(
             {"track_id": claimed},
         )
     assert refresh_live_smart_mix_coverage() is True
+
+
+def _coverage_refreshed_at() -> datetime:
+    with read_scope() as session:
+        return session.execute(
+            text("SELECT updated_at FROM ops_runtime_state WHERE key = :key"),
+            {"key": smart_mix_backfill.COVERAGE_STATE_KEY},
+        ).scalar_one()
+
+
+def _age_coverage(*, seconds: int) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE ops_runtime_state
+                SET updated_at = updated_at - make_interval(secs => :seconds)
+                WHERE key = :key
+                """
+            ),
+            {"key": smart_mix_backfill.COVERAGE_STATE_KEY, "seconds": seconds},
+        )
+
+
+def _coordinator_on_the_database(monkeypatch):
+    """The coordinator with a real claim and coverage; children are not queued."""
+    from crate.db.jobs.smart_mix_backfill import save_smart_mix_campaign
+    from crate.worker_handlers import analysis
+
+    save_smart_mix_campaign(_running_campaign(batch_size=1))
+    monkeypatch.setattr(analysis, "_now", lambda: DAY)
+    _allow_by_governor(monkeypatch)
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.create_task_dedup",
+        lambda task_type, params, *, dedup_key: f"child-{params['track_id']}",
+    )
+    monkeypatch.setattr(
+        analysis, "queue_next_smart_mix_batch", lambda **_kwargs: "task-next"
+    )
+    monkeypatch.setattr("crate.crate_cli.is_available", lambda: False)
+    return analysis
+
+
+def test_a_claiming_pass_refreshes_coverage_at_most_once_a_minute(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import refresh_smart_mix_coverage
+    from crate.db.queries.smart_mix_admin import get_smart_mix_admin_status
+
+    _create_tracks(tmp_path, count=3)
+    analysis = _coordinator_on_the_database(monkeypatch)
+    refresh_smart_mix_coverage(max_attempts=3)
+    refreshed_at = _coverage_refreshed_at()
+
+    # Right after a refresh, a pass that claims leaves the coverage as it is.
+    assert (
+        analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})["claimed"] == 1
+    )
+    assert _coverage_refreshed_at() == refreshed_at
+    assert get_smart_mix_admin_status()["processing"]["active"] == 0
+
+    # A minute later, the next one refreshes it.
+    _age_coverage(seconds=smart_mix_backfill.PASS_COVERAGE_MAX_AGE_SECONDS + 1)
+    aged_at = _coverage_refreshed_at()
+    assert (
+        analysis._handle_backfill_smart_mix_profiles("task-2", {}, {})["claimed"] == 1
+    )
+    assert _coverage_refreshed_at() > aged_at
+    assert get_smart_mix_admin_status()["processing"]["active"] == 2
+
+
+def test_a_completing_pass_leaves_the_coverage_current(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        refresh_smart_mix_coverage,
+    )
+    from crate.db.queries.smart_mix_admin import get_smart_mix_admin_status
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    analysis = _coordinator_on_the_database(monkeypatch)
+    refresh_smart_mix_coverage(max_attempts=3)
+    _insert_profile(track_id, analyzer_version=ANALYZER_VERSION)
+
+    # The coverage is seconds old, but the campaign ends on this pass.
+    result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert result == {"claimed": 0, "queued": 0, "completed": True}
+    assert get_smart_mix_campaign()["status"] == "completed"
+    assert get_smart_mix_admin_status()["current_profiles"] == 1
 
 
 def _create_tracks(tmp_path: Path, *, count: int) -> list[int]:
@@ -1218,6 +1601,9 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
         analysis, "refresh_smart_mix_coverage", lambda **_kwargs: {"total_tracks": 1}
     )
     monkeypatch.setattr(
+        analysis, "refresh_smart_mix_coverage_after_pass", lambda **_kwargs: True
+    )
+    monkeypatch.setattr(
         analysis,
         "complete_smart_mix_campaign",
         lambda: calls["completed"].append(True) or True,
@@ -1731,7 +2117,7 @@ def _bump_schema(monkeypatch) -> int:
     return next_schema
 
 
-def _v7_draft() -> TrackMixProfileDraft:
+def _current_draft() -> TrackMixProfileDraft:
     return TrackMixProfileDraft(
         analyzer="crate-rust",
         analyzer_version=ANALYZER_VERSION,
@@ -1762,7 +2148,7 @@ def _publish_claims(claimed: list[dict]) -> list[str]:
                 capture_smart_mix_source(
                     int(row["id"]), row["path"], claim_token=row["claim_token"]
                 ),
-                _v7_draft(),
+                _current_draft(),
             )
         )
         for row in claimed
@@ -1849,6 +2235,81 @@ def test_a_freshly_written_current_profile_is_never_claimed_again(
     )
 
 
+def test_v7_profiles_are_claimed_once_for_v8(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    track_ids = _create_tracks(tmp_path, count=3)
+    for track_id in track_ids:
+        _insert_profile(track_id, analyzer_version=PREVIOUS_ANALYZER_VERSION)
+        # Finished by the v7 campaign with its retry budget spent: v8 is a new
+        # generation, so the budget starts again.
+        _insert_processing(
+            track_id,
+            state="done",
+            attempts=3,
+            target_generation=PREVIOUS_ANALYZER_VERSION,
+        )
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=10, max_attempts=3, claimed_by="task:v8"
+    )
+
+    assert sorted(row["id"] for row in claimed) == sorted(track_ids)
+    assert {
+        (
+            _processing_row(track_id)["attempts"],
+            _processing_row(track_id)["target_generation"],
+        )
+        for track_id in track_ids
+    } == {(1, ANALYZER_VERSION)}
+    assert _publish_claims(claimed) == ["published"] * 3
+    assert _stored_versions(track_ids) == {(ANALYZER_VERSION, PROFILE_SCHEMA_VERSION)}
+    assert (
+        claim_smart_mix_backfill_batch(
+            limit=10,
+            max_attempts=3,
+            claimed_by="task:v8",
+            promote_python_profiles=True,
+        )
+        == []
+    )
+
+
+def test_starting_v8_over_the_paused_v7_campaign_starts_a_new_one(pg_db) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        campaign_targets_current,
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+        start_smart_mix_campaign,
+    )
+
+    save_smart_mix_campaign(dict(PAUSED_V7_CAMPAIGN))
+    assert campaign_targets_current(get_smart_mix_campaign()) is False
+
+    campaign = start_smart_mix_campaign(batch_size=25, max_attempts=3)
+
+    assert {
+        key: campaign[key]
+        for key in (
+            "target",
+            "profile_version",
+            "status",
+            "batches",
+            "claimed",
+            "sequence",
+        )
+    } == {
+        "target": ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
+        "status": "running",
+        "batches": 0,
+        "claimed": 0,
+        # The sequence keeps growing, so the new batches never reuse a dedup key.
+        "sequence": 1_750,
+    }
+    assert campaign_targets_current(get_smart_mix_campaign()) is True
+
+
 def test_fresh_campaign_after_the_cancelled_v6_one_claims_old_rows_once(
     pg_db, tmp_path: Path
 ) -> None:
@@ -1930,6 +2391,7 @@ def test_campaigns_of_another_target_never_claim_for_the_current_one(
 ) -> None:
     for stale in (
         {**CANCELLED_V6_CAMPAIGN, "status": "running"},
+        {**PAUSED_V7_CAMPAIGN, "status": "running"},
         _running_campaign(target="smart-mix-audio-v6"),
         _running_campaign(profile_version=PROFILE_SCHEMA_VERSION - 1),
         # Campaigns written before the schema was recorded targeted schema 1.
@@ -1985,7 +2447,7 @@ def test_profile_task_publishes_the_draft_with_its_phrase_voice(monkeypatch) -> 
 
     draft = TrackMixProfileDraft(
         analyzer="crate-rust",
-        analyzer_version="smart-mix-audio-v7",
+        analyzer_version=ANALYZER_VERSION,
         duration_ms=10_000,
         quality=MixProfileQuality.PARTIAL,
     )
@@ -2089,7 +2551,7 @@ def test_profile_task_runs_the_beat_model_before_the_analysis(monkeypatch) -> No
     from crate.smart_mix.beat_model import BeatTrack
     from crate.worker_handlers import analysis
 
-    draft = _v7_draft()
+    draft = _current_draft()
     published = _profile_task_harness(monkeypatch, draft)
     beats = BeatTrack(
         tracker="beat-this-small0-dbn", beats_ms=(500, 1_000), downbeats_ms=(500,)
@@ -2119,7 +2581,7 @@ def test_profile_falls_back_when_beat_model_fails(monkeypatch, caplog) -> None:
 
     from crate.worker_handlers import analysis
 
-    draft = _v7_draft()
+    draft = _current_draft()
     published = _profile_task_harness(monkeypatch, draft)
 
     def broken(_path):
