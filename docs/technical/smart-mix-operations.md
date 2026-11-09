@@ -317,6 +317,10 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   that probe fails (a timeout on a loaded worker, for example), it logs a warning once and
   is not run again for 60 s (`PROBE_RETRY_SECONDS`); meanwhile each track logs at info that
   the probe is backing off and goes to the Python analyzer as well.
+- **Decoding.** The model reads the file with libsndfile. What libsndfile cannot open,
+  AAC in MP4 (the library's `.m4a`), ffmpeg decodes to mono at 22,050 Hz, as players
+  decode it: it trims the encoder delay an MP4 edit list marks and decodes HE-AAC with
+  its SBR band. Before, every `.m4a` lost the model and kept the analyzer's own tracker.
 - **Meter.** The DBN keeps one bar length per track, 3 or 4 beats, and `beats_per_bar` is
   read from its downbeats: the beats from each downbeat to the next, when every bar has as
   many (otherwise null). Phrases, the planner and Crate Decks count bars of four, so with

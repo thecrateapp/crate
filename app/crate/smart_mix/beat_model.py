@@ -10,7 +10,9 @@ fitting the constant grid, and take the bar phase from the model's downbeats
 (``crate.smart_mix.phrase_grid.downbeat_anchor_from_model``).
 
 Only the analysis worker has torch, ``beat_this``, madmom and the checkpoint, which the
-image bakes in; nothing is ever downloaded at run time. Without them, when the model
+image bakes in; nothing is ever downloaded at run time. libsndfile reads the audio; what
+it cannot open (AAC in MP4, the library's ``.m4a``) is decoded by ffmpeg, which the
+worker images install. Without them, when the model
 fails or for tracks over ``BEAT_MODEL_MAX_SECONDS``, there are no model beats and the
 analysis keeps its own tracker: without madmom the model is off, never run without its
 DBN. ``CRATE_BEAT_THIS_CHECKPOINT`` names the checkpoint (``small0`` by default,
@@ -25,6 +27,7 @@ import logging
 import math
 import os
 import re
+import subprocess
 from bisect import bisect_left
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -54,6 +57,9 @@ _CHECKPOINT_NAME = re.compile(r"[a-z0-9_-]{1,18}")
 # Besides torch, which only PANNS=off builds leave out. madmom runs the DBN.
 _MODEL_MODULES = ("beat_this", "madmom")
 _READ_BLOCK_FRAMES = 65_536
+# Decoding a ten-minute track takes ffmpeg a few seconds; a hung decoder must not hold
+# the task.
+_FFMPEG_TIMEOUT_SECONDS = 120
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,9 +278,7 @@ def _duration_seconds(path: Path) -> float:
 
         return float(sf.info(str(path)).duration)
     except Exception:
-        import librosa
-
-        return float(librosa.get_duration(path=str(path)))
+        return _ffprobe_duration(path)
 
 
 def _load_signal(path: Path) -> tuple[np.ndarray, int]:
@@ -285,16 +289,65 @@ def _load_signal(path: Path) -> tuple[np.ndarray, int]:
         with sf.SoundFile(str(path)) as source:
             mono, rate = _read_mono(source), int(source.samplerate)
     except Exception:
-        import librosa
-
-        audio, rate = librosa.load(str(path), sr=None, mono=True)
-        mono, rate = np.asarray(audio, dtype=np.float32), int(rate)
+        return _ffmpeg_mono(path), MODEL_SAMPLE_RATE
     if rate != MODEL_SAMPLE_RATE and mono.size:
         import soxr
 
         mono = soxr.resample(mono, rate, MODEL_SAMPLE_RATE)
         rate = MODEL_SAMPLE_RATE
     return np.ascontiguousarray(mono, dtype=np.float32), rate
+
+
+def _ffprobe_duration(path: Path) -> float:
+    """The container's duration, as players read it, for files libsndfile cannot open."""
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(path),
+        ],
+        capture_output=True,
+        check=True,
+        text=True,
+        timeout=_FFMPEG_TIMEOUT_SECONDS,
+    )
+    return float(result.stdout.strip())
+
+
+def _ffmpeg_mono(path: Path) -> np.ndarray:
+    """The first audio stream as mono float32 at the model's rate, decoded by ffmpeg.
+
+    ffmpeg decodes it as players do: it trims the encoder delay an MP4 edit list marks
+    and decodes HE-AAC with its SBR band, so the beats fall where a player plays them.
+    """
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-map",
+            "0:a:0",
+            "-ac",
+            "1",
+            "-ar",
+            str(MODEL_SAMPLE_RATE),
+            "-f",
+            "f32le",
+            "pipe:1",
+        ],
+        capture_output=True,
+        check=True,
+        timeout=_FFMPEG_TIMEOUT_SECONDS,
+    )
+    return np.frombuffer(result.stdout, dtype="<f4").astype(np.float32)
 
 
 def _read_mono(source) -> np.ndarray:
