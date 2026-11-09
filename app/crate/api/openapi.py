@@ -358,6 +358,7 @@ _AUTH_REQUIRED_PREFIXES = frozenset(
         "/api/users",
         "/api/jam",
         "/api/crates",
+        "/api/decks",
         "/api/curation",
         "/api/artwork",
         "/api/manage",
