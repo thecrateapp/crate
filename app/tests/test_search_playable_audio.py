@@ -32,6 +32,12 @@ def library(tmp_path: Path):
     (root / "Artist" / "Album" / "present.flac").write_bytes(b"fLaC")
     (root / "Artist" / "Album" / "folder.flac").mkdir()
     (tmp_path / "outside.flac").write_bytes(b"fLaC")
+    (root / "Artist" / "Album" / "linked.flac").symlink_to(
+        root / "Artist" / "Album" / "present.flac"
+    )
+    (root / "Artist" / "Album" / "leak.flac").symlink_to(tmp_path / "outside.flac")
+    (root / "Linked").symlink_to(root / "Artist" / "Album", target_is_directory=True)
+    (root / "Escape").symlink_to(tmp_path, target_is_directory=True)
     with patch("crate.streaming.service.library_path", return_value=root):
         yield root
 
@@ -41,9 +47,16 @@ def _dj_tracks(root: Path) -> list[dict]:
         ("present", str(root / "Artist" / "Album" / "present.flac")),
         ("relative", "Artist/Album/present.flac"),
         ("container-path", "/music/Artist/Album/present.flac"),
+        ("data-path", "/data/Artist/Album/present.flac"),
+        ("dot-dot-inside", "Artist/Album/../Album/present.flac"),
+        ("file-link-inside", "Artist/Album/linked.flac"),
+        ("folder-link-inside", "Linked/present.flac"),
         ("missing", str(root / "Artist" / "Album" / "missing.flac")),
         ("directory", str(root / "Artist" / "Album" / "folder.flac")),
         ("escape", "../outside.flac"),
+        ("dot-dot-escape", "Artist/../../outside.flac"),
+        ("file-link-outside", "Artist/Album/leak.flac"),
+        ("folder-link-outside", "Escape/outside.flac"),
         ("absolute-outside", str(root.parent / "outside.flac")),
         ("empty", ""),
         ("null", None),
@@ -60,9 +73,17 @@ _EXPECTED_PLAYABLE = {
     # Rows may hold the container path; like the stream endpoint, /music/ maps
     # onto the configured library root.
     "container-path": True,
+    "data-path": True,
+    "dot-dot-inside": True,
+    # Symlinks count where they lead, as Path.resolve() in the stream endpoints.
+    "file-link-inside": True,
+    "folder-link-inside": True,
     "missing": False,
     "directory": False,
     "escape": False,
+    "dot-dot-escape": False,
+    "file-link-outside": False,
+    "folder-link-outside": False,
     "absolute-outside": False,
     "empty": False,
     "null": False,
@@ -113,7 +134,10 @@ def test_unreadable_library_counts_as_no_audio(test_app, library):
     tracks = _dj_tracks(library)[:1]
     with (
         patch("crate.api.browse_media.search_dj_tracks", return_value=tracks),
-        patch("pathlib.Path.stat", side_effect=PermissionError("denied")),
+        patch(
+            "crate.streaming.service.os.lstat", side_effect=PermissionError("denied")
+        ),
+        patch("crate.streaming.service.os.stat", side_effect=PermissionError("denied")),
     ):
         response = test_app.get("/api/search", params={"q": "noah", "fields": "dj"})
 
@@ -124,7 +148,7 @@ def test_unreadable_library_counts_as_no_audio(test_app, library):
 def test_batch_check_matches_the_per_track_check(library):
     # S3 pages check up to 500 tracks at once; the batch check gives the same
     # answers as the stream endpoints and returns the stat of each regular file.
-    from crate.streaming.service import stat_playable_sources
+    from crate.streaming.service import resolve_source_path, stat_playable_sources
 
     rows = _dj_tracks(library)
     stats = stat_playable_sources([row["path"] for row in rows])
@@ -133,9 +157,42 @@ def test_batch_check_matches_the_per_track_check(library):
         row["title"]: file_stat is not None
         for row, file_stat in zip(rows, stats, strict=True)
     } == _EXPECTED_PLAYABLE
+    for row, file_stat in zip(rows, stats, strict=True):
+        # The stream endpoints' own check, one track at a time.
+        try:
+            source = resolve_source_path({"path": row["path"]})
+            streamable = source is not None and source.is_file()
+        except (OSError, ValueError):
+            source, streamable = None, False
+        assert (file_stat is not None) is streamable, row["title"]
+        if file_stat is not None:
+            assert source is not None
+            assert file_stat.st_ino == source.stat().st_ino, row["title"]
     present = stats[0]
     assert present is not None
     assert present.st_size == len(b"fLaC")
+
+
+def test_batch_check_resolves_each_folder_once(library):
+    # Resolving symlinks costs one lstat per path component; a page of an album
+    # or a crate shares folders, so the batch resolves each folder once.
+    import os
+
+    from crate.streaming.service import stat_playable_sources
+
+    album = library / "Artist" / "Album"
+    for number in range(20):
+        (album / f"{number}.flac").write_bytes(b"fLaC")
+    paths = [str(album / f"{number}.flac") for number in range(20)]
+    realpath = os.path.realpath
+    with patch(
+        "crate.streaming.service.os.path.realpath", side_effect=realpath
+    ) as resolved:
+        stats = stat_playable_sources(paths)
+
+    assert all(file_stat is not None for file_stat in stats)
+    # The library root, and the album folder once.
+    assert resolved.call_count == 2
 
 
 def test_dj_search_reads_the_library_root_once(test_app, library):

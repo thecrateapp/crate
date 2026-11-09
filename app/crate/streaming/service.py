@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from stat import S_ISREG
+from stat import S_ISLNK, S_ISREG
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -72,6 +72,19 @@ def media_type_for_path(path: Path) -> str:
     return STREAM_MEDIA_TYPES.get(path.suffix.lower(), "audio/mpeg")
 
 
+def _library_relative_path(raw_path: str, lib_str: str) -> str:
+    """The path below the library root, mapping the container prefixes."""
+    if raw_path.startswith(lib_str):
+        return raw_path[len(lib_str) :].lstrip("/")
+    if raw_path.startswith("/music/"):
+        return raw_path[len("/music/") :].lstrip("/")
+    if raw_path.startswith("/data/"):
+        # Rows written when the library was mounted at /data; the read plane
+        # (media.ResolveUnder) maps them onto the library root the same way.
+        return raw_path[len("/data/") :].lstrip("/")
+    return raw_path
+
+
 def resolve_source_path(
     track: dict, *, library_root: Path | None = None
 ) -> Path | None:
@@ -79,17 +92,7 @@ def resolve_source_path(
     if not raw_path:
         return None
     lib = library_root if library_root is not None else library_path()
-    lib_str = str(lib)
-    filepath = raw_path
-    if filepath.startswith(lib_str):
-        filepath = filepath[len(lib_str) :].lstrip("/")
-    elif filepath.startswith("/music/"):
-        filepath = filepath[len("/music/") :].lstrip("/")
-    elif filepath.startswith("/data/"):
-        # Rows written when the library was mounted at /data; the read plane
-        # (media.ResolveUnder) maps them onto the library root the same way.
-        filepath = filepath[len("/data/") :].lstrip("/")
-    return safe_path(lib, filepath)
+    return safe_path(lib, _library_relative_path(raw_path, str(lib)))
 
 
 def stat_playable_sources(
@@ -97,21 +100,44 @@ def stat_playable_sources(
 ) -> list[os.stat_result | None]:
     """Stat each audio file the stream endpoints could serve, in order.
 
-    Same rule as the stream endpoints: a regular file inside the library.
-    Anything else (no path, missing, not a regular file, outside the library,
-    unreadable) is ``None``. The library root is read once per batch because
-    ``library_path()`` parses the config file on every call.
+    Same rule as the stream endpoints (``resolve_source_path``, then a regular
+    file): the path, with its symlinks resolved, is a regular file inside the
+    library. Anything else (no path, missing, not a regular file, outside the
+    library, unreadable) is ``None``.
+
+    A page checks up to 500 files, so the work per file is kept to the
+    syscalls: ``library_path()`` (which parses the config file) and the
+    library root are resolved once per batch, and each folder once, since an
+    album's tracks share theirs. Only a file that is itself a symlink is
+    resolved on its own.
     """
     if not paths:
         return []
     library_root = library_path()
+    lib_str = str(library_root)
+    real_root = os.path.realpath(library_root)
+    real_folders: dict[str, str] = {}
     results: list[os.stat_result | None] = []
     for path in paths:
-        try:
-            source = resolve_source_path({"path": path}, library_root=library_root)
-            file_stat = source.stat() if source is not None else None
-        except (OSError, ValueError):
-            file_stat = None
+        raw_path = str(path or "")
+        file_stat: os.stat_result | None = None
+        if raw_path:
+            try:
+                folder, name = os.path.split(
+                    os.path.join(lib_str, _library_relative_path(raw_path, lib_str))
+                )
+                real_folder = real_folders.get(folder)
+                if real_folder is None:
+                    real_folder = real_folders[folder] = os.path.realpath(folder)
+                source = os.path.join(real_folder, name)
+                file_stat = os.lstat(source)
+                if S_ISLNK(file_stat.st_mode):
+                    source = os.path.realpath(source)
+                    file_stat = os.stat(source)
+                if os.path.commonpath((real_root, source)) != real_root:
+                    file_stat = None
+            except (OSError, ValueError):
+                file_stat = None
         if file_stat is not None and not S_ISREG(file_stat.st_mode):
             file_stat = None
         results.append(file_stat)
