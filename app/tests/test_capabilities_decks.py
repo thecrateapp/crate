@@ -40,7 +40,7 @@ def test_capabilities_includes_decks_section(test_app, monkeypatch):
         "available": True,
         "min_client_version": "0.1.0",
         "contract_version": 1,
-        "features": ["stems", "stem_upload"],
+        "features": ["stems", "stem_upload", "local_refinement"],
     }
 
 
@@ -49,8 +49,8 @@ def test_decks_features_reflect_settings(test_app, monkeypatch, enabled):
     # Each Decks feature is advertised by the phase that implements its server
     # contract (S3 library_cursor, S4 profiles_batch, S5 beatmatch/bass_handoff/
     # long_beatmatch, S7 cues, Smart Mix Stems ST1 stems/stem_upload, ST3
-    # local_refinement); only the stem features ship so far. In particular,
-    # Decks never inherits the Android Smart Mix flags.
+    # local_refinement); only the Smart Mix Stems features ship so far. In
+    # particular, Decks never inherits the Android Smart Mix flags.
     for flag in _ANDROID_AND_SMART_MIX_FLAGS:
         if enabled:
             monkeypatch.setenv(flag, "true")
@@ -60,7 +60,7 @@ def test_decks_features_reflect_settings(test_app, monkeypatch, enabled):
     decks = test_app.get("/api/capabilities").json()["decks"]
 
     assert decks["available"] is True
-    assert decks["features"] == ["stems", "stem_upload"]
+    assert decks["features"] == ["stems", "stem_upload", "local_refinement"]
 
 
 def test_decks_capabilities_schema_documents_the_feature_vocabulary(test_app):

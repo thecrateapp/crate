@@ -337,7 +337,13 @@ class TransitionContextRequest(SmartMixRequestModel):
         "shuffle",
         "infinite",
         "manual",
-    ]
+        "decks",
+    ] = Field(
+        description=(
+            "Where the queue comes from. `decks` is Crate Decks' automatic mixing "
+            "(Smart Mix Stems, STEM-D10); it plans like `playlist`."
+        )
+    )
     automatic: bool
     offline: bool
     preferred_duration_ms: int = Field(
@@ -372,6 +378,15 @@ class TransitionContextRequest(SmartMixRequestModel):
             "chose from the planner's candidates (SM3-D4). The deterministic plan "
             "is always returned and does not depend on this flag. smart-mix-v2 "
             "ignores it."
+        ),
+    )
+    local_refinement: bool = Field(
+        default=False,
+        alias="localRefinement",
+        description=(
+            "smart-mix-v3 with source `decks` only: also return `candidates` and "
+            "`policyLimits`, so Crate Decks can refine the plan locally (STEM-D10). "
+            "Ignored otherwise; it does not change the plan."
         ),
     )
 
@@ -448,6 +463,133 @@ class RefinedTransitionPlanResponse(_TransitionPlanFields):
     """A plan rebuilt from the candidate an AI model chose and validated again."""
 
 
+class CandidatePlanResponse(_TransitionPlanFields):
+    """The complete, valid plan of a menu candidate."""
+
+
+class StemScoreResponse(SmartMixApiModel):
+    """The stems terms of a candidate (Smart Mix Stems, STEM-D5)."""
+
+    vocal_overlap_ms: int = Field(
+        alias="vocalOverlapMs",
+        ge=0,
+        description="Full-level mix time with stem vocals on both decks.",
+    )
+    bass_overlap_ms: int = Field(
+        alias="bassOverlapMs",
+        ge=0,
+        description=(
+            "Mix time with both basses at full level (crossfade and bass handoff) "
+            "and a bassline on both decks."
+        ),
+    )
+    drums_only_entry: float = Field(
+        alias="drumsOnlyEntry",
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Share of the mix before the handoff with the incoming on drums "
+            "without bass or vocals."
+        ),
+    )
+    vocal_free_exit: float = Field(
+        alias="vocalFreeExit",
+        ge=0.0,
+        le=1.0,
+        description="Share of the mix with the outgoing on a phrase without vocals.",
+    )
+
+
+class CandidateScoreResponse(SmartMixApiModel):
+    """The components of a candidate's score, each in [0, 1] (SM3-D3)."""
+
+    alignment: float = Field(ge=0.0, le=1.0)
+    energy: float = Field(ge=0.0, le=1.0)
+    harmonic: float = Field(ge=0.0, le=1.0)
+    stability: float = Field(ge=0.0, le=1.0)
+    bass: float = Field(ge=0.0, le=1.0)
+    position: float = Field(ge=0.0, le=1.0)
+    vocal: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Voice over voice at full level over 48 s, the base of a penalty; absent "
+            "unless both tracks carry the voice per phrase."
+        ),
+    )
+    stems: StemScoreResponse | None = Field(
+        default=None,
+        description="Absent unless both tracks have a stems layer.",
+    )
+
+
+class TransitionCandidateResponse(SmartMixApiModel):
+    """One entry of the v3 candidate menu (SM3-D3), best first."""
+
+    index: int = Field(ge=0, description="Rank in the menu; 0 is the served plan.")
+    outgoing_phrase: int | None = Field(
+        default=None,
+        alias="outgoingPhrase",
+        ge=0,
+        description="Index of the outgoing phrase; absent on the bar heuristic.",
+    )
+    incoming_phrase: int | None = Field(default=None, alias="incomingPhrase", ge=0)
+    length_bars: Literal[8, 16, 32] | None = Field(
+        default=None,
+        alias="lengthBars",
+        description="Mix length in outgoing bars; absent for the preferred duration.",
+    )
+    structure_used: bool = Field(alias="structureUsed")
+    stems_used: bool | None = Field(
+        default=None,
+        alias="stemsUsed",
+        description="Only true: the stems layer of both tracks scored the candidate.",
+    )
+    score: float = Field(ge=0.0, le=1.0)
+    breakdown: CandidateScoreResponse
+    plan: CandidatePlanResponse
+
+
+class PolicyLimitsResponse(SmartMixApiModel):
+    """The planner policy resolved for the edge (STEM-D10).
+
+    A plan that mixes is valid when it keeps every bound (inclusive): duration from
+    `minimumTransitionMs` to `maximumTransitionMs`, or up to `maximumLongBeatmatchMs`
+    as a beatmatched `dj-blend` when `longBeatmatchAllowed` and
+    `longBeatmatchEligible`; `|incomingTempoRatio - 1|` within
+    `maximumTempoAdjustment` in beatmatch (1 otherwise, and within 0.001 without
+    `tempoAdjustmentAllowed`); each deck's gain from `-maximumCutDb` to the lower of
+    `maximumBoostDb` and its peak-limited gain, or exactly that peak-limited gain;
+    the outgoing cue from `outgoingEarliestCueMs` and cue + duration up to
+    `outgoingLatestEndMs`; the incoming cue plus the duration at the incoming tempo
+    up to `incomingLatestEndMs`; a `balanced` bass handoff only with
+    `bassHandoffAllowed` and beatmatch only with `beatmatchAllowed`.
+    """
+
+    rules_revision: int = Field(alias="rulesRevision")
+    beatmatch_allowed: bool = Field(alias="beatmatchAllowed")
+    tempo_adjustment_allowed: bool = Field(alias="tempoAdjustmentAllowed")
+    bass_handoff_allowed: bool = Field(alias="bassHandoffAllowed")
+    long_beatmatch_allowed: bool = Field(alias="longBeatmatchAllowed")
+    long_beatmatch_eligible: bool = Field(
+        alias="longBeatmatchEligible",
+        description="Both tracks' tempo is stable enough for a long blend.",
+    )
+    maximum_tempo_adjustment: float = Field(alias="maximumTempoAdjustment", ge=0.0)
+    minimum_transition_ms: int = Field(alias="minimumTransitionMs", ge=0)
+    maximum_transition_ms: int = Field(alias="maximumTransitionMs", ge=0)
+    maximum_long_beatmatch_ms: int = Field(alias="maximumLongBeatmatchMs", ge=0)
+    maximum_boost_db: float = Field(alias="maximumBoostDb")
+    maximum_cut_db: float = Field(alias="maximumCutDb")
+    outgoing_peak_limited_gain_db: float = Field(alias="outgoingPeakLimitedGainDb")
+    incoming_peak_limited_gain_db: float = Field(alias="incomingPeakLimitedGainDb")
+    outgoing_earliest_cue_ms: int = Field(alias="outgoingEarliestCueMs")
+    outgoing_latest_end_ms: int = Field(alias="outgoingLatestEndMs")
+    incoming_latest_end_ms: int = Field(alias="incomingLatestEndMs")
+    phrase_lengths: list[int] = Field(alias="phraseLengths")
+
+
 RefinementReasonCode = Literal[
     "disabled",
     "no_model",
@@ -505,6 +647,22 @@ class TransitionPlanResponse(_TransitionPlanFields):
         description=(
             "Only when the edge asked for `aiRefinement` with smart-mix-v3 "
             "(SM3-D4). Absent otherwise."
+        ),
+    )
+    candidates: list[TransitionCandidateResponse] | None = Field(
+        default=None,
+        description=(
+            "smart-mix-v3 with source `decks` and `localRefinement` only: the "
+            "candidate menu, best first, with each score breakdown (STEM-D10). The "
+            "first candidate is this plan. Absent otherwise."
+        ),
+    )
+    policy_limits: PolicyLimitsResponse | None = Field(
+        default=None,
+        alias="policyLimits",
+        description=(
+            "With `candidates`, when both tracks have a profile: the limits a "
+            "locally refined plan must keep."
         ),
     )
 

@@ -1445,6 +1445,11 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
   build the cache keys: an edge with an analysis on both tracks keys on both analyses too. It
   reads the structure only for the edges it has to plan, with the beat grid when a layer
   applies (the grid places the end of the outro for the layer; the planner does not read it).
+- **Crate Decks** (`context.source = "decks"` with `localRefinement`) also gets the menu and
+  the policy limits; see `docs/technical/crate-decks.md`, "Local refinement".
+- **Capability**: `smart_mix.structure` is true when at least half the library's tracks have a
+  current profile with phrases, read from the coverage snapshot (`structure_percent`, counted by
+  `refresh_smart_mix_coverage`). It is never computed in the request.
 
 ### AI refinement (SM4)
 

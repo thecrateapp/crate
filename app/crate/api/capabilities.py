@@ -166,6 +166,8 @@ def _decks_features(request: Request) -> list[DecksFeature]:
     features: list[DecksFeature] = ["stems"]
     if _may_upload_stems(request):
         features.append("stem_upload")
+    # smart-mix-v3 serves the candidate menu and policy limits to the decks context.
+    features.append("local_refinement")
     return features
 
 

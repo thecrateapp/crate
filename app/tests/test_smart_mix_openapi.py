@@ -22,6 +22,7 @@ def test_smart_mix_openapi_exposes_typed_bounded_contracts(test_app) -> None:
         "shuffle",
         "infinite",
         "manual",
+        "decks",
     ]
 
     plan = schema["components"]["schemas"]["TransitionPlanResponse"]
@@ -161,3 +162,35 @@ def test_smart_mix_openapi_types_the_decks_stem_file_download(
             "format": "binary",
         }
     assert {"401", "404"} <= set(operation["responses"])
+
+
+@pytest.mark.parametrize("spec", ["/openapi.json", "/openapi-crate.json"])
+def test_smart_mix_openapi_offers_the_decks_menu(test_app, spec: str) -> None:
+    components = test_app.get(spec).json()["components"]["schemas"]
+
+    context = components["TransitionContextRequest"]
+    assert context["properties"]["localRefinement"]["default"] is False
+    assert "localRefinement" not in context.get("required", [])
+    plan = components["TransitionPlanResponse"]["properties"]
+    assert {"candidates", "policyLimits"} <= set(plan)
+    assert "candidates" not in components["TransitionPlanResponse"].get("required", [])
+    candidate = components["TransitionCandidateResponse"]
+    assert {"index", "score", "breakdown", "plan", "structureUsed"} <= set(
+        candidate["required"]
+    )
+    stems = components["StemScoreResponse"]["properties"]
+    assert set(stems) == {
+        "vocalOverlapMs",
+        "bassOverlapMs",
+        "drumsOnlyEntry",
+        "vocalFreeExit",
+    }
+    limits = components["PolicyLimitsResponse"]
+    assert set(limits["required"]) == set(limits["properties"])
+    assert {
+        "maximumTempoAdjustment",
+        "maximumBoostDb",
+        "outgoingLatestEndMs",
+        "incomingLatestEndMs",
+        "phraseLengths",
+    } <= set(limits["properties"])

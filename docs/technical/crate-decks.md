@@ -73,7 +73,7 @@ need them.
     "available": true,
     "min_client_version": "0.1.0",
     "contract_version": 1,
-    "features": ["stems", "stem_upload"]
+    "features": ["stems", "stem_upload", "local_refinement"]
   }
 }
 ```
@@ -103,11 +103,12 @@ Rules:
   | `stem_upload`                                 | Smart Mix Stems ST1, stem analysis uploads (only for a caller who may) |
   | `local_refinement`                            | Smart Mix Stems ST3, candidate menu for local refinement               |
 
-  `stems` and `stem_upload` ship so far. `stems` is always present.
-  `stem_upload` is present only when the caller's session holds
-  `smart_mix.stems.contribute` and an admin has not turned uploads off, so it
-  depends on who asks. Decks features never follow the Android Smart Mix flags
-  (`CRATE_ANDROID_*`); `smart_mix.android_*` remains the Android contract.
+  `stems`, `stem_upload` and `local_refinement` ship so far. `stems` and
+  `local_refinement` are always present. `stem_upload` is present only when the
+  caller's session holds `smart_mix.stems.contribute` and an admin has not
+  turned uploads off, so it depends on who asks. Decks features never follow
+  the Android Smart Mix flags (`CRATE_ANDROID_*`); `smart_mix.android_*`
+  remains the Android contract.
 
 The constants live in `app/crate/api/capabilities.py`
 (`DECKS_CONTRACT_VERSION`, `DECKS_MIN_CLIENT_VERSION`, `_decks_features`), and
@@ -251,6 +252,79 @@ computed for all listed playlists in one query. It is reported on the caller's
 own and shared playlists (`GET /api/playlists`, `playlists` in
 `GET /api/me/playlists-page`, and the detail for the owner and collaborators),
 and is null elsewhere. The Go read plane serves none of these routes.
+
+## Local refinement (Smart Mix Stems ST3)
+
+The server plan is the baseline; Crate Decks may refine it locally with its own
+stems (STEM-D10). It asks for the material with `plannerVersion:
+"smart-mix-v3"` and a `decks` context:
+
+```json
+{
+  "plannerVersion": "smart-mix-v3",
+  "edges": [
+    {
+      "outgoingTrackEntityUid": "…",
+      "incomingTrackEntityUid": "…",
+      "context": {
+        "source": "decks",
+        "automatic": true,
+        "offline": false,
+        "preferredDurationMs": 12000,
+        "userCueProfile": "auto",
+        "allowBeatmatch": true,
+        "allowTempoAdjustment": true,
+        "allowBassHandoff": true,
+        "allowLongBeatmatch": true,
+        "localRefinement": true
+      }
+    }
+  ]
+}
+```
+
+Each plan then also carries:
+
+- **`candidates`**: the v3 menu, best first (index 0 is the served plan), each
+  with `outgoingPhrase`, `incomingPhrase`, `lengthBars`, `structureUsed`,
+  `stemsUsed` (only when true), `score`, the `breakdown` (the six components,
+  `vocal` and, with stems on both tracks, `stems`: `vocalOverlapMs`,
+  `bassOverlapMs`, `drumsOnlyEntry`, `vocalFreeExit`) and the complete `plan`.
+  Null values are left out.
+- **`policyLimits`**, when both tracks have a profile: the planner policy
+  resolved for the edge. A plan Decks builds (another candidate, a phrase moved
+  by one, another length or bass handoff) is valid when it keeps every bound,
+  all inclusive:
+
+  - duration from `minimumTransitionMs` to `maximumTransitionMs`, or up to
+    `maximumLongBeatmatchMs` as a beatmatched `dj-blend` when both
+    `longBeatmatchAllowed` (the context) and `longBeatmatchEligible` (the
+    tracks' tempo stability);
+  - `|incomingTempoRatio − 1|` within `maximumTempoAdjustment` in beatmatch,
+    exactly 1 otherwise, and within 0.001 without `tempoAdjustmentAllowed`;
+  - each deck's gain from `−maximumCutDb` to the lower of `maximumBoostDb` and
+    its peak-limited gain (`outgoingPeakLimitedGainDb`,
+    `incomingPeakLimitedGainDb`), or exactly that peak-limited gain (a hot
+    master), within 0.001 dB;
+  - outgoing cue from `outgoingEarliestCueMs`, outgoing cue + duration up to
+    `outgoingLatestEndMs`, incoming cue + duration × the incoming tempo (in
+    beatmatch) up to `incomingLatestEndMs`;
+  - `bassHandoff: "balanced"` only with `bassHandoffAllowed`, beatmatch only
+    with `beatmatchAllowed`;
+  - `phraseLengths` are the lengths the menu tries; `rulesRevision` is the
+    planner's.
+
+  `crate.smart_mix.evaluation.limit_violations` is the reference check: on a
+  plan that mixes, it gives exactly the codes of `policy_violations` (a test
+  compares both on hundreds of plans around every bound). Gapless plans and the
+  350 ms short cut are not refinements: Decks keeps the server's plan there.
+
+Without `localRefinement`, with another `source` or with `smart-mix-v2` the
+response does not change, and the flag does not split the plan cache outside
+the `decks` context. Android and the VirtualDJ plugin get exactly the plans and
+cache keys they got before. Until the `decks` context of S5 exists, `decks`
+plans like `playlist` and its bass handoff still follows the Android flag
+(`CRATE_ANDROID_BASS_HANDOFF_ENABLED`).
 
 ## Audio availability and plan fields (S9)
 

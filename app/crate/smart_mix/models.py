@@ -479,6 +479,7 @@ class TransitionContext:
             "shuffle",
             "infinite",
             "manual",
+            "decks",
         }:
             raise ValueError(f"Unsupported transition source: {self.source!r}")
         _require_non_negative_ms("preferred_duration_ms", self.preferred_duration_ms)

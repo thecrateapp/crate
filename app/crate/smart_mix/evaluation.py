@@ -560,6 +560,180 @@ def policy_violations(
     return tuple(codes)
 
 
+@dataclass(frozen=True, slots=True)
+class PolicyLimits:
+    """The planner policy resolved for one edge (Smart Mix Stems, STEM-D10).
+
+    Crate Decks may change a server plan locally (another candidate, a shifted
+    phrase, another length or bass handoff) and must check the result against these
+    before it plays it. ``limit_violations`` is the reference check: for a plan that
+    mixes (neither gapless nor the planner's short cut) it gives exactly the codes of
+    ``policy_violations`` but ``track_mismatch``.
+
+    Bounds are inclusive. A deck's gain is valid from ``-maximum_cut_db`` to the
+    lower of ``maximum_boost_db`` and its peak-limited gain, or exactly at its
+    peak-limited gain (``ceiling - headroom - true peak``: what a hot master needs).
+    Windows are in each track's own time: the outgoing mix runs from its cue
+    (``outgoing_earliest_cue_ms`` at the earliest) to cue + duration (at most
+    ``outgoing_latest_end_ms``); the incoming cue plus the duration at the incoming
+    tempo ends by ``incoming_latest_end_ms``.
+    """
+
+    rules_revision: int
+    beatmatch_allowed: bool
+    tempo_adjustment_allowed: bool
+    bass_handoff_allowed: bool
+    long_beatmatch_allowed: bool
+    long_beatmatch_eligible: bool
+    maximum_tempo_adjustment: float
+    minimum_transition_ms: int
+    maximum_transition_ms: int
+    maximum_long_beatmatch_ms: int
+    maximum_boost_db: float
+    maximum_cut_db: float
+    outgoing_peak_limited_gain_db: float
+    incoming_peak_limited_gain_db: float
+    outgoing_earliest_cue_ms: int
+    outgoing_latest_end_ms: int
+    incoming_latest_end_ms: int
+    phrase_lengths: tuple[int, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "rulesRevision": self.rules_revision,
+            "beatmatchAllowed": self.beatmatch_allowed,
+            "tempoAdjustmentAllowed": self.tempo_adjustment_allowed,
+            "bassHandoffAllowed": self.bass_handoff_allowed,
+            "longBeatmatchAllowed": self.long_beatmatch_allowed,
+            "longBeatmatchEligible": self.long_beatmatch_eligible,
+            "maximumTempoAdjustment": self.maximum_tempo_adjustment,
+            "minimumTransitionMs": self.minimum_transition_ms,
+            "maximumTransitionMs": self.maximum_transition_ms,
+            "maximumLongBeatmatchMs": self.maximum_long_beatmatch_ms,
+            "maximumBoostDb": self.maximum_boost_db,
+            "maximumCutDb": self.maximum_cut_db,
+            "outgoingPeakLimitedGainDb": self.outgoing_peak_limited_gain_db,
+            "incomingPeakLimitedGainDb": self.incoming_peak_limited_gain_db,
+            "outgoingEarliestCueMs": self.outgoing_earliest_cue_ms,
+            "outgoingLatestEndMs": self.outgoing_latest_end_ms,
+            "incomingLatestEndMs": self.incoming_latest_end_ms,
+            "phraseLengths": list(self.phrase_lengths),
+        }
+
+
+def policy_limits(
+    outgoing: TrackMixProfile,
+    incoming: TrackMixProfile,
+    context: TransitionContext,
+    policy: PlannerPolicy = PLANNER_POLICY,
+) -> PolicyLimits:
+    """``policy_violations``' rules for the plans of one edge, as bounds."""
+    accredited = _has_accredited_measurement(outgoing) and _has_accredited_measurement(
+        incoming
+    )
+    outgoing_end = _playable_end_ms(outgoing)
+    return PolicyLimits(
+        rules_revision=policy.rules_revision,
+        beatmatch_allowed=context.allow_beatmatch,
+        tempo_adjustment_allowed=context.allow_tempo_adjustment,
+        bass_handoff_allowed=context.allow_bass_handoff,
+        long_beatmatch_allowed=context.allow_long_beatmatch,
+        long_beatmatch_eligible=_long_beatmatch_stable(outgoing, incoming, policy),
+        maximum_tempo_adjustment=min(
+            policy.maximum_tempo_adjustment, policy.hard_maximum_tempo_adjustment
+        ),
+        minimum_transition_ms=policy.minimum_transition_ms,
+        maximum_transition_ms=policy.maximum_transition_ms,
+        maximum_long_beatmatch_ms=policy.maximum_long_beatmatch_ms,
+        maximum_boost_db=max(
+            0.0,
+            policy.max_loudness_adjustment_db
+            if accredited
+            else policy.maximum_unaccredited_gain_db,
+        ),
+        maximum_cut_db=policy.max_loudness_adjustment_db,
+        outgoing_peak_limited_gain_db=_peak_limited_gain_db(outgoing, policy),
+        incoming_peak_limited_gain_db=_peak_limited_gain_db(incoming, policy),
+        outgoing_earliest_cue_ms=min(
+            int(outgoing_end * policy.minimum_outgoing_body_ratio),
+            policy.minimum_outgoing_body_ms,
+        ),
+        outgoing_latest_end_ms=outgoing_end + 1,
+        incoming_latest_end_ms=(
+            _playable_end_ms(incoming) - policy.minimum_incoming_body_ms + 1
+        ),
+        phrase_lengths=tuple(policy.phrase_lengths),
+    )
+
+
+def limit_violations(plan: TransitionPlan, limits: PolicyLimits) -> tuple[str, ...]:
+    """The codes ``policy_violations`` gives a mixing plan, from ``limits`` alone."""
+    codes: list[str] = []
+    beatmatch = plan.mode == TransitionMode.BEATMATCH
+    ratio = plan.incoming_tempo_ratio
+    duration = plan.duration_ms
+    long_blend = duration > limits.maximum_transition_ms
+    if (
+        duration < limits.minimum_transition_ms
+        or duration > limits.maximum_long_beatmatch_ms
+    ):
+        codes.append("duration_out_of_range")
+    elif long_blend and not (
+        beatmatch and plan.curve == "dj-blend" and limits.long_beatmatch_eligible
+    ):
+        codes.append("long_beatmatch_ineligible")
+    maximum_adjustment = limits.maximum_tempo_adjustment if beatmatch else 0.0
+    if abs(ratio - 1.0) > maximum_adjustment + _EPSILON:
+        codes.append("tempo_out_of_range")
+    gains = (
+        (plan.outgoing_gain_db, limits.outgoing_peak_limited_gain_db),
+        (plan.incoming_gain_db, limits.incoming_peak_limited_gain_db),
+    )
+    if not all(
+        gain <= limits.maximum_boost_db + _EPSILON
+        and (
+            gain >= -limits.maximum_cut_db - _EPSILON
+            or abs(gain - peak_limited) <= _TRUE_PEAK_TOLERANCE_DB
+        )
+        for gain, peak_limited in gains
+    ):
+        codes.append("gain_out_of_range")
+    if any(
+        gain > peak_limited + _TRUE_PEAK_TOLERANCE_DB for gain, peak_limited in gains
+    ):
+        codes.append("true_peak_exceeded")
+    if plan.outgoing_cue_ms + duration > limits.outgoing_latest_end_ms:
+        codes.append("outgoing_window_out_of_range")
+    if plan.outgoing_cue_ms < limits.outgoing_earliest_cue_ms:
+        codes.append("outgoing_body_too_short")
+    if (
+        plan.incoming_cue_ms + duration * incoming_tempo(plan)
+        > limits.incoming_latest_end_ms
+    ):
+        codes.append("incoming_body_too_short")
+    if beatmatch and not limits.beatmatch_allowed:
+        codes.append("beatmatch_not_allowed")
+    if (
+        abs(ratio - 1.0) > _TEMPO_ADJUSTMENT_FLOOR
+        and not limits.tempo_adjustment_allowed
+    ):
+        codes.append("tempo_adjustment_not_allowed")
+    if plan.bass_handoff == "balanced" and not limits.bass_handoff_allowed:
+        codes.append("bass_handoff_not_allowed")
+    if long_blend and not limits.long_beatmatch_allowed:
+        codes.append("long_beatmatch_not_allowed")
+    return tuple(codes)
+
+
+def _peak_limited_gain_db(profile: TrackMixProfile, policy: PlannerPolicy) -> float:
+    return round(
+        policy.combined_true_peak_ceiling_dbfs
+        - policy.equal_power_midpoint_headroom_db
+        - _deck_peak_dbfs(profile),
+        6,
+    )
+
+
 def crossfade_gains(progress: float, curve: str) -> tuple[float, float]:
     """Linear (outgoing, incoming) crossfade gains at a mix progress in [0, 1]."""
     if curve == "dj-blend":
@@ -1080,6 +1254,7 @@ __all__ = [
     "OVERLAP_FLOOR_GAIN",
     "POLICY_VIOLATION_CODES",
     "PhraseAlignment",
+    "PolicyLimits",
     "TransitionEvaluation",
     "bass_cut_db",
     "bass_handoff_engaged",
@@ -1092,8 +1267,10 @@ __all__ = [
     "harmonic_clash_ms",
     "incoming_start_ms",
     "incoming_tempo",
+    "limit_violations",
     "music_left_out",
     "phrase_alignment",
+    "policy_limits",
     "policy_violations",
     "staging_gains",
     "stem_bass_clash_ms",

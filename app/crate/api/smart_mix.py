@@ -61,6 +61,7 @@ from crate.smart_mix.models import (
     TrackMixProfile,
     TransitionContext,
 )
+from crate.smart_mix.evaluation import policy_limits
 from crate.smart_mix.planner import plan_transition, plan_transition_v3
 from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3, PlannerPolicy
 from crate.smart_mix.stems import (
@@ -671,6 +672,15 @@ def _plan_edge(
         # Absent without stems, so those v3 plans keep their shape (STEM-D5).
         if planned.stems_used:
             serialized["stemsUsed"] = True
+        if _local_refinement(edge.context):
+            # Crate Decks refines the plan locally within these (STEM-D10).
+            serialized["candidates"] = [
+                candidate.to_dict() for candidate in planned.candidates
+            ]
+            if outgoing is not None and incoming is not None:
+                serialized["policyLimits"] = policy_limits(
+                    outgoing, incoming, context, policy
+                ).to_dict()
         return serialized
     return plan_transition(
         outgoing,
@@ -697,7 +707,13 @@ def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
 
 
 def _bass_handoff_allowed(payload: TransitionContextRequest) -> bool:
+    # Crate Decks follows the Android flag until its own context (S5) exists.
     return payload.allow_bass_handoff and android_bass_handoff_enabled()
+
+
+def _local_refinement(payload: TransitionContextRequest) -> bool:
+    """Crate Decks asked for the menu and the limits (STEM-D10)."""
+    return payload.source == "decks" and payload.local_refinement
 
 
 def _cache_context(payload: TransitionContextRequest) -> dict:
@@ -712,6 +728,10 @@ def _cache_context(payload: TransitionContextRequest) -> dict:
     # not split the cache.
     context.pop("setHistory", None)
     context.pop("aiRefinement", None)
+    # The menu and limits only change the response in the decks context; elsewhere
+    # the flag is ignored and must not split the cache either.
+    if not _local_refinement(payload):
+        context.pop("localRefinement", None)
     return context
 
 
