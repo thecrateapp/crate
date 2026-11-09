@@ -421,7 +421,10 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   `smart-mix-audio-v7`): a draft that brings a
   tracker the stored profile lacks, or another one (`beat-this-small0-dbn` over the
   `beat-this-small0` of the first, peak-picking builds), replaces it at the same quality,
-  and a run without the model never replaces a profile whose beats came from it.
+  and a run without the model never replaces a profile of the same version whose beats
+  came from it, whatever its quality. The library analysis embeds such runs: before
+  2026-11-10 a reanalysis of a track's BPM, key and loudness replaced its model beats
+  whenever the analyzer's own tracker rated the track higher.
 - **Cost.** With one thread (`TORCH_NUM_THREADS`) on the development machine, `small0`
   takes 12.8 s of CPU on a 237 s track and 21.1 s on a 367 s one, and the DBN 0.8-1.0 s;
   with decoding and resampling, the whole step takes 14.7 s and 25.4 s.
@@ -1240,7 +1243,9 @@ The queues do not change: the coordinator and each analysis run on `heavy`.
    finished, a later release can drop v8, v7, v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
 8. **The library analysis of the `.m4a`.** The v9 profiles fix the Smart Mix side only. The
    BPM, key, loudness and mood the library analysis stored for the AAC `.m4a` came from the
-   same slowed audio; their reanalysis runs apart, on the library analysis tasks.
+   same slowed audio; their reanalysis runs apart, on the library analysis tasks, once
+   the track's v9 profile carries Beat This!'s beats. Earlier, the library analysis
+   would publish its own v9 profile first, and the backfill would never claim the track.
 
 ### Running the v8 backfill
 
