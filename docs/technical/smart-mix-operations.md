@@ -45,6 +45,9 @@ sources:
   - app/crate/db/repositories/smart_mix_stems.py
   - app/crate/db/schema_sections/smart_mix_stems_v156.py
   - app/crate/db/repositories/smart_mix_playlists.py
+  - app/crate/smart_mix/separation.py
+  - app/crate/smart_mix/stem_storage.py
+  - app/Dockerfile
   - app/crate/db/schema_sections/smart_mix_playlists_v157.py
   - app/crate/api/smart_mix_playlists.py
   - app/crate/api/decks_stems.py
@@ -324,6 +327,14 @@ signals" below).
 | Beat This! `small0` with madmom's DBN (SM3-D14)           | Beat This! MIT (code and weights); madmom code BSD | Beats, downbeats and beats per bar; `beat_tracker` = `beat-this-small0-dbn` | 12.8 s on a 237 s track, 21.1 s on a 367 s one, plus 0.8-1.0 s for the DBN |
 | YAMNet, Google's weights in a PyTorch port (SM3-D13)      | Apache-2.0                                         | Voice per 0.48 s patch and per phrase; `vocal_detector` = `yamnet-2`        | About 0.7 s per minute of audio                                            |
 | None: harmony and timbre novelty of the phrases (SM3-D17) | —                                                  | Phrase boundaries, since `analyzerVersion` `smart-mix-audio-v7`             | About 6 ms (Python) and 4 ms (Rust)                                        |
+
+Smart Mix playlists add a third model, run only on their tracks (see "Server separation"
+below): `htdemucs-onnx-1`, Demucs v4 `htdemucs` exported to ONNX, on ONNX Runtime CPU.
+Demucs' code is MIT; the weights state no licence of their own and were trained partly on
+research-only data (MUSDB18-HQ), which Diego accepted at STEM-G0 for a free,
+non-commercial project. The image ships them with `htdemucs-onnx-1.NOTICE`, the
+attribution. A five-minute track takes about two to three minutes with four threads on a
+development laptop, plus the drum beats.
 
 Two more models serve only the offline measurement and never run in the worker: All-In-One
 (MIT), the reference for sections and downbeats, and madmom's downbeat networks (CC
@@ -655,9 +666,106 @@ playlists"); the code is in `crate/db/repositories/smart_mix_playlists.py`.
   `{enabled, ready, total}`, computed for all of them in one query; `ready` and `total`
   are 0 while off. The toggle invalidates the `playlists` and `playlist:{id}` client
   caches.
-- **Not yet.** Nothing separates the queued tracks until ST2.PR2 and ST2.PR3 (the
-  analysis worker and `analyze_playlist_stems`). `last_used_at` is set when a playlist
-  is turned on; marking later use is part of ST2.PR3.
+- **Not yet.** Nothing separates the queued tracks until ST2.PR3 (the task
+  `analyze_playlist_stems`); the separation itself is described in the next section.
+  `last_used_at` is set when a playlist is turned on; marking later use is part of
+  ST2.PR3.
+
+### Server separation
+
+The analysis worker separates the tracks of Smart Mix playlists with `htdemucs-onnx-1`:
+Demucs v4 `htdemucs` exported to ONNX by Crate Decks, the network only, run on ONNX
+Runtime CPU (STEM-D3). There is no PyTorch in the separation. The code is
+`crate/smart_mix/separation.py`; where its audio goes is `crate/smart_mix/stem_storage.py`.
+
+- **One separator for both producers.** The DSP around the graph is numpy, ported from
+  Crate Decks' reference (`tools/crate-stems/stems_dsp.py`) with the parameters of the
+  ST0 spike report (section 5): normalisation of the whole track by its mono mix,
+  segments of 343,980 samples every 257,985, STFT and iSTFT with n_fft 4096 and hop 1024
+  (periodic Hann, normalised, reflect padding, centred), triangular overlap-add,
+  `shifts=0`. `tests/test_smart_mix_separation_dsp.py` checks it against Crate Decks'
+  fixtures within 1e-5, and `tests/test_smart_mix_separation_onnx.py` checks the whole
+  separation against the golden stems PyTorch computed (at least 60 dB SDR per stem).
+  The server's analyses say `producer` `crate-server/stems-1` and `separator`
+  `{model: htdemucs, version: htdemucs-onnx-1}`, the identifier Decks uses for the same
+  graph.
+- **The graph in the image.** The analysis image downloads `htdemucs-onnx-1.onnx`
+  (174 MB) at build time from the Crate Decks release asset
+  `models-htdemucs-onnx-1/htdemucs-onnx-1.onnx` and checks its SHA-256
+  (`808790c0…6d08`), like the Beat This! checkpoint; the worker never downloads it. It
+  lands in `/app/models` with `htdemucs-onnx-1.NOTICE`, the attribution and the note on
+  the training data (design section 7). **That release asset does not exist yet: it must
+  be published before any image builds from the default.** Until then, and for local
+  and dev builds, the file comes from a named build context with the same check:
+
+  ```bash
+  docker build --target worker-analysis --build-arg PANNS=on \
+    --build-arg HTDEMUCS_ONNX_SOURCE=context \
+    --build-context htdemucs-onnx=<directory holding htdemucs-onnx-1.onnx> app
+  ```
+
+  `HTDEMUCS_ONNX_URL` points the download elsewhere, and `CRATE_HTDEMUCS_ONNX` the
+  worker at another file. Images built with `PANNS=off` separate too; they only lack
+  the drum beats.
+
+- **Disk.** Separation writes only to `CRATE_STEMS_DIR` (`/stems` in the Compose files,
+  `${MEDIA_DIR}/smart-mix-stems` on the host), and only after checking that it is on the
+  library's filesystem: the music volume, never `/tmp`, a `tmpfs` or the container's
+  disk. Create the host directory, owned by `PUID:PGID`, before deploying: Docker
+  would create a missing one owned by root. Scratch goes to `.scratch` inside it: ffmpeg
+  decodes the track to float32 (about 106 MB for five minutes), the overlap-add writes
+  one float32 file per stem (four times that), and the directory is removed when the
+  stems are no longer needed, on success and on failure.
+- **Memory.** Nothing holds a whole track: the normalisation reads the decoded file in
+  blocks, and the overlap-add streams, writing each segment's final samples as soon as no
+  later segment can touch them. What stays in memory is ONNX Runtime with the graph and a
+  few segments of arrays, whatever the track's length. ONNX Runtime's default
+  (sequential) executor reuses buffers across the encoder and the decoder and held
+  3.8-3.9 GB, above the 1.5 GB at which the worker recycles a process and the 2 GB of the
+  default analysis container. The worker runs it without that reuse
+  (`SESSION_CONFIG` in `separation.py`, `enable_mem_reuse=False`). Measured in the
+  analysis image with 4 threads on a development laptop (Core Ultra 9 185H, shared with
+  other work):
+
+  | Session                           | Peak RSS   | Graph per segment | CPU per segment |
+  | --------------------------------- | ---------- | ----------------- | --------------- |
+  | Sequential (ONNX Runtime default) | 3.8-3.9 GB | 3.0-3.4 s         | 9.7-11.2 s      |
+  | Parallel, 2 inter-op threads      | 0.8 GB     | 3.3-4.0 s         | 13.6-16.6 s     |
+  | No memory reuse (used)            | 1.0 GB     | 2.4-3.0 s         | 8.0-10.0 s      |
+
+  The three give the same stems: 87.7-101.3 dB SDR against PyTorch on the golden track.
+  The parallel executor peaks lowest but spends 40-60 % more CPU per segment, the
+  scarcer resource on the server. Once the stems are written the session is dropped and
+  the freed heap goes back to the system (`malloc_trim`), so Beat This! afterwards adds
+  nothing to the peak: 1.0 GB for the whole separation of three tracks of 300-314 s, each
+  in a container limited to 2 GB (its cgroup, page cache included, peaked at 1.4-2.0 GB).
+
+- **Threads.** `CRATE_STEMS_THREADS` (4 by default, 1-64) sets ONNX Runtime's intra-op
+  threads and ffmpeg's. Idle threads sleep instead of spinning, so a waiting separation
+  does not raise the load the resource governor reads. On the same laptop, with 4
+  threads and a one-minute load of 3.6-9, a five-minute track took 122-173 s to separate
+  (54 segments, nine tenths of it in the graph), 15-20 s for the drum beats and 2 s for
+  the levels: 380-560 s of CPU. One segment of the graph by threads, at a load of about 3:
+
+  | Threads                 | 1   | 2   | 4   | 8   |
+  | ----------------------- | --- | --- | --- | --- |
+  | Seconds per segment     | 4.4 | 2.7 | 2.2 | 1.7 |
+  | CPU seconds per segment | 4.4 | 5.1 | 7.4 | 9.7 |
+
+  Threads past two buy less and less. On the default analysis container
+  (`cpus: "0.75"`) set `CRATE_STEMS_THREADS=1`; on the project server (`cpus: "7.0"`)
+  the default 4 leaves CPUs to Postgres and the API. The i7-7700 is slower per thread
+  than this laptop: **timing a 50-track Smart Mix playlist on the server is still to do
+  after the deploy** (ST2.PR2), and its result belongs here.
+
+- **Levels.** The level of a stem is the RMS of its mono mix (the mean of both channels)
+  over windows of 11,025 samples (250 ms at 44.1 kHz) from the start of the track; the
+  last window may be short and covers the samples it has. `durationMs` is the decoded
+  length, rounded to the millisecond. Crate Decks must compute them the same way (ST5).
+- **Drum beats.** Beat This! with its DBN, the profiles' beat tracker, runs on the drum
+  stem's mono mix at 22,050 Hz and fills `drumBeatsMs`. They are stored and measured,
+  never used for the grid (STEM-D4). Tracks over ten minutes, images without torch and
+  a model failure leave them out.
 
 ### Measurement of the structure
 

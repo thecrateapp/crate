@@ -562,11 +562,15 @@ services:
       - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0}
       - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
+      - CRATE_STEMS_DIR=/stems
+      - CRATE_STEMS_THREADS=${CRATE_STEMS_THREADS:-4}
     volumes:
       - ./app/crate:/app/crate:ro
       - ./app/tests:/app/tests:ro
       - ./app/config.yaml:/app/config.yaml:ro
       - ./test-music:/music:ro
+      # Smart Mix Stems scratch and stem files: next to test-music, on its filesystem.
+      - ./data/smart-mix-stems:/stems
       - dev_data:/data
     networks:
       - crate-dev
