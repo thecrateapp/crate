@@ -336,6 +336,110 @@ def test_draft_with_tracker_replaces_same_version(pg_db, tmp_path: Path) -> None
     )
 
 
+def test_draft_without_tracker_never_replaces_model_beats_of_a_higher_quality(
+    pg_db, tmp_path: Path
+) -> None:
+    # The analyzer's own tracker can rate a track higher than Beat This!'s beats do
+    # (a constant grid it fits to its own beats looks steadier), but its grid is the
+    # weaker one: a same-version draft without a tracker never replaces a profile whose
+    # beats came from the model, whatever its quality.
+    del pg_db
+    path = tmp_path / "model-beats.flac"
+    path.write_bytes(b"model-beats-source")
+    track_id, _track_uid = _create_track(path)
+    model = replace(
+        _draft(),
+        analyzer="crate-rust",
+        analyzer_version=ANALYZER_VERSION,
+        quality=MixProfileQuality.PARTIAL,
+        beat_tracker="beat-this-small0-dbn",
+    )
+    own_full = replace(
+        model,
+        quality=MixProfileQuality.FULL,
+        downbeat_anchor_ms=1_000,
+        beat_tracker=None,
+    )
+
+    assert store_smart_mix_profile_result(track_id, path, model) is True
+    assert store_smart_mix_profile_result(track_id, path, own_full) is False
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert (profile.beat_tracker, profile.quality, profile.downbeat_anchor_ms) == (
+        "beat-this-small0-dbn",
+        MixProfileQuality.PARTIAL,
+        500,
+    )
+
+
+def test_library_analysis_keeps_a_model_profile_of_the_same_version(
+    pg_db, tmp_path: Path
+) -> None:
+    # The library analysis embeds crate-cli's profile, built without Beat This!: a
+    # reanalysis of the library (BPM, key, loudness) must not strip the model's beats
+    # from the Smart Mix profile, even when its own profile rates full.
+    del pg_db
+    path = tmp_path / "library.m4a"
+    path.write_bytes(b"library-source")
+    track_id, _track_uid = _create_track(path)
+    model = replace(
+        _draft(),
+        analyzer="crate-rust",
+        analyzer_version=ANALYZER_VERSION,
+        quality=MixProfileQuality.PARTIAL,
+        beat_tracker="beat-this-small0-dbn",
+    )
+    assert store_smart_mix_profile_result(track_id, path, model) is True
+
+    store_analysis_result(
+        track_id,
+        str(path),
+        {
+            "bpm": 120.0,
+            "key": "A",
+            "scale": "minor",
+            "energy": 0.7,
+            "mood": None,
+            "mix_profile": {
+                "schemaVersion": 1,
+                "analyzer": "crate-rust",
+                "analyzerVersion": ANALYZER_VERSION,
+                "durationMs": 180_000,
+                "quality": "full",
+                "bpm": 120.0,
+                "bpmConfidence": 0.95,
+                "tempoStability": 0.97,
+                "beatAnchorMs": 500,
+                "downbeatAnchorMs": 1_000,
+                "timeSignature": 4,
+                "beatGridMs": [500, 1_000, 1_500],
+                "key": "A",
+                "scale": "minor",
+                "camelot": "8A",
+                "keyConfidence": 0.9,
+                "introCueMs": 500,
+                "outroCueMs": 175_000,
+            },
+        },
+    )
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert (profile.beat_tracker, profile.quality, profile.downbeat_anchor_ms) == (
+        "beat-this-small0-dbn",
+        MixProfileQuality.PARTIAL,
+        500,
+    )
+    with read_scope() as session:
+        bpm = session.execute(
+            text("SELECT bpm FROM library_tracks WHERE id = :track_id"),
+            {"track_id": track_id},
+        ).scalar_one()
+    # The library fields still take the reanalysis.
+    assert bpm == 120.0
+
+
 def test_unsegmented_structure_stays_distinct_from_no_structure(
     pg_db, tmp_path: Path
 ) -> None:
