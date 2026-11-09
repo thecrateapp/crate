@@ -771,7 +771,8 @@ fn cue_downbeat_ms(
 }
 
 /// The bar downbeat nearest a cue from the model downbeats around it: the window of
-/// `cue_downbeat_ms` and the phase rule of the anchor (SM3-D14).
+/// `cue_downbeat_ms` and the former phase rule of the anchor (SM3-D14), where every
+/// downbeat inside the window counts.
 fn model_cue_downbeat_ms(
     beat_grid_ms: &[u64],
     downbeats_ms: &[u64],
@@ -784,7 +785,7 @@ fn model_cue_downbeat_ms(
     let nearest = nearest_beat(beat_grid_ms, cue_ms);
     let count = CUE_DOWNBEAT_BEATS.min(beat_grid_ms.len());
     let start = window_start(beat_grid_ms.len(), nearest, count);
-    let phase = beat_tracking::downbeat_phase_from_model(
+    let phase = beat_tracking::cue_downbeat_phase_from_model(
         &beat_grid_ms[start..start + count],
         downbeats_ms,
     )?;

@@ -257,6 +257,7 @@ def test_rust_model_downbeat_rule_matches_python() -> None:
     assert rust == {
         "MODEL_DOWNBEAT_TOLERANCE_MS": phrase_grid.MODEL_DOWNBEAT_TOLERANCE_MS,
         "MODEL_DOWNBEAT_MIN_SHARE": phrase_grid.MODEL_DOWNBEAT_MIN_SHARE,
+        "MODEL_DOWNBEAT_MIN_ON_GRID": phrase_grid.MODEL_DOWNBEAT_MIN_ON_GRID,
     }
 
 

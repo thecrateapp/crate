@@ -309,9 +309,15 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   fallback. Both use
   them instead of their own tracker, still fit the constant grid, and anchor the bar on the
   grid phase (beat index mod 4) that collects the most model downbeats within 70 ms, if
-  that phase holds at least 60 % of the model downbeats inside the grid. Otherwise the
+  that phase holds at least 60 % of those votes and at least half the model downbeats
+  inside the grid voted. A downbeat more than 70 ms from every grid beat (where Beat
+  This! slides half a beat off the grid in a section) votes for no phase; before
+  2026-11-09 it counted against the winning phase, and tracks whose downbeats all
+  agreed on the grid lost their bars and phrases. Otherwise the
   track has no downbeat and no phrases. The Rust cue downbeats (`introDownbeatMs`,
-  `outroDownbeatMs`) take the same rule over the 32 beats around each cue. A `crate-cli`
+  `outroDownbeatMs`) take the former rule over the 32 beats around each cue: 60 % of every
+  model downbeat in the window, the ones off the grid included, since eight bars are too
+  few to let those abstain. A `crate-cli`
   whose `analyze --help` does not list `--beats` would track its own beats after the model
   ran, so the worker logs a warning and the Python analyzer takes the beats instead. When
   that probe fails (a timeout on a loaded worker, for example), it logs a warning once and
