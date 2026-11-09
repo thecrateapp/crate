@@ -782,8 +782,10 @@ Runtime CPU (STEM-D3). There is no PyTorch in the separation. The code is
   | CPU seconds per segment | 4.4 | 5.1 | 7.4 | 9.7 |
 
   Threads past two buy less and less. On the default analysis container
-  (`cpus: "0.75"`) set `CRATE_STEMS_THREADS=1`; on the project server (`cpus: "7.0"`)
-  the default 4 leaves CPUs to Postgres and the API. The i7-7700 is slower per thread
+  (`cpus: "0.75"`) set `CRATE_STEMS_THREADS=1`. The project server (`cpus: "7.0"`) sets
+  `CRATE_STEMS_THREADS=2` in its `.env` while the backfill runs four to eight analyses on
+  its eight logical CPUs: by the table, 31 % less CPU per segment than 4 threads for 23 %
+  more time. The i7-7700 is slower per thread
   than this laptop: **timing a 50-track Smart Mix playlist on the server is still to do
   after the deploy** (ST2.PR2), and its result belongs here.
 
