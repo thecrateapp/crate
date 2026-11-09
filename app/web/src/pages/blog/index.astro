@@ -34,7 +34,10 @@ const minutes = (body = "") => t("blog.minutes", "en", {
         <h1 data-enter style="--d:80ms">{t("blog.title")}</h1>
         <p class="intro" data-enter style="--d:140ms">{t("blog.lede")}</p>
       </div>
-      <a class="u-link rss" href="/blog/rss.xml">{t("blog.rss")} <BlogIcon name="arrow-right" size={16} /></a>
+      <nav class="blog-actions" aria-label="Browse the blog">
+        <a class="u-link mono-link" href="/blog/tags" data-hover-scramble>Explore topics</a>
+        <a class="u-link mono-link" href="/blog/rss.xml" data-hover-scramble>{t("blog.rss")}</a>
+      </nav>
     </header>
 
     {firstChapter && (
@@ -42,7 +45,7 @@ const minutes = (body = "") => t("blog.minutes", "en", {
         <div class="series-intro">
           <p class="section-label">The story of Crate</p>
           <h2 id="series-title" aria-label={SERIES_TITLE}>
-            <span>How to forget Spotify.</span>{" "}
+            <span>How to dismantle Spotify.</span>{" "}
             <span>Building Crate from the ground.</span>
           </h2>
           <p class="series-description">From a tool that organised music files to a platform that plays them. Follow the problems we hit and the systems we built to solve them.</p>
@@ -134,7 +137,7 @@ const minutes = (body = "") => t("blog.minutes", "en", {
   .blog-header .eyebrow { margin:0 0 16px; }
   h1 { margin:0 0 16px; font:600 clamp(2.2rem,4.3vw,3.5rem)/1.06 var(--display); letter-spacing:-.035em; }
   .intro { max-width:58ch; margin:0; color:var(--fg-2); font:16px/1.65 var(--sans); }
-  .rss { display:inline-flex; align-items:center; gap:12px; flex:none; min-height:44px; font:11px var(--mono); letter-spacing:.1em; text-transform:uppercase; }
+  .blog-actions { display:flex; align-items:center; flex-shrink:0; gap:clamp(20px,2vw,30px); }
   .section-label { margin:0; font:11px/1.6 var(--mono); text-transform:uppercase; letter-spacing:.13em; color:var(--fg-3); }
   .series { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:clamp(32px,6vw,88px); padding:44px 0 38px; border-top:1px solid var(--line); }
   .series-intro>.section-label { color:var(--cyan-hi); margin-bottom:22px; }

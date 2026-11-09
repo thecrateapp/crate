@@ -1,8 +1,7 @@
 ---
 title: "Reading production errors in Admin without trusting what they say"
 description: "Crate copies Sentry issues into PostgreSQL, has a model triage them as untrusted data and lets an agent draft a fix that a person reviews."
-date: 2026-11-17
-draft: true
+date: 2026-11-10
 tags: [observability, Sentry, AI, GitHub Actions]
 sources:
   - app/crate/error_inbox/digest.py

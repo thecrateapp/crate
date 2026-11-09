@@ -105,7 +105,7 @@
       marker-end: url(#amberArrow);
     }
   </style>
-  <rect width="960" height="638" rx="8" fill="#0a0a0f" />
+  <rect width="960" height="638" fill="#0a0a0f" />
   <text x="32" y="38" class="label">
     BROWSING A PAGE WITHOUT REBUILDING THE INVENTORY
   </text>

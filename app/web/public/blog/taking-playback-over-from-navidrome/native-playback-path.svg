@@ -75,7 +75,7 @@
       fill: #fbbf24;
     }
   </style>
-  <rect width="960" height="990" rx="10" fill="#0a0a0f" />
+  <rect width="960" height="990" fill="#0a0a0f" />
   <text x="32" y="42" class="label" text-anchor="start">
     11 APR · THE NATIVE LISTEN PLAYBACK PATH
   </text>

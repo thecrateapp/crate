@@ -91,12 +91,13 @@ for (const width of [1440, 390]) {
 test("source icons are present in rendered HTML without JavaScript", async ({
   browser,
 }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false });
+  const context = await browser.newContext({
+    javaScriptEnabled: false,
+    baseURL: test.info().project.use.baseURL,
+  });
   try {
     const page = await context.newPage();
-    await page.goto(
-      "http://localhost:4321/blog/smart-mix-planned-on-the-server",
-    );
+    await page.goto("/blog/smart-mix-planned-on-the-server");
     await expect(page.locator(".prose .expressive-code")).toHaveCount(3);
     await expect(
       page.locator('.prose .source-link > svg[data-blog-icon="github"]'),

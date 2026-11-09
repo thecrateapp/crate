@@ -23,7 +23,16 @@ export function postNavigation<T extends BlogEntry>(
             a.data.series!.part - b.data.series!.part ||
             a.id.localeCompare(b.id),
         )
-    : [...visible].reverse();
+    : // Standalone articles step through each other: oldest first, calendar order on the same day.
+      visible
+        .map((entry, index) => ({ entry, index }))
+        .filter(({ entry }) => !entry.data.series)
+        .sort(
+          (a, b) =>
+            a.entry.data.date.getTime() - b.entry.data.date.getTime() ||
+            a.index - b.index,
+        )
+        .map(({ entry }) => entry);
   const index = sequence.findIndex((entry) => entry.id === current.id);
   const previous = sequence[index - 1];
   const next = sequence[index + 1];

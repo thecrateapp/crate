@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 790" role="img" aria-labelledby="title desc">
+<title id="title">One operation, one shared transaction</title>
+<desc id="desc">Before the refactor, artist genre replacement borrowed connection A and its genre creation helper borrowed connection B. B could commit a new genre even if A later rolled back the artist links. After the refactor, genre creation and link replacement used the same supplied session, so one commit or rollback covered their database changes.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#67e8f9" stroke-width="1.3"/></marker>
+  <style>
+    .bg{fill:#0a0a0f}.panel{fill:#0d0e14;stroke:#303442;stroke-width:1}.scope{fill:#0a0a0f;stroke:#526172;stroke-width:1}.shared{fill:#0a0a0f;stroke:#67e8f9;stroke-width:1}.title{font:600 24px 'JetBrains Mono',monospace;fill:#e7e9f2}.label{font:500 15px 'JetBrains Mono',monospace;letter-spacing:1px;fill:#67e8f9}.body{font:17px system-ui,sans-serif;fill:#c9cdd8}.small{font:14px 'JetBrains Mono',monospace;fill:#c9cdd8}.muted{font:15px system-ui,sans-serif;fill:#959dad}.edge{fill:none;stroke:#67e8f9;stroke-width:1.5;marker-end:url(#arrow)}.rule{stroke:#303442;stroke-width:1}
+  </style>
+</defs>
+<rect class="bg" width="1200" height="790"/>
+<text class="title" x="40" y="49">GIVE THE OPERATION ONE TRANSACTION</text>
+<text class="muted" x="40" y="80">Artist genre replacement · April 2026</text>
+
+<rect class="panel" x="40" y="116" width="540" height="570" rx="8"/>
+<text class="label" x="61" y="148">BEFORE / EACH HELPER BORROWS A CONNECTION</text>
+<text class="body" x="61" y="180">Nested calls, independent commits</text>
+<rect class="scope" x="60" y="210" width="245" height="350" rx="7"/>
+<text class="small" x="78" y="240">CONNECTION A</text>
+<text class="body" x="78" y="279">Delete old artist links</text>
+<text class="small" x="78" y="323">get_or_create_genre</text>
+<text class="small" x="78" y="346">(name)</text>
+<text class="body" x="78" y="455">Insert new artist links</text>
+<text class="body" x="78" y="501">If a later insert fails:</text>
+<text class="small" x="78" y="533">ROLLBACK A</text>
+
+<rect class="scope" x="337" y="282" width="222" height="154" rx="7"/>
+<text class="small" x="355" y="312">CONNECTION B</text>
+<text class="body" x="355" y="348">Create missing genre</text>
+<text class="small" x="355" y="386">COMMIT B</text>
+<text class="muted" x="355" y="414">Return genre ID</text>
+<path class="edge" d="M 305 329 H 327"/>
+<path class="edge" d="M 337 405 H 321 V 447 H 307"/>
+<text class="body" x="61" y="605">The old artist links are restored.</text>
+<text class="body" x="61" y="634">The new genre definition stays committed.</text>
+<text class="muted" x="61" y="663">A cannot roll back B's completed transaction.</text>
+
+<rect class="panel" x="620" y="116" width="540" height="570" rx="8"/>
+<text class="label" x="641" y="148">AFTER / PASS THE SAME SESSION</text>
+<text class="body" x="641" y="180">One operation owns commit and rollback</text>
+<rect class="shared" x="640" y="210" width="500" height="350" rx="7"/>
+<text class="small" x="660" y="240">ONE SHARED TRANSACTION</text>
+<text class="body" x="660" y="279">Delete old artist links</text>
+<path class="edge" d="M 890 290 V 310"/>
+<text class="small" x="660" y="338">get_or_create_genre(name, session=session)</text>
+<text class="muted" x="660" y="367">Create if missing; return its ID without committing</text>
+<path class="edge" d="M 890 382 V 405"/>
+<text class="body" x="660" y="435">Insert new artist links</text>
+<path class="edge" d="M 890 449 V 475"/>
+<text class="small" x="660" y="504">COMMIT ON SUCCESS</text>
+<text class="small" x="660" y="533">ROLLBACK ON EXCEPTION</text>
+<text class="body" x="641" y="605">Genre definitions and artist links commit together.</text>
+<text class="body" x="641" y="634">A failure rolls back both sets of changes.</text>
+<text class="muted" x="641" y="663">Helpers use the supplied session throughout.</text>
+
+<line class="rule" x1="40" y1="724" x2="1160" y2="724"/>
+<text class="muted" x="40" y="755">Omitting session= can still open a separate transaction. File writes and broker messages need their own handling.</text>
+</svg>

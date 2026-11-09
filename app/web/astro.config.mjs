@@ -17,6 +17,19 @@ export default defineConfig({
   build: { format: "file" },
   markdown: { rehypePlugins: [rehypeBlogLinks] },
   integrations: [
+    {
+      name: "crate-isolated-vite-cache",
+      hooks: {
+        "astro:config:setup": ({ command, updateConfig }) => {
+          // Check/build must not replace the dependency hashes served by a live preview.
+          updateConfig({
+            vite: {
+              cacheDir: fileURLToPath(new URL(`./node_modules/.vite-${command}/`, import.meta.url)),
+            },
+          });
+        },
+      },
+    },
     expressiveCode({
       themes: [crateTheme],
       plugins: [crateSourceLinks(), pluginLineNumbers()],
@@ -49,6 +62,15 @@ export default defineConfig({
     routing: { prefixDefaultLocale: false },
   },
   vite: {
+    plugins: [{
+      name: "crate-content-vite-cache",
+      config(config) {
+        // Astro also starts an auxiliary Vite server while restarting dev.
+        if (config.optimizeDeps?.noDiscovery && config.cacheDir) {
+          return { cacheDir: `${config.cacheDir}-content` };
+        }
+      },
+    }],
     resolve: {
       alias: {
         "@shared": fileURLToPath(new URL("../shared", import.meta.url)),

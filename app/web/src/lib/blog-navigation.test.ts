@@ -68,16 +68,20 @@ describe("postNavigation", () => {
     expect(postNavigation(draft, all)).toEqual({ related: [] });
   });
 
-  it("uses chronological neighbours for standalone posts with deterministic same-day order", () => {
+  it("steps through standalone articles only, oldest first and in calendar order on the same day", () => {
     const oldest = entry("oldest", { date: new Date("2026-01-01") });
     const first = entry("first");
+    const between = chapter("between", 1);
     const second = entry("second");
     const newest = entry("newest", { date: new Date("2026-12-01") });
-    const result = postNavigation(second, [newest, second, oldest, first], {
-      order: ["first", "second"],
-    });
-    expect(result.previous).toBe(oldest);
-    expect(result.next).toBe(first);
+    const entries = [newest, second, between, oldest, first];
+    const order = ["first", "between", "second"];
+    const fromFirst = postNavigation(first, entries, { order });
+    expect(fromFirst.previous).toBe(oldest);
+    expect(fromFirst.next).toBe(second);
+    const fromSecond = postNavigation(second, entries, { order });
+    expect(fromSecond.previous).toBe(first);
+    expect(fromSecond.next).toBe(newest);
   });
 
   it("preserves curated order then ranks actual shared topics, excluding current and neighbours", () => {

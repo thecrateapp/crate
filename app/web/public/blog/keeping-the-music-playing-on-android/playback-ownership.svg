@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 880" role="img" aria-labelledby="title desc">
+  <title id="title">Playback belongs to the Android service</title>
+  <desc id="desc">Before, Android controls sent commands through the WebView to web audio. After, the Media3 service owns the player and queue, with a detachable React interface. Process loss requires a checkpoint, paused restoration and fresh authorization.</desc>
+  <defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1L7 4L1 7" fill="none" stroke="#67e8f9"/></marker></defs>
+  <rect width="1200" height="880" fill="#0a0a0f"/>
+  <g font-family="JetBrains Mono,monospace" font-size="17" fill="#a9adbb">
+    <text x="40" y="48" fill="#67e8f9" letter-spacing="1">WHO ADVANCES THE MUSIC?</text>
+    <text x="40" y="79">The loaded queue must survive a disconnected interface.</text>
+    <text x="40" y="126" fill="#67e8f9" font-size="15">BEFORE / WEBVIEW IN THE PLAYBACK PATH</text>
+    <g fill="#0d0e14" stroke="#353947"><rect x="40" y="148" width="320" height="124" rx="4"/><rect x="440" y="148" width="320" height="124" rx="4"/><rect x="840" y="148" width="320" height="124" rx="4"/></g>
+    <g fill="#e5e7ef"><text x="60" y="182">NATIVE CONTROLS</text><text x="460" y="182">CAPACITOR + WEBVIEW</text><text x="860" y="182">WEB AUDIO</text></g>
+    <text x="60" y="216">Notification / media keys</text><text x="60" y="245">Commands need JavaScript</text>
+    <text x="460" y="216">Bridge delivers the action</text><text x="460" y="245">React owns queue changes</text>
+    <text x="860" y="216">Audio element + web engine</text><text x="860" y="245">Runs inside the WebView</text>
+    <path d="M360 210H432M760 210H832" fill="none" stroke="#67e8f9" marker-end="url(#arrow)"/>
+    <text x="40" y="330" fill="#67e8f9" font-size="15">AFTER / SERVICE OWNS THE PLAYER</text>
+    <g fill="#0d0e14" stroke="#353947"><rect x="40" y="354" width="320" height="164" rx="4"/><rect x="440" y="354" width="320" height="164" rx="4"/><rect x="840" y="354" width="320" height="164" rx="4"/></g>
+    <g fill="#e5e7ef"><text x="60" y="390">LISTEN INTERFACE</text><text x="460" y="390">MEDIA3 SERVICE</text><text x="860" y="390">ANDROID CONTROLS</text></g>
+    <text x="60" y="425">Commands + queue revision</text><text x="60" y="454">Can detach and reconnect</text><text x="60" y="483">Reconciles native state</text>
+    <text x="460" y="425">ExoPlayer + loaded queue</text><text x="460" y="454">MediaSession + audio focus</text><text x="460" y="483">Advances without React</text>
+    <text x="860" y="425">Notification / media keys</text><text x="860" y="454">Command the same session</text>
+    <path d="M360 421H432M840 421H768" fill="none" stroke="#67e8f9" marker-end="url(#arrow)"/>
+    <path d="M440 475H368" fill="none" stroke="#67e8f9" stroke-dasharray="1 5" marker-end="url(#arrow)"/>
+    <text x="40" y="584" fill="#67e8f9" font-size="15">PROCESS LOST / RECOVERY REQUIRES AUTHORIZATION</text>
+    <g fill="#0d0e14" stroke="#353947"><rect x="40" y="608" width="320" height="128" rx="4"/><rect x="440" y="608" width="320" height="128" rx="4"/><rect x="840" y="608" width="320" height="128" rx="4"/></g>
+    <g fill="#e5e7ef"><text x="60" y="644">SAFE CHECKPOINT</text><text x="460" y="644">PAUSED RESTORATION</text><text x="860" y="644">AUTHENTICATED QUEUE</text></g>
+    <text x="60" y="677">Track IDs, metadata, cursor</text><text x="60" y="706">No stream URLs or secrets</text>
+    <text x="460" y="677">Placeholder media items</text><text x="460" y="706">Play / prepare gated</text>
+    <text x="860" y="677">App renews media access</text><text x="860" y="706">Honour current play intent</text>
+    <path d="M360 672H432M760 672H832" fill="none" stroke="#67e8f9" stroke-dasharray="9 4" marker-end="url(#arrow)"/>
+    <path d="M40 784H1160" stroke="#353947"/>
+    <text x="40" y="818">Detaching the UI can leave playback running. Losing the process cannot.</text>
+    <text x="40" y="847">An explicit stop ends playback; the service does not override that action.</text>
+  </g>
+</svg>

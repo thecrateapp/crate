@@ -57,7 +57,7 @@
       marker-end: url(#arrow);
     }
   </style>
-  <rect width="1200" height="650" rx="6" fill="#0a0a0f" />
+  <rect width="1200" height="650" fill="#0a0a0f" />
   <text x="40" y="47" class="label">ONE ALBUM / TWO LOOKUP PATHS</text>
   <text x="40" y="77" class="note">Library workflow, 19–20 March 2026</text>
   <text x="40" y="127" class="label">METADATA MATCHING</text>

@@ -55,6 +55,15 @@ describe("engineering timeline", () => {
         /^draft:\s*true\s*$/m.test(readFileSync(path, "utf8")),
         item.id,
       ).toBe(item.status === "draft");
+      if (item.chapter) {
+        const part = readFileSync(path, "utf8").match(
+          /^  part:\s*(\d+)$/m,
+        )?.[1];
+        expect(
+          Number(part),
+          `${item.id} must name its destination chapter`,
+        ).toBe(item.chapter);
+      }
     }
   });
 

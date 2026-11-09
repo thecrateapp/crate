@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { codeSource } from "../lib/code-source";
-import { calendar } from "./blog-calendar";
+import { calendar, LAUNCH_DATE } from "./blog-calendar";
 
 const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const postsDir = fileURLToPath(new URL("../content/blog/", import.meta.url));
@@ -36,13 +36,30 @@ describe("blog calendar", () => {
     }
   });
 
-  it("publishes on Tuesdays, never going back in time", () => {
-    let previous = "";
-    for (const entry of calendar) {
+  it("launches every published post together on a Tuesday", () => {
+    expect(new Date(`${LAUNCH_DATE}T00:00:00Z`).getUTCDay()).toBe(2);
+    for (const entry of calendar.filter((item) => item.status === "published"))
+      expect(entry.publishOn, entry.slug).toBe(LAUNCH_DATE);
+  });
+
+  it("schedules proposed articles on later Tuesdays, never going back in time", () => {
+    let previous = LAUNCH_DATE;
+    for (const entry of calendar.filter((item) => item.status !== "published")) {
       const day = new Date(`${entry.publishOn}T00:00:00Z`).getUTCDay();
       expect(day, entry.slug).toBe(2);
+      expect(entry.publishOn > LAUNCH_DATE, entry.slug).toBe(true);
       expect(entry.publishOn >= previous, entry.slug).toBe(true);
       previous = entry.publishOn;
+    }
+  });
+
+  it("publishes every written post", () => {
+    const published = new Set(
+      calendar.filter((item) => item.status === "published").map((item) => item.slug),
+    );
+    for (const file of posts) {
+      expect(published, file).toContain(file.replace(/\.md$/, ""));
+      expect(frontmatter(file).draft, file).toBe(false);
     }
   });
 

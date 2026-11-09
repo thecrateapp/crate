@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+<title id="title">Three memories for radio</title><desc id="desc">The active player buffer excludes queued songs. A bounded session ledger cools delivered songs. Actual significant play events form the listener's seven-day history. A delivery alone cannot create listening history.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#67e8f9"/></marker></defs>
+<rect width="1200" height="700" fill="#0a0a0f"/>
+<g font-family="Inter,Arial,sans-serif" fill="#f0f1f5">
+<text x="48" y="54" font-family="JetBrains Mono,monospace" font-size="17" fill="#67e8f9">RADIO / DIFFERENT EVENTS, DIFFERENT MEMORIES</text>
+<text x="48" y="92" font-size="27">A queue response is not a listening event</text>
+<g fill="#0d0e14" stroke="#353947" stroke-width="2"><rect x="48" y="144" width="328" height="166" rx="12"/><rect x="436" y="144" width="328" height="166" rx="12"/><rect x="824" y="144" width="328" height="166" rx="12"/><rect x="215" y="444" width="770" height="154" rx="12"/></g>
+<text x="72" y="181" font-size="21">Active player buffer</text><text x="72" y="219" font-size="18" fill="#a1a7b5">Songs already queued</text><text x="72" y="250" font-size="18" fill="#a1a7b5">Protect their song families</text><text x="72" y="281" font-size="18" fill="#a1a7b5">Context supplied by client</text>
+<text x="460" y="181" font-size="21">Session delivery ledger</text><text x="460" y="219" font-size="18" fill="#a1a7b5">Latest 500 delivered songs</text><text x="460" y="250" font-size="18" fill="#a1a7b5">Includes a five-second skip</text><text x="460" y="281" font-size="18" fill="#a1a7b5">Oldest deliveries leave first</text>
+<text x="848" y="181" font-size="21">Significant listening</text><text x="848" y="219" font-size="18" fill="#a1a7b5">Per listener · seven days</text><text x="848" y="250" font-size="18" fill="#a1a7b5">Completed, or min(30 s, ½ track)</text><text x="848" y="281" font-size="18" fill="#a1a7b5">Only actual qualifying events</text>
+<g fill="none" stroke="#67e8f9" stroke-width="2" stroke-dasharray="9 4" marker-end="url(#arrow)"><path d="M212 310 V376 H315 V444"/><path d="M600 310 V444"/><path d="M988 310 V376 H885 V444"/></g>
+<g fill="#0a0a0f"><rect x="62" y="328" width="280" height="34"/><rect x="480" y="328" width="240" height="34"/><rect x="876" y="328" width="245" height="34"/></g><text x="72" y="352" font-size="17" fill="#a1a7b5">Exclude queued families</text><text x="490" y="352" font-size="17" fill="#a1a7b5">Cool across refills</text><text x="886" y="352" font-size="17" fill="#a1a7b5">Rotate later sessions</text>
+<text x="245" y="486" font-size="22">Candidate selection keeps these inputs separate</text><text x="245" y="525" font-size="18" fill="#a1a7b5">Delivery: prefer a truly fresh alternative from the eligible pool.</text><text x="245" y="558" font-size="18" fill="#a1a7b5">Listening: prefer unheard songs within the 0.05 score allowance.</text>
+<text x="48" y="654" font-size="18" fill="#a1a7b5">Fallback retains suitable repeated songs when useful fresh candidates run out.</text>
+</g></svg>

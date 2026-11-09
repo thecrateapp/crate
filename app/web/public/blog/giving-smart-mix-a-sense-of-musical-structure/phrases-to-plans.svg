@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="790" viewBox="0 0 1200 790" role="img" aria-labelledby="title desc">
+<title id="title">From musical phrases to a transition plan</title><desc id="desc">Illustrative outgoing and incoming phrase lanes show candidate start positions. Profiles feed up to eight validated plans, the deterministic winner is available immediately, and an optional model proposal must pass reconstruction and policy checks.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#67e8f9"/></marker></defs>
+<rect width="1200" height="790" fill="#0a0a0f"/>
+<g font-family="Inter,Arial,sans-serif" fill="#f0f1f5">
+<text x="48" y="53" font-size="17" font-family="JetBrains Mono,monospace" fill="#67e8f9">SMART MIX 3 / CANDIDATE GEOMETRY</text><text x="48" y="94" font-size="28">Choose where to mix, then check what the choice costs</text>
+<text x="48" y="153" font-size="19">Outgoing</text><text x="260" y="153" font-size="17" fill="#a1a7b5">Last four eligible phrase starts</text>
+<g stroke="#353947" stroke-width="2" fill="#111b23"><rect x="260" y="172" width="185" height="70"/><rect x="445" y="172" width="210" height="70"/><rect x="655" y="172" width="280" height="70"/><rect x="935" y="172" width="215" height="70"/></g>
+<g stroke="#67e8f9" stroke-width="3"><path d="M260 170V245 M445 170V245 M655 170V245 M935 170V245"/></g>
+<text x="283" y="215" font-size="18">phrase A</text><text x="468" y="215" font-size="18">phrase B</text><text x="678" y="215" font-size="18">phrase C</text><text x="958" y="215" font-size="18">outro</text>
+<text x="48" y="292" font-size="19">Incoming</text><text x="260" y="292" font-size="17" fill="#a1a7b5">First three phrase starts</text>
+<g stroke="#353947" stroke-width="2" fill="#111b23"><rect x="260" y="311" width="185" height="70"/><rect x="445" y="311" width="280" height="70"/><rect x="725" y="311" width="425" height="70"/></g>
+<g stroke="#67e8f9" stroke-width="3"><path d="M260 309V384 M445 309V384 M725 309V384"/></g>
+<text x="283" y="354" font-size="18">intro</text><text x="468" y="354" font-size="18">phrase B</text><text x="748" y="354" font-size="18">phrase C</text>
+<text x="260" y="416" font-size="17" fill="#a1a7b5">Illustrative positions · 8 / 16 / 32 bars or preferred duration · context limits apply</text>
+<g fill="#0d0e14" stroke="#353947" stroke-width="2"><rect x="48" y="463" width="284" height="112" rx="12"/><rect x="405" y="463" width="350" height="112" rx="12"/><rect x="830" y="463" width="322" height="112" rx="12"/><rect x="405" y="642" width="747" height="95" rx="12"/></g>
+<text x="72" y="503" font-size="21">Stored profiles</text><text x="72" y="541" font-size="17" fill="#a1a7b5">Phrases, energy, voice, tempo</text><text x="430" y="503" font-size="21">At most eight valid plans</text><text x="430" y="541" font-size="17" fill="#a1a7b5">Rank cost · include the v2 plan</text><text x="855" y="503" font-size="21">Deterministic winner</text><text x="855" y="541" font-size="17" fill="#a1a7b5">Usable without a model call</text>
+<g fill="none" stroke="#67e8f9" stroke-width="2" marker-end="url(#a)"><path d="M332 519H405"/><path d="M755 519H830"/><path d="M580 575V642" stroke-dasharray="9 4"/></g>
+<text x="600" y="612" font-size="17" fill="#a1a7b5">Optional · off by default</text><text x="430" y="680" font-size="20">Model choice + bounded changes → reconstruct → validate</text><text x="430" y="713" font-size="17" fill="#a1a7b5">Rejection or stale profiles leave the deterministic plan available.</text>
+</g></svg>

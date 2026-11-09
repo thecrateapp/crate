@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 830" role="img" aria-labelledby="title desc">
+  <title id="title">From an artist batch to a radio session</title>
+  <desc id="desc">In March 2026, Artist Radio averaged analysed tracks and returned one batch. By early April, four seed types fed recommendations, personal scoring and queue diversity. Listen retained the source context and requested another batch when three or fewer upcoming tracks remained. Filtering could leave a refill empty.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#67e8f9" stroke-width="1.25"/></marker>
+    <style>
+      .bg{fill:#0a0a0f}.panel{fill:#0d0e14;stroke:#303442;stroke-width:1}.title{font:600 23px 'JetBrains Mono',monospace;fill:#e7e9f2}.label{font:500 15px 'JetBrains Mono',monospace;letter-spacing:1px;fill:#67e8f9}.body{font:17px system-ui,sans-serif;fill:#c9cdd8}.muted{font:15px system-ui,sans-serif;fill:#959dad}.small{font:14px 'JetBrains Mono',monospace;fill:#c9cdd8}.edge{fill:none;stroke:#67e8f9;stroke-width:1.5;marker-end:url(#arrow)}.old{fill:none;stroke:#61697b;stroke-width:1}.rule{stroke:#303442;stroke-width:1}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="830"/>
+  <text class="title" x="40" y="46">FROM AN ARTIST BATCH TO A RADIO SESSION</text>
+  <text class="muted" x="40" y="76">Crate · March–April 2026</text>
+
+  <rect class="panel" x="40" y="104" width="1120" height="98" rx="8"/>
+  <text class="label" x="62" y="132">MARCH</text>
+  <text class="body" x="62" y="170">Analysed artist tracks</text>
+  <path class="old" d="M 242 164 H 294 m -7 -5 7 5 -7 5"/>
+  <text class="body" x="311" y="170">One centroid</text>
+  <path class="old" d="M 427 164 H 479 m -7 -5 7 5 -7 5"/>
+  <text class="body" x="497" y="170">Distance to other tracks</text>
+  <path class="old" d="M 687 164 H 739 m -7 -5 7 5 -7 5"/>
+  <text class="body" x="758" y="170">Source + neighbours → one batch</text>
+
+  <text class="label" x="40" y="246">EARLY APRIL</text>
+
+  <rect class="panel" x="40" y="271" width="330" height="178" rx="8"/>
+  <text class="label" x="61" y="301">1 / KEEP THE CONTEXT</text>
+  <text class="body" x="61" y="337">Artist · track · album · playlist</text>
+  <text class="body" x="61" y="369">Choose real seed tracks</text>
+  <text class="muted" x="61" y="405">Retain the seed type and ID</text>
+  <text class="muted" x="61" y="426">alongside the playable queue.</text>
+
+  <rect class="panel" x="435" y="271" width="330" height="178" rx="8"/>
+  <text class="label" x="456" y="301">2 / RECOMMEND</text>
+  <text class="body" x="456" y="337">Audio + catalogue relationships</text>
+  <text class="body" x="456" y="369">Merge evidence from several seeds</text>
+  <text class="muted" x="456" y="405">Use available metadata when</text>
+  <text class="muted" x="456" y="426">seed audio vectors are missing.</text>
+
+  <rect class="panel" x="830" y="271" width="330" height="178" rx="8"/>
+  <text class="label" x="851" y="301">3 / PERSONALIZE</text>
+  <text class="body" x="851" y="337">Likes and recent plays / skips</text>
+  <text class="body" x="851" y="369">Artist and album listening history</text>
+  <text class="muted" x="851" y="405">Adjust rankings; scope cached</text>
+  <text class="muted" x="851" y="426">responses to the user and seed.</text>
+
+  <path class="edge" d="M 370 360 H 425"/>
+  <path class="edge" d="M 765 360 H 820"/>
+  <path class="edge" d="M 995 449 V 507"/>
+
+  <rect class="panel" x="830" y="517" width="330" height="178" rx="8"/>
+  <text class="label" x="851" y="547">4 / BUILD THE QUEUE</text>
+  <text class="body" x="851" y="583">Interleave source tracks</text>
+  <text class="body" x="851" y="615">Space artists, albums and titles</text>
+  <text class="muted" x="851" y="651">Relax placement preferences</text>
+  <text class="muted" x="851" y="672">when no remaining track fits.</text>
+
+  <rect class="panel" x="435" y="517" width="330" height="178" rx="8"/>
+  <text class="label" x="456" y="547">5 / LISTEN</text>
+  <text class="body" x="456" y="583">Play the queue with its context</text>
+  <text class="body" x="456" y="615">Watch upcoming track count</text>
+  <text class="muted" x="456" y="651">Suggestions stay in the session;</text>
+  <text class="muted" x="456" y="672">the saved playlist stays intact.</text>
+
+  <rect class="panel" x="40" y="517" width="330" height="178" rx="8"/>
+  <text class="label" x="61" y="547">6 / REFILL</text>
+  <text class="body" x="61" y="583">Three or fewer tracks ahead</text>
+  <text class="body" x="61" y="615">Request 30 from the same seed</text>
+  <text class="muted" x="61" y="651">Ignore stale replies; filter queue</text>
+  <text class="muted" x="61" y="672">and recent tracks before append.</text>
+
+  <path class="edge" d="M 830 606 H 775"/>
+  <path class="edge" d="M 435 606 H 380"/>
+  <path class="edge" d="M 205 517 V 459"/>
+  <text class="small" x="223" y="489">same context</text>
+
+  <line class="rule" x1="40" y1="738" x2="1160" y2="738"/>
+  <text class="muted" x="40" y="770">A refill may contain no acceptable new tracks. These early sessions did not guarantee endless novelty.</text>
+  <text class="muted" x="40" y="797">Diagram follows the early April implementation; later delivery and rotation rules are outside this chapter.</text>
+</svg>

@@ -4,6 +4,16 @@ import BlogPostNavigation from "../../components/BlogPostNavigation.astro";
 import BlogRelatedPosts from "../../components/BlogRelatedPosts.astro";
 import BlogIcon from "../../components/BlogIcon.astro";
 import BlogIconCredits from "../../components/BlogIconCredits.astro";
+import BlogTags from "../../components/BlogTags.astro";
+import GitHubFilePreview from "../../components/GitHubFilePreview.astro";
+import BlogProse from "../../components/BlogProse.astro";
+import EnrichmentJourney from "../../components/blog-viz/EnrichmentJourney.astro";
+import CrossfadeEngine from "../../components/blog-viz/CrossfadeEngine.astro";
+import SmartMixCandidates from "../../components/blog-viz/SmartMixCandidates.astro";
+import MusicPathJourney from "../../components/blog-viz/MusicPathJourney.astro";
+import RadioRotation from "../../components/blog-viz/RadioRotation.astro";
+import WorkersAdmission from "../../components/blog-viz/WorkersAdmission.astro";
+import ConnectHandoff from "../../components/blog-viz/ConnectHandoff.astro";
 import SignalTrack from "../../components/blog-timeline/SignalTrack.astro";
 import { calendar } from "../../data/blog-calendar";
 import { milestones } from "../../data/engineering-timeline";
@@ -52,7 +62,7 @@ const timeline = post.data.series?.id === "how-to-forget-spotify"
   />
   <article class="post">
     <header class="post-head" data-reveal>
-      <a class="u-link back" href="/blog" data-enter><BlogIcon name="arrow-left" size={16} /> {t("blog.back")}</a>
+      <a class="u-link mono-link back" href="/blog" data-enter data-hover-scramble>{t("blog.back")}</a>
       <div class:list={["post-meta-group", { "has-series": Boolean(post.data.series) }]} data-enter style="--d:80ms">
         {post.data.series && (
           <p class="post-series" data-post-series>{post.data.series.title}</p>
@@ -85,6 +95,9 @@ const timeline = post.data.series?.id === "how-to-forget-spotify"
         {post.data.title}
       </h1>
       <p class="lede" data-enter style="--d:300ms">{post.data.description}</p>
+      <div class="post-topics" data-enter style="--d:340ms">
+        <BlogTags tags={post.data.tags} />
+      </div>
     </header>
 
     {timeline && (
@@ -101,7 +114,30 @@ const timeline = post.data.series?.id === "how-to-forget-spotify"
     <div id="post-content" tabindex="-1" class:list={["post-body", { "has-related": navigation.related.length > 0 }]}>
       <div class="post-reading">
         <div class="prose">
-          <Content />
+          <BlogProse>
+            <Content />
+            <Fragment slot="enrichment">
+              {post.data.visuals.includes("enrichment") && <EnrichmentJourney />}
+            </Fragment>
+            <Fragment slot="crossfade">
+              {post.data.visuals.includes("crossfade") && <CrossfadeEngine />}
+            </Fragment>
+            <Fragment slot="music-paths">
+              {post.data.visuals.includes("music-paths") && <MusicPathJourney />}
+            </Fragment>
+            <Fragment slot="radio-rotation">
+              {post.data.visuals.includes("radio-rotation") && <RadioRotation />}
+            </Fragment>
+            <Fragment slot="workers">
+              {post.data.visuals.includes("workers") && <WorkersAdmission />}
+            </Fragment>
+            <Fragment slot="connect">
+              {post.data.visuals.includes("connect") && <ConnectHandoff />}
+            </Fragment>
+            <Fragment slot="smart-mix">
+              {post.data.visuals.includes("smart-mix") && <SmartMixCandidates />}
+            </Fragment>
+          </BlogProse>
         </div>
 
         <footer class="sources">
@@ -125,13 +161,22 @@ const timeline = post.data.series?.id === "how-to-forget-spotify"
     </div>
     <BlogIconCredits />
   </article>
+  <GitHubFilePreview post={post} />
 </Base>
 
 <script>
   import { mountOnPage } from "../../scripts/motion/page";
   import { initTextMotion } from "../../scripts/motion/text-motion";
+  import { initViz } from "../../scripts/viz";
 
-  mountOnPage(".post", () => initTextMotion());
+  mountOnPage(".post", () => {
+    const text = initTextMotion();
+    const figures = initViz();
+    return () => {
+      text();
+      figures();
+    };
+  });
 </script>
 
 <style>
@@ -149,6 +194,8 @@ const timeline = post.data.series?.id === "how-to-forget-spotify"
     gap: 24px;
     margin-bottom: 9vh;
   }
+
+  .post-topics :global(.blog-tags) { margin-top:0; }
 
   .series-browser {margin:0 0 64px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);scroll-margin-top:100px;}
   .series-browser summary {display:flex;align-items:center;gap:16px;min-height:76px;list-style:none;cursor:pointer;}
@@ -169,7 +216,6 @@ const timeline = post.data.series?.id === "how-to-forget-spotify"
   }
   @media(prefers-reduced-motion:reduce) {.browser-toggle {transition:none;}}
 
-  .back,
   .meta,
   .label {
     justify-self: start;
@@ -186,7 +232,7 @@ const timeline = post.data.series?.id === "how-to-forget-spotify"
     gap: 10px;
     color: var(--fg-3);
   }
-  .back {display:inline-flex;align-items:center;gap:8px;min-height:44px;}
+  .back {justify-self:start;margin:0;}
 
   .post-meta-group {display:grid;gap:10px;min-width:0;}
   .post-meta-group.has-series {border-left:2px solid var(--cyan-hi);padding:2px 0 2px 16px;}

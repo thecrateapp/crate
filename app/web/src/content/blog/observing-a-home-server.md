@@ -148,9 +148,10 @@ disabled by default and meant to spend one or two weeks in shadow before paging.
 instrumentation: 18 of its metrics have targets defined but remain unconfigured in the catalogue. Radio and
 Music Paths metrics stay inside Crate; we don't export them to Prometheus.
 
-Our only benchmark so far covers Admin's reads of the stored history. With eight days of data across 100 series,
-a cold one-hour view went from 2.6 seconds to 0.46 seconds at p95. We haven't measured the overhead of recording
-those metrics. We also still need an external playback check: watching the internal services does not confirm
+Our only benchmark so far covers Admin's reads of the stored history. On a controlled local fixture with eight days
+of data across 100 series, a cold one-hour view of Admin's metric section went from 2.6 seconds to 0.46 seconds at
+p95. The measurement ran in development and excludes HTTP and serialization. We haven't measured the overhead
+of recording those metrics. We also still need an external playback check: watching the internal services does not confirm
 that a listener can play a song.
 
 ## Read the code

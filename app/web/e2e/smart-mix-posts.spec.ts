@@ -23,7 +23,7 @@ for (const width of [1440, 390]) {
       const response = await page.goto(`/blog/${article.slug}`);
       test.skip(
         response?.status() === 404,
-        "Draft articles are only rendered in development.",
+        "The article is not published in this build.",
       );
       await expect(page.locator("article h1")).toHaveText(article.title);
       expect((await page.locator(".prose").innerText()).length).toBeGreaterThan(
@@ -63,13 +63,13 @@ for (const width of [1440, 390]) {
   });
 }
 
-test("the two Smart Mix 3 drafts connect through the article footer", async ({
+test("the two Smart Mix 3 articles connect through the article footer", async ({
   page,
 }) => {
   const response = await page.goto("/blog/finding-the-one");
   test.skip(
     response?.status() === 404,
-    "Draft articles are only rendered in development.",
+    "The article is not published in this build.",
   );
   const next = page.locator("[data-next-post]");
   await expect(next).toHaveAttribute("href", "/blog/lyrics-as-labels");

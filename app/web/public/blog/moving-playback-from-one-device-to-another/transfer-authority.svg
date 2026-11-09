@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Crate Connect v2 transfers playback authority</title>
+  <desc id="desc">The source remains active during a pending transfer. The server sends the target the queue and playback state. The target applies them with autoplay disabled and replies ready with the transfer ID and incoming state version. The server commits the new active instance, tells the target to resume and tells the source to pause. Cancellation or timeout clears the pending transfer while retaining the source owner. Committing ownership does not prove that target audio has started.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10" fill="none" stroke="#67e8f9" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: "JetBrains Mono", monospace; fill: #d6dae3; font-size: 19px; }
+    .label { fill: #67e8f9; letter-spacing: 1.4px; font-size: 17px; }
+    .note { fill: #a1a7b5; font-size: 17px; }
+    .box { fill: #0d0e14; stroke: #353947; stroke-width: 1; }
+    .flow { fill: none; stroke: #67e8f9; stroke-width: 1.5; marker-end: url(#arrow); }
+    .notification { stroke-dasharray: 1 5; stroke-linecap: round; }
+    .lifeline { stroke: #353947; stroke-width: 1; }
+  </style>
+  <rect width="1200" height="1000" fill="#0a0a0f"/>
+  <text x="40" y="44" class="label">CONNECT V2 / HANDOFF BETWEEN TWO INSTANCES</text>
+  <text x="40" y="78" class="note">The source acts as controller here. Another connected instance can request the transfer.</text>
+
+  <rect x="40" y="110" width="280" height="72" rx="4" class="box"/>
+  <text x="180" y="140" text-anchor="middle" class="label">SOURCE PLAYER</text>
+  <text x="180" y="166" text-anchor="middle" class="note">active owner</text>
+  <rect x="460" y="110" width="280" height="72" rx="4" class="box"/>
+  <text x="600" y="140" text-anchor="middle" class="label">CONNECT SERVER</text>
+  <text x="600" y="166" text-anchor="middle" class="note">versioned PlayerState</text>
+  <rect x="880" y="110" width="280" height="72" rx="4" class="box"/>
+  <text x="1020" y="140" text-anchor="middle" class="label">TARGET PLAYER</text>
+  <text x="1020" y="166" text-anchor="middle" class="note">connected instance</text>
+
+  <line x1="180" y1="182" x2="180" y2="742" class="lifeline"/>
+  <line x1="600" y1="182" x2="600" y2="790" class="lifeline"/>
+  <line x1="1020" y1="182" x2="1020" y2="742" class="lifeline"/>
+
+  <text x="390" y="218" text-anchor="middle" class="note">transfer_request(target, version)</text>
+  <path d="M180 232H592" class="flow"/>
+
+  <rect x="420" y="260" width="360" height="64" rx="4" class="box"/>
+  <text x="600" y="286" text-anchor="middle">Mark transfer pending</text>
+  <text x="600" y="311" text-anchor="middle" class="note">Keep source as active owner</text>
+
+  <text x="810" y="356" text-anchor="middle" class="note">transfer_incoming(state, version)</text>
+  <path d="M600 370H1012" class="flow"/>
+
+  <rect x="830" y="398" width="350" height="68" rx="4" class="box"/>
+  <text x="1005" y="426" text-anchor="middle">Apply queue and position</text>
+  <text x="1005" y="453" text-anchor="middle" class="note">autoplay: false</text>
+
+  <text x="810" y="500" text-anchor="middle" class="note">transfer_ready(id, version)</text>
+  <path d="M1020 514H608" class="flow"/>
+
+  <rect x="420" y="542" width="360" height="68" rx="4" class="box"/>
+  <text x="600" y="570" text-anchor="middle">Validate and commit owner</text>
+  <text x="600" y="597" text-anchor="middle" class="note">active_instance_id = target</text>
+
+  <text x="810" y="646" text-anchor="middle" class="note">transfer_committed → resume</text>
+  <path d="M600 660H1012" class="flow notification"/>
+
+  <text x="390" y="706" text-anchor="middle" class="note">became_inactive → pause</text>
+  <path d="M600 720H188" class="flow notification"/>
+
+  <text x="180" y="772" text-anchor="middle" class="note">no longer the owner</text>
+  <text x="1020" y="772" text-anchor="middle" class="note">attempts local playback</text>
+
+  <rect x="40" y="822" width="1120" height="132" rx="4" class="box"/>
+  <text x="64" y="858" class="label">FAILURES HAVE DIFFERENT BOUNDARIES</text>
+  <text x="64" y="893" class="note">Before commit: cancellation or the 10-second timeout clears the pending transfer.</text>
+  <text x="64" y="924" class="note">After commit: a stalled target asks for a user gesture; ownership does not roll back.</text>
+  <text x="40" y="981" class="note">Resume and pause run on separate audio engines. This exchange does not synchronise their clocks.</text>
+</svg>

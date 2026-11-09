@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 744" role="img" aria-labelledby="title desc">
+  <title id="title">Profiles, pair plans and a running transition have different lifetimes</title>
+  <desc id="desc">Background analysis captures an audio source revision and publishes a versioned profile only when its source and claim remain valid. A server planner reads two profiles and a playback context. Android loads a queue independently of that request and accepts returned plans only for its current queue revision. A running transition retains its plan while audio processing executes the envelope.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="none" stroke="#67e8f9" stroke-width="1.5"/></marker></defs>
+  <style>
+    text { font-family: "JetBrains Mono", monospace; fill: #d6dae3; font-size: 19px; }
+    .label { fill: #67e8f9; letter-spacing: 1.4px; font-size: 17px; }
+    .note { fill: #a1a7b5; font-size: 17px; }
+    .box { fill: #0d0e14; stroke: #353947; stroke-width: 1; }
+    .flow { fill: none; stroke: #67e8f9; stroke-width: 1.5; marker-end: url(#arrow); }
+    .async { stroke-dasharray: 9 4; }
+  </style>
+  <rect width="1200" height="744" fill="#0a0a0f"/>
+  <text x="40" y="44" class="label">SMART MIX / THREE LIFETIMES</text>
+  <text x="40" y="78" class="note">Analysing the file, planning a pair and executing a mix are separate operations.</text>
+  <rect x="40" y="112" width="500" height="120" rx="4" class="box"/>
+  <text x="64" y="148" class="label">BACKGROUND ANALYSIS</text>
+  <text x="64" y="181">Capture source → analyse → recheck</text>
+  <text x="64" y="211" class="note">Source metadata + profile revision + claim</text>
+  <path d="M540 172H652" class="flow async"/>
+  <rect x="660" y="112" width="500" height="120" rx="4" class="box"/>
+  <text x="684" y="148" class="label">PERSISTED PROFILE</text>
+  <text x="684" y="181">Cues, beats and measured levels</text>
+  <text x="684" y="211" class="note">Identifies the source and analyser generation</text>
+  <path d="M910 232V278H600V310" class="flow"/>
+  <rect x="330" y="318" width="540" height="120" rx="4" class="box"/>
+  <text x="354" y="354" class="label">SERVER PLAN FOR A PAIR</text>
+  <text x="354" y="387">Two profiles + playback context</text>
+  <text x="354" y="417" class="note">Cues, duration, gains, mode and fallback reason</text>
+  <path d="M600 438V552H548" class="flow async"/>
+  <text x="624" y="474" class="note">plans arrive after queue loading</text>
+  <rect x="40" y="502" width="500" height="130" rx="4" class="box"/>
+  <text x="64" y="538" class="label">CURRENT NATIVE QUEUE</text>
+  <text x="64" y="572">Accept only matching queue revision</text>
+  <text x="64" y="606" class="note">Discard a response for a replaced queue</text>
+  <path d="M540 592H652" class="flow"/>
+  <rect x="660" y="502" width="500" height="130" rx="4" class="box"/>
+  <text x="684" y="538" class="label">RUNNING TRANSITION</text>
+  <text x="684" y="572">Keep the plan already in use</text>
+  <text x="684" y="606" class="note">Execute the envelope as audio frames advance</text>
+  <text x="40" y="685" class="note">A new profile can affect a future plan. A late plan cannot rewrite an active fade.</text>
+  <text x="40" y="719" class="note">Solid: calls and decisions. Dashed: background results or a pending network response.</text>
+</svg>

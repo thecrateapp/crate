@@ -8,7 +8,7 @@ import { milestones } from "../src/data/engineering-timeline";
 
 const first = "/blog/crate-started-as-a-librarian";
 const second = "/blog/filesystem-to-indexed-catalogue";
-const third = "/blog/taking-playback-over-from-navidrome";
+import { historicalChapters, draftHrefs } from "./blog-content";
 const test = base.extend<{ pageErrors: string[] }>({
   pageErrors: [
     async ({ page }, use) => {
@@ -27,7 +27,7 @@ const test = base.extend<{ pageErrors: string[] }>({
 async function chapter(page: Page, href: string) {
   const response = await page.goto(href);
   test.skip(
-    [second, third].includes(href.split("#")[0]!) && response?.status() === 404,
+    draftHrefs.includes(href.split("#")[0]!) && response?.status() === 404,
     "Draft chapters only render in development.",
   );
   expect(response?.status()).toBe(200);
@@ -50,14 +50,12 @@ async function expectStopVisible(stop: Locator) {
     .toBe(true);
 }
 
-for (const [href, milestone] of [
-  [first, "librarian"],
-  [second, "catalog"],
-  [third, "direct-streaming"],
-]) {
-  test(`${milestone} chapter starts at its own milestone and opens a folding navigator before the article`, async ({
+for (const { href } of historicalChapters) {
+  const milestone = milestones.find((item) => item.href === href)?.id;
+  test(`${milestone ?? href} chapter starts at its own milestone and opens a folding navigator before the article`, async ({
     page,
   }) => {
+    expect(milestone, `${href} needs a timeline milestone`).toBeTruthy();
     const browser = await chapter(page, href!);
     const track = browser.locator('[data-timeline-proposal="signal-track"]');
     await expect(browser).not.toHaveAttribute("open", "");
@@ -94,7 +92,10 @@ for (const [href, milestone] of [
       track.locator('[data-track-stop][aria-pressed="true"]'),
     );
     const current = track.locator("[data-track-detail]:visible .track-read");
-    await expect(current).toHaveAttribute("href", "#post-content");
+    await expect(current).toHaveAttribute(
+      "href",
+      `${href}?milestone=${milestone}#post-content`,
+    );
     await expect(current).toContainText("Continue reading");
     await current.click();
     await expect.poll(() => new URL(page.url()).hash).toBe("#post-content");
@@ -117,7 +118,7 @@ test("timeline links connect chapters and remain interactive after Astro navigat
   let track = browser.locator('[data-timeline-proposal="signal-track"]');
   await track.locator('[data-milestone-id="catalog"]').click();
   const next = track.locator("[data-track-detail]:visible .track-read");
-  await expect(next).toHaveAttribute("href", second);
+  await expect(next).toHaveAttribute("href", `${second}?milestone=catalog`);
   await next.click();
   await expect.poll(() => new URL(page.url()).pathname).toBe(second);
   browser = page.locator("[data-series-browser]");
@@ -126,7 +127,10 @@ test("timeline links connect chapters and remain interactive after Astro navigat
   await browser.locator("summary").click();
   await track.locator('[data-milestone-id="librarian"]').click();
   const previous = track.locator("[data-track-detail]:visible .track-read");
-  await expect(previous).toHaveAttribute("href", first);
+  await expect(previous).toHaveAttribute(
+    "href",
+    `${first}?milestone=librarian`,
+  );
   await previous.click();
   await expect.poll(() => new URL(page.url()).pathname).toBe(first);
   browser = page.locator("[data-series-browser]");
@@ -137,7 +141,100 @@ test("timeline links connect chapters and remain interactive after Astro navigat
   ).toHaveAttribute("data-selected-milestone", "catalog");
   await expect(
     browser.locator("[data-track-detail]:visible .track-read"),
-  ).toHaveAttribute("href", second);
+  ).toHaveAttribute("href", `${second}?milestone=catalog`);
+});
+
+for (const [id, part] of [
+  ["postgresql", 2],
+  ["ai-queues", 28],
+  ["crate-v3", 30],
+] as const) {
+  test(`following ${id} preserves that event instead of resetting to its article's first milestone`, async ({
+    page,
+    request,
+  }) => {
+    const destination = historicalChapters.find((item) => item.part === part)!;
+    test.skip(
+      (await request.get(destination.href)).status() === 404,
+      "Drafts only render in development.",
+    );
+    const browser = await chapter(page, `${first}#series-timeline`);
+    const track = browser.locator('[data-timeline-proposal="signal-track"]');
+    await track.locator(`[data-milestone-id="${id}"]`).click();
+    const link = track.locator("[data-track-detail]:visible .track-read");
+    await expect(link).toContainText(`Part ${part}`);
+    await expect(link).toContainText(destination.title);
+    await link.click();
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe(destination.href);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("milestone"))
+      .toBe(id);
+    const current = page.locator('[data-timeline-proposal="signal-track"]');
+    await expect(current).toHaveAttribute("data-selected-milestone", id);
+    await page.locator("[data-series-browser] summary").click();
+    await expect(
+      current.locator("[data-track-detail]:visible .track-read"),
+    ).toContainText(destination.title);
+  });
+}
+
+test("continuing a second milestone in the same article keeps its identity and moves to the prose", async ({
+  page,
+}) => {
+  const browser = await chapter(page, `${first}#series-timeline`);
+  const track = browser.locator('[data-timeline-proposal="signal-track"]');
+  await track.locator('[data-milestone-id="worker-writes"]').click();
+  const link = track.locator("[data-track-detail]:visible .track-read");
+  await expect(link).toContainText("Continue reading");
+  await link.click();
+  await expect.poll(() => new URL(page.url()).hash).toBe("#post-content");
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("milestone"))
+    .toBe("worker-writes");
+  await expect(
+    page.locator('[data-timeline-proposal="signal-track"]'),
+  ).toHaveAttribute("data-selected-milestone", "worker-writes");
+});
+
+test("an unknown, unrelated or repeated milestone parameter falls back to the article's own event", async ({
+  page,
+}) => {
+  for (const query of [
+    "milestone=missing",
+    "milestone=postgresql",
+    "milestone=worker-writes&milestone=librarian",
+  ]) {
+    await chapter(page, `${first}?${query}`);
+    await expect(
+      page.locator('[data-timeline-proposal="signal-track"]'),
+    ).toHaveAttribute("data-selected-milestone", "librarian");
+  }
+});
+
+test("long destination titles fit the mobile timeline reading link", async ({
+  page,
+  request,
+}) => {
+  test.skip(
+    (await request.get(second)).status() === 404,
+    "Drafts only render in development.",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  const browser = await chapter(page, `${first}#series-timeline`);
+  const track = browser.locator('[data-timeline-proposal="signal-track"]');
+  for (const id of ["opensubsonic", "smart-mix-3"]) {
+    await track.locator(`[data-milestone-id="${id}"]`).click();
+    const link = track.locator("[data-track-detail]:visible .track-read");
+    await expect(link.locator(".track-read-title")).toBeVisible();
+    const bounds = await link.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(390);
+  }
 });
 
 test("mobile period jumps, folding and resizing keep the selected stop visible", async ({
@@ -208,7 +305,7 @@ test("the current chapter is server rendered and standalone posts have no series
     );
     await expect(
       browser.locator("[data-track-detail]:visible .track-read"),
-    ).toHaveAttribute("href", "#post-content");
+    ).toHaveAttribute("href", `${first}?milestone=librarian#post-content`);
   } finally {
     await staticPage.close();
   }

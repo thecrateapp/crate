@@ -1,26 +1,12 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
-const slugs = [
-  "smart-mix-planned-on-the-server",
-  "a-beat-grid-in-a-few-bytes",
-  "observing-a-home-server",
-  "reading-errors-without-trusting-them",
-  "reads-from-snapshots",
-  "crate-started-as-a-librarian",
-  "filesystem-to-indexed-catalogue",
-  "taking-playback-over-from-navidrome",
-  "finding-the-one",
-  "lyrics-as-labels",
-];
-const draftSlugs = new Set([
-  "reading-errors-without-trusting-them",
-  "crate-started-as-a-librarian",
-  "filesystem-to-indexed-catalogue",
-  "taking-playback-over-from-navidrome",
-  "finding-the-one",
-  "lyrics-as-labels",
-]);
+import { blogPosts } from "./blog-content";
+
+const slugs = blogPosts.map((post) => post.slug);
+const draftSlugs = new Set(
+  blogPosts.filter((post) => post.draft).map((post) => post.slug),
+);
 
 // Expressive Code expands tabs to two spaces by default, including copied Go code.
 const renderedExcerpt = (code: string) =>

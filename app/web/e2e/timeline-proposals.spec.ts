@@ -464,11 +464,12 @@ test("the librarian draft opens and timeline controls work after returning", asy
 
   const track = component(page, "signal-track");
   const link = track.locator(
-    `[data-track-detail]:visible a[href="${librarian.href}"]`,
+    `[data-track-detail]:visible a[href="${librarian.href}?milestone=${librarian.id}"]`,
   );
   await expect(link).toBeVisible();
   await link.click();
   await expect.poll(() => new URL(page.url()).pathname).toBe(librarian.href);
+  expect(new URL(page.url()).searchParams.get("milestone")).toBe(librarian.id);
   await expect(page.locator("article h1")).toBeVisible();
 
   await page.goBack();
@@ -516,7 +517,10 @@ for (const chapterNumber of [2, 3]) {
       await track.locator("[data-track-stop]").nth(index).click();
       const detail = track.locator("[data-track-detail]:visible");
       await expect(detail.locator("h3")).toHaveText(milestone.title);
-      await expect(detail.locator(".track-read")).toHaveAttribute("href", href);
+      await expect(detail.locator(".track-read")).toHaveAttribute(
+        "href",
+        `${href}?milestone=${milestone.id}`,
+      );
     }
     await track.locator("[data-track-detail]:visible .track-read").click();
     await expect.poll(() => new URL(page.url()).pathname).toBe(href);
@@ -536,7 +540,7 @@ test("planned entries link historical evidence without offering placeholder arti
   await track.locator("[data-track-stop]").nth(index).click();
   const trackDetail = track.locator("[data-track-detail]:visible");
   await expect(trackDetail.locator(".track-planned")).toContainText(
-    "Post planned",
+    "Article not available",
   );
   await expect(trackDetail.locator(".track-read")).toHaveCount(0);
   await expect(trackDetail.locator(".track-source")).toHaveAttribute(

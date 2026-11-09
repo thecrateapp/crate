@@ -2,7 +2,7 @@
   "tracks": "48,213",
   "albums": "4,400",
   "pytest": 8453,
-  "vitest": 7045,
+  "vitest": 7251,
   "goTests": 435,
   "rustTests": 361,
   "taskTypes": 158,
@@ -177,6 +177,8 @@
       "backfill_smart_mix_profiles",
       "backfill_track_audio_fingerprints"
     ],
-    "playback": ["prepare_stream_variant"]
+    "playback": [
+      "prepare_stream_variant"
+    ]
   }
 }

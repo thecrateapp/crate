@@ -1,4 +1,5 @@
 import type { Cleanup } from "../motion/page";
+import { initialTimelineIndex } from "../../lib/engineering-timeline";
 
 export function initSignalTrack(root: HTMLElement): Cleanup {
   const stops = [
@@ -307,7 +308,20 @@ export function initSignalTrack(root: HTMLElement): Cleanup {
     options,
   );
   window.addEventListener("hashchange", revealFromHash, options);
-  select(Number(root.dataset.initialIndex ?? 0), false, true);
+  const requested = new URLSearchParams(window.location.search).getAll(
+    "milestone",
+  );
+  const initialIndex = root.dataset.currentPostHref
+    ? initialTimelineIndex(
+        stops.map((stop) => ({
+          id: stop.dataset.milestoneId!,
+          href: stop.dataset.articleHref,
+        })),
+        root.dataset.currentPostHref,
+        requested.length === 1 ? requested[0] : undefined,
+      )
+    : Number(root.dataset.initialIndex ?? 0);
+  select(initialIndex, false, true);
   revealFromHash();
   return () => {
     controller.abort();

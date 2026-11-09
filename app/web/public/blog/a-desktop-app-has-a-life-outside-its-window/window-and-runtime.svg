@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 870" role="img" aria-labelledby="title desc">
+  <title id="title">A hidden window still contains Crate's desktop player</title>
+  <desc id="desc">Operating-system media controls and deep links enter the Rust shell. Commands reach Listen's web player; Now Playing metadata returns to the OS. Close hides the existing webview, while Quit ends the application. Early deep links wait until the frontend listener is ready.</desc>
+  <defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1L7 4L1 7" fill="none" stroke="#67e8f9"/></marker></defs>
+  <rect width="1200" height="870" fill="#0a0a0f"/>
+  <g font-family="JetBrains Mono,monospace" font-size="17" fill="#a9adbb">
+    <text x="40" y="48" fill="#67e8f9" letter-spacing="1">WINDOW VISIBILITY IS NOT PLAYER OWNERSHIP</text>
+    <text x="40" y="79">Tauri manages the desktop. Listen's web engine still produces the audio.</text>
+    <g fill="#0d0e14" stroke="#353947"><rect x="40" y="125" width="320" height="220" rx="4"/><rect x="440" y="125" width="320" height="220" rx="4"/><rect x="840" y="125" width="320" height="220" rx="4"/></g>
+    <g fill="#e5e7ef"><text x="60" y="162">DESKTOP EVENTS</text><text x="460" y="162">RUST SHELL</text><text x="860" y="162">LISTEN WEBVIEW</text></g>
+    <text x="60" y="202">Tray / Dock / media keys</text><text x="60" y="235">Login callback links</text><text x="60" y="268">Window Close / app Quit</text><text x="60" y="316" font-size="15">macOS / Linux / Windows</text>
+    <text x="460" y="202">Native OS adapters</text><text x="460" y="235">Commands + startup buffer</text><text x="460" y="268">Window lifecycle</text><text x="460" y="316" font-size="15">Credential vault commands</text>
+    <text x="860" y="202">Shared React application</text><text x="860" y="235">Queue + web audio engine</text><text x="860" y="268">OAuth callback consumer</text><text x="860" y="316" font-size="15">WKWebView / GTK / WebView2</text>
+    <path d="M360 202H432M760 202H832" fill="none" stroke="#67e8f9" marker-end="url(#arrow)"/>
+    <path d="M840 290H768M440 290H368" fill="none" stroke="#67e8f9" stroke-dasharray="1 5" marker-end="url(#arrow)"/>
+    <text x="440" y="379" font-size="15">Dotted return path: Now Playing state</text>
+    <text x="40" y="432" fill="#67e8f9" font-size="15">WINDOW LIFECYCLE</text>
+    <g fill="#0d0e14" stroke="#353947"><rect x="40" y="456" width="320" height="108" rx="4"/><rect x="440" y="456" width="320" height="108" rx="4"/><rect x="840" y="456" width="320" height="108" rx="4"/></g>
+    <g fill="#e5e7ef"><text x="60" y="491">VISIBLE WINDOW</text><text x="460" y="491">HIDDEN WINDOW</text><text x="860" y="491">APPLICATION ENDED</text></g>
+    <text x="60" y="531">Existing Listen instance</text><text x="460" y="531">Same webview remains alive</text><text x="860" y="531">Player runtime ends too</text>
+    <path d="M360 502H432M440 546H368M760 502H832" fill="none" stroke="#67e8f9" marker-end="url(#arrow)"/>
+    <text x="374" y="488" font-size="13">Close</text><text x="374" y="533" font-size="13">Show</text><text x="778" y="488" font-size="13">Quit</text>
+    <text x="40" y="620" fill="#67e8f9" font-size="15">COLD-START LINK DELIVERY</text>
+    <g fill="#0d0e14" stroke="#353947"><rect x="40" y="644" width="320" height="108" rx="4"/><rect x="440" y="644" width="320" height="108" rx="4"/><rect x="840" y="644" width="320" height="108" rx="4"/></g>
+    <g fill="#e5e7ef"><text x="60" y="679">LINK ARRIVES EARLY</text><text x="460" y="679">FRONTEND READY</text><text x="860" y="679">CONSUME CALLBACK</text></g>
+    <text x="60" y="719">Rust buffers pending URLs</text><text x="460" y="719">Subscribe, then drain</text><text x="860" y="719">Validate pending login</text>
+    <path d="M360 699H432M760 699H832" fill="none" stroke="#67e8f9" stroke-dasharray="9 4" marker-end="url(#arrow)"/>
+    <path d="M40 797H1160" stroke="#353947"/>
+    <text x="40" y="831">The shell can hide the UI. It cannot replace a suspended web audio runtime.</text>
+  </g>
+</svg>

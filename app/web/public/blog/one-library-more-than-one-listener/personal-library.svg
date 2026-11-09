@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">One shared catalogue, separate saved albums</title>
+  <desc id="desc">Two listeners send the same album ID to the personal-library API. Authentication supplies user 7 or user 12. The API stores two separate user-and-album relationships, both referring to album 42 in the shared catalogue. Removing user 7's save leaves user 12's save and the audio files intact. IDs are illustrative.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="none" stroke="#67e8f9" stroke-width="1.5"/></marker>
+  </defs>
+  <style>
+    text { font-family: "JetBrains Mono", monospace; fill: #d6dae3; font-size: 18px; }
+    .label { fill: #67e8f9; letter-spacing: 1.5px; font-size: 17px; }
+    .note { fill: #a1a7b5; font-size: 17px; }
+    .box { fill: #0d0e14; stroke: #353947; stroke-width: 1; }
+    .flow { fill: none; stroke: #67e8f9; stroke-width: 1.5; marker-end: url(#arrow); }
+  </style>
+  <rect width="1200" height="650" fill="#0a0a0f"/>
+  <text x="40" y="47" class="label">ONE CATALOGUE / PERSONAL RELATIONSHIPS</text>
+  <text x="40" y="77" class="note">Saving an album writes a relationship. It does not copy the music.</text>
+
+  <rect x="40" y="130" width="290" height="130" rx="4" class="box"/>
+  <text x="60" y="165" class="label">LISTENER A</text>
+  <text x="60" y="202">Authenticated user 7</text>
+  <text x="60" y="235" class="note">Body: album_id = 42</text>
+
+  <rect x="40" y="340" width="290" height="130" rx="4" class="box"/>
+  <text x="60" y="375" class="label">LISTENER B</text>
+  <text x="60" y="412">Authenticated user 12</text>
+  <text x="60" y="445" class="note">Body: album_id = 42</text>
+
+  <rect x="410" y="130" width="340" height="340" rx="4" class="box"/>
+  <text x="430" y="165" class="label">POST /API/ME/ALBUMS</text>
+  <text x="430" y="210">Account from request</text>
+  <text x="430" y="240" class="note">user_id = user["id"]</text>
+  <path d="M430 270H730" stroke="#353947"/>
+  <text x="430" y="310">Album from body</text>
+  <text x="430" y="340" class="note">album_id = 42</text>
+  <text x="430" y="400" class="note">Insert the pair</text>
+  <text x="430" y="435" class="note">Duplicate save: no-op</text>
+
+  <rect x="830" y="130" width="330" height="185" rx="4" class="box"/>
+  <text x="850" y="165" class="label">USER_SAVED_ALBUMS</text>
+  <text x="850" y="202" class="note">user_id</text>
+  <text x="1030" y="202" class="note">album_id</text>
+  <text x="850" y="239">7</text>
+  <text x="1030" y="239">42</text>
+  <text x="850" y="276">12</text>
+  <text x="1030" y="276">42</text>
+
+  <rect x="830" y="390" width="330" height="120" rx="4" class="box"/>
+  <text x="850" y="425" class="label">SHARED CATALOGUE</text>
+  <text x="850" y="462">Album 42</text>
+  <text x="850" y="491" class="note">One set of audio files</text>
+
+  <path d="M330 195H402" class="flow"/>
+  <path d="M330 405H402" class="flow"/>
+  <path d="M750 222H822" class="flow"/>
+  <path d="M995 315V382" class="flow"/>
+  <text x="1015" y="355" class="note">album_id</text>
+
+  <path d="M40 552H1160" stroke="#353947"/>
+  <text x="40" y="589" class="note">Unsave as user 7 deletes (7, 42). User 12's save and the album remain.</text>
+  <text x="40" y="622" class="note">The user-and-album pair is unique; neither column is unique on its own.</text>
+</svg>

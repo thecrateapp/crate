@@ -1,15 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-const first = "/blog/crate-started-as-a-librarian";
-const second = "/blog/filesystem-to-indexed-catalogue";
-const third = "/blog/taking-playback-over-from-navidrome";
+import { historicalChapters } from "./blog-content";
 
-for (const [index, href] of [first, second, third].entries()) {
-  test(`part ${index + 1} keeps its series identity with reading metadata on desktop and mobile`, async ({
+const first = historicalChapters[0]!.href;
+const second = historicalChapters[1]!.href;
+
+for (const { part, href, date } of historicalChapters) {
+  test(`part ${part} keeps its series identity with reading metadata on desktop and mobile`, async ({
     page,
   }) => {
     const seriesTitle =
-      "How to forget Spotify. Building Crate from the ground.";
+      "How to dismantle Spotify. Building Crate from the ground.";
     for (const viewport of [
       { width: 1440, height: 1100 },
       { width: 390, height: 844 },
@@ -26,11 +27,11 @@ for (const [index, href] of [first, second, third].entries()) {
       await expect(identity).toContainText(seriesTitle);
       await expect(
         page.locator(".post-meta-group [data-series-part]"),
-      ).toHaveText(`Part ${index + 1}`);
+      ).toHaveText(`Part ${part}`);
       const metadata = page.locator(".post-meta-group .meta");
       await expect(metadata.locator("time").first()).toHaveAttribute(
         "datetime",
-        ["2026-11-10", "2026-11-17", "2026-11-24"][index]!,
+        date,
       );
       await expect(metadata).toContainText(/\d+\s+min read/i);
       await expect(page.locator(".prose")).not.toContainText(seriesTitle);
@@ -41,13 +42,15 @@ for (const [index, href] of [first, second, third].entries()) {
             .evaluate((element) => getComputedStyle(element).opacity),
         )
         .toBe("1");
-      const [label, date, title] = await Promise.all([
+      const [label, dateBounds, title] = await Promise.all([
         identity.boundingBox(),
         metadata.boundingBox(),
         page.locator("article h1").boundingBox(),
       ]);
-      expect(label!.y + label!.height).toBeLessThanOrEqual(date!.y + 1);
-      expect(date!.y + date!.height).toBeLessThanOrEqual(title!.y + 1);
+      expect(label!.y + label!.height).toBeLessThanOrEqual(dateBounds!.y + 1);
+      expect(dateBounds!.y + dateBounds!.height).toBeLessThanOrEqual(
+        title!.y + 1,
+      );
       const outside = await page
         .locator(".post-meta-group")
         .evaluate((element) =>
@@ -91,25 +94,35 @@ test("series footer connects visible chapters and respects its publication bound
     await expect(next).toHaveCount(0);
     return;
   }
-  await expect(next).toHaveAttribute("href", second);
-  await expect(next).toContainText("Part 2");
-  await next.click();
-  await expect(page).toHaveURL(new RegExp(`${second}$`));
-  const previous = page.locator("[data-previous-post]");
-  await expect(previous).toHaveAttribute("href", first);
-  await expect(previous).toContainText("Part 1");
-  await expect(page.locator("[data-next-post]")).toHaveAttribute("href", third);
-  await page.locator("[data-next-post]").click();
-  await expect(page).toHaveURL(new RegExp(`${third}$`));
-  await expect(page.locator("[data-previous-post]")).toHaveAttribute(
-    "href",
-    second,
-  );
+  // Walks every chapter forward and back: allow a few seconds per navigation.
+  test.setTimeout(30_000 + historicalChapters.length * 2 * 4_000);
+  for (let index = 1; index < historicalChapters.length; index++) {
+    const current = historicalChapters[index]!;
+    const previous = historicalChapters[index - 1]!;
+    await expect(page.locator("[data-next-post]")).toHaveAttribute(
+      "href",
+      current.href,
+    );
+    await expect(page.locator("[data-next-post]")).toContainText(
+      `Part ${current.part}`,
+    );
+    await page.locator("[data-next-post]").click();
+    await expect(page).toHaveURL(new RegExp(`${current.href}$`), {
+      timeout: 15_000,
+    });
+    await expect(page.locator("[data-previous-post]")).toHaveAttribute(
+      "href",
+      previous.href,
+    );
+  }
   await expect(page.locator("[data-next-post]")).toHaveCount(0);
-  await page.locator("[data-previous-post]").click();
-  await expect(page).toHaveURL(new RegExp(`${second}$`));
-  await previous.click();
-  await expect(page).toHaveURL(new RegExp(`${first}$`));
+  for (const previous of historicalChapters.slice(0, -1).reverse()) {
+    await page.locator("[data-previous-post]").click();
+    await expect(page).toHaveURL(new RegExp(`${previous.href}$`), {
+      timeout: 15_000,
+    });
+  }
+  await expect(page.locator("[data-previous-post]")).toHaveCount(0);
 });
 
 test("standalone articles do not display a series identity", async ({

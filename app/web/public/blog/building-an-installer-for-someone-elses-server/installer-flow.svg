@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 700" role="img" aria-labelledby="title desc">
+<title id="title">One installation workflow, two ways to use it</title>
+<desc id="desc">A release embeds the integration manifest and deployment files. The terminal wizard and MCP tools feed a shared configuration draft. In MCP mode, credentials enter through a separate local form. After review, the installer preserves existing values, writes configuration, starts Compose and waits for the API. Doctor provides broader diagnostics.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#67e8f9"/></marker></defs>
+<rect width="1080" height="700" fill="#0a0a0f"/>
+<g font-family="ui-sans-serif,system-ui,sans-serif">
+<text x="38" y="48" fill="#f8fafc" font-size="26" font-weight="650">One installation workflow, two ways to use it</text>
+<text x="38" y="80" fill="#94a3b8" font-size="16">Release files and existing configuration meet in a shared draft.</text>
+<rect x="40" y="115" width="1000" height="76" rx="10" fill="#172033" stroke="#475569"/>
+<text x="65" y="146" fill="#f8fafc" font-size="21">Versioned installer binary</text>
+<text x="65" y="174" fill="#cbd5e1" font-size="16">Embedded integration manifest + Compose + supporting files</text>
+<g fill="#1e293b" stroke="#475569"><rect x="40" y="240" width="300" height="90" rx="10"/><rect x="390" y="240" width="300" height="90" rx="10"/><rect x="740" y="240" width="300" height="90" rx="10"/></g>
+<g fill="#f8fafc" font-size="22"><text x="65" y="275">Terminal wizard</text><text x="415" y="275">MCP tools</text><text x="765" y="275">Local secret form</text></g>
+<g fill="#cbd5e1" font-size="16"><text x="65" y="304">Guided or plain prompts</text><text x="415" y="304">Configuration + progress</text><text x="765" y="304">Keys enter outside tool output</text></g>
+<g fill="none" stroke="#67e8f9" stroke-width="2" marker-end="url(#arrow)"><path d="M540 195V220H190V233"/><path d="M540 220V233"/><path d="M540 220H890V233"/></g>
+<rect x="190" y="400" width="700" height="100" rx="10" fill="#164e63" stroke="#67e8f9"/>
+<text x="215" y="438" fill="#f8fafc" font-size="23">Shared draft + checks + review</text>
+<text x="215" y="469" fill="#a5f3fc" font-size="17">Existing secrets survive. Provider failures keep distinct meanings.</text>
+<g fill="none" stroke="#67e8f9" stroke-width="2" marker-end="url(#arrow)"><path d="M190 335V370H280V393"/><path d="M540 335V393"/><path d="M890 335V370H800V393"/></g>
+<g fill="#1e293b" stroke="#475569"><rect x="40" y="560" width="300" height="88" rx="10"/><rect x="390" y="560" width="300" height="88" rx="10"/><rect x="740" y="560" width="300" height="88" rx="10"/></g>
+<g fill="#f8fafc" font-size="21"><text x="65" y="594">Write configuration</text><text x="415" y="594">Pull + start Compose</text><text x="765" y="594">Wait for API</text></g>
+<g fill="#cbd5e1" font-size="16"><text x="65" y="623">Owner-only .env replacement</text><text x="415" y="623">Selected release images</text><text x="765" y="623">Doctor for broader diagnosis</text></g>
+<g fill="none" stroke="#67e8f9" stroke-width="2" marker-end="url(#arrow)"><path d="M540 505V530H190V553"/><path d="M345 604H383"/><path d="M695 604H733"/></g>
+<text x="40" y="680" fill="#94a3b8" font-size="15">An atomic .env replacement does not make all file writes and container startup one transaction.</text>
+</g></svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 870" role="img" aria-labelledby="title desc">
+<title id="title">Different workflows, shared UI foundations</title><desc id="desc">Admin and Listen retain their own data, navigation and playback adapters. Both import shared components and generated tokens. Stories use those same components. Policy and interaction checks inspect the shared implementation and its consumers. V3 migration removes old visual overrides while preserving functional preferences.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1 1 L7 4 L1 7" fill="none" stroke="#67e8f9"/></marker></defs>
+<rect width="1200" height="870" fill="#0a0a0f"/><g font-family="'JetBrains Mono',monospace" font-size="17" fill="#aeb3c2">
+<text x="40" y="48" fill="#67e8f9" font-size="18">TWO APPLICATIONS, ONE SET OF FOUNDATIONS</text><text x="40" y="80">Imports cross the shared boundary; application state stays with its owner.</text>
+<g fill="#0d0e14" stroke="#353947"><rect x="40" y="120" width="530" height="150" rx="5"/><rect x="630" y="120" width="530" height="150" rx="5"/><rect x="40" y="365" width="1120" height="170" rx="5"/><rect x="40" y="635" width="530" height="130" rx="5"/><rect x="630" y="635" width="530" height="130" rx="5"/></g>
+<text x="62" y="155" fill="#f1f5f9">ADMIN</text><text x="62" y="193">Library operations · admin navigation</text><text x="62" y="229">API adapters and domain workflows</text>
+<text x="652" y="155" fill="#f1f5f9">LISTEN</text><text x="652" y="193">Queue · player · mobile navigation</text><text x="652" y="229">Native / web adapters and auth flow</text>
+<g stroke="#67e8f9" fill="none" marker-end="url(#arrow)"><path d="M305 277 V355"/><path d="M895 277 V355"/><path d="M305 627 V545"/><path d="M895 627 V545"/></g>
+<text x="329" y="320" font-size="15">Props + callbacks</text><text x="919" y="320" font-size="15">Props + callbacks</text>
+<text x="62" y="403" fill="#f1f5f9">@crate/ui</text><text x="62" y="443">Domain components → compositions → primitives / curated Radix controls</text><text x="62" y="483">One V3 identity · semantic tokens · focus / motion / geometry contracts</text><text x="62" y="513" font-size="14">Each app compiles the source and explicitly scans it for Tailwind utilities.</text>
+<text x="329" y="588" font-size="15">Real imports</text><text x="919" y="588" font-size="15">Inspect behaviour</text>
+<text x="62" y="674" fill="#f1f5f9">STORIES + REVIEW SCENES</text><text x="62" y="712">Actual controls, representative states</text><text x="62" y="743">No CSS fixes hidden in the example</text>
+<text x="652" y="674" fill="#f1f5f9">TESTS + POLICY CHECKS</text><text x="652" y="712">Interactions · tokens · export usage</text><text x="652" y="743">Consumer adoption still needs review</text>
+<path d="M40 798 H1160" stroke="#353947"/><text x="40" y="832" font-size="15">V3 startup: remove legacy visual overrides; retain density, motion and effects.</text></g></svg>

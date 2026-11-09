@@ -5,7 +5,11 @@ import {
   type EngineeringMilestone,
 } from "../data/engineering-timeline";
 import type { BlogEntry } from "./blog";
-import { initialTimelineIndex, prepareTimeline } from "./engineering-timeline";
+import {
+  initialTimelineIndex,
+  prepareTimeline,
+  timelineArticleHref,
+} from "./engineering-timeline";
 
 const post = (id: string, draft = false): BlogEntry => ({
   id,
@@ -39,11 +43,28 @@ describe("prepareTimeline", () => {
     expect(prepared.map((item) => item.id)).toEqual(
       items.map((item) => item.id),
     );
-    expect(prepared[0]).toEqual(items[0]);
+    expect(prepared[0]).toMatchObject(items[0]!);
+    expect(prepared[0]!.article).toEqual({
+      title: "published",
+      part: undefined,
+    });
     for (const item of prepared.slice(1)) {
       expect(item).not.toHaveProperty("href");
+      expect(item).not.toHaveProperty("article");
       expect(item.status).toBe("planned");
     }
+  });
+
+  it("uses the destination article's actual title and chapter for the reading link", () => {
+    const entry = post("catalogue", true);
+    entry.data.title = "When the filesystem stopped being the catalogue";
+    entry.data.series = { id: "history", title: "History", part: 2 };
+    const [prepared] = prepareTimeline(
+      [milestone("postgresql", "/blog/catalogue")],
+      [entry],
+      { includeDrafts: true },
+    );
+    expect(prepared!.article).toEqual({ title: entry.data.title, part: 2 });
   });
 
   it("uses actual collection status for visible drafts and newly published articles", () => {
@@ -77,20 +98,38 @@ describe("prepareTimeline", () => {
     const prepared = prepareTimeline(milestones, posts);
     expect(prepared).toHaveLength(milestones.length);
     expect(prepared.length).toBeGreaterThanOrEqual(37);
-    prepared.forEach(({ href: _href, status: _status, ...history }, index) => {
-      const {
-        href: _sourceHref,
-        status: _sourceStatus,
-        ...original
-      } = before[index]!;
-      expect(history).toEqual(original);
-    });
+    prepared.forEach(
+      (
+        { href: _href, status: _status, article: _article, ...history },
+        index,
+      ) => {
+        const {
+          href: _sourceHref,
+          status: _sourceStatus,
+          ...original
+        } = before[index]!;
+        expect(history).toEqual(original);
+      },
+    );
     expect(milestones).toEqual(before);
     expect(posts).toEqual(beforePosts);
   });
 });
 
 describe("initialTimelineIndex", () => {
+  it("preserves a selected later event only for its matching visible article", () => {
+    const href = "/blog/filesystem-to-indexed-catalogue";
+    const requested = initialTimelineIndex(milestones, href, "postgresql");
+    expect(milestones[requested]!.id).toBe("postgresql");
+    expect(
+      milestones[initialTimelineIndex(milestones, href, "crate-v3")]!.id,
+    ).toBe("catalog");
+    expect(
+      milestones[initialTimelineIndex(milestones, href, "missing")]!.id,
+    ).toBe("catalog");
+    const hidden = prepareTimeline(milestones, []);
+    expect(initialTimelineIndex(hidden, href, "postgresql")).toBe(0);
+  });
   it("starts at the first of several milestones covered by the current article", () => {
     const index = initialTimelineIndex(
       milestones,
@@ -115,5 +154,18 @@ describe("initialTimelineIndex", () => {
         "/blog/filesystem-to-indexed-catalogue",
       ),
     ).toBe(0);
+  });
+});
+
+describe("timelineArticleHref", () => {
+  it("carries the selected event to the article and to its current-page reading anchor", () => {
+    const item = milestone("postgresql", "/blog/catalogue");
+    expect(timelineArticleHref(item)).toBe(
+      "/blog/catalogue?milestone=postgresql",
+    );
+    expect(timelineArticleHref(item, "/blog/catalogue")).toBe(
+      "/blog/catalogue?milestone=postgresql#post-content",
+    );
+    expect(timelineArticleHref(milestone("unavailable"))).toBeUndefined();
   });
 });

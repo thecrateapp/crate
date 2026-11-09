@@ -1,14 +1,13 @@
 ---
 title: "Taking playback over from Navidrome"
 description: "Listen began with two playback routes. Removing Navidrome meant reconciling track identity, serving audio and owning the state around every play."
-date: 2026-11-24
-draft: true
+date: 2026-11-10
 series:
   id: how-to-forget-spotify
-  title: "How to forget Spotify. Building Crate from the ground."
+  title: "How to dismantle Spotify. Building Crate from the ground."
   part: 3
 related: [smart-mix-planned-on-the-server, reads-from-snapshots]
-tags: [How to forget Spotify, playback, Listen, architecture, history]
+tags: [How to dismantle Spotify, playback, Listen, architecture, history]
 sources:
   - docs/technical/09-playback-realtime-and-subsonic.md
   - docs/technical/08-frontends-admin-and-listen.md

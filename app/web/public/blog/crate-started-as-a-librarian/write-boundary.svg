@@ -62,7 +62,7 @@
       font-size: 17px;
     }
   </style>
-  <rect width="1200" height="560" rx="6" fill="#0a0a0f" />
+  <rect width="1200" height="560" fill="#0a0a0f" />
   <text x="40" y="46" class="label">MAKING THE WRITE BOUNDARY REAL</text>
   <text x="40" y="103" class="label">
     19 MARCH / MUTATION INSIDE THE REQUEST

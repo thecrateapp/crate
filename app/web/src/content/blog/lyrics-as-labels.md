@@ -1,7 +1,7 @@
 ---
 title: "Lyrics as labels: calibrating a voice detector without listening"
 description: "Smart Mix needed voice labels for its phrases. We compared detectors against synced lyrics, chose YAMNet and stored scores we could recalibrate."
-date: 2026-12-08
+date: 2026-11-10
 tags: [Smart Mix, audio analysis, machine learning, Python]
 sources:
   - app/crate/smart_mix/vocals.py
@@ -11,16 +11,15 @@ sources:
   - tools/smart-mix-eval/vocals
   - docs/technical/smart-mix-operations.md
 related: [smart-mix-planned-on-the-server, a-beat-grid-in-a-few-bytes, finding-the-one]
-draft: true
 ---
 
-A transition can line up the beats and still put two singers on top of each other. For Smart Mix 3, we
-needed to tell the transition planner which phrases contained a voice. The analyser already divided tracks
-into phrases; it had no useful way to distinguish a verse from an instrumental passage.
+Our first voice detector marked 13 of 322 phrases across 28 development tracks as voiced and missed
+whole tracks with obvious singing. It was a spectral heuristic, and we left it disabled.
 
-Our first attempt was a spectral heuristic. It marked 13 of 322 phrases across 28 development tracks as
-voiced, and missed entire tracks with obvious singing. We left it disabled. Before adding a model to every
-analysis job, we needed a way to compare its output with the audio.
+Smart Mix 3 needed to know which phrases contained a voice so the planner could keep two singers
+from overlapping. The analyser already divided tracks into phrases; it had no useful way to
+distinguish a verse from an instrumental passage. Before adding a model to every analysis job, we
+needed a way to compare its output with the audio.
 
 ## Turning lyrics into a reference
 
@@ -74,9 +73,9 @@ The comparison used Essentia's packaged YAMNet graph. For the worker, we used Go
 and ported the model to PyTorch, which the image already carried. The port reproduces the log-mel front end,
 the periodic Hann window and TensorFlow's asymmetric padding. Tests compare the front end with a saved
 TensorFlow reference; a separate test compares network outputs when the converted weights are available.
-[Port and reference tests](https://github.com/thecrateapp/crate/blob/98d889ac20d48fbec10028d316a848fa729f2c7f/app/tests/test_smart_mix_voice_model.py#L29-L97).
+[Port and reference tests](https://github.com/thecrateapp/crate/blob/e2b2bd476a818f02b760a86d74cc2c77a833d3cd/app/tests/test_smart_mix_voice_model.py#L29-L97).
 
-[YAMNet](https://github.com/tensorflow/models/blob/master/research/audioset/yamnet/README.md) returns scores for
+[YAMNet](https://github.com/tensorflow/models/blob/19f287775ae950e22a9b5fb82727e72cff2e3664/research/audioset/yamnet/README.md) returns scores for
 521 AudioSet classes. Each patch covers 0.975 seconds of waveform and advances by 0.48 seconds. Crate takes
 the highest score among its selected voice classes, including speech, singing, choir, chant and rapping.
 The classes use separate sigmoid outputs: a voice score does not have to compete with music for a share of
@@ -92,7 +91,7 @@ YAMNet often gave voice classes small scores over music. A linear byte scale wou
 the useful range near zero. We mapped scores logarithmically: values at or below `0.0001` become 0, and a
 score of 1 becomes 255. These endpoints describe the model score, not certainty about the audio:
 
-```python source="app/crate/smart_mix/vocals.py#L123-L127" commit="98d889ac20d48fbec10028d316a848fa729f2c7f" "np.log10"
+```python source="app/crate/smart_mix/vocals.py#L124-L128" commit="e2b2bd476a818f02b760a86d74cc2c77a833d3cd" "np.log10"
 def _log_levels(scores) -> np.ndarray:
     """Scores from ``LOG_FLOOR`` or less (0) to 1 (1) on a log scale."""
     logs = np.log10(np.maximum(np.asarray(scores, dtype=np.float64), LOG_FLOOR))
@@ -127,7 +126,7 @@ of the distinction we wanted the planner to use.
 
 We chose 90, trading some recall for more usable unvoiced passages:
 
-```python source="app/crate/smart_mix/models.py#L47-L49" commit="98d889ac20d48fbec10028d316a848fa729f2c7f" "VOCAL_THRESHOLD = 90"
+```python source="app/crate/smart_mix/models.py#L47-L49" commit="e2b2bd476a818f02b760a86d74cc2c77a833d3cd" "VOCAL_THRESHOLD = 90"
 # Gate SG1b (2026-11-05): a phrase has voice from this byte, a geometric mean voice score
 # of about 0.0026. Against synced lyrics: precision 0.88, recall 0.78, specificity 0.66.
 VOCAL_THRESHOLD = 90
@@ -156,7 +155,7 @@ A stored phrase score still depends on where the phrase starts and ends. Improvi
 make it obsolete. We kept the window scores too, one byte every 0.48 seconds, and rebuilt each phrase score
 from the windows inside its new boundaries:
 
-```python source="app/crate/smart_mix/vocals.py#L114-L120" commit="98d889ac20d48fbec10028d316a848fa729f2c7f" "inside = levels"
+```python source="app/crate/smart_mix/vocals.py#L115-L121" commit="e2b2bd476a818f02b760a86d74cc2c77a833d3cd" "inside = levels"
     levels = np.frombuffer(windows.scores, dtype=np.uint8).astype(np.float64)
     centres = np.arange(levels.size, dtype=np.int64) * windows.hop_ms + PATCH_CENTRE_MS
     presence = bytearray()
@@ -180,7 +179,9 @@ closely enough for this implementation.
 
 We started with a disabled heuristic that missed obvious singing. Smart Mix 3 gained an optional voice
 score per phrase, a calibrated server-side cut and reusable model output. The expensive step moved into
-background analysis; the score stayed available to the profile API and subsequent transition planning.
+background analysis. The score is stored with the profile, where `smart-mix-v3` planning and Admin's
+structure view read it; the public profile endpoint does not return it yet.
+[Structure reads](https://github.com/thecrateapp/crate/blob/8d1430fa09e0fe8630da2984eb8b482728da9fa7/docs/technical/smart-mix-operations.md#L246-L252).
 
 The reference still comes from lyrics. A model can disagree with a lyric label because it heard a backing
 vocal the lyrics omitted, or because it made a mistake. These measurements cannot distinguish the two.
@@ -188,6 +189,6 @@ They also do not measure how often a listener hears two singers clash in a finis
 phrases and listening tests remain useful checks, especially for genres where the scores separated poorly.
 
 The implementation and its failure behaviour are documented in
-[voice per phrase](https://github.com/thecrateapp/crate/blob/98d889ac20d48fbec10028d316a848fa729f2c7f/docs/technical/smart-mix-operations.md#voice-per-phrase).
+[voice per phrase](https://github.com/thecrateapp/crate/blob/e2b2bd476a818f02b760a86d74cc2c77a833d3cd/docs/technical/smart-mix-operations.md#voice-per-phrase).
 The analysis of [bar boundaries](/blog/finding-the-one) addresses a separate dependency: a voice score can
 only be assigned to a useful phrase if the analyser puts that phrase in the right place.

@@ -1,26 +1,19 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
-const POST = "/blog/reads-from-snapshots";
-const CHAPTERS = [
-  "/blog/crate-started-as-a-librarian",
-  "/blog/filesystem-to-indexed-catalogue",
-  "/blog/taking-playback-over-from-navidrome",
-];
-const DRAFTS = [
-  ...CHAPTERS.slice(1),
-  "/blog/reading-errors-without-trusting-them",
-  "/blog/finding-the-one",
-  "/blog/lyrics-as-labels",
-];
-const PUBLISHED_ARTICLES = [
-  POST,
-  "/blog/smart-mix-planned-on-the-server",
-  "/blog/a-beat-grid-in-a-few-bytes",
-  "/blog/observing-a-home-server",
-];
+import { blogPosts, historicalChapters, draftHrefs } from "./blog-content";
 
+const POST = "/blog/reads-from-snapshots";
+const CHAPTERS = historicalChapters.map((post) => post.href);
+const DRAFTS = draftHrefs;
+const PUBLISHED = blogPosts.filter((post) => !post.draft).map((post) => post.href);
+const PUBLISHED_CHAPTERS = historicalChapters
+  .filter((post) => !post.draft)
+  .map((post) => post.href);
+
+// Drafts render only in development; with none left, preview and production match.
 async function includesDrafts(request: APIRequestContext): Promise<boolean> {
-  const response = await request.get(CHAPTERS[1]!);
+  if (!DRAFTS.length) return false;
+  const response = await request.get(DRAFTS[0]!);
   expect([200, 404]).toContain(response.status());
   return response.status() === 200;
 }
@@ -86,7 +79,7 @@ for (const width of [1440, 390]) {
     await page.goto("/blog");
     await expect(page.locator("[data-blog-home]")).toHaveCount(1);
     await expect(page.locator("[data-blog-series]")).toContainText(
-      "How to forget Spotify. Building Crate from the ground.",
+      "How to dismantle Spotify. Building Crate from the ground.",
     );
     const start = page.locator("[data-start-series]");
     await expect(start).toHaveAttribute("href", CHAPTERS[0]!);
@@ -105,27 +98,25 @@ for (const width of [1440, 390]) {
     const articleHrefs = await articles.evaluateAll((links) =>
       links.map((link) => link.getAttribute("href")!),
     );
-    expect(chapterHrefs).toEqual(preview ? CHAPTERS : CHAPTERS.slice(0, 1));
-    expect(articleHrefs).toHaveLength(preview ? 7 : 4);
+    expect(chapterHrefs).toEqual(preview ? CHAPTERS : PUBLISHED_CHAPTERS);
+    const visibleArticles = blogPosts.filter(
+      (post) => post.part === null && (preview || !post.draft),
+    );
+    expect(new Set(articleHrefs)).toEqual(
+      new Set(visibleArticles.map((post) => post.href)),
+    );
     const readingLinks = [...chapterHrefs, ...articleHrefs];
     expect(new Set(readingLinks).size).toBe(readingLinks.length);
     for (const href of readingLinks) {
       expect((await request.get(href)).status(), href).toBe(200);
     }
-    if (preview) {
-      await expect(
-        chapters.filter({
-          hasText: "When the filesystem stopped being the catalogue",
-        }),
-      ).toContainText(/draft/i);
-      await expect(
-        articles.filter({ hasText: "Lyrics as labels" }),
-      ).toContainText(/draft/i);
-    } else {
-      expect(articleHrefs).toEqual(PUBLISHED_ARTICLES);
-      for (const href of DRAFTS)
-        await expect(page.locator(`a[href="${href}"]`)).toHaveCount(0);
+    for (const href of DRAFTS) {
+      const link = page.locator(`[data-blog-home] a[href="${href}"]`);
+      if (preview) await expect(link).toContainText(/draft/i);
+      else await expect(link).toHaveCount(0);
     }
+    if (!DRAFTS.length)
+      await expect(page.locator("[data-blog-home] .draft")).toHaveCount(0);
     for (const link of await chapters.all()) {
       expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     }
@@ -191,12 +182,13 @@ test("the series entry and article lists work without JavaScript", async ({
   }
 });
 
-test("launch article prose links only to available reading and keeps the next chapter as copy", async ({
+test("published prose links only to available reading and keeps the next chapter as copy", async ({
   page,
   request,
 }) => {
+  test.setTimeout(180_000);
   const preview = await includesDrafts(request);
-  for (const href of [CHAPTERS[0]!, ...PUBLISHED_ARTICLES]) {
+  for (const href of PUBLISHED) {
     const response = await page.goto(href);
     expect(response?.status()).toBe(200);
     const prose = page.locator(".prose");
@@ -254,15 +246,70 @@ test("code blocks link their source pinned to a commit", async ({ page }) => {
   ).toHaveCount(1);
 });
 
-test("the RSS feed contains the five launch posts and excludes every draft", async ({
+for (const width of [1440, 390]) {
+  test(`the acquisition chapter renders its handoff diagram and source links at ${width}px`, async ({
+    page,
+    request,
+  }) => {
+    const href = "/blog/when-retries-repeat-a-download";
+    await page.setViewportSize({ width, height: 1100 });
+    const response = await page.goto(href);
+    test.skip(
+      response?.status() === 404,
+      "The acquisition chapter remains a development draft.",
+    );
+    expect(response?.status()).toBe(200);
+    await expect(page.locator("article h1")).toHaveText(
+      "When retries repeat a finished download",
+    );
+    const diagram = page.locator(
+      `.prose img[src="${href}/ingestion-handoff.svg"]`,
+    );
+    await expect(diagram).toHaveAttribute("alt", /.{20,}/);
+    await diagram.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        diagram.evaluate(
+          (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+        ),
+      )
+      .toBe(true);
+    expect((await request.get(`${href}/ingestion-handoff.svg`)).ok()).toBe(
+      true,
+    );
+
+    const sourceLinks = page.locator(".expressive-code .source-link");
+    expect(await sourceLinks.count()).toBeGreaterThan(0);
+    for (const link of await sourceLinks.all()) {
+      await expect(link).toHaveAttribute(
+        "href",
+        /^https:\/\/github\.com\/thecrateapp\/crate\/blob\/[0-9a-f]{40}\/.+#L\d+(-L\d+)?$/,
+      );
+      await expect(link.locator('svg[data-blog-icon="github"]')).toHaveCount(1);
+    }
+    const externalReferences = page.locator(
+      '.prose a[data-blog-link="external"]',
+    );
+    expect(await externalReferences.count()).toBeGreaterThan(0);
+    for (const link of await externalReferences.all())
+      await expect(
+        link.locator('svg[data-blog-icon="external-link"]'),
+      ).toHaveCount(1);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+  });
+}
+
+test("the RSS feed contains every published post and excludes every draft", async ({
   request,
 }) => {
   const response = await request.get("/blog/rss.xml");
   expect(response.status()).toBe(200);
   const body = await response.text();
   expect(body).toContain("<rss");
-  expect(body.match(/<item>/g)).toHaveLength(5);
-  for (const href of [CHAPTERS[0], ...PUBLISHED_ARTICLES])
+  expect(body.match(/<item>/g)).toHaveLength(PUBLISHED.length);
+  for (const href of PUBLISHED)
     expect(body).toContain(`https://cratemusic.app${href}`);
   for (const href of DRAFTS)
     expect(body).not.toContain(`https://cratemusic.app${href}`);

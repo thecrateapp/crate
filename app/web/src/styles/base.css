@@ -104,11 +104,22 @@ body::after {
   transition: color 0.3s var(--ease-snap);
 }
 
-.nav .links a {
+.nav .links a,
+.mono-link {
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.mono-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.nav .links a {
   opacity: 0;
   animation: fade-in 0.5s var(--ease-out) both;
   animation-delay: calc(80ms + var(--i, 0) * 60ms);
@@ -126,6 +137,11 @@ body::after {
   transform: scaleX(0);
   transform-origin: right;
   transition: transform 0.45s var(--ease-snap);
+}
+
+.mono-link::after {
+  /* Keep the navbar's text offset inside the larger touch target. */
+  bottom: calc(50% - 0.5lh - 4px);
 }
 
 .nav .links a:hover,
@@ -327,6 +343,17 @@ html.menu-open body {
 
 :where(html.js) [data-enter] {
   opacity: 0;
+}
+
+/* Article identity and navigation remain readable if motion cannot initialise. */
+.post-head [data-enter],
+.blog-header [data-enter] {
+  opacity: 1;
+}
+
+.post-head [data-split]:not([aria-label]) {
+  visibility: visible;
+  animation: none;
 }
 
 .is-in [data-enter],

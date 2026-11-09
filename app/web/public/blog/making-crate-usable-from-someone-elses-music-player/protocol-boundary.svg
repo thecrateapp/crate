@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+<title id="title">One protocol boundary, existing Crate services</title>
+<desc id="desc">A third-party player uses GET or form POST through parameter parsing, dedicated authentication and JSON or XML rendering. Catalogue, playlist and media services remain in Crate. A queue with tracks A, B, A uses index 2 to preserve the second occurrence of A.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#67e8f9"/></marker></defs>
+<rect width="1200" height="630" fill="#0a0a0f"/>
+<g font-family="'JetBrains Mono',monospace" font-size="14" fill="#a1a1aa"><text x="48" y="43">CRATE ENGINEERING / OPEN SUBSONIC</text></g>
+<text x="48" y="85" fill="#fafafa" font-family="sans-serif" font-size="27">The player changes. The library stays in Crate.</text>
+<g fill="#0d0e14" stroke="#33343e"><rect x="48" y="136" width="226" height="166" rx="5"/><rect x="354" y="136" width="400" height="166" rx="5"/><rect x="834" y="136" width="318" height="166" rx="5"/><rect x="48" y="356" width="1104" height="222" rx="5"/></g>
+<g font-family="sans-serif" fill="#fafafa" font-size="20"><text x="70" y="174">Third-party player</text><text x="378" y="174">Shared protocol layer</text><text x="858" y="174">Crate services</text></g>
+<g font-family="sans-serif" fill="#b5b5c1" font-size="16"><text x="70" y="212">GET / form POST</text><text x="70" y="239">/rest and .view aliases</text><text x="70" y="275">JSON or XML response</text><text x="378" y="211">Preserve repeated parameters</text><text x="378" y="241">Authenticate a dedicated credential</text><text x="378" y="271">Render one response envelope</text><text x="858" y="211">Catalogue + source resolution</text><text x="858" y="241">User playlists + preferences</text><text x="858" y="271">Playback preparation</text></g>
+<g stroke="#67e8f9" stroke-width="1.5" fill="none" marker-end="url(#arrow)"><path d="M274 214H342"/><path d="M754 214H822"/></g>
+<text x="72" y="392" fill="#67e8f9" font-family="'JetBrains Mono',monospace" font-size="14">A QUEUE IS AN ORDERED LIST, INCLUDING REPEATS</text>
+<g fill="#151720" stroke="#484b59"><rect x="72" y="418" width="120" height="66" rx="4"/><rect x="216" y="418" width="120" height="66" rx="4"/><rect x="360" y="418" width="120" height="66" rx="4" stroke="#67e8f9"/></g>
+<g fill="#fafafa" font-family="'JetBrains Mono',monospace" font-size="25" text-anchor="middle"><text x="132" y="459">A</text><text x="276" y="459">B</text><text x="420" y="459" fill="#67e8f9">A</text></g>
+<g fill="#a1a1aa" font-family="'JetBrains Mono',monospace" font-size="14" text-anchor="middle"><text x="132" y="511">index 0</text><text x="276" y="511">index 1</text><text x="420" y="511">index 2</text></g>
+<g font-family="sans-serif" font-size="18"><text x="542" y="447" fill="#b5b5c1">current=A → first matching occurrence</text><text x="542" y="480" fill="#67e8f9">currentIndex=2 → the second A</text><text x="542" y="533" fill="#b5b5c1">One saved queue per user; last committed write wins.</text></g>
+<text x="48" y="610" fill="#80808e" font-family="'JetBrains Mono',monospace" font-size="13">SOLID ARROWS: REQUEST PROCESSING · SAVED QUEUE DOES NOT ANNOUNCE A LIVE CONNECT DEVICE</text>
+</svg>

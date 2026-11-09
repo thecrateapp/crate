@@ -74,7 +74,7 @@
       fill: #fbbf24;
     }
   </style>
-  <rect width="960" height="890" rx="10" fill="#0a0a0f" />
+  <rect width="960" height="890" fill="#0a0a0f" />
   <text x="32" y="40" class="label" text-anchor="start">
     THREE STAGES OF PLAYBACK OWNERSHIP
   </text>

@@ -14,12 +14,31 @@ merging a pull request.
 | `app/web/src/pages/blog/`            | Index, post page and `rss.xml`                         |
 | `app/web/src/lib/blog.ts`            | Sorting, drafts, reading time, source links            |
 
+## Local preview
+
+Astro dev, build, sync/check and Vitest use separate Vite dependency caches. Astro's temporary
+content-sync server also gets its own cache, including during a dev restart. Keep these paths
+separate: overwriting the live dev cache changes dependency hashes and can make GSAP and Lenis
+requests fail with `504 Outdated Optimize Dep` while the page still serves its HTML and CSS.
+
+Page controllers mount at DOM readiness as well as through Astro's navigation events, once per
+page, and clean up before a swap. Blog header content stays readable if those scripts fail.
+`e2e/blog-header.spec.ts` covers a lost initial Astro event, navigation, mobile layouts and blocked
+motion scripts; checking only that a heading is present does not detect this failure.
+
 ## Calendar
 
-One post a week, on Tuesdays. Every calendar entry has a slug, a title, the problem the post solves, a date, a
-status (`planned`, `drafting`, `review`, `published`) and the repository paths it is based on.
-`blog-calendar.test.ts` checks that dates fall on Tuesdays in order, that every source path exists, that every
-post is in the calendar and that published entries match their post's date.
+The blog launches with every written post on one date, `LAUNCH_DATE` in `app/web/src/data/blog-calendar.ts`:
+the 34 chapters of the series and the technical articles. A post's `date` records when it went public, so
+the launch posts share it. The series' chronology lives in each chapter's opening line ("Part 17.
+Connecting separate Listen players in May and June 2026.") and in the Signal Track, never in backdated
+publication dates. After the launch, new articles take Tuesday slots.
+
+Every calendar entry has a slug, a title, the problem the post solves, a date, a status (`planned`,
+`drafting`, `review`, `published`) and the repository paths it is based on. `blog-calendar.test.ts` checks
+that published entries share the launch date (a Tuesday), that every written post is published, that
+proposed entries fall on later Tuesdays in order, that every source path exists, that every post is in the
+calendar and that published entries match their post's date.
 
 Releases can add posts. When a Crate or Crate Decks release contains something worth explaining from an
 engineering point of view, add an entry for it. It can take the next Tuesday slot and push the rest back a week.
@@ -67,7 +86,12 @@ First person does not license invented memories. Do not add late-night debugging
 conversations, user reports, motivations or measurements that the evidence does not support. Present-day
 comparisons can explain how another system handles a problem without claiming we evaluated it at the time.
 
-## How to forget Spotify. Building Crate from the ground.
+## How to dismantle Spotify. Building Crate from the ground.
+
+The series was renamed from "How to forget Spotify" during editorial review. Its internal
+`how-to-forget-spotify` identifier stays stable for grouping and timeline selection. Use the new title
+and the "How to dismantle Spotify" topic label in visible copy; the topic URL is
+`/blog/tags/how-to-dismantle-spotify`.
 
 This series follows the problems Crate had to solve as it became a music platform. New entries should follow
 this progression, with headings and section lengths chosen for the particular problem:
@@ -88,13 +112,19 @@ This is a preferred narrative progression, not a requirement for four headings. 
 several sections, and an implementation may need more space than the rest of the article. Existing posts
 linked from the series keep their own structure; do not rewrite them just to fit this progression.
 
+Review each draft alongside its neighbouring chapters as well as on its own. Compare their openings,
+section rhythm, placement of evidence and endings so that a series does not repeat one structure with
+different subjects. The [editorial variety inventory](engineering-blog-editorial-variety.md) records the
+review of all 34 historical chapters, the revisions already applied and the next candidates. It is a
+working plan, not another article template.
+
 ## Frontmatter
 
 ```yaml
 ---
 title: "Serving hot screens from snapshots, not queries" # up to 90 characters
 description: "One or two sentences, up to 160 characters."
-date: 2026-11-10 # the publication Tuesday, same as the calendar
+date: 2026-11-10 # the publication date, same as the calendar (LAUNCH_DATE for launch posts)
 tags: [read plane, Go, PostgreSQL]
 sources: # repository paths, linked at the end of the post
   - app/readplane/internal/routes/server.go
@@ -107,7 +137,7 @@ Series entries also declare their reading order:
 ```yaml
 series:
   id: how-to-forget-spotify
-  title: "How to forget Spotify. Building Crate from the ground."
+  title: "How to dismantle Spotify. Building Crate from the ground."
   part: 2
 related: [reads-from-snapshots, a-beat-grid-in-a-few-bytes]
 ```
@@ -121,8 +151,10 @@ the content collection at build time and require no browser JavaScript.
 
 The `how-to-forget-spotify` series also includes the Signal Track history navigator between its header and
 article. Readers open it through “Explore the series”; linking to `#series-timeline` opens it directly.
-The navigator starts at the first milestone linked to the current post, and “Continue reading” returns to
-the article. Maintain each milestone's `href` in `app/web/src/data/engineering-timeline.ts` when adding a
+A direct visit starts at the first milestone linked to the current post. Links from the navigator carry
+`?milestone=<id>` so the destination keeps the selected event when several milestones share an article.
+The client accepts that ID only when it belongs to the visible current article. “Continue reading” retains
+the same context and returns to the prose. The link displays the destination’s actual title and series part. Maintain each milestone's `href` in `app/web/src/data/engineering-timeline.ts` when adding a
 chapter. Rendered links and draft labels are resolved against the content collection: the complete history
 remains visible, while posts absent from the build have no article link.
 
@@ -188,7 +220,116 @@ Markdown links automatically; authors do not add icons or HTML to the post. Sour
 the article's source list and the timeline also use the GitHub mark. Link destinations and whether they
 open a new tab remain explicit authoring choices.
 
+### File previews
+
+GitHub `blob` links in prose, code headers and the source list open a large source viewer. Keep
+writing ordinary Markdown links with the original destination. Without JavaScript, or with a
+modified click to open a new tab, they still go to GitHub. Repository, directory, commit and issue
+links retain their usual behaviour.
+
+The viewer loads the complete file from a same-origin snapshot when opened. It shows the resolved
+commit, scrolls to `#Lx-Ly` ranges and highlights them. Markdown has document and numbered source
+views; heading anchors open the matching section. Copy uses the original text, optionally limited
+to the referenced lines. Raw HTML in Markdown is disabled, relative links retain the same commit,
+and embedded images become links.
+
+Snapshots are generated by `/blog/source/[id].json.ts` for the files referenced by visible posts.
+Historical commits are read from Git; an exported or shallow checkout can fetch the same immutable
+object from GitHub. A missing historical file never falls back to its current version. `main` in
+the source list resolves to `BLOG_SOURCE_COMMIT` or the local checkout's `HEAD`, with that resolution
+shown in the viewer. The site Docker build receives `BLOG_SOURCE_COMMIT` from the workflow's merge
+SHA. Other branches and tags resolve to a full SHA through Git's HTTP ref protocol, not the
+rate-limited REST API, and the build warns that the link moves; pin such links to a commit. An
+abbreviated SHA needs a local checkout, or `BLOG_SOURCE_GITHUB_TOKEN` for an authenticated API call.
+
+A production build loads every referenced file before writing snapshots, at most six GitHub
+requests at a time. Network errors, timeouts, 429 and 5xx responses are retried with backoff. If
+a file still cannot be loaded, the build fails and lists every broken link; it never ships an
+"unavailable" snapshot. `BLOG_SOURCE_NO_GIT=1 BLOG_SOURCE_COMMIT=$(git rev-parse HEAD) npm run
+build` reproduces the Docker build, which has no Git history and reads everything from GitHub.
+
+For another repository available locally, set `BLOG_SOURCE_REPOSITORIES` to a JSON object mapping
+its GitHub name to an absolute checkout path, for example
+`{"thecrateapp/crate-decks":"/path/to/crate-decks"}`. The loader checks the checkout's `origin`
+before resolving the revision or reading its blob. This can preserve access to an exact historical
+document that is no longer available from GitHub; it never substitutes a working-tree file.
+
+Binary files and files over 1 MB retain an explicit GitHub fallback. Syntax highlighting runs on
+the server, but a snapshot stores the text once: `styles` lists theme classes and each `runs` entry
+encodes one line as `<letter><length>` runs over those classes. The viewer rebuilds the numbered
+markup when a file opens. `GitHubFilePreview.astro` emits the class rules from `code-theme.json`.
+The browser downloads a snapshot only when needed.
+
+## Topics
+
+The existing `tags` frontmatter supplies header chips and `/blog/tags/<tag>` indexes. `/blog/tags`
+lists available topics and counts. The chips use the shared `FilterChip` geometry and typography,
+rendered as native links in Astro. They work without JavaScript and do not need a CMS.
+
+Topic grouping ignores case and repeated whitespace, preserves authored labels, and gives
+punctuation distinct addresses so names such as C, C++ and C# cannot collide. Both the directory
+and topic indexes follow the blog's visibility rules: drafts appear in development only. Tags
+used exclusively by drafts do not produce production pages.
+
 ## Diagrams
+
+### Interactive figures
+
+Articles can use a server-rendered Astro figure at a marker in their Markdown:
+
+```html
+<div data-blog-visual="connect"></div>
+```
+
+Declare `visuals: [connect]` in frontmatter. The post page supplies the named component to
+`BlogProse.astro`, which inserts it at the marker before sending HTML. Missing and duplicate markers fail
+rendering. This keeps the figure in the passage that explains it and provides a complete static view
+without JavaScript. Register future figure names in the content schema and post renderer.
+
+A figure shows one mechanism in motion and still reads as a single frame. It follows the visual language
+of the site's own visualizations: the home page "Inside Crate" mix, Admin's enrichment orbit and Listen's
+federation graph. Every figure has the same five parts, in order:
+
+1. A label bar: a cyan label, a mono context, a version switch when the article describes a
+   transformation, and an `Example` tag when the sequence or values are illustrative.
+2. One SVG scene at full width, with HTML labels positioned over it. Names and constants come from
+   the code the article cites.
+3. Three or four readouts in display type. Amber marks the failure and cyan the fix.
+4. Three or four numbered phases, each a short title and one sentence.
+5. A one-line caption with the provenance.
+
+The prose explains; the figure shows. Figures have no heading of their own, no Play, Step or Reset
+buttons, no scrubber and no paragraph of caveats.
+
+`BlogFigure.astro` supplies the frame. `scripts/viz/blog/phase-loop.ts` runs it through the site's viz
+registry (`data-viz`, `scripts/viz/index.ts`): the figure loops while visible, a click on a phase pins it
+and a second click resumes, and the switch restarts the selected version. Reduced motion shows the end of
+each version without looping. Without JavaScript the server-rendered frame and every phase remain
+readable, and Astro navigation disposes the loop. Each figure contributes a pure model with tests, a
+scene component and a render function. The `crate-blog-figures` skill
+(`.agents/skills/crate-blog-figures/SKILL.md`) is the step-by-step recipe.
+
+| Figure | Article | What it shows |
+| --- | --- | --- |
+| `connect` (`ConnectHandoff`) | H17 | v1 starts the desktop before the phone stops; v2 applies the queue silently, commits ownership, then resumes and pauses. |
+| `crossfade` (`CrossfadeEngine`) | H19 | UI timer, PCM envelope and shared bus over one six-second transition; gain formulas from the Android code before and after `e08714d4`. |
+| `workers` (`WorkersAdmission`) | H12 | The resource governor at `09da2273` defers the next repair and holds the next analysis batch while playback keeps its own slot; nothing already admitted is interrupted. |
+| `enrichment` (`EnrichmentJourney`) | T01 | Six providers with their own cache lifetimes, a pool of three fetchers, a failed provider whose missing value does not erase stored data, and a locked field that the write keeps. |
+| `smart-mix` (`SmartMixCandidates`) | H34 | The v2 default plan, the v3 menu up to its first choice, and v3 without structure; clash and omitted music recomputed from the exported planner fixture. |
+| `music-paths` (`MusicPathJourney`) | H11 | The anchor-first builder (`f602d82d`) on three regression fixtures: destination and song family reserved before the middle, empty steps left visible. |
+| `radio-rotation` (`RadioRotation`) | H31 | Ranked candidates, the 0.05 quality band and three memories (buffer, session cooldown, significant listening at `924b7fb6`). |
+
+Every figure is built on the kit. Figures that replay Python output read their JSON on the server and send
+the browser only what the render function needs:
+
+- H34: `src/data/blog-smart-mix-fixture.json`, from `python3 tools/smart-mix-eval/export_blog_fixture.py`.
+- H11: `src/data/blog-music-path-fixture.json`, from `python3 app/web/scripts/export_music_path_fixture.py`.
+- H31: `src/data/blog-radio-fixture.json`, from `python3 app/web/scripts/export_radio_fixture.py`.
+
+Each exporter runs pinned Python code on declared inputs and accepts `--check` to verify the committed
+JSON without rewriting it. The browser never ranks, plans or queries the library.
+
+### Static diagrams
 
 - SVG files in `app/web/public/blog/<slug>/`, referenced from Markdown with alt text that explains the diagram:
   `![What the diagram shows](/blog/<slug>/name.svg)`.

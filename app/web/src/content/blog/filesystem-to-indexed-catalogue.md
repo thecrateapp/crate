@@ -1,14 +1,13 @@
 ---
 title: "When the filesystem stopped being the catalogue"
 description: "A SQLite catalogue replaced directory walks on Crate's read path. PostgreSQL then changed how background jobs coordinated their writes."
-date: 2026-11-17
-draft: true
+date: 2026-11-10
 series:
   id: how-to-forget-spotify
-  title: "How to forget Spotify. Building Crate from the ground."
+  title: "How to dismantle Spotify. Building Crate from the ground."
   part: 2
-related: [reads-from-snapshots, a-beat-grid-in-a-few-bytes]
-tags: [How to forget Spotify, databases, architecture, history]
+related: [building-an-artist-page-when-the-providers-disagree, reads-from-snapshots, a-beat-grid-in-a-few-bytes]
+tags: [How to dismantle Spotify, databases, architecture, history]
 sources:
   - docs/technical/04-library-storage-sync-and-imports.md
   - docs/technical/02-backend-api-and-data.md

@@ -5,10 +5,10 @@ date: 2026-11-10
 draft: false
 series:
   id: how-to-forget-spotify
-  title: "How to forget Spotify. Building Crate from the ground."
+  title: "How to dismantle Spotify. Building Crate from the ground."
   part: 1
 related: [reads-from-snapshots, reading-errors-without-trusting-them]
-tags: [How to forget Spotify, architecture, library, history]
+tags: [How to dismantle Spotify, architecture, library, history]
 sources:
   - docs/technical/04-library-storage-sync-and-imports.md
   - docs/technical/03-worker-tasks-and-background-services.md

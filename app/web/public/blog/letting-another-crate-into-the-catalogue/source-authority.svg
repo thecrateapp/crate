@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1020" viewBox="0 0 1200 1020" role="img" aria-labelledby="title desc">
+  <title id="title">The catalogue can describe remote music without owning its files</title>
+  <desc id="desc">Three paths cross from an owner node to a consumer node. Catalogue synchronization stores source rows with the remote node and entity identifiers, then reconciles them with local sources into a canonical catalogue. Playback goes through the consumer's local relay; the owner checks its current grant and stream ticket. An approved import downloads a signed manifest into worker staging, verifies the files and publishes them into the consumer's local library. Catalogue sync alone never copies audio.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10" fill="none" stroke="#67e8f9" stroke-width="1"/></marker>
+    <style>
+      .label { font-family: 'JetBrains Mono', monospace; font-size: 16px; letter-spacing: 1px; fill: #67e8f9; }
+      .body { font-family: Inter, Arial, sans-serif; font-size: 20px; fill: #e7e9f0; }
+      .note { font-family: Inter, Arial, sans-serif; font-size: 16px; fill: #a2a8b8; }
+      .panel { fill: #0d0e14; stroke: #343744; stroke-width: 1; }
+      .edge { fill: none; stroke: #67e8f9; stroke-width: 1; marker-end: url(#arrow); }
+      .async { stroke-dasharray: 9 4; }
+    </style>
+  </defs>
+  <rect width="1200" height="1020" fill="#0a0a0f"/>
+  <text x="40" y="46" class="label">ONE CATALOGUE, DIFFERENT AUTHORITIES</text>
+  <text x="40" y="80" class="note">July 2026 architecture · Each operation needs its own permission.</text>
+  <text x="40" y="124" class="label">OWNER NODE</text>
+  <text x="400" y="124" class="label">CONSUMER NODE</text>
+  <path d="M370 109 V948" stroke="#343744" stroke-width="1" stroke-dasharray="1 5"/>
+
+  <text x="40" y="169" class="note">01 / Synchronize metadata</text>
+  <rect x="40" y="190" width="300" height="142" rx="8" class="panel"/>
+  <text x="60" y="223" class="label">OWNER CATALOGUE</text>
+  <text x="60" y="260" class="body">Manifest / deltas</text>
+  <text x="60" y="291" class="note">Approved catalogue access</text>
+
+  <rect x="400" y="190" width="330" height="142" rx="8" class="panel"/>
+  <text x="420" y="223" class="label">REMOTE SOURCE ROWS</text>
+  <text x="420" y="260" class="body">Node + remote entity ID</text>
+  <text x="420" y="291" class="note">No local file ownership</text>
+
+  <rect x="820" y="190" width="340" height="142" rx="8" class="panel"/>
+  <text x="840" y="223" class="label">CANONICAL CATALOGUE</text>
+  <text x="840" y="260" class="body">Local + remote sources</text>
+  <text x="840" y="291" class="note">Resolve each requested facet</text>
+  <path d="M340 261 H400" class="edge async"/>
+  <path d="M730 261 H820" class="edge async"/>
+  <text x="400" y="366" class="note">Metadata visibility does not grant streaming or import permission.</text>
+
+  <text x="40" y="418" class="note">02 / Request playback</text>
+  <rect x="40" y="440" width="300" height="142" rx="8" class="panel"/>
+  <text x="60" y="473" class="label">OWNER MEDIA</text>
+  <text x="60" y="510" class="body">Grant + ticket check</text>
+  <text x="60" y="541" class="note">Current policy and quota</text>
+
+  <rect x="400" y="440" width="330" height="142" rx="8" class="panel"/>
+  <text x="420" y="473" class="label">LOCAL RELAY</text>
+  <text x="420" y="510" class="body">Peer ticket stays here</text>
+  <text x="420" y="541" class="note">Signed peer request / audio</text>
+
+  <rect x="820" y="440" width="340" height="142" rx="8" class="panel"/>
+  <text x="840" y="473" class="label">LISTEN CLIENT</text>
+  <text x="840" y="510" class="body">Local opaque relay URL</text>
+  <text x="840" y="541" class="note">No owner URL or owner ticket</text>
+  <path d="M400 485 H340" class="edge"/>
+  <path d="M340 540 H400" class="edge"/>
+  <path d="M820 485 H730" class="edge"/>
+  <path d="M730 540 H820" class="edge"/>
+  <text x="400" y="616" class="note">Request goes left. Authorized audio returns right. Files remain remote.</text>
+
+  <text x="40" y="668" class="note">03 / Explicitly approve an import</text>
+  <rect x="40" y="690" width="300" height="142" rx="8" class="panel"/>
+  <text x="60" y="723" class="label">AUTHORIZED TRANSFER</text>
+  <text x="60" y="760" class="body">Signed manifest + files</text>
+  <text x="60" y="791" class="note">Separate import capabilities</text>
+
+  <rect x="400" y="690" width="330" height="142" rx="8" class="panel"/>
+  <text x="420" y="723" class="label">CONSUMER WORKER</text>
+  <text x="420" y="760" class="body">Reserve → stage → verify</text>
+  <text x="420" y="791" class="note">Size / hash / manifest identity</text>
+
+  <rect x="820" y="690" width="340" height="142" rx="8" class="panel"/>
+  <text x="840" y="723" class="label">LOCAL LIBRARY</text>
+  <text x="840" y="760" class="body">Import + catalogue sync</text>
+  <text x="840" y="791" class="note">Keep remote provenance</text>
+  <path d="M340 761 H400" class="edge async"/>
+  <path d="M730 761 H820" class="edge"/>
+  <text x="400" y="866" class="note">This path creates local media. The API never writes to /music.</text>
+
+  <path d="M40 917 H82" class="edge async"/>
+  <text x="96" y="923" class="note">Background exchange</text>
+  <path d="M390 917 H432" class="edge"/>
+  <text x="446" y="923" class="note">Request / response or worker call</text>
+  <text x="40" y="980" class="note">Public peering requires release-specific production acceptance; a local demo is not that acceptance.</text>
+</svg>

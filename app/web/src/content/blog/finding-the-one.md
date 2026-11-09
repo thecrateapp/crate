@@ -1,7 +1,7 @@
 ---
 title: "Finding the one: where every bar starts"
 description: "Smart Mix put phrase boundaries on the wrong beat. We replaced its bar heuristic, then had to fix how the model's beats became a grid."
-date: 2026-12-01
+date: 2026-11-10
 tags: [Smart Mix, audio analysis, Python, Rust]
 related: [smart-mix-planned-on-the-server, a-beat-grid-in-a-few-bytes, lyrics-as-labels]
 sources:
@@ -11,12 +11,11 @@ sources:
   - tools/crate-cli/src/beat_tracking.rs
   - docs/technical/smart-mix-operations.md
   - tools/smart-mix-eval/structure
-draft: true
 ---
 
-Two tracks can have matching beats and still enter at the wrong musical moment. Start the incoming track
-one beat into a bar and its opening lands against a different part of the outgoing bar. The tempo can be
-right throughout the transition while the phrasing sounds wrong.
+Start an incoming track one beat into a bar and its opening lands against the wrong part of the
+outgoing bar. The tempo is right and the phrasing is wrong. On the first reference set of 25 tracks,
+Crate's analyser picked the right first beat of the bar on only 10.
 
 Smart Mix needs to know which beat starts each bar before it can place phrases of 8, 16 or 32 bars. In the
 first version of the v7 analyser, we estimated that position from low-frequency onsets and chord changes.
@@ -57,8 +56,8 @@ reference bar position on 21 tracks, enough of an improvement to try it inside t
 
 We then compared two checkpoints on 56 tracks. The smaller `small0` checkpoint agreed with All-In-One's
 raw downbeats on 38 tracks; the larger `final0` agreed on 37. The smaller file was about 8 MB, against about
-78 MB for the full model. We chose `small0`: that sample gave us no reason to pay for the larger one.
-[Checkpoint comparison](https://github.com/thecrateapp/crate/blob/98d889ac20d48fbec10028d316a848fa729f2c7f/docs/technical/smart-mix-operations.md#measurement-of-the-structure).
+77 MB for the full model. We chose `small0`: that sample gave us no reason to pay for the larger one.
+[Checkpoint comparison](https://github.com/thecrateapp/crate/blob/e2b2bd476a818f02b760a86d74cc2c77a833d3cd/docs/technical/smart-mix-operations.md#measurement-of-the-structure).
 
 The model runs in the analysis worker before the rest of the profile calculation. The worker passes beat
 timestamps, downbeat timestamps and the detected beats per bar to Rust through `crate-cli analyze --beats`.
@@ -77,7 +76,7 @@ Each downbeat inside the grid's time range, allowing 70 ms at either end, contri
 It votes only if the nearest grid beat is within 70 ms. The winning position must account for at least 60%
 of the downbeats considered:
 
-```python source="app/crate/smart_mix/phrase_grid.py#L56-L73" commit="98d889ac20d48fbec10028d316a848fa729f2c7f" "min_share * counted"
+```python source="app/crate/smart_mix/phrase_grid.py#L56-L73" commit="e2b2bd476a818f02b760a86d74cc2c77a833d3cd" "min_share * counted"
     votes = [0] * BEATS_PER_BAR
     counted = 0
     for downbeat in downbeats_ms:
@@ -106,7 +105,7 @@ The Rust implementation uses the same tolerance and share. If no position passes
 phrases and the planner falls back to a crossfade. A detected three-beat bar is also kept out of the phrase
 path: v7's phrase and transition code assumes four beats per bar. It records the time signature without
 inventing a four-beat phrase grid.
-[Python and Rust bar rules](https://github.com/thecrateapp/crate/blob/98d889ac20d48fbec10028d316a848fa729f2c7f/docs/technical/smart-mix-operations.md#beats-and-downbeats).
+[Python and Rust bar rules](https://github.com/thecrateapp/crate/blob/e2b2bd476a818f02b760a86d74cc2c77a833d3cd/docs/technical/smart-mix-operations.md#beats-and-downbeats).
 
 ## A good model still produced bad grids
 
@@ -131,7 +130,7 @@ with `dbn=True`. It decodes the model's activations into a sequence of beats and
 three or four beats per bar. That gives the grid a sequence constrained by a metrical model, instead of
 independent peaks. [Beat This! inference options](https://github.com/CPJKU/beat_this#inference).
 
-```python source="app/crate/smart_mix/beat_model.py#L108-L121" commit="98d889ac20d48fbec10028d316a848fa729f2c7f" "dbn=True"
+```python source="app/crate/smart_mix/beat_model.py#L108-L121" commit="e2b2bd476a818f02b760a86d74cc2c77a833d3cd" "dbn=True"
 class BeatThisModel:
     """Beat This! on the CPU, with madmom's DBN, from a local checkpoint."""
 
@@ -186,7 +185,7 @@ analyser so it can still consume them.
 The profile records the tracker name, `beat-this-small0-dbn`. Including the post-processing in that name
 lets the system distinguish these results from the earlier `beat-this-small0` output. A fallback run also
 cannot replace a stored profile whose beats came from the model with a weaker profile at the same quality.
-[Integration and fallback behaviour](https://github.com/thecrateapp/crate/blob/98d889ac20d48fbec10028d316a848fa729f2c7f/docs/technical/smart-mix-operations.md#beats-and-downbeats).
+[Integration and fallback behaviour](https://github.com/thecrateapp/crate/blob/e2b2bd476a818f02b760a86d74cc2c77a833d3cd/docs/technical/smart-mix-operations.md#beats-and-downbeats).
 
 ## Keeping the expensive result
 
@@ -199,7 +198,7 @@ Changing a phrase boundary rule should not require running the model on every fi
 `track_mix_signals` to keep its beats, downbeats and beats per bar separately from the derived profile.
 The worker first looks up signals for the file's source revision, then checks the tracker identity:
 
-```python source="app/crate/worker_handlers/analysis.py#L1404-L1411" commit="98d889ac20d48fbec10028d316a848fa729f2c7f" "signals.beat_tracker == tracker"
+```python source="app/crate/worker_handlers/analysis.py#L1404-L1411" commit="e2b2bd476a818f02b760a86d74cc2c77a833d3cd" "signals.beat_tracker == tracker"
     tracker = beat_tracker_name()
     if signals is not None and signals.beat_tracker == tracker and signals.beats_ms:
         return BeatTrack(
@@ -219,7 +218,7 @@ A later change to phrase segmentation can reuse these stored outputs and rerun t
 analysis. Changing the checkpoint or its post-processing changes the tracker name and causes inference
 to run again. This is why keeping only the final phrases would have been insufficient: they discard the
 beat evidence needed to try a different segmentation.
-[Stored-signal format and invalidation](https://github.com/thecrateapp/crate/blob/98d889ac20d48fbec10028d316a848fa729f2c7f/docs/technical/smart-mix-operations.md#stored-model-signals).
+[Stored-signal format and invalidation](https://github.com/thecrateapp/crate/blob/e2b2bd476a818f02b760a86d74cc2c77a833d3cd/docs/technical/smart-mix-operations.md#stored-model-signals).
 
 ## What changed for Smart Mix
 
@@ -238,10 +237,10 @@ features to the boundary score, alongside loudness and spectral balance. In the 
 F1 within three seconds rose from 0.45 for the old heuristic to 0.49 with the model and DBN, then to 0.53
 with those additional features. That measures how phrase cuts line up with All-In-One's section boundaries;
 phrases are often shorter than sections, so the two are not expected to coincide everywhere.
-[Evaluation method and full results](https://github.com/thecrateapp/crate/blob/98d889ac20d48fbec10028d316a848fa729f2c7f/docs/technical/smart-mix-operations.md#measurement-of-the-structure).
+[Evaluation method and full results](https://github.com/thecrateapp/crate/blob/e2b2bd476a818f02b760a86d74cc2c77a833d3cd/docs/technical/smart-mix-operations.md#measurement-of-the-structure).
 
 The remaining tests need listening as well as model comparisons. All-In-One and madmom can agree and still
 be wrong, and the chosen tracks do not represent every kind of music in a personal library. The
-[structure evaluation tools](https://github.com/thecrateapp/crate/tree/98d889ac20d48fbec10028d316a848fa729f2c7f/tools/smart-mix-eval/structure)
+[structure evaluation tools](https://github.com/thecrateapp/crate/tree/e2b2bd476a818f02b760a86d74cc2c77a833d3cd/tools/smart-mix-eval/structure)
 keep the reference outputs separate from Crate's profiles, so the same tracks can be compared again when
 the grid or phrase rules change.

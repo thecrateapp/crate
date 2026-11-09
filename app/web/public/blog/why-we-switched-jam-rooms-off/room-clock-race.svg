@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 650" role="img" aria-labelledby="title desc">
+<title id="title">The room snapshot and clock compete for one player</title>
+<desc id="desc">In the startup race, state sync starts an asynchronous load at an old position. The clock seeks the player forward, then the old load completes and overwrites the position. The revised flow stores the queue without starting it, waits for the live clock and applies the queue and clock together. That ordering fix does not prove audible synchronization.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#67e8f9"/></marker></defs>
+<rect width="1100" height="650" fill="#0a0a0f"/>
+<g font-family="ui-sans-serif,system-ui,sans-serif">
+<text x="40" y="49" fill="#f8fafc" font-size="26" font-weight="650">A newer message can lose to an older load</text>
+<text x="40" y="81" fill="#94a3b8" font-size="16">Message order stays intact. Asynchronous media work finishes later.</text>
+<rect x="35" y="112" width="1030" height="220" rx="12" fill="#172033" stroke="#475569"/>
+<text x="58" y="144" fill="#fda4af" font-size="16" font-weight="650">THE STARTUP RACE</text>
+<g fill="#1e293b" stroke="#475569"><rect x="58" y="169" width="275" height="95" rx="9"/><rect x="411" y="169" width="275" height="95" rx="9"/><rect x="764" y="169" width="275" height="95" rx="9"/></g>
+<g fill="#f8fafc" font-size="19"><text x="78" y="199">state_sync</text><text x="431" y="199">sync_clock</text><text x="784" y="199">Old load completes</text></g>
+<g fill="#cbd5e1" font-size="16"><text x="78" y="230">Start loading stored position</text><text x="431" y="230">Seek to current position</text><text x="784" y="230">Restore stale position</text></g>
+<g stroke="#67e8f9" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M337 217H404"/><path d="M690 217H757"/></g>
+<text x="58" y="301" fill="#fda4af" font-size="17">The seek may hit the old engine. The pending load can overwrite the correction.</text>
+<rect x="35" y="356" width="1030" height="220" rx="12" fill="#172033" stroke="#475569"/>
+<text x="58" y="388" fill="#67e8f9" font-size="16" font-weight="650">WAIT FOR THE AUTHORITATIVE CLOCK</text>
+<g fill="#1e293b" stroke="#475569"><rect x="58" y="413" width="275" height="95" rx="9"/><rect x="411" y="413" width="275" height="95" rx="9"/><rect x="764" y="413" width="275" height="95" rx="9"/></g>
+<g fill="#f8fafc" font-size="19"><text x="78" y="443">Keep the room queue</text><text x="431" y="443">Receive the clock</text><text x="784" y="443">Apply both together</text></g>
+<g fill="#cbd5e1" font-size="16"><text x="78" y="474">Do not start from the snapshot</text><text x="431" y="474">Project its position to now</text><text x="784" y="474">Queue + track + position</text></g>
+<g stroke="#67e8f9" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M337 461H404"/><path d="M690 461H757"/></g>
+<text x="58" y="545" fill="#67e8f9" font-size="17">Do not pause a player that already belongs to the same Jam session.</text>
+<text x="40" y="617" fill="#94a3b8" font-size="17">This fixes an ordering problem. Audible alignment still needs tests with real players.</text>
+</g></svg>

@@ -24,6 +24,7 @@ const blog = defineCollection({
       })
       .optional(),
     related: z.array(z.string()).default([]),
+    visuals: z.array(z.enum(["enrichment", "crossfade", "smart-mix", "connect", "workers", "music-paths", "radio-rotation"])).default([]),
   }),
 });
 
