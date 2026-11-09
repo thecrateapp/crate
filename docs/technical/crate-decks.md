@@ -145,6 +145,7 @@ serve it, announced by the `library_cursor` feature:
 
 ```json
 {
+  "library": { "track_count": 136512 },
   "containers": [
     {
       "id": "28",
@@ -224,6 +225,18 @@ What changes a node `etag`:
 
 Public and system playlists and public crates that the user does not follow
 are not in the tree, but the tracks endpoint serves them (see access below).
+
+`library.track_count` is the number of tracks in the whole library, the count
+Decks shows for its Library entry:
+
+- It is always present, `0` for an empty library.
+- It adds up the albums' `library_albums.track_count`, the counts the scanner
+  keeps and the genre nodes use, so no request counts `library_tracks`.
+- Like the playlist and genre counts, it includes tracks without an
+  `entity_uid`, which the tracks endpoint leaves out. A track outside any album
+  is not counted.
+- `library` is not a container: it has no node `etag` and no tracks endpoint. A
+  change to it changes the tree's response `ETag` (see caching below).
 
 ### Container tracks
 
@@ -333,8 +346,9 @@ Paging:
 Caching:
 
 - Each response carries a strong `ETag` computed from its body (a quoted
-  32-character hex string), so it changes with any change to the response:
-  tracks, any field (`playable` included) or `next_cursor`.
+  32-character hex string), so it changes with any change to the response: in
+  the tree, `library.track_count` or any node; in a page, the tracks, any field
+  (`playable` included) or `next_cursor`.
 - `If-None-Match` (one value, a list, `*`, or a weak `W/` value) that matches
   gets `304` and no body, with the same `ETag`. The server still runs the query;
   the `304` saves the transfer and the client's parsing.
@@ -352,7 +366,9 @@ Cost (measured 2026-11-09):
   both. A 500-track page takes 9,000 to 23,000 shared buffer hits, the tree
   under 1,000.
 - There is no stored genre ranking: the tree ranks `album_genres` (about 26,000
-  rows) on every request, which is most of the tree's cost.
+  rows) on every request, which is most of the tree's cost. It also adds up the
+  albums' track counts for `library.track_count`, one pass over
+  `library_albums` (about 11,000 rows).
 - `playable`, `source_revision` and `byte_length` come from one `stat` per
   track (`stat_playable_sources`), which resolves the library root once and each
   folder once per page.
@@ -371,6 +387,9 @@ Cost (measured 2026-11-09):
   a measurement on an idle server, and there is no `playable` column. Cold disk
   caches add latency to each file check; if that ever breaks the budget,
   availability moves to a column.
+- Diego accepted on 2026-11-09 the p95 extrapolation above and the two
+  deviations from the plan: genres ranked on every request instead of a
+  precomputed top N, and no migration (no `playable` column).
 
 ## Stem analyses (Smart Mix Stems ST1)
 
