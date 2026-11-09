@@ -1735,6 +1735,90 @@ def test_backfill_handler_completes_the_campaign_when_nothing_is_left(
     assert calls["next"] == []
 
 
+def _coverage_query_out_of_shared_memory() -> Exception:
+    """The error that stopped the v8 backfill in production on 2026-11-09.
+
+    PostgreSQL ran with Docker's default 64 MB /dev/shm, and a parallel plan of
+    the coverage aggregate could not grow its shared memory segment.
+    """
+    from psycopg2.errors import DiskFull
+    from sqlalchemy.exc import OperationalError
+
+    return OperationalError(
+        "SELECT profile.analyzer_version, COUNT(*) FROM track_mix_profiles ...",
+        {},
+        DiskFull(
+            'could not resize shared memory segment "/PostgreSQL.1" to 4194304 '
+            "bytes: No space left on device"
+        ),
+    )
+
+
+def _coverage_warnings(caplog) -> list:
+    return [
+        record
+        for record in caplog.records
+        if record.levelname == "WARNING"
+        and record.exc_info
+        and "No space left on device" in str(record.exc_info[1])
+    ]
+
+
+def test_a_claiming_pass_queues_the_next_one_when_the_coverage_refresh_fails(
+    monkeypatch, caplog
+) -> None:
+    import logging
+
+    # The coordinator has no retries: a pass that fails without queueing the
+    # next one stops the whole backfill.
+    claimed = [{"id": 5, "entity_uid": "uid-5", "claim_token": "token-5"}]
+    analysis, calls = _handler_harness(
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[0], claimed=claimed
+    )
+    queued_before_refresh: list[list] = []
+
+    def failing_refresh(**_kwargs):
+        queued_before_refresh.append(list(calls["next"]))
+        raise _coverage_query_out_of_shared_memory()
+
+    monkeypatch.setattr(
+        analysis, "refresh_smart_mix_coverage_after_pass", failing_refresh
+    )
+
+    with caplog.at_level(logging.WARNING):
+        result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert result["claimed"] == 1
+    assert result["next_task_id"] == "task-next"
+    # The next pass is queued before the coverage refresh even starts.
+    assert queued_before_refresh == [[{"batches": 1, "claimed": 1}]]
+    assert calls["next"] == [{"batches": 1, "claimed": 1}]
+    assert len(_coverage_warnings(caplog)) == 1
+
+
+def test_a_completing_pass_completes_the_campaign_when_the_coverage_refresh_fails(
+    monkeypatch, caplog
+) -> None:
+    import logging
+
+    analysis, calls = _handler_harness(
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[0]
+    )
+
+    def failing_refresh(**_kwargs):
+        raise _coverage_query_out_of_shared_memory()
+
+    monkeypatch.setattr(analysis, "refresh_smart_mix_coverage", failing_refresh)
+
+    with caplog.at_level(logging.WARNING):
+        result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert result == {"claimed": 0, "queued": 0, "completed": True}
+    assert calls["completed"] == [True]
+    assert calls["next"] == []
+    assert len(_coverage_warnings(caplog)) == 1
+
+
 def _runs_again_later(result: dict) -> bool:
     from crate.worker_handlers import RUN_AGAIN_AFTER_KEY
 

@@ -1582,22 +1582,40 @@ def _handle_backfill_smart_mix_profiles(
     if not claimed:
         in_flight = count_smart_mix_in_flight()
         if in_flight == 0:
-            refresh_smart_mix_coverage(max_attempts=max_attempts)
+            _refresh_pass_coverage(refresh_smart_mix_coverage, max_attempts)
             complete_smart_mix_campaign()
             return {"claimed": 0, "queued": 0, "completed": True}
         return run_again_later(
             _smart_mix_backfill_poll_seconds(),
             progress=f"Waiting for the {in_flight} analyses in flight to finish",
         )
-    refresh_smart_mix_coverage_after_pass(max_attempts=max_attempts)
+    # The coordinator has no retries, so the next pass is queued first: a pass
+    # that failed before queueing it would stop the backfill for good.
+    next_task_id = queue_next_smart_mix_batch(batches=1, claimed=len(claimed))
+    _refresh_pass_coverage(refresh_smart_mix_coverage_after_pass, max_attempts)
     return {
         "claimed": len(claimed),
         "queued": queued,
         "released": len(released),
         "window": window.window,
         "limit": window.limit,
-        "next_task_id": queue_next_smart_mix_batch(batches=1, claimed=len(claimed)),
+        "next_task_id": next_task_id,
     }
+
+
+def _refresh_pass_coverage(refresh: Callable[..., Any], max_attempts: int) -> None:
+    """Refresh the coverage read model without ever failing the pass.
+
+    The coverage only feeds Admin; the next pass, a finished analysis or the
+    refresh Admin can request brings it up to date again.
+    """
+    try:
+        refresh(max_attempts=max_attempts)
+    except Exception:
+        log.warning(
+            "Smart Mix coverage refresh failed; the backfill pass carries on",
+            exc_info=True,
+        )
 
 
 def _smart_mix_backfill_poll_seconds() -> int:
