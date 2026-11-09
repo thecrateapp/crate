@@ -1102,6 +1102,20 @@ completes has exhausted the claimable work in that pass; it can still leave exha
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
 
+A `completed` campaign of the deployed target reopens by itself (since `smart-mix-audio-v10`).
+Every 10 minutes (`SMART_MIX_WAKE_SECONDS`) the service loop of `crate-worker` looks for one
+claimable profile written since the campaign completed: a new import or a library reanalysis
+on the analyzer's own beats, a profile that became `unavailable`, a source change. If it finds
+one, it sets the campaign back to `running` and queues the coordinator, which claims under the
+same night window, resource governor and `maxAttempts`, and completes it again when nothing is
+left. Admin then shows the campaign `running`, with its counters going on from where they
+were. It reads the profiles written since `completed_at` through the `updated_at` index, one
+row at most, and does nothing for any other campaign: a paused or cancelled campaign stays
+stopped, a campaign of another target waits for an operator to start the new one, and a setup
+whose analysis worker cannot run Beat This! (the coordinator records it in the campaign as
+`beat_model_available`) never reopens by itself. To stop the reopening, pause or cancel the
+campaign.
+
 ### How a pass claims
 
 Ranking the whole library is expensive, and since the night window a pass only claims its free
@@ -1282,6 +1296,25 @@ without claiming.
    the campaign then upgrades it with Beat This!.
 6. **Watch, pause, resume, cancel and close it** as for v9 below. Once it has finished,
    a later release can drop v9 and older versions from `READABLE_ANALYZER_VERSIONS`.
+7. **After it completes,** the campaign reopens by itself when new imports or library
+   reanalyses leave claimable profiles (see [Campaign, queues and backfill](#campaign-queues-and-backfill)):
+   new tracks get Beat This!'s beats within about ten minutes plus their analysis, under
+   the night window. Pause or cancel the campaign to stop that.
+
+#### Known issues of v10 (backlog, not in this release)
+
+- `crate-cli` decodes AAC in MP4 with symphonia, which keeps the encoder delay an MP4 edit
+  list trims (about 46 ms on gapless AAC) and decodes HE-AAC without its SBR band (about
+  22 ms): its own readings (cues, `bpmConfidence`) shift on such files; the grid, from Beat
+  This!, does not.
+- About 20 of the 399 evaluation tracks change bar phase during the track (odd bars, or
+  model slips): a single downbeat anchor cannot hold them, so they keep no phrases.
+- The meter arbiter was measured on the evaluation sets only; the labelled three-beat
+  reference set of its plan (All-In-One) is not built, and nobody has listened to the
+  tracks it changes. Swans "Coward", with irregular live drums, takes bars of four.
+- The analysis worker finds no PANNs model, so the library's mood comes from Essentia.
+- The wake-up only sees profiles written since the campaign completed: a track the
+  analysis daemon never profiled waits for an operator to start a campaign.
 
 ### Running the v9 backfill
 

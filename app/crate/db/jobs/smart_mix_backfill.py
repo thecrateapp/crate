@@ -6,6 +6,7 @@ import json
 import os
 import socket
 import uuid
+from datetime import UTC, datetime
 from typing import Any, Sequence
 
 from sqlalchemy import text
@@ -1063,14 +1064,97 @@ def queue_next_smart_mix_batch(*, batches: int = 0, claimed: int = 0) -> str | N
 
 
 def complete_smart_mix_campaign() -> bool:
+    """Mark the running campaign completed, with when: the wake-up looks for profiles
+    written after it (``wake_smart_mix_backfill``)."""
     return (
         _update_smart_mix_campaign(
-            "payload_json || jsonb_build_object('status', 'completed')",
+            "payload_json || jsonb_build_object("
+            "'status', 'completed', 'completed_at', CAST(:completed_at AS text))",
             "payload_json->>'status' = 'running'",
-            {},
+            {"completed_at": datetime.now(UTC).isoformat()},
         )
         is not None
     )
+
+
+def record_smart_mix_model_availability(available: bool) -> None:
+    """Keep in the campaign whether the coordinator's worker can run Beat This!.
+
+    Only the analysis worker can tell; the wake-up in the service loop reads it here,
+    so a setup without the model never reopens its campaign by itself. Written only
+    when it changes.
+    """
+    _update_smart_mix_campaign(
+        "payload_json || jsonb_build_object("
+        "'beat_model_available', CAST(:available AS boolean))",
+        "(payload_json->'beat_model_available') IS DISTINCT FROM "
+        "to_jsonb(CAST(:available AS boolean))",
+        {"available": bool(available)},
+    )
+
+
+# The service loop checks this often for tracks that became claimable after the
+# campaign completed: new imports and library reanalyses on the analyzer's own beats.
+WAKE_CHECK_SQL = f"""
+    SELECT lt.id
+    FROM track_mix_profiles profile
+    JOIN library_tracks lt ON lt.id = profile.track_id
+    LEFT JOIN library_albums la ON la.id = lt.album_id
+    LEFT JOIN track_processing_state processing
+        ON processing.track_id = lt.id
+       AND processing.pipeline = :pipeline
+    WHERE profile.updated_at > CAST(:since AS timestamptz)
+      AND {_CLAIMABLE_SQL}
+    LIMIT 1
+"""
+
+
+def wake_smart_mix_backfill() -> str | None:
+    """Reopen a completed campaign when a profile written since became claimable.
+
+    Only a campaign of this target that completed, whose last pass ran where Beat
+    This! can run: a paused, cancelled or running campaign, another target, or a setup
+    without the model is left alone, and an explicit pause keeps stopping it. The
+    check reads the profiles written since the campaign completed (the
+    ``updated_at`` index), one row at most. The reopened campaign runs the usual
+    coordinator, under its night window, load checks and retry budget, and completes
+    again when nothing is left. Returns the queued coordinator task, or None.
+    """
+    campaign = get_smart_mix_campaign()
+    if (
+        campaign is None
+        or not campaign_targets_current(campaign)
+        or campaign.get("status") != "completed"
+        or campaign.get("beat_model_available") is not True
+        or not campaign.get("completed_at")
+    ):
+        return None
+    params = {
+        "pipeline": SMART_MIX_PIPELINE,
+        "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
+        "target_generation": smart_mix_target_generation(),
+        "max_attempts": max(
+            1, min(int(campaign.get("max_attempts") or DEFAULT_MAX_ATTEMPTS), 10)
+        ),
+        "promote_python_profiles": False,
+        "python_analyzer": PYTHON_ANALYZER,
+        "upgrade_own_tracker": True,
+        "model_beats_max_seconds": MODEL_BEATS_MAX_SECONDS,
+        "since": campaign["completed_at"],
+    }
+    with read_scope() as session:
+        found = session.execute(text(WAKE_CHECK_SQL), params).first()
+    if found is None:
+        return None
+    reopened = _update_smart_mix_campaign(
+        "payload_json || jsonb_build_object('status', 'running')",
+        "payload_json->>'status' = 'completed' AND payload_json->>'target' = :target",
+        {"target": SMART_MIX_ANALYZER_VERSION},
+    )
+    if reopened is None:
+        return None
+    return queue_next_smart_mix_batch()
 
 
 def _update_smart_mix_campaign(
@@ -1108,12 +1192,14 @@ __all__ = [
     "PASS_COVERAGE_MAX_AGE_SECONDS",
     "RANKING_MAX_AGE_SECONDS",
     "RANKING_STATE_KEY",
+    "WAKE_CHECK_SQL",
     "campaign_targets_current",
     "claim_smart_mix_backfill_batch",
     "complete_smart_mix_campaign",
     "count_smart_mix_in_flight",
     "get_smart_mix_campaign",
     "queue_next_smart_mix_batch",
+    "record_smart_mix_model_availability",
     "refresh_smart_mix_coverage",
     "refresh_smart_mix_coverage_after_pass",
     "release_dead_smart_mix_claims",
@@ -1124,4 +1210,5 @@ __all__ = [
     "set_smart_mix_campaign_status",
     "smart_mix_target_generation",
     "start_smart_mix_campaign",
+    "wake_smart_mix_backfill",
 ]

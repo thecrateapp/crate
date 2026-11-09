@@ -1589,6 +1589,9 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
         lambda **kwargs: calls["claims"].append(kwargs) or list(claimed),
     )
     monkeypatch.setattr(
+        analysis, "record_smart_mix_model_availability", lambda _available: None
+    )
+    monkeypatch.setattr(
         "crate.db.repositories.tasks.create_task_dedup",
         lambda task_type, params, *, dedup_key: (
             calls["children"].append((task_type, params, dedup_key))
@@ -2480,6 +2483,186 @@ def test_the_coordinator_upgrades_only_with_the_model(monkeypatch) -> None:
         analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
 
         assert calls["claims"][0]["upgrade_own_tracker"] is available
+
+
+def _completed_campaign(**overrides) -> dict:
+    return {
+        **_running_campaign(),
+        "status": "completed",
+        "completed_at": "2026-11-10T08:00:00+00:00",
+        "beat_model_available": True,
+        **overrides,
+    }
+
+
+def _touch_profile(track_id: int, when: str) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE track_mix_profiles SET updated_at = CAST(:when AS timestamptz)"
+                " WHERE track_id = :id"
+            ),
+            {"when": when, "id": track_id},
+        )
+
+
+def _wake(monkeypatch) -> list[dict]:
+    from crate.db.jobs.smart_mix_backfill import wake_smart_mix_backfill
+
+    queued: list[dict] = []
+    monkeypatch.setattr(
+        smart_mix_backfill,
+        "queue_next_smart_mix_batch",
+        lambda **kwargs: queued.append(kwargs) or "task-wake",
+    )
+    wake_smart_mix_backfill()
+    return queued
+
+
+def test_an_import_after_the_campaign_completed_reopens_it(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    # The library analysis wrote an own-tracker profile for a new import after the
+    # campaign completed: the service loop reopens the campaign, which claims it under
+    # its window, load checks and retry budget.
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    _insert_profile(track_id, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _touch_profile(track_id, "2026-11-10T09:00:00+00:00")
+    save_smart_mix_campaign(_completed_campaign())
+
+    queued = _wake(monkeypatch)
+
+    assert queued == [{}]
+    assert get_smart_mix_campaign()["status"] == "running"
+
+
+@pytest.mark.parametrize(
+    "campaign",
+    [
+        _completed_campaign(status="paused"),
+        _completed_campaign(status="cancelled"),
+        _completed_campaign(status="running"),
+        _completed_campaign(target="smart-mix-audio-v5"),
+        # The last pass ran where Beat This! cannot: a setup without the model.
+        _completed_campaign(beat_model_available=False),
+        {
+            key: value
+            for key, value in _completed_campaign().items()
+            if key != "beat_model_available"
+        },
+    ],
+)
+def test_the_wake_up_leaves_other_campaigns_alone(
+    pg_db, tmp_path: Path, monkeypatch, campaign
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    _insert_profile(track_id, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _touch_profile(track_id, "2026-11-10T09:00:00+00:00")
+    save_smart_mix_campaign(dict(campaign))
+
+    assert _wake(monkeypatch) == []
+    assert get_smart_mix_campaign()["status"] == campaign["status"]
+
+
+def test_the_wake_up_needs_a_claimable_profile_written_since_completion(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    # Older own-tracker rows (exhausted, or left from before the campaign ended) and
+    # new model-backed rows give nothing to claim: the campaign stays completed.
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+
+    older, modelled, exhausted = _create_tracks(tmp_path, count=3)
+    _insert_profile(older, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _touch_profile(older, "2026-11-10T07:00:00+00:00")
+    _insert_profile(modelled, analyzer_version=ANALYZER_VERSION)
+    _touch_profile(modelled, "2026-11-10T09:00:00+00:00")
+    _insert_profile(exhausted, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _touch_profile(exhausted, "2026-11-10T09:00:00+00:00")
+    _insert_processing(
+        exhausted, state="done", attempts=3, target_generation=ANALYZER_VERSION
+    )
+    save_smart_mix_campaign(_completed_campaign())
+
+    assert _wake(monkeypatch) == []
+    assert get_smart_mix_campaign()["status"] == "completed"
+
+
+def test_completing_a_campaign_records_when(pg_db) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        complete_smart_mix_campaign,
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+
+    save_smart_mix_campaign(_running_campaign())
+
+    assert complete_smart_mix_campaign() is True
+
+    campaign = get_smart_mix_campaign()
+    assert campaign["status"] == "completed"
+    assert datetime.fromisoformat(campaign["completed_at"]).tzinfo is not None
+
+
+def test_each_pass_records_whether_the_model_can_run(pg_db, monkeypatch) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        record_smart_mix_model_availability,
+        save_smart_mix_campaign,
+    )
+
+    save_smart_mix_campaign(_running_campaign())
+    record_smart_mix_model_availability(True)
+    assert get_smart_mix_campaign()["beat_model_available"] is True
+    record_smart_mix_model_availability(False)
+    assert get_smart_mix_campaign()["beat_model_available"] is False
+
+
+def test_the_coordinator_records_the_model_availability(monkeypatch) -> None:
+    analysis, calls = _handler_harness(
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[0]
+    )
+    recorded: list[bool] = []
+    monkeypatch.setattr("crate.smart_mix.beat_model.beat_model_available", lambda: True)
+    monkeypatch.setattr(
+        analysis, "record_smart_mix_model_availability", recorded.append
+    )
+
+    analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert recorded == [True]
+
+
+def test_the_service_loop_step_wakes_the_backfill(monkeypatch) -> None:
+    from crate import worker
+
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        "crate.db.jobs.smart_mix_backfill.wake_smart_mix_backfill",
+        lambda: calls.append(True) or "task-wake",
+    )
+
+    worker._wake_smart_mix_backfill()
+
+    assert calls == [True]
+    assert worker.SMART_MIX_WAKE_SECONDS == 600
 
 
 def test_starting_v10_over_the_v9_campaign_starts_a_new_one(pg_db) -> None:

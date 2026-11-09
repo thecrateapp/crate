@@ -34,6 +34,7 @@ from crate.db.jobs.smart_mix_backfill import (
     count_smart_mix_in_flight,
     get_smart_mix_campaign,
     queue_next_smart_mix_batch,
+    record_smart_mix_model_availability,
     refresh_live_smart_mix_coverage,
     refresh_smart_mix_coverage,
     refresh_smart_mix_coverage_after_pass,
@@ -1571,6 +1572,10 @@ def _handle_backfill_smart_mix_profiles(
     ]
     from crate.crate_cli import has_subcommands, is_available
 
+    model_available = _beat_model_available()
+    # The service loop's wake-up reads it: a setup without the model never reopens
+    # its campaign by itself.
+    record_smart_mix_model_availability(model_available)
     claimed = claim_smart_mix_backfill_batch(
         limit=min(batch_size, window.limit - in_flight),
         max_in_flight=window.limit,
@@ -1580,7 +1585,7 @@ def _handle_backfill_smart_mix_profiles(
         promote_python_profiles=is_available() and has_subcommands(),
         # Profiles at the target on the analyzer's own beats (new imports, library
         # reanalyses) get Beat This!'s when this worker can run it.
-        upgrade_own_tracker=_beat_model_available(),
+        upgrade_own_tracker=model_available,
     )
     queued = 0
     released: list[int] = []
