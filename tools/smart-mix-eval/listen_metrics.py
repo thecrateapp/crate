@@ -14,6 +14,12 @@ clock) and the rendered audio is measured around the transition.
 - **Voice on voice** (YAMNet, ``crate.smart_mix.voice_model``) on each stem: time
   at full level with a voiced patch on both decks, a patch voiced from the byte
   threshold of the profiles (``VOCAL_THRESHOLD``, gate SG1b).
+- **Bass on bass** (Smart Mix Stems, ST3) on each stem: the level below
+  ``BASS_BAND_HZ``, with the crossfade gain and the bass handoff shelf of the plan
+  applied as ``crate.smart_mix.evaluation.bass_overlap_ms`` does; time with both
+  basses at full level while each deck plays its low end (within
+  ``BASS_PLAYING_DROP_DB`` of its own loud low-end level). Measured on the rendered
+  audio, not on the separated stems the planner reads.
 - **Loudness** (EBU R128 momentary and short-term loudness from FFmpeg's
   ``ebur128``) on the mix: the step between the short-term loudness before and
   after the mix, the momentary bump above and dip below both sides during it, and
@@ -64,7 +70,10 @@ from common import (
 ensure_app_on_path()
 
 from crate.smart_mix.evaluation import (  # noqa: E402
+    OVERLAP_FLOOR_DB,
     OVERLAP_FLOOR_GAIN,
+    bass_cut_db,
+    bass_handoff_engaged,
     crossfade_gains,
     effective_curve,
 )
@@ -72,7 +81,8 @@ from crate.smart_mix.models import TransitionPlan  # noqa: E402
 from crate.smart_mix.vocals import VOCAL_THRESHOLD  # noqa: E402
 from render_pair import plan_from_dict, render_pair  # noqa: E402
 
-METRICS_VERSION = 1
+# 2: bassOnBassMs (Smart Mix Stems ST3).
+METRICS_VERSION = 2
 STEP_MS = 10
 # Beats further apart than this sound as a flam (about 1/16 beat at 150 BPM).
 PHASE_TOLERANCE_MS = 25.0
@@ -82,6 +92,13 @@ SLOPE_CONTEXT_MS = 3_000
 SLOPE_SPAN_MS = 1_000
 SILENCE_LUFS = -70.0
 YAMNET_RATE = 16_000
+# The bass handoff's shelf frequency (BassHandoffFilter).
+BASS_BAND_HZ = 150.0
+BASS_FRAME_MS = 50
+# A deck plays its low end while its level below BASS_BAND_HZ is within this of its
+# own loud low-end level (90th percentile over the render), and above silence.
+BASS_PLAYING_DROP_DB = 12.0
+BASS_SILENCE_DB = -60.0
 
 LOWER_IS_BETTER = frozenset(
     {
@@ -89,6 +106,7 @@ LOWER_IS_BETTER = frozenset(
         "phaseErrorMsMedian",
         "mixIbiCv",
         "voiceOnVoiceMs",
+        "bassOnBassMs",
         "levelStepLuAbs",
         "bumpLu",
         "dipLu",
@@ -103,6 +121,7 @@ SAME_WITHIN = {
     "lockedShare": 0.05,
     "mixIbiCv": 0.02,
     "voiceOnVoiceMs": 480.0,
+    "bassOnBassMs": 480.0,
     "levelStepLuAbs": 0.5,
     "bumpLu": 0.5,
     "dipLu": 0.5,
@@ -115,6 +134,7 @@ LABELS = {
     "lockedShare": "Beats within 25 ms",
     "mixIbiCv": "Mix beat interval variation (CV)",
     "voiceOnVoiceMs": "Voice on voice at full level (ms)",
+    "bassOnBassMs": "Bass on bass at full level (ms)",
     "levelStepLuAbs": "Loudness step across the mix, |LU|",
     "bumpLu": "Loudness bump during the mix (LU)",
     "dipLu": "Loudness dip during the mix (LU)",
@@ -261,6 +281,93 @@ def voice_on_voice_ms(
     return int(both.sum()) * step_ms
 
 
+def low_band_db(
+    audio: np.ndarray,
+    rate: int,
+    steps: int,
+    *,
+    step_ms: int = STEP_MS,
+    frame_ms: int = BASS_FRAME_MS,
+    cutoff_hz: float = BASS_BAND_HZ,
+) -> np.ndarray:
+    """Per step, the RMS level in dBFS of the audio below ``cutoff_hz``.
+
+    A Hann-windowed frame of ``frame_ms`` around each step's centre; the band level
+    adds the frame's spectrum below the cutoff (Parseval), so a full-scale sine
+    below the cutoff reads about -3 dBFS.
+    """
+    samples = np.asarray(audio, dtype=np.float64)
+    length = max(2, round(frame_ms * rate / 1_000))
+    window = np.hanning(length)
+    norm = float(np.sum(window**2))
+    frequencies = np.fft.rfftfreq(length, 1.0 / rate)
+    band = frequencies < cutoff_hz
+    padded = np.concatenate([np.zeros(length), samples, np.zeros(length)])
+    levels = np.full(steps, -np.inf)
+    for step in range(steps):
+        centre = round((step * step_ms + step_ms / 2) * rate / 1_000) + length
+        frame = padded[centre - length // 2 : centre - length // 2 + length]
+        if frame.size < length:
+            break
+        spectrum = np.abs(np.fft.rfft(frame * window)) ** 2
+        weights = np.where((frequencies > 0) & (frequencies < rate / 2), 2.0, 1.0)
+        power = float(np.sum(spectrum[band] * weights[band])) / (norm * length)
+        levels[step] = 10.0 * np.log10(power) if power > 0 else -np.inf
+    return levels
+
+
+def bass_on_bass_ms(
+    outgoing_db: np.ndarray,
+    incoming_db: np.ndarray,
+    plan: TransitionPlan,
+    *,
+    start_ms: int,
+    step_ms: int = STEP_MS,
+    playing_drop_db: float = BASS_PLAYING_DROP_DB,
+) -> int:
+    """Mix time with both decks' low end playing and at full level.
+
+    ``outgoing_db`` and ``incoming_db`` are each deck's low-band level per step,
+    rendered alone at unity gain; the plan's crossfade gain and bass handoff shelf
+    are applied here (full level: at least ``OVERLAP_FLOOR_DB``, as in
+    ``crate.smart_mix.evaluation.bass_overlap_ms``).
+    """
+    steps = min(outgoing_db.size, incoming_db.size)
+    if plan.duration_ms <= 0 or steps == 0:
+        return 0
+
+    def playing(levels: np.ndarray) -> np.ndarray:
+        audible = levels[np.isfinite(levels) & (levels > BASS_SILENCE_DB)]
+        if audible.size == 0:
+            return np.zeros(levels.size, dtype=bool)
+        reference = float(np.percentile(audible, 90))
+        return (levels >= reference - playing_drop_db) & (levels > BASS_SILENCE_DB)
+
+    outgoing_on = playing(outgoing_db[:steps])
+    incoming_on = playing(incoming_db[:steps])
+    curve = effective_curve(plan)
+    handoff = bass_handoff_engaged(plan)
+    total = 0
+    for step in np.flatnonzero(outgoing_on & incoming_on):
+        progress = (step * step_ms + step_ms / 2 - start_ms) / plan.duration_ms
+        if not 0.0 <= progress < 1.0:
+            continue
+        outgoing_gain, incoming_gain = crossfade_gains(float(progress), curve)
+        outgoing_cut, incoming_cut = (
+            bass_cut_db(float(progress), plan.handoff_progress) if handoff else (0, 0)
+        )
+        if (
+            _gain_db(outgoing_gain) + outgoing_cut >= OVERLAP_FLOOR_DB
+            and _gain_db(incoming_gain) + incoming_cut >= OVERLAP_FLOOR_DB
+        ):
+            total += step_ms
+    return total
+
+
+def _gain_db(gain: float) -> float:
+    return -np.inf if gain <= 0.0 else 20.0 * float(np.log10(gain))
+
+
 _EBUR128_LINE = re.compile(
     r"t:\s*(?P<t>[\d.]+)\s+TARGET:.*?M:\s*(?P<m>-?[\d.]+|-?inf|nan)\s+"
     r"S:\s*(?P<s>-?[\d.]+|-?inf|nan)"
@@ -373,6 +480,7 @@ def measure_plan(
         mask = full_level_mask(plan, start_ms=start, total_ms=result.duration_ms)
         beats = {}
         voices = {}
+        low_end = {}
         for name, path in paths.items():
             audio, rate = _load_mono(path)
             track = track_beats(audio, rate, model=beat_model)
@@ -383,6 +491,7 @@ def measure_plan(
                     voice_window_bytes(windows).scores, dtype=np.uint8
                 )
                 voices[name] = (np.asarray(windows.centres_ms), levels)
+                low_end[name] = low_band_db(audio, rate, mask.size)
         loudness = loudness_jumps(
             *_ebur128(paths["mix"], ffmpeg), start_ms=start, end_ms=end
         )
@@ -401,6 +510,9 @@ def measure_plan(
         "mixIbiCv": ibi_cv(beats["mix"], start, end),
         "voiceOnVoiceMs": voice_on_voice_ms(
             voices["outgoing"], voices["incoming"], mask
+        ),
+        "bassOnBassMs": bass_on_bass_ms(
+            low_end["outgoing"], low_end["incoming"], plan, start_ms=start
         ),
         **loudness,
     }
@@ -812,11 +924,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 __all__ = [
     "LOWER_IS_BETTER",
     "PlanSelector",
+    "bass_on_bass_ms",
     "beat_agreement",
     "compare_variants",
     "full_level_mask",
     "ibi_cv",
     "loudness_jumps",
+    "low_band_db",
     "measure_plan",
     "parse_ebur128",
     "parse_selector",

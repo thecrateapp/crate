@@ -1,0 +1,180 @@
+/* Stem lanes (track Audio profile, Stems tab): one lane per stem on the track's time
+   axis, in the language of the sound spectrum (approved mockup, 2026-11-09), drawn at the
+   container's width. Like GenreWheel, StackMap and the spectrum it sits straight on the
+   dialog, without a panel of its own. Only tokens: accent for the stems the planner reads
+   and the server stores (drums, bass, vocals); the quiet text colour for "other", which
+   neither uses. Font sizes follow sound-spectrum.css. */
+.stem-lanes {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.stem-lanes svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* The phrase strip is the Phrases tab's own (HTML, MonoLabels), over the plot columns. */
+.stem-lanes-strip {
+  min-width: 0;
+}
+
+.stem-lanes-boundary {
+  stroke: var(--border-quiet);
+  stroke-width: 1;
+}
+
+.stem-lanes-baseline {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.08;
+}
+
+.stem-lanes-grid {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.04;
+}
+
+/* Lane labels are MonoLabels drawn in SVG: the same size, tracking and colour. */
+.stem-lanes-label {
+  fill: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.stem-lanes-sublabel {
+  fill: var(--text-subtle);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.stem-lanes-value {
+  fill: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stem-lanes-unit {
+  fill: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.stem-lanes-axis {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stem-lanes-tick {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.2;
+}
+
+/* Ridge: the 250 ms level as a filled envelope with its edge, like the spectrum ridge. */
+.stem-lanes-ridge-from {
+  stop-color: var(--accent-action-hi);
+  stop-opacity: 0.42;
+}
+
+.stem-lanes-ridge-to {
+  stop-color: var(--accent-action);
+  stop-opacity: 0.03;
+}
+
+.stem-lanes-ridge-line {
+  fill: none;
+  stroke: var(--accent-action-hi);
+  stroke-opacity: 0.8;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+
+.stem-lanes-quiet-from {
+  stop-color: var(--text-primary);
+  stop-opacity: 0.2;
+}
+
+.stem-lanes-quiet-to {
+  stop-color: var(--text-primary);
+  stop-opacity: 0.02;
+}
+
+.stem-lanes-lane[data-quiet="true"] .stem-lanes-ridge-line {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.42;
+}
+
+/* Plateaus: the phrase means the planner reads (the stems layer), lit like the
+   spectrum's mean mark. */
+.stem-lanes-plateau {
+  fill: var(--text-primary);
+}
+
+.stem-lanes-lane[data-quiet="true"] .stem-lanes-plateau {
+  fill: var(--text-primary);
+  fill-opacity: 0.7;
+}
+
+/* A stale analysis describes another file: drawn without accent, glow or plateaus. */
+.stem-lanes[data-stale="true"] .stem-lanes-ridge-line {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.3;
+}
+
+.stem-lanes[data-stale="true"] .stem-lanes-ridge-from {
+  stop-color: var(--text-primary);
+  stop-opacity: 0.12;
+}
+
+.stem-lanes[data-stale="true"] .stem-lanes-ridge-to {
+  stop-color: var(--text-primary);
+  stop-opacity: 0.01;
+}
+
+.stem-lanes[data-stale="true"] .stem-lanes-beat {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.18;
+}
+
+.stem-lanes[data-stale="true"] .stem-lanes-value {
+  fill: var(--text-muted);
+}
+
+/* Rows under the lanes: the profile's voice per phrase and the drum-stem beats. */
+.stem-lanes-voice {
+  fill: var(--accent-action-hi);
+}
+
+.stem-lanes-beat {
+  stroke: var(--accent-action-hi);
+  stroke-opacity: 0.3;
+  stroke-width: 1;
+}
+
+.stem-lanes-empty {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stem-lanes-empty-band {
+  fill: var(--text-primary);
+  fill-opacity: 0.025;
+}
+
+.stem-lanes-glow-flood {
+  flood-color: var(--accent-action-hi);
+  flood-opacity: 0.9;
+}

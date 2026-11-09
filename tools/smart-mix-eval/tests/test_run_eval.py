@@ -106,7 +106,7 @@ def test_evaluate_dataset_plans_every_edge_with_the_chosen_planner() -> None:
     assert records[2]["plan"]["fallbackReason"] == "missing_profile"
     assert records[0]["metrics"]["harmonicRelationship"] == "incompatible"
     assert records[0]["metrics"]["policyViolations"] == []
-    assert set(PLANNERS) == {"smart-mix-v2", "smart-mix-v3"}
+    assert set(PLANNERS) == {"smart-mix-v2", "smart-mix-v3", "smart-mix-v3-nostems"}
     assert "structureUsed" not in records[0]
     json.dumps(records)
 
@@ -274,7 +274,7 @@ def test_v3_plans_the_edge_set_as_the_api_does() -> None:
     assert records[1]["structureUsed"] is False
     assert records[1]["plan"] == v2[1]["plan"]
     assert summary["structureUsed"] == {"edges": 1, "rate": 0.5}
-    assert PLANNER_RULES["smart-mix-v3"] == 1
+    assert PLANNER_RULES["smart-mix-v3"] == 5
     json.dumps(records)
 
 
@@ -575,3 +575,197 @@ def test_refine_needs_the_v3_planner() -> None:
         ]
     )
     assert shared.ledger == Path("spend.jsonl")
+
+
+# --- stems layer (Smart Mix Stems ST3) ------------------------------------------------
+
+
+def _stem_analysis(profile: TrackMixProfile, *, revision: str = "f" * 64, scale=1.0):
+    from crate.smart_mix.stems import STEM_SOURCES, StemAnalysis
+
+    windows = -(-round(profile.duration_ms * scale) // 250)
+    # Loud vocals and bass in the first half of the track, silence after it.
+    half = windows // 2
+    loud = bytes([220]) * half + bytes(windows - half)
+    return StemAnalysis(
+        schema_version="stem-analysis/1",
+        producer="crate-server/eval",
+        separator={
+            "model": "htdemucs",
+            "version": "htdemucs-onnx-1",
+            "sources": STEM_SOURCES,
+        },
+        source_revision=revision,
+        hop_ms=250,
+        levels={
+            "drums": bytes([200]) * windows,
+            "bass": loud,
+            "other": bytes([150]) * windows,
+            "vocals": loud,
+        },
+        duration_ms=round(profile.duration_ms * scale),
+    )
+
+
+def test_stem_analyses_bind_to_profiles_by_uid_and_duration() -> None:
+    from run_eval import attach_stem_layers
+
+    profiles = {**_structured_pair(), "missing": None}
+    analyses = {
+        # A local copy: another source revision, the same duration.
+        OUT: _stem_analysis(profiles[OUT]),
+        IN: _stem_analysis(profiles[IN], scale=1.05),
+        "missing": _stem_analysis(profiles[OUT]),
+    }
+
+    attached, counts = attach_stem_layers(profiles, analyses)
+
+    assert counts == {
+        "attached": 1,
+        "durationMismatch": 1,
+        "noAnalysis": 1,
+        "noProfile": 1,
+    }
+    bound = attached[OUT]
+    assert bound is not None and bound.stems is not None
+    assert bound.stems.vocal_detector == "stem-vocals-1"
+    assert attached[IN] is profiles[IN]
+    assert attached[OTHER] is profiles[OTHER]
+
+
+def test_v3_plans_with_the_stems_layer_and_nostems_without_it() -> None:
+    from run_eval import PLANNER_RULES, attach_stem_layers
+
+    profiles, counts = attach_stem_layers(
+        _structured_pair(),
+        {uid: _stem_analysis(p) for uid, p in _structured_pair().items()},
+    )
+    rows = [_row("e0001", OUT, IN, "electronic/0-2")]
+    techno = {OUT: 0.95, IN: 0.95}
+
+    with_stems = evaluate_dataset(
+        rows,
+        profiles,
+        planner="smart-mix-v3",
+        context=CONTEXTS["dj"],
+        genre_priors=techno,
+    )
+    without = evaluate_dataset(
+        rows,
+        profiles,
+        planner="smart-mix-v3-nostems",
+        context=CONTEXTS["dj"],
+        genre_priors=techno,
+    )
+    plain = evaluate_dataset(
+        rows, _structured_pair(), planner="smart-mix-v3", context=CONTEXTS["dj"]
+    )
+
+    assert counts["attached"] == 2
+    assert with_stems[0]["stemsUsed"] is True
+    assert with_stems[0]["stemsGate"] is True
+    assert without[0]["stemsUsed"] is False
+    # Without the layer, v3 plans the profiles as if they had none.
+    assert without[0]["plan"] == plain[0]["plan"]
+    assert "stemMetrics" not in plain[0]
+    for record in (with_stems[0], without[0]):
+        assert set(record["stemMetrics"]) == {"vocalClashMs", "bassClashMs"}
+    assert PLANNER_RULES["smart-mix-v3-nostems"] == 1
+
+    report = build_report(
+        with_stems,
+        meta={"planner": "smart-mix-v3", "stems": {"profiles": counts}},
+        baseline=build_report(without, meta={"planner": "smart-mix-v3-nostems"}),
+    )
+    stems = report["summary"]["stems"]
+    assert stems["edgesWithLayers"] == 1 and stems["stemsUsed"] == 1
+    assert stems["edgesInFamily"] == 1
+    assert report["overall"]["stemsUsedRate"] == 1.0
+    assert report["comparison"]["overall"]["stemsUsedRate"] == 1.0
+    markdown = render_markdown(report)
+    assert "## Stems layer" in markdown
+    assert "Stem bass clash (ms)" in markdown
+    json.dumps(report)
+    # Reports without stems keep their shape.
+    assert summarize(plain)["stems"] is None
+    assert "## Stems layer" not in render_markdown(build_report(plain, meta={}))
+
+
+@pytest.mark.parametrize(
+    "priors",
+    [{OUT: 0.95, IN: 0.15}, {OUT: 0.95}, None],
+    ids=["rock", "unknown", "none"],
+)
+def test_v3_keeps_the_stems_layer_to_the_beatmatch_family(priors) -> None:
+    from run_eval import attach_stem_layers
+
+    profiles, _counts = attach_stem_layers(
+        _structured_pair(),
+        {uid: _stem_analysis(p) for uid, p in _structured_pair().items()},
+    )
+    rows = [_row("e0001", OUT, IN, "electronic/0-2")]
+
+    gated = evaluate_dataset(
+        rows,
+        profiles,
+        planner="smart-mix-v3",
+        context=CONTEXTS["dj"],
+        genre_priors=priors,
+    )
+    plain = evaluate_dataset(
+        rows, _structured_pair(), planner="smart-mix-v3", context=CONTEXTS["dj"]
+    )
+
+    assert gated[0]["stemsUsed"] is False
+    assert gated[0]["stemsGate"] is False
+    assert gated[0]["plan"] == plain[0]["plan"]
+    assert summarize(gated)["stems"]["edgesInFamily"] == 0
+
+
+def test_genre_priors_come_from_the_album_and_artist_genres(monkeypatch) -> None:
+    import crate.db.queries.smart_mix_genres as genres_module
+    from crate.db.queries.smart_mix_genres import TrackGenres
+
+    from run_eval import load_genre_priors
+
+    monkeypatch.setattr(
+        genres_module,
+        "get_track_genres",
+        lambda uids: {
+            OUT: TrackGenres(album={"techno": 1.0}),
+            IN: TrackGenres(album={"rock": 0.5, "punk": 0.5}),
+            OTHER: TrackGenres(artist={"industrial metal": 1.0, "metal": 0.88}),
+        },
+    )
+
+    assert load_genre_priors([OUT, IN, OTHER]) == {OUT: 0.95, IN: 0.15, OTHER: 1.0}
+
+
+def test_the_dj_context_is_crate_decks_and_listen_gets_no_stems() -> None:
+    # Rules revision 5 (STEM-G1): the stems layer serves Crate Decks only, so the
+    # harness's dj context asks as Decks does and Listen's never gets the layer.
+    from run_eval import attach_stem_layers
+
+    assert CONTEXTS["dj"].source == "decks"
+    assert CONTEXTS["listen"].source == "playlist"
+    profiles, _counts = attach_stem_layers(
+        _structured_pair(),
+        {uid: _stem_analysis(p) for uid, p in _structured_pair().items()},
+    )
+    rows = [_row("e0001", OUT, IN, "electronic/0-2")]
+    techno = {OUT: 0.95, IN: 0.95}
+
+    listen = evaluate_dataset(
+        rows,
+        profiles,
+        planner="smart-mix-v3",
+        context=CONTEXTS["listen"],
+        genre_priors=techno,
+    )
+    plain = evaluate_dataset(
+        rows, _structured_pair(), planner="smart-mix-v3", context=CONTEXTS["listen"]
+    )
+
+    assert listen[0]["stemsUsed"] is False
+    assert listen[0]["stemsGate"] is False
+    assert listen[0]["plan"] == plain[0]["plan"]

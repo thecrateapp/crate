@@ -25,6 +25,7 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 import { SmartMixCoverage } from "@/components/SmartMixCoverage";
+import { SmartMixPlaylists } from "@/components/SmartMixPlaylists";
 import { Button } from "@crate/ui/shadcn/button";
 import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import {
@@ -651,6 +652,8 @@ export function Analysis() {
       >
         <SmartMixCoverage />
       </OpsPanel>
+
+      <SmartMixPlaylists />
 
       <OpsPanel
         title="Portable library state"

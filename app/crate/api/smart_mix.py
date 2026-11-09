@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
+from dataclasses import replace
 from urllib.parse import quote
 from typing import Literal
 from uuid import UUID
@@ -41,6 +43,7 @@ from crate.db.cache_store import (
     set_smart_mix_plan_caches,
 )
 from crate.db.queries.smart_mix_compatible import get_compatible_track_inputs
+from crate.db.queries.smart_mix_genres import get_track_genres
 from crate.db.repositories.access_tokens import (
     get_continuation_descriptor,
     issue_playback_continuation_token,
@@ -49,14 +52,26 @@ from crate.db.repositories.smart_mix import (
     get_track_mix_profile_by_entity_uid,
     get_track_mix_profiles_by_entity_uids,
 )
+from crate.db.repositories.smart_mix_stems import (
+    get_stem_analyses_by_entity_uids,
+    get_stem_track,
+)
 from crate.smart_mix.compatible import rank_compatible_tracks
 from crate.smart_mix.models import (
     MixProfileQuality,
     TrackMixProfile,
     TransitionContext,
 )
+from crate.smart_mix.evaluation import policy_limits
+from crate.smart_mix.candidates import stems_gate_prior, stems_layer_applies
 from crate.smart_mix.planner import plan_transition, plan_transition_v3
 from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3, PlannerPolicy
+from crate.smart_mix.stems import (
+    StemAnalysis,
+    choose_analysis,
+    duration_matches,
+    stem_phrase_layer,
+)
 from crate.smart_mix.versions import PLANNER_IDENTIFIER, planner_reads_structure
 
 
@@ -77,14 +92,28 @@ def track_mix_profile(
 ) -> MixProfileResponse:
     _require_vdj_scope(request, "vdj.smart_mix.read")
     include_beat_grid = detail == "full"
+    # The full profile carries the stems layer (STEM-D4), which needs the phrases.
+    analysis = _current_stem_analysis(entity_uid) if include_beat_grid else None
     profile = get_track_mix_profile_by_entity_uid(
         str(entity_uid),
         include_beat_grid=include_beat_grid,
+        include_structure=analysis is not None,
     )
     if profile is None:
         raise HTTPException(status_code=404, detail="Smart Mix profile not found")
     payload = profile.to_full_dict() if include_beat_grid else profile.to_summary_dict()
+    layer = None if analysis is None else stem_phrase_layer(profile, analysis)
+    if layer is not None:
+        payload["stems"] = layer.to_dict()
     return MixProfileResponse.model_validate(payload)
+
+
+def _current_stem_analysis(entity_uid: UUID) -> StemAnalysis | None:
+    """The stem analysis that applies to the track's current file, if any."""
+    track = get_stem_track(str(entity_uid))
+    if track is None or track.source_revision is None:
+        return None
+    return choose_analysis(track.analyses, source_revision=track.source_revision)
 
 
 @router.get(
@@ -358,14 +387,18 @@ def _plan_transition_edges(
     policy = _planner_policy(planner_version)
     unique_edges = _deduplicate_edges(edges)
     entity_uids = _ordered_entity_uids(unique_edges)
-    # The cache key needs only the profile revisions; the structure (v3) is read
-    # below for the edges the cache misses.
+    # The cache key needs only the profile revisions (and, for v3, the stem analyses
+    # that apply); the structure is read below for the edges the cache misses.
     profiles = get_track_mix_profiles_by_entity_uids(
         entity_uids, include_structure=False
     )
+    stems = _applicable_stem_analyses(entity_uids, profiles, policy)
+    genre_priors = _genre_priors(unique_edges, stems, policy)
     edge_profiles = _edge_profiles(unique_edges, entity_uids, profiles)
     cache_keys = [
-        _plan_cache_key(edge, outgoing, incoming, policy)
+        _plan_cache_key(
+            edge, outgoing, incoming, policy, stems=stems, genre_priors=genre_priors
+        )
         for edge, outgoing, incoming in edge_profiles
     ]
     refinements = (
@@ -386,15 +419,18 @@ def _plan_transition_edges(
     if missed and planner_reads_structure(policy.identifier):
         missed_edges = [unique_edges[index] for index in missed]
         missed_uids = _ordered_entity_uids(missed_edges)
+        layered = _stems_of_edges(
+            missed_edges, stems, genre_priors=genre_priors, policy=policy
+        )
         structured = _edge_profiles(
-            missed_edges,
-            missed_uids,
-            get_track_mix_profiles_by_entity_uids(missed_uids, include_structure=True),
+            missed_edges, missed_uids, _structured_profiles(missed_uids, layered)
         )
         for index, (edge, outgoing, incoming) in zip(missed, structured, strict=True):
             edge_profiles[index] = (edge, outgoing, incoming)
             # A profile republished between the two reads keys its new plan.
-            cache_keys[index] = _plan_cache_key(edge, outgoing, incoming, policy)
+            cache_keys[index] = _plan_cache_key(
+                edge, outgoing, incoming, policy, stems=stems, genre_priors=genre_priors
+            )
     computed: dict[str, dict] = {}
     plans = []
     statuses = refinements.resolve(cached_refinements) if refinements else {}
@@ -404,7 +440,11 @@ def _plan_transition_edges(
         serialized = cached.get(cache_key)
         if serialized is None:
             serialized = _plan_edge(
-                edge, outgoing=outgoing, incoming=incoming, policy=policy
+                edge,
+                outgoing=outgoing,
+                incoming=incoming,
+                policy=policy,
+                genre_priors=genre_priors,
             )
             computed[cache_key] = serialized
         if index in statuses:
@@ -412,6 +452,120 @@ def _plan_transition_edges(
         plans.append(TransitionPlanResponse.model_validate(serialized))
     set_smart_mix_plan_caches(computed)
     return plans
+
+
+def _applicable_stem_analyses(
+    entity_uids: list[str],
+    profiles: list[TrackMixProfile | None],
+    policy: PlannerPolicy,
+) -> dict[str, StemAnalysis]:
+    """The stem analysis that applies to each profile (STEM-D4), for a planner that
+    scores with the stems layer; one bounded query, none for other planners."""
+    if not (planner_reads_structure(policy.identifier) and policy.stems_layer):
+        return {}
+    current = {
+        uid: profile
+        for uid, profile in zip(entity_uids, profiles, strict=True)
+        if profile is not None
+    }
+    if not current:
+        return {}
+    chosen: dict[str, StemAnalysis] = {}
+    for uid, rows in get_stem_analyses_by_entity_uids(list(current)).items():
+        profile = current.get(uid)
+        if profile is None:
+            continue
+        analysis = choose_analysis(rows, source_revision=profile.source_revision)
+        if analysis is not None and duration_matches(
+            analysis.duration_ms, profile.duration_ms
+        ):
+            chosen[uid] = analysis
+    return chosen
+
+
+def _stems_of_edges(
+    edges: list[TransitionEdgeRequest],
+    stems: Mapping[str, StemAnalysis],
+    *,
+    genre_priors: Mapping[str, float | None] | None = None,
+    policy: PlannerPolicy | None = None,
+) -> dict[str, StemAnalysis]:
+    """The analyses of the tracks of edges where both tracks have one; with a policy,
+    only of the edges the stems layer scores (STEM-G1: the beatmatch family)."""
+    result: dict[str, StemAnalysis] = {}
+    for edge in edges:
+        pair = (
+            str(edge.outgoing_track_entity_uid),
+            str(edge.incoming_track_entity_uid),
+        )
+        if not all(uid in stems for uid in pair):
+            continue
+        if policy is not None and not stems_layer_applies(
+            policy,
+            *((genre_priors or {}).get(uid) for uid in pair),
+            source=edge.context.source,
+        ):
+            continue
+        result.update((uid, stems[uid]) for uid in pair)
+    return result
+
+
+def _genre_priors(
+    edges: list[TransitionEdgeRequest],
+    stems: Mapping[str, StemAnalysis],
+    policy: PlannerPolicy,
+) -> dict[str, float | None]:
+    """The gate prior (``stems_gate_prior``) of the tracks of the edges the stems layer
+    may score: a client it serves (Crate Decks) and stems on both tracks (STEM-G1). One
+    bounded query of their album and artist genres, none when no edge qualifies."""
+    served = [
+        edge for edge in edges if edge.context.source in policy.stems_layer_sources
+    ]
+    uids = list(_stems_of_edges(served, stems))
+    if not uids:
+        return {}
+    genres = get_track_genres(uids)
+    return {
+        uid: stems_gate_prior(track.album, track.artist) if track else None
+        for uid in uids
+        for track in (genres.get(uid),)
+    }
+
+
+def _structured_profiles(
+    entity_uids: list[str], stems: Mapping[str, StemAnalysis]
+) -> list[TrackMixProfile | None]:
+    """Profiles with their structure and, where an analysis applies, the stems layer.
+
+    The beat grid is read only for those: it places the end of the last phrase (the
+    outro) for the layer; the planner does not read it.
+    """
+    if not stems:
+        return get_track_mix_profiles_by_entity_uids(
+            entity_uids, include_structure=True
+        )
+    profiles = get_track_mix_profiles_by_entity_uids(
+        entity_uids, include_structure=True, include_beat_grid=True
+    )
+    return [
+        _with_stems_layer(profile, stems.get(uid))
+        for uid, profile in zip(entity_uids, profiles, strict=True)
+    ]
+
+
+def _with_stems_layer(
+    profile: TrackMixProfile | None, analysis: StemAnalysis | None
+) -> TrackMixProfile | None:
+    if profile is None or analysis is None:
+        return profile
+    layer = stem_phrase_layer(profile, analysis)
+    return profile if layer is None else replace(profile, stems=layer)
+
+
+def _stem_identity(analysis: StemAnalysis) -> str:
+    """What the stems layer of a plan depends on: the analysis itself."""
+    canonical = analysis.model_dump_json(by_alias=True, exclude={"drum_beats_ms"})
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _refinement_batch(
@@ -540,12 +694,14 @@ def _plan_edge(
     outgoing: TrackMixProfile | None,
     incoming: TrackMixProfile | None,
     policy: PlannerPolicy | None = None,
+    genre_priors: Mapping[str, float | None] | None = None,
 ) -> dict:
     policy = policy or PLANNER_POLICY
     context = _transition_context(edge.context)
     outgoing_uid = str(edge.outgoing_track_entity_uid)
     incoming_uid = str(edge.incoming_track_entity_uid)
     if planner_reads_structure(policy.identifier):
+        priors = genre_priors or {}
         planned = plan_transition_v3(
             outgoing,
             incoming,
@@ -553,8 +709,26 @@ def _plan_edge(
             outgoing_track_entity_uid=outgoing_uid,
             incoming_track_entity_uid=incoming_uid,
             policy=policy,
+            outgoing_genre_prior=priors.get(outgoing_uid),
+            incoming_genre_prior=priors.get(incoming_uid),
         )
-        return {**planned.plan.to_dict(), "structureUsed": planned.structure_used}
+        serialized = {
+            **planned.plan.to_dict(),
+            "structureUsed": planned.structure_used,
+        }
+        # Absent without stems, so those v3 plans keep their shape (STEM-D5).
+        if planned.stems_used:
+            serialized["stemsUsed"] = True
+        if _local_refinement(edge.context):
+            # Crate Decks refines the plan locally within these (STEM-D10).
+            serialized["candidates"] = [
+                candidate.to_dict() for candidate in planned.candidates
+            ]
+            if outgoing is not None and incoming is not None:
+                serialized["policyLimits"] = policy_limits(
+                    outgoing, incoming, context, policy
+                ).to_dict()
+        return serialized
     return plan_transition(
         outgoing,
         incoming,
@@ -580,7 +754,13 @@ def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
 
 
 def _bass_handoff_allowed(payload: TransitionContextRequest) -> bool:
+    # Crate Decks follows the Android flag until its own context (S5) exists.
     return payload.allow_bass_handoff and android_bass_handoff_enabled()
+
+
+def _local_refinement(payload: TransitionContextRequest) -> bool:
+    """Crate Decks asked for the menu and the limits (STEM-D10)."""
+    return payload.source == "decks" and payload.local_refinement
 
 
 def _cache_context(payload: TransitionContextRequest) -> dict:
@@ -595,6 +775,10 @@ def _cache_context(payload: TransitionContextRequest) -> dict:
     # not split the cache.
     context.pop("setHistory", None)
     context.pop("aiRefinement", None)
+    # The menu and limits only change the response in the decks context; elsewhere
+    # the flag is ignored and must not split the cache either.
+    if not _local_refinement(payload):
+        context.pop("localRefinement", None)
     return context
 
 
@@ -603,9 +787,12 @@ def _plan_cache_key(
     outgoing: TrackMixProfile | None,
     incoming: TrackMixProfile | None,
     policy: PlannerPolicy | None = None,
+    *,
+    stems: Mapping[str, StemAnalysis] | None = None,
+    genre_priors: Mapping[str, float | None] | None = None,
 ) -> str:
     policy = policy or PLANNER_POLICY
-    cache_identity = {
+    cache_identity: dict[str, object] = {
         "plannerVersion": policy.identifier,
         "plannerRules": policy.rules_revision,
         "outgoingTrackEntityUid": str(edge.outgoing_track_entity_uid),
@@ -618,6 +805,28 @@ def _plan_cache_key(
         ),
         "context": _cache_context(edge.context),
     }
+    stems = stems if stems and policy.stems_layer else {}
+    outgoing_uid = str(edge.outgoing_track_entity_uid)
+    incoming_uid = str(edge.incoming_track_entity_uid)
+    outgoing_stems = stems.get(outgoing_uid)
+    incoming_stems = stems.get(incoming_uid)
+    priors = genre_priors or {}
+    if (
+        outgoing_stems is not None
+        and incoming_stems is not None
+        and stems_layer_applies(
+            policy,
+            priors.get(outgoing_uid),
+            priors.get(incoming_uid),
+            source=edge.context.source,
+        )
+    ):
+        # Only edges the stems layer scores carry these, so other keys keep their
+        # shape; the client and the genres gate it (STEM-G1). The key carries the
+        # context's source, and a genre that moves an edge into or out of the
+        # beatmatch family changes it.
+        cache_identity["outgoingStems"] = _stem_identity(outgoing_stems)
+        cache_identity["incomingStems"] = _stem_identity(incoming_stems)
     canonical = json.dumps(
         cache_identity,
         sort_keys=True,

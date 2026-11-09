@@ -48,6 +48,10 @@ VOCAL_LOG_FLOOR = 1e-4
 # Gate SG1b (2026-11-05): a phrase has voice from this byte, a geometric mean voice score
 # of about 0.0026. Against synced lyrics: precision 0.88, recall 0.78, specificity 0.66.
 VOCAL_THRESHOLD = 90
+# Smart Mix Stems (STEM-D4): the voice per phrase of a stems layer comes from the vocal
+# stem, which replaces YAMNet's (``vocal_detector``) where both profiles of an edge
+# carry one.
+STEM_VOCAL_DETECTOR = "stem-vocals-1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +230,56 @@ class TrackMixProfileDraft:
 
 
 @dataclass(frozen=True, slots=True)
+class StemPhraseLevels:
+    """Mean level byte of each stem over one phrase of the profile, and which stems
+    the phrase has (cuts in ``crate.smart_mix.stems.STEM_PRESENCE_CUTS``)."""
+
+    start_ms: int
+    end_ms: int
+    drums: int
+    bass: int
+    other: int
+    vocals: int
+    vocal_present: bool = False
+    bass_present: bool = False
+    drums_present: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "startMs": self.start_ms,
+            "endMs": self.end_ms,
+            "drums": self.drums,
+            "bass": self.bass,
+            "other": self.other,
+            "vocals": self.vocals,
+            "vocalPresent": self.vocal_present,
+            "bassPresent": self.bass_present,
+            "drumsPresent": self.drums_present,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class StemsLayer:
+    """The stems layer of a profile (STEM-D4): one entry per phrase, derived on read
+    from a ``stem-analysis/1`` (``crate.smart_mix.stems.stem_phrase_layer``)."""
+
+    producer: str
+    separator_model: str
+    separator_version: str
+    phrases: tuple[StemPhraseLevels, ...]
+    vocal_detector: str = STEM_VOCAL_DETECTOR
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "producer": self.producer,
+            "separatorModel": self.separator_model,
+            "separatorVersion": self.separator_version,
+            "vocalDetector": self.vocal_detector,
+            "phrases": [phrase.to_dict() for phrase in self.phrases],
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class TrackMixProfile:
     track_entity_uid: str
     profile_version: int
@@ -282,6 +336,9 @@ class TrackMixProfile:
     # The model that gave the beats and downbeats (SM3-D14); null with the
     # analyzer's own tracker.
     beat_tracker: str | None = None
+    # Smart Mix Stems (STEM-D4): attached by readers that found a stem analysis of
+    # this file; never stored with the profile nor serialized by it.
+    stems: StemsLayer | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "quality", MixProfileQuality(self.quality))
@@ -422,6 +479,7 @@ class TransitionContext:
             "shuffle",
             "infinite",
             "manual",
+            "decks",
         }:
             raise ValueError(f"Unsupported transition source: {self.source!r}")
         _require_non_negative_ms("preferred_duration_ms", self.preferred_duration_ms)
@@ -516,11 +574,48 @@ class TransitionPlan:
 
 
 @dataclass(frozen=True, slots=True)
+class StemScore:
+    """The stems terms of a v3 candidate (Smart Mix Stems, STEM-D5).
+
+    Only when both profiles carry a stems layer. ``vocal_overlap_ms`` is the mix time
+    with both decks at full level and stem vocals on both, the base of the vocal
+    penalty in place of YAMNet's voice; ``bass_overlap_ms`` the time with both basses
+    at full level (crossfade and bass handoff) and a bassline on both, the base of the
+    bass component. ``drums_only_entry`` is the share of the mix before the handoff
+    with the incoming on drums without bass or vocals, and ``vocal_free_exit`` the
+    share of the mix with the outgoing on a phrase without vocals; both are bonuses.
+    """
+
+    vocal_overlap_ms: int
+    bass_overlap_ms: int
+    drums_only_entry: float
+    vocal_free_exit: float
+
+    def __post_init__(self) -> None:
+        for name in ("vocal_overlap_ms", "bass_overlap_ms"):
+            object.__setattr__(self, name, max(0, round(getattr(self, name))))
+        for name in ("drums_only_entry", "vocal_free_exit"):
+            object.__setattr__(
+                self, name, round(_clamp_confidence(getattr(self, name)), 6)
+            )
+
+    def to_dict(self) -> dict[str, float | int]:
+        return {
+            "vocalOverlapMs": self.vocal_overlap_ms,
+            "bassOverlapMs": self.bass_overlap_ms,
+            "drumsOnlyEntry": self.drums_only_entry,
+            "vocalFreeExit": self.vocal_free_exit,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class CandidateScore:
     """The components of a v3 candidate score, each in [0, 1] (SM3-D3).
 
     ``vocal`` is the share of a reference overlap with voice on both decks, the base
-    of a penalty, and is null unless both profiles carry the voice per phrase.
+    of a penalty, and is null unless both profiles carry the voice per phrase (YAMNet
+    or, with stems on both, the vocal stem). ``stems`` holds the stems terms, null
+    unless both profiles carry a stems layer.
     """
 
     alignment: float
@@ -530,6 +625,7 @@ class CandidateScore:
     bass: float
     position: float
     vocal: float | None = None
+    stems: StemScore | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -547,13 +643,13 @@ class CandidateScore:
             object.__setattr__(self, "vocal", round(_clamp_confidence(self.vocal), 6))
 
     def weighted_sum(self, weights: CandidateWeights) -> float:
-        """The weighted components, without the vocal penalty."""
+        """The six weighted components, without the vocal penalty or stem bonuses."""
         return sum(
             getattr(self, name) * weight for name, weight in weights.components()
         )
 
-    def to_dict(self) -> dict[str, float | None]:
-        return {
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "alignment": self.alignment,
             "energy": self.energy,
             "harmonic": self.harmonic,
@@ -562,6 +658,10 @@ class CandidateScore:
             "position": self.position,
             "vocal": self.vocal,
         }
+        # Absent without stems, so menus without them keep their shape.
+        if self.stems is not None:
+            payload["stems"] = self.stems.to_dict()
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -675,8 +775,13 @@ class TransitionCandidate:
             fallback_reason=self.fallback_reason,
         )
 
+    @property
+    def stems_used(self) -> bool:
+        """Whether the stems layer of both tracks scored this candidate (STEM-D5)."""
+        return self.breakdown.stems is not None
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "index": self.index,
             "outgoingPhrase": self.outgoing_phrase,
             "incomingPhrase": self.incoming_phrase,
@@ -686,6 +791,9 @@ class TransitionCandidate:
             "breakdown": self.breakdown.to_dict(),
             "plan": self.to_plan().to_dict(),
         }
+        if self.stems_used:
+            payload["stemsUsed"] = True
+        return payload
 
 
 def mix_profile_draft_from_payload(payload: Mapping[str, Any]) -> TrackMixProfileDraft:
@@ -816,6 +924,12 @@ def _validate_structure(profile: Any) -> None:
         raise ValueError(
             f"vocal_detector must name the detector in 1-{MAX_VOCAL_DETECTOR} characters"
         )
+    stems = getattr(profile, "stems", None)
+    if stems is not None:
+        if not isinstance(stems, StemsLayer):
+            raise TypeError("stems must be a StemsLayer")
+        if phrases is None or len(stems.phrases) != len(phrases):
+            raise ValueError("a stems layer needs one entry per phrase")
     confidence = profile.structure_confidence
     if confidence is not None:
         object.__setattr__(

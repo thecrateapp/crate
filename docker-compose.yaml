@@ -376,9 +376,12 @@ services:
       - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES=${CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES:-250000000000}
       - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES=${CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES:-10737418240}
       - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=${CRATE_FEDERATION_IMPORT_LEASE_SECONDS:-18000}
+      # Smart Mix Stems: stem files Crate Decks downloads (written by the analysis worker).
+      - CRATE_STEMS_DIR=/stems
     volumes:
       - ./app/config.yaml:/app/config.yaml:ro
       - ${MEDIA_DIR}/music:/music:ro
+      - ${STEMS_DIR:-${MEDIA_DIR}/smart-mix-stems}:/stems:ro
       - ${DATA_DIR}/crate:/data
       - ${CACHE_DIR:-./data/cache}:/cache:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -949,9 +952,14 @@ services:
       - CRATE_LEGACY_POOL_MAXCONN=${ANALYSIS_LEGACY_POOL_MAXCONN:-2}
       - CRATE_SQLALCHEMY_POOL_SIZE=${ANALYSIS_SQLALCHEMY_POOL_SIZE:-1}
       - CRATE_SQLALCHEMY_MAX_OVERFLOW=${ANALYSIS_SQLALCHEMY_MAX_OVERFLOW:-1}
+      # Smart Mix Stems: separation scratch and stem files, on the music volume
+      # (docs/technical/smart-mix-operations.md, "Server separation").
+      - CRATE_STEMS_DIR=/stems
+      - CRATE_STEMS_THREADS=${CRATE_STEMS_THREADS:-4}
     volumes:
       - ./app/config.yaml:/app/config.yaml:ro
       - ${MEDIA_DIR}/music:/music:ro
+      - ${STEMS_DIR:-${MEDIA_DIR}/smart-mix-stems}:/stems
       - ${DATA_DIR}/crate:/data
     networks:
       - crate

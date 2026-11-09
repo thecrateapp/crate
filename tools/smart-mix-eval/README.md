@@ -23,7 +23,9 @@ Store results by `entity_uid`, edge id or index, never by title or artist. The o
 | `app/crate/db/queries/smart_mix_evaluation.py` | Read-only session guard and seed sampling used by the tools                |
 | `render_pair.py`                               | Renders a plan and its two audio files to a WAV for listening              |
 | `blind_session.py`                             | Blind A/B rating of rendered pairs into `ratings.csv`                      |
-| `listen_metrics.py`                            | Beat, voice and loudness measurements of rendered transitions (SM5)        |
+| `listen_metrics.py`                            | Beat, voice, bass and loudness measurements of rendered transitions (SM5)  |
+| `separate_pool.py`                             | Stem analyses of a pool of audio files with the server's separation (ST3)  |
+| `calibrate_stems.py`                           | Calibrates the stems layer's presence cuts (Smart Mix Stems ST3)           |
 | `reference/`                                   | Analyzer reference tools (Queen Mary, KeyFinder, kick) used to measure v6  |
 | `structure/`                                   | Beats, downbeats and phrases against All-In-One and madmom (SMB.PR3)       |
 | `tests/`                                       | Unit tests of the tools                                                    |
@@ -201,8 +203,9 @@ incoming_uid) -> TransitionPlan`, or a `PlannedTransition` like v3's; each v3 ed
 `report.json` also says whether it was planned on the stored phrases (`structureUsed`) and how
 many candidates its menu had. `--context` picks the transition context:
 
-- `dj` (default): playlist, automatic, 12 s preferred, beatmatch with tempo adjustment, long
-  beatmatch and bass handoff allowed. What Crate Decks asks for, and what exercises all of v2.
+- `dj` (default): source `decks`, automatic, 12 s preferred, beatmatch with tempo adjustment,
+  long beatmatch and bass handoff allowed. What Crate Decks asks for, and what exercises all of
+  v2; the only context the stems layer serves (STEM-G1, rules revision 5).
 - `listen`: Listen's defaults: 6 s, beatmatch with tempo adjustment, no long blend or bass
   handoff.
 
@@ -292,6 +295,42 @@ The development database can lag behind the migrations of the branch under test 
 selects columns it does not have). Run the tools against a copy migrated to `head` instead of
 migrating the shared development database.
 
+## Stems (Smart Mix Stems ST3)
+
+The stems layer is evaluated on the same edge sets. Three tools add it:
+
+1. **Separation.** `separate_pool.py separate --tracks pool.tsv --output out/<set>/stems
+--scratch out/scratch [--music-root /music=out/<set>/audio]` runs each track through
+   `crate.smart_mix.separation` unchanged (decode, normalisation, segments, STFT, the
+   `htdemucs-onnx-1` graph, iSTFT, overlap-add) and `analyze_stems`, and writes one
+   `stem-analysis/1` per entity UID. `pool.tsv` is `<entity_uid>\t<path>`. `--provider cuda`
+   runs the same graph on ONNX Runtime's CUDA provider (it needs `onnxruntime-gpu` and the CUDA
+   and cuDNN libraries on `LD_LIBRARY_PATH`; sessions use two inter-op threads to stay under
+   about 750 MiB of VRAM); everything around the graph is the same numpy. `parity` separates a
+   few tracks on both providers and reports the SDR of CUDA against CPU per stem and how many
+   level bytes differ. Scratch audio (about 425 MB per five minutes of music) must be on disk:
+   the tool refuses `/tmp`, `/dev/shm` and `/run`. Existing analyses are skipped, so a rerun
+   resumes. Never commit the analyses or the audio.
+2. **Calibration.** `calibrate_stems.py --stems <folder> --labels labels.csv [--yamnet
+phrase_windows.csv] [--dataset <set>/dataset.jsonl --groups <set>/groups.tsv] --output
+out/<dir>` measures where the presence cuts go: vocals against the SG1b lyrics labels (5
+   folds by track, balanced accuracy, compared per genre with YAMNet's stored byte), and each
+   vocal floor against YAMNet on the evaluation sets, since songs with synced lyrics are rarely
+   instrumental; bass and drums from the distribution of each phrase's level below its track's
+   loudest phrase (its valley and a two-component mixture cut, each with a bootstrap over
+   tracks and per set, both also tried on the labelled vocals) and the share of phrases marked
+   present by phrase kind.
+3. **Planning.** `run_eval.py --stems <folder> [--stems <folder>]` attaches the layer of
+   those analyses to the profiles (by entity UID and duration within 2 %: the analysis was made
+   from a local copy, so its source revision is that file's) and adds, per edge, `stemsUsed`
+   and the stem vocal and bass clashes, and a `## Stems layer` section to `report.md`.
+   `--planner smart-mix-v3` plans with the layer where it applies (the beatmatch family: the
+   tracks' gate priors come from their album and artist genres, read like the API reads them,
+   and each record says `stemsGate`), `--planner smart-mix-v3-nostems` plans the same profiles
+   without it (rules revision 1's menus), so the two reports pair edge by edge.
+   `listen_metrics.py` then measures both, with `bassOnBassMs` (low end below 150 Hz on both
+   decks at full level, crossfade and bass handoff applied) next to the other metrics.
+
 ## Listening: renders and blind sessions
 
 Numbers cannot hear a transition, so SG3 also asks for a blind listening test. Both tools only
@@ -345,16 +384,17 @@ Do not open `ratings.csv` before the end.
 rendered with `render_pair.py`, once as the mix and once per deck (`stem`: the deck alone, at
 unity gain, on the mix's clock), and the audio around the transition is measured:
 
-| Metric                    | How                                                                                                                           |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `beatClashMs`             | Beat This! on each stem; full-level time (crossfade gain of half or more) while the nearest beats disagree by more than 25 ms |
-| `phaseErrorMsMedian`      | Median phase error of the outgoing beats in the mix against the nearest incoming beat, folded into one beat                   |
-| `lockedShare`             | Share of those beats within 25 ms                                                                                             |
-| `mixIbiCv`                | Beat This! on the mix: variation of the beat intervals inside the mix (flams make them irregular)                             |
-| `voiceOnVoiceMs`          | YAMNet on each stem: full-level time with a voiced patch (byte from `VOCAL_THRESHOLD`) on both decks                          |
-| `levelStepLuAbs`          | EBU R128 short-term loudness of the mix, median over 6 s after the mix minus 6 s before it                                    |
-| `bumpLu`, `dipLu`         | Momentary loudness during the mix above the louder side, and below the quieter side                                           |
-| `maxShortTermSlopeLuPerS` | Steepest change of short-term loudness over one second, from 3 s before to 3 s after the mix                                  |
+| Metric                    | How                                                                                                                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `beatClashMs`             | Beat This! on each stem; full-level time (crossfade gain of half or more) while the nearest beats disagree by more than 25 ms                                                |
+| `phaseErrorMsMedian`      | Median phase error of the outgoing beats in the mix against the nearest incoming beat, folded into one beat                                                                  |
+| `lockedShare`             | Share of those beats within 25 ms                                                                                                                                            |
+| `mixIbiCv`                | Beat This! on the mix: variation of the beat intervals inside the mix (flams make them irregular)                                                                            |
+| `voiceOnVoiceMs`          | YAMNet on each stem: full-level time with a voiced patch (byte from `VOCAL_THRESHOLD`) on both decks                                                                         |
+| `bassOnBassMs`            | Level below 150 Hz of each stem with the crossfade gain and bass shelf applied: both decks at full level while each plays its low end (within 12 dB of its own loud low end) |
+| `levelStepLuAbs`          | EBU R128 short-term loudness of the mix, median over 6 s after the mix minus 6 s before it                                                                                   |
+| `bumpLu`, `dipLu`         | Momentary loudness during the mix above the louder side, and below the quieter side                                                                                          |
+| `maxShortTermSlopeLuPerS` | Steepest change of short-term loudness over one second, from 3 s before to 3 s after the mix                                                                                 |
 
 ```bash
 python tools/smart-mix-eval/listen_metrics.py \

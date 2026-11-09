@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { Layers } from "@crate/ui/icons";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 const meta = {
@@ -12,7 +13,7 @@ const meta = {
       options: ["neutral", "info", "success", "warning", "danger", "accent"],
     },
     surface: { control: "radio", options: ["default", "overlay"] },
-    variant: { control: "radio", options: ["label", "counter"] },
+    variant: { control: "radio", options: ["label", "counter", "icon"] },
     className: { table: { disable: true } },
   },
 } satisfies Meta<typeof InfoBadge>;
@@ -30,6 +31,22 @@ export const Tones: Story = {
         </InfoBadge>
       ))}
       <InfoBadge variant="counter">3</InfoBadge>
+    </div>
+  ),
+};
+export const IconOnly: Story = {
+  render: () => (
+    <div className="showcase-line">
+      <InfoBadge icon={Layers} tone="accent">
+        41/48
+      </InfoBadge>
+      <InfoBadge
+        variant="icon"
+        icon={Layers}
+        tone="accent"
+        aria-label="Smart Mix: all 118 tracks have stems"
+        title="Smart Mix: all 118 tracks have stems"
+      />
     </div>
   ),
 };

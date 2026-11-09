@@ -9,6 +9,9 @@ DecksFeature = Literal[
     "bass_handoff",
     "long_beatmatch",
     "cues",
+    "stems",
+    "stem_upload",
+    "local_refinement",
 ]
 
 
@@ -32,6 +35,19 @@ class SmartMixAiAssistedCapabilities(BaseModel):
     ) = None
 
 
+class SmartMixStemsCapabilities(BaseModel):
+    """Smart Mix Stems (STEM-D4): stem levels per phrase in full profiles.
+
+    playlists: Smart Mix playlists can be turned on (/api/smart-mix/playlists), so the
+    server queues their tracks for separation, and playlist responses carry smartMix.
+    storage: the server keeps stem audio for Crate Decks to download.
+    """
+
+    available: bool
+    playlists: bool
+    storage: bool
+
+
 class SmartMixCapabilities(BaseModel):
     available: bool
     planner_version: str | None
@@ -53,6 +69,7 @@ class SmartMixCapabilities(BaseModel):
     android_bass_handoff: bool
     android_long_beatmatch: bool
     ai_assisted: SmartMixAiAssistedCapabilities
+    stems: SmartMixStemsCapabilities
 
 
 class VDJCapabilities(BaseModel):

@@ -5,7 +5,7 @@ section: reference
 audience: [developer]
 status: canonical
 order: 35
-verified: 2026-11-03
+verified: 2026-11-09
 sources:
   - app/crate/api/auth.py
   - app/crate/api/native_oauth_auth.py
@@ -14,6 +14,17 @@ sources:
   - app/crate/api/browse_media.py
   - app/crate/api/schemas/media.py
   - app/crate/api/schemas/smart_mix.py
+  - app/crate/api/decks_stems.py
+  - app/crate/api/smart_mix.py
+  - app/crate/api/settings.py
+  - app/crate/api/permissions.py
+  - app/crate/smart_mix/stems.py
+  - app/crate/db/repositories/smart_mix_stems.py
+  - app/crate/db/repositories/smart_mix_stem_files.py
+  - app/crate/smart_mix/stem_files.py
+  - app/crate/api/smart_mix_playlists.py
+  - app/crate/db/repositories/smart_mix_playlists.py
+  - app/crate/api/schemas/playlists.py
   - app/crate/db/queries/browse_media_search.py
   - app/crate/smart_mix/planner.py
   - app/crate/smart_mix/cue_detection.py
@@ -22,6 +33,10 @@ sources:
   - app/listen/android/app/src/main/java/app/cratemusic/crate/NativeTransitionPlan.java
   - app/tests/test_auth_decks_client.py
   - app/tests/test_capabilities_decks.py
+  - app/tests/test_capabilities_stems.py
+  - app/tests/test_decks_stem_analysis_api.py
+  - app/tests/test_stem_files.py
+  - app/tests/test_smart_mix_playlists_api.py
   - app/tests/test_search_playable_audio.py
 ---
 
@@ -58,7 +73,7 @@ need them.
     "available": true,
     "min_client_version": "0.1.0",
     "contract_version": 1,
-    "features": []
+    "features": ["stems", "stem_upload", "local_refinement"]
   }
 }
 ```
@@ -68,7 +83,7 @@ need them.
 | `available`          | The server accepts the Decks client                                       |
 | `min_client_version` | Oldest Decks version (semver) the server supports                         |
 | `contract_version`   | Integer, bumped on every incompatible change to the Decks server contract |
-| `features`           | Decks server contracts this instance serves                               |
+| `features`           | Decks server contracts this instance serves to this caller                |
 
 Rules:
 
@@ -78,21 +93,241 @@ Rules:
 - Clients ignore unknown `features` values and degrade when one is missing.
 - Each feature is added by the server change that implements it:
 
-  | Feature                                       | Server change                         |
-  | --------------------------------------------- | ------------------------------------- |
-  | `library_cursor`                              | S3, paginated navigation for clients  |
-  | `profiles_batch`                              | S4, batch mix profiles                |
-  | `beatmatch`, `bass_handoff`, `long_beatmatch` | S5, `decks` context in the planner    |
-  | `cues`                                        | S7, synchronised cues and corrections |
+  | Feature                                       | Server change                                                          |
+  | --------------------------------------------- | ---------------------------------------------------------------------- |
+  | `library_cursor`                              | S3, paginated navigation for clients                                   |
+  | `profiles_batch`                              | S4, batch mix profiles                                                 |
+  | `beatmatch`, `bass_handoff`, `long_beatmatch` | S5, `decks` context in the planner                                     |
+  | `cues`                                        | S7, synchronised cues and corrections                                  |
+  | `stems`                                       | Smart Mix Stems ST1, stem analysis reads and the profile stems layer   |
+  | `stem_upload`                                 | Smart Mix Stems ST1, stem analysis uploads (only for a caller who may) |
+  | `local_refinement`                            | Smart Mix Stems ST3, candidate menu for local refinement               |
 
-  None ships yet, so `features` is empty. Decks features never follow the
-  Android Smart Mix flags (`CRATE_ANDROID_*`); `smart_mix.android_*` remains
-  the Android contract.
+  `stems`, `stem_upload` and `local_refinement` ship so far. `stems` and
+  `local_refinement` are always present. `stem_upload` is present only when the
+  caller's session holds `smart_mix.stems.contribute` and an admin has not
+  turned uploads off, so it depends on who asks. Decks features never follow
+  the Android Smart Mix flags (`CRATE_ANDROID_*`); `smart_mix.android_*`
+  remains the Android contract.
 
 The constants live in `app/crate/api/capabilities.py`
 (`DECKS_CONTRACT_VERSION`, `DECKS_MIN_CLIENT_VERSION`, `_decks_features`), and
 the allowed feature names in `DecksFeature`
 (`app/crate/api/schemas/capabilities.py`).
+
+## Stem analyses (Smart Mix Stems ST1)
+
+Crate Decks separates tracks into stems on the DJ's machine and shares the
+result as a `stem-analysis/1` document: per-stem level curves, never audio. The
+format, its storage and which analysis applies are in the Smart Mix operations
+doc (`docs/technical/smart-mix-operations.md`, section "Stem analyses").
+
+| Route                                                     | Use                                                                     |
+| --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `GET /api/decks/tracks/{uid}/stem-analysis`               | The analysis Smart Mix uses for the track's current file, as a document |
+| `PUT /api/decks/tracks/{uid}/stem-analysis`               | Upload Decks' own analysis of the track                                 |
+| `GET /api/decks/tracks/{uid}/stems`                       | Download the server's stem file of the track (Smart Mix playlists)      |
+| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=full` | The profile with its `stems` layer, when an analysis applies            |
+
+The `/api/decks` routes take a Decks session; `crv_` access tokens do not reach
+them. A UID outside the server's local library answers 404.
+
+**Read.** `GET` answers the analysis of the track's current source revision, the
+stronger separator first and the server's on a tie, in the same JSON an upload
+sends. It answers 404 when the track has no profile, when its file changed since
+its analyses, or when it has none. Decks reads it before separating a track.
+
+**Upload.** An upload is untrusted input. The server checks, in this order:
+
+| Check                                                                                      | Answer |
+| ------------------------------------------------------------------------------------------ | ------ |
+| A session                                                                                  | 401    |
+| The `smart_mix.stems.contribute` permission (owner and admin roles by default)             | 403    |
+| A body of at most 64 KiB, by `Content-Length` and while reading it                         | 413    |
+| Uploads turned on (`stem_uploads_enabled` in `PUT /api/settings/smart-mix`, on by default) | 403    |
+| A valid `stem-analysis/1` document with no unknown fields                                  | 422    |
+| A `crate-decks/<version>` producer: Decks cannot pass its analysis off as the server's     | 422    |
+| A local track with that UID                                                                | 404    |
+| `sourceRevision` equal to the profile's `sourceRevision` of the current file               | 409    |
+| `durationMs` within 2 % of the profile's duration                                          | 422    |
+
+A 409 means the file changed after Decks got the track: the client fetches the
+profile again before it separates or uploads again. When everything passes, the
+answer is `{"result": "stored" | "replaced" | "kept_stronger"}`.
+`kept_stronger` stores nothing, because the server already has an analysis of
+the same file from an equal or stronger separator, so retrying the same upload
+changes nothing. Each stored upload records the uploader in `contributed_by`.
+
+**Profile layer.** With `detail=full`, the profile gains an optional `stems`
+object when an analysis of its current file applies: `producer`,
+`separatorModel`, `separatorVersion`, `vocalDetector` (`stem-vocals-1`) and
+`phrases`, one entry per phrase with `startMs`, `endMs`, the mean level byte of
+`drums`, `bass`, `other` and `vocals`, and whether the phrase has each of
+vocals, bass and drums (`vocalPresent`, `bassPresent`, `drumsPresent`; cuts in
+`docs/technical/smart-mix-operations.md`, "Stem analyses"). The summary profile
+never carries it, because the Go read plane serves the summary natively.
+`smart-mix-v3` scores with the layer when both tracks of an edge have one and
+the request is Crate Decks' (`source: "decks"`; no other client gets the layer)
+and the edge belongs to the beatmatch family (both tracks' genre priors at least 0.5,
+with the machine-drum industrial family in, STEM-G1), and says so with
+`stemsUsed: true` on the plan.
+
+**Stem files.** For the tracks of Smart Mix playlists the server also keeps
+the separated audio, when `smart_mix.stems.storage` is true in
+`GET /api/capabilities`. `GET /api/decks/tracks/{uid}/stems` answers one MP4
+(`audio/mp4`) with three AAC streams at 256 kbps, in this order: drums, bass
+and vocals, each named in its handler (`handler_name`), at 44.1 kHz stereo.
+There is no `other` stream: Decks computes it as its own decode minus the three
+stems (STEM-D9). Range requests are served (`206` with `Content-Range`), so a
+download can resume. The route answers 404 when the server has no stem file of
+the track's current file: not separated yet, separated from a file that has
+changed since, evicted by the server's quota, or a server that keeps no stem
+files. Decks then separates the track itself; the analysis may still be there
+(`GET .../stem-analysis`). A download counts as use of the file and of the
+caller's Smart Mix playlists that hold the track, which keeps them from being
+evicted first. A five-minute track is about 29 MB.
+
+## Smart Mix playlists (Smart Mix Stems ST2)
+
+A Smart Mix playlist is a playlist its owner marks for Smart Mix. The mark is
+the same for Listen, the web app and Decks: the server separates the
+playlist's tracks into stems, and Decks keeps the playlist as an offline set
+(it replaces Decks' own offline sets). How the server stores the state and
+queues the work is in the Smart Mix operations doc
+(`docs/technical/smart-mix-operations.md`, section "Smart Mix playlists").
+`smart_mix.stems.playlists` in `GET /api/capabilities` says the server offers
+them.
+
+| Route                                              | Use                                                                |
+| -------------------------------------------------- | ------------------------------------------------------------------ |
+| `GET /api/smart-mix/playlists?sinceRevision=N`     | The caller's Smart Mix playlists changed after revision `N`        |
+| `GET /api/smart-mix/playlists/{playlistId}`        | The playlist's state, its tracks' stem progress and an estimate    |
+| `PUT /api/smart-mix/playlists/{playlistId}`        | Turn Smart Mix on or off: `{"enabled": true \| false}`, owner only |
+| `GET /api/playlists`, its detail, `playlists-page` | Each playlist carries `smartMix: {enabled, ready, total}`          |
+
+All of them take a session; `crv_` access tokens do not reach them.
+
+**Sync.** Every change of one of the user's Smart Mix playlists takes the next
+value of a per-user revision: turned on, turned off, or tracks added, removed
+or replaced while it is on. The list answers
+`{"revision": R, "playlists": [...]}`, oldest change first, including
+playlists turned off. Each item has `playlistId`, `enabled`, `enabledAt`,
+`disabledAt`, `lastUsedAt`, `revision` and `updatedAt`. Decks keeps `R` and
+sends it as `sinceRevision` next time; without it, the list has every Smart
+Mix playlist the user ever turned on. A deleted playlist loses its Smart Mix
+row with it and is not listed as a change: Decks drops offline sets whose
+playlist no longer exists in `GET /api/playlists`. A change of tracks comes as
+a new revision of the playlist, so Decks reads its tracks again from
+`GET /api/playlists/{id}`.
+
+**Turning it on or off.** Only the playlist's owner can, and system playlists
+have none: anyone else gets 403, and an unknown playlist 404. Setting the state
+the playlist already has changes nothing (turning on again only queues the
+tracks still missing). Turning it on answers 409 when the playlist, or all of
+the owner's Smart Mix playlists together, would hold more distinct local
+tracks than the instance allows (`stem_max_tracks_per_playlist`, 300 by
+default, and `stem_max_tracks_per_user`, no limit by default, both in
+`PUT /api/settings/smart-mix`). Adding tracks to a Smart Mix playlist past
+those limits answers 409 too, in `POST /api/playlists/{id}/tracks`, in
+`POST /api/playlists/{id}/generate` and in OpenSubsonic. The answer is the
+playlist's state, as in the list; a playlist that was never on answers
+`enabled: false` with null dates and revision.
+
+**Progress.** The status adds `total` (distinct local tracks while it is on),
+`counts` per state and `tracks`, one per local track in playlist order with
+`trackId`, `trackEntityUid`, `state` and `attempts`:
+
+| `state`     | Meaning                                                    |
+| ----------- | ---------------------------------------------------------- |
+| `ready`     | The server has a stem analysis of the track's current file |
+| `pending`   | Waiting for separation                                     |
+| `analyzing` | Being separated                                            |
+| `failed`    | Separation failed for this file; retried up to 3 attempts  |
+
+`estimatedSecondsLeft` is the time left for the playlist's pending and
+analysing tracks at the server's recent pace, without other queued work; it is
+null while the playlist is off. The owner, collaborators and admins read the
+status; other users get 403.
+
+**Playlist responses.** `smartMix` is `{enabled, ready, total}`: `ready` of
+`total` local tracks have server stems, both 0 while Smart Mix is off. It is
+computed for all listed playlists in one query. It is reported on the caller's
+own and shared playlists (`GET /api/playlists`, `playlists` in
+`GET /api/me/playlists-page`, and the detail for the owner and collaborators),
+and is null elsewhere. The Go read plane serves none of these routes.
+
+## Local refinement (Smart Mix Stems ST3)
+
+The server plan is the baseline; Crate Decks may refine it locally with its own
+stems (STEM-D10). It asks for the material with `plannerVersion:
+"smart-mix-v3"` and a `decks` context:
+
+```json
+{
+  "plannerVersion": "smart-mix-v3",
+  "edges": [
+    {
+      "outgoingTrackEntityUid": "…",
+      "incomingTrackEntityUid": "…",
+      "context": {
+        "source": "decks",
+        "automatic": true,
+        "offline": false,
+        "preferredDurationMs": 12000,
+        "userCueProfile": "auto",
+        "allowBeatmatch": true,
+        "allowTempoAdjustment": true,
+        "allowBassHandoff": true,
+        "allowLongBeatmatch": true,
+        "localRefinement": true
+      }
+    }
+  ]
+}
+```
+
+Each plan then also carries:
+
+- **`candidates`**: the v3 menu, best first (index 0 is the served plan), each
+  with `outgoingPhrase`, `incomingPhrase`, `lengthBars`, `structureUsed`,
+  `stemsUsed` (only when true), `score`, the `breakdown` (the six components,
+  `vocal` and, with stems on both tracks, `stems`: `vocalOverlapMs`,
+  `bassOverlapMs`, `drumsOnlyEntry`, `vocalFreeExit`) and the complete `plan`.
+  Null values are left out.
+- **`policyLimits`**, when both tracks have a profile: the planner policy
+  resolved for the edge. A plan Decks builds (another candidate, a phrase moved
+  by one, another length or bass handoff) is valid when it keeps every bound,
+  all inclusive:
+
+  - duration from `minimumTransitionMs` to `maximumTransitionMs`, or up to
+    `maximumLongBeatmatchMs` as a beatmatched `dj-blend` when both
+    `longBeatmatchAllowed` (the context) and `longBeatmatchEligible` (the
+    tracks' tempo stability);
+  - `|incomingTempoRatio − 1|` within `maximumTempoAdjustment` in beatmatch,
+    exactly 1 otherwise, and within 0.001 without `tempoAdjustmentAllowed`;
+  - each deck's gain from `−maximumCutDb` to the lower of `maximumBoostDb` and
+    its peak-limited gain (`outgoingPeakLimitedGainDb`,
+    `incomingPeakLimitedGainDb`), or exactly that peak-limited gain (a hot
+    master), within 0.001 dB;
+  - outgoing cue from `outgoingEarliestCueMs`, outgoing cue + duration up to
+    `outgoingLatestEndMs`, incoming cue + duration × the incoming tempo (in
+    beatmatch) up to `incomingLatestEndMs`;
+  - `bassHandoff: "balanced"` only with `bassHandoffAllowed`, beatmatch only
+    with `beatmatchAllowed`;
+  - `phraseLengths` are the lengths the menu tries; `rulesRevision` is the
+    planner's.
+
+  `crate.smart_mix.evaluation.limit_violations` is the reference check: on a
+  plan that mixes, it gives exactly the codes of `policy_violations` (a test
+  compares both on hundreds of plans around every bound). Gapless plans and the
+  350 ms short cut are not refinements: Decks keeps the server's plan there.
+
+Without `localRefinement`, with another `source` or with `smart-mix-v2` the
+response does not change, and the flag does not split the plan cache outside
+the `decks` context. Android and the VirtualDJ plugin get exactly the plans and
+cache keys they got before. Until the `decks` context of S5 exists, `decks`
+plans like `playlist` and its bass handoff still follows the Android flag
+(`CRATE_ANDROID_BASS_HANDOFF_ENABLED`).
 
 ## Audio availability and plan fields (S9)
 

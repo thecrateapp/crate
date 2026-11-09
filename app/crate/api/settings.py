@@ -30,6 +30,15 @@ from crate.smart_mix_ai import (
     SEND_GENRE_SETTING,
     invalidate_refinement_gate,
 )
+from crate.smart_mix.stems import (
+    DEFAULT_STEM_MAX_TRACKS_PER_PLAYLIST,
+    STEM_MAX_TRACKS_PER_PLAYLIST_SETTING,
+    STEM_MAX_TRACKS_PER_USER_SETTING,
+    STEM_QUOTA_SETTING,
+    STEM_UPLOADS_SETTING,
+    stem_quota_gib,
+    stem_track_limit,
+)
 from crate.db.audit import get_db_table_stats
 from crate.db.cache_settings import get_setting, set_setting
 from crate.db.cache_store import (
@@ -134,6 +143,15 @@ def _get_smart_mix_settings() -> dict:
     return {
         "ai_enabled": get_setting(ENABLED_SETTING, "false") == "true",
         "ai_send_genre": get_setting(SEND_GENRE_SETTING, "true") == "true",
+        "stem_uploads_enabled": get_setting(STEM_UPLOADS_SETTING, "true") == "true",
+        "stem_max_tracks_per_playlist": stem_track_limit(
+            get_setting(STEM_MAX_TRACKS_PER_PLAYLIST_SETTING),
+            default=DEFAULT_STEM_MAX_TRACKS_PER_PLAYLIST,
+        ),
+        "stem_max_tracks_per_user": stem_track_limit(
+            get_setting(STEM_MAX_TRACKS_PER_USER_SETTING), default=None
+        ),
+        "stem_quota_gib": stem_quota_gib(get_setting(STEM_QUOTA_SETTING)),
     }
 
 
@@ -366,7 +384,7 @@ def update_paths_settings(request: Request, body: PathsSettingsUpdateRequest):
     "/smart-mix",
     response_model=SettingsUpdateResponse,
     responses=_SETTINGS_RESPONSES,
-    summary="Update Smart Mix AI settings",
+    summary="Update Smart Mix AI, stem upload, Smart Mix playlist and stem quota settings",
 )
 def update_smart_mix_settings(request: Request, body: SmartMixSettingsUpdateRequest):
     _require_settings_manager(request)
@@ -374,6 +392,22 @@ def update_smart_mix_settings(request: Request, body: SmartMixSettingsUpdateRequ
         set_setting(ENABLED_SETTING, "true" if body.ai_enabled else "false")
     if body.ai_send_genre is not None:
         set_setting(SEND_GENRE_SETTING, "true" if body.ai_send_genre else "false")
+    if body.stem_uploads_enabled is not None:
+        set_setting(
+            STEM_UPLOADS_SETTING, "true" if body.stem_uploads_enabled else "false"
+        )
+    if body.stem_max_tracks_per_playlist is not None:
+        set_setting(
+            STEM_MAX_TRACKS_PER_PLAYLIST_SETTING, str(body.stem_max_tracks_per_playlist)
+        )
+    if "stem_max_tracks_per_user" in body.model_fields_set:
+        # An empty value is no limit.
+        per_user = body.stem_max_tracks_per_user
+        set_setting(
+            STEM_MAX_TRACKS_PER_USER_SETTING, "" if per_user is None else str(per_user)
+        )
+    if body.stem_quota_gib is not None:
+        set_setting(STEM_QUOTA_SETTING, str(body.stem_quota_gib))
     # Clients see the change on their next request, not after the gate expires.
     invalidate_refinement_gate()
     return {"ok": True}
