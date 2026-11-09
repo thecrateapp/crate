@@ -384,4 +384,7 @@ def test_explain_uses_index(pg_db, tmp_path: Path):
         ]
         if name != "tree":
             assert scans, (name, plan)
+        else:
+            # The library's track count comes from the albums' counts.
+            assert not scans, (name, plan)
         assert all(node["Node Type"] != "Seq Scan" for node in scans), (name, plan)

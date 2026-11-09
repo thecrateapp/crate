@@ -433,6 +433,8 @@ def test_containers_tree_for_user(pg_db, test_app, monkeypatch, library):
 
     assert response.status_code == 200
     assert response.headers["etag"]
+    # The whole library: the albums' precomputed counts (0 + 3 + 2 + 4).
+    assert response.json()["library"] == {"track_count": 9}
     nodes = response.json()["containers"]
     assert [(n["kind"], n["id"], n["name"]) for n in nodes] == [
         ("playlist", str(shared), "B-sides"),
@@ -465,6 +467,36 @@ def test_containers_tree_for_user(pg_db, test_app, monkeypatch, library):
         assert "track_count" not in by_key[(kind, container_id)]
     assert all(n["parent_id"] is None for n in nodes)
     assert all(isinstance(n["etag"], str) and n["etag"] for n in nodes)
+
+
+def test_library_track_count_changes_the_tree_etag(
+    pg_db, test_app, monkeypatch, library
+):
+    from crate.db.tx import transaction_scope
+
+    me = _user("library-count")
+    _act_as(monkeypatch, me)
+    empty = test_app.get("/api/decks/containers")
+    assert empty.json()["library"] == {"track_count": 0}
+
+    album = _album(library, "Counted", track_count=2)
+    _album(library, "Also counted", track_count=3)
+    fresh = test_app.get("/api/decks/containers")
+    assert fresh.json()["library"] == {"track_count": 5}
+    etag = fresh.headers["etag"]
+
+    # A rescan that finds one more file only updates the album's count.
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE library_albums SET track_count = 3 WHERE id = :id"),
+            {"id": album},
+        )
+    changed = test_app.get("/api/decks/containers", headers={"If-None-Match": etag})
+
+    assert changed.status_code == 200
+    assert changed.headers["etag"] != etag
+    assert changed.json()["library"] == {"track_count": 6}
+    assert changed.json()["containers"] == fresh.json()["containers"]
 
 
 def test_genre_nodes_are_capped_to_the_top_genres(

@@ -196,8 +196,14 @@ WITH playlist_nodes AS (
             ':', 'likes', COUNT(*), SUM(hashtextextended(ref, 0))
         )) AS etag
     FROM like_rows
+), library_total AS (
+    -- The whole library, from the albums' counts that the scanner keeps (the
+    -- same counts the genre nodes add up), never a count of library_tracks.
+    SELECT COALESCE(SUM(album.track_count), 0)::bigint AS track_count
+    FROM library_albums album
 )
-SELECT kind, id, name, track_count, etag
+SELECT kind, id, name, track_count, etag,
+       (SELECT track_count FROM library_total) AS library_track_count
 FROM (
     SELECT * FROM playlist_nodes
     UNION ALL
@@ -675,23 +681,30 @@ def decks_containers_statement(user_id: int) -> tuple[TextClause, dict[str, Any]
 
 def get_decks_containers(
     user_id: int, *, session: Session | None = None
-) -> list[dict[str, Any]]:
-    """The user's playlists, crates, top genres, moods, recent and likes."""
+) -> dict[str, Any]:
+    """The library's track count, and the user's playlists, crates, top genres,
+    moods, recent and likes."""
     statement, params = decks_containers_statement(user_id)
 
-    def _impl(current: Session) -> list[dict[str, Any]]:
+    def _impl(current: Session) -> dict[str, Any]:
         rows = current.execute(statement, params).mappings().all()
-        return [
-            {
-                "id": row["id"],
-                "kind": row["kind"],
-                "name": row["name"],
-                "parent_id": None,
-                "track_count": row["track_count"],
-                "etag": row["etag"],
-            }
-            for row in rows
-        ]
+        # Every row carries the library count; the mood, recent and likes
+        # nodes guarantee there is at least one row.
+        track_count = int(rows[0]["library_track_count"]) if rows else 0
+        return {
+            "library": {"track_count": track_count},
+            "containers": [
+                {
+                    "id": row["id"],
+                    "kind": row["kind"],
+                    "name": row["name"],
+                    "parent_id": None,
+                    "track_count": row["track_count"],
+                    "etag": row["etag"],
+                }
+                for row in rows
+            ],
+        }
 
     if session is not None:
         return _impl(session)

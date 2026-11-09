@@ -24,6 +24,7 @@ from crate.api.schemas.decks import (
     DecksContainerKind,
     DecksContainerNodeResponse,
     DecksContainersResponse,
+    DecksLibraryResponse,
     DecksTracksPageResponse,
 )
 from crate.db.queries.decks_library import (
@@ -77,18 +78,23 @@ def _require_session_user(request: Request) -> dict:
     summary="List the user's Decks library containers",
 )
 def decks_containers(request: Request) -> Response:
-    """Playlists, crates, top genres, moods, recent and likes.
+    """The library's track count, and playlists, crates, top genres, moods,
+    recent and likes.
 
     Supports If-None-Match.
     """
     user = _require_session_user(request)
+    tree = get_decks_containers(int(user["id"]))
     nodes = []
-    for row in get_decks_containers(int(user["id"])):
+    for row in tree["containers"]:
         node = DecksContainerNodeResponse.model_validate(row).model_dump(mode="json")
         if node["track_count"] is None:
             del node["track_count"]
         nodes.append(node)
-    return _conditional_json(request, {"containers": nodes})
+    library = DecksLibraryResponse.model_validate(tree["library"]).model_dump(
+        mode="json"
+    )
+    return _conditional_json(request, {"library": library, "containers": nodes})
 
 
 @router.get(

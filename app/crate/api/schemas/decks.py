@@ -42,7 +42,18 @@ class DecksContainerNodeResponse(BaseModel):
     )
 
 
+class DecksLibraryResponse(BaseModel):
+    track_count: int = Field(
+        ge=0,
+        description=(
+            "Every track in the library, from the albums' precomputed counts. "
+            "It changes the tree ETag, not any node etag."
+        ),
+    )
+
+
 class DecksContainersResponse(BaseModel):
+    library: DecksLibraryResponse
     containers: list[DecksContainerNodeResponse]
 
 
@@ -109,6 +120,7 @@ __all__ = [
     "DecksContainerNodeResponse",
     "DecksContainerRefResponse",
     "DecksContainersResponse",
+    "DecksLibraryResponse",
     "DecksProfileQuality",
     "DecksTrackResponse",
     "DecksTracksPageResponse",

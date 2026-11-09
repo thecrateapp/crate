@@ -1927,7 +1927,14 @@ def test_openapi_types_decks_library_routes_and_marks_them_authenticated(test_ap
     ]
     for status in ("400", "403", "404", "422"):
         assert status in tracks["get"]["responses"]
-    track = schema["components"]["schemas"]["DecksTrackResponse"]["properties"]
+    components = schema["components"]["schemas"]
+    tree = components["DecksContainersResponse"]
+    assert set(tree["required"]) == {"library", "containers"}
+    assert tree["properties"]["library"]["$ref"] == (
+        "#/components/schemas/DecksLibraryResponse"
+    )
+    assert components["DecksLibraryResponse"]["required"] == ["track_count"]
+    track = components["DecksTrackResponse"]["properties"]
     assert "stream" in track["playable"]["description"]
     app_spec = test_app.get("/openapi-app.json").json()
     assert "/api/decks/containers" in app_spec["paths"]

@@ -14,6 +14,7 @@ from crate.api.schemas.decks import (
     DecksContainerNodeResponse,
     DecksContainerRefResponse,
     DecksContainersResponse,
+    DecksLibraryResponse,
     DecksTrackResponse,
     DecksTracksPageResponse,
 )
@@ -480,6 +481,7 @@ __all__ = [
     "DecksContainerNodeResponse",
     "DecksContainerRefResponse",
     "DecksContainersResponse",
+    "DecksLibraryResponse",
     "DecksTrackResponse",
     "DecksTracksPageResponse",
     "ShowCandidate",
