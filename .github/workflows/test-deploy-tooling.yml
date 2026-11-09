@@ -6,6 +6,9 @@ on:
     paths:
       - "scripts/deploy-remote.sh"
       - "scripts/deploy.sh"
+      - "scripts/release_manifest.py"
+      - "app/tests/test_release_manifest.py"
+      - ".github/workflows/build-images.yml"
       - "app/tests/test_deploy_release_commands.py"
       - "scripts/observability-deploy.sh"
       - "scripts/observability-deploy-remote.sh"
@@ -23,6 +26,9 @@ on:
     paths:
       - "scripts/deploy-remote.sh"
       - "scripts/deploy.sh"
+      - "scripts/release_manifest.py"
+      - "app/tests/test_release_manifest.py"
+      - ".github/workflows/build-images.yml"
       - "app/tests/test_deploy_release_commands.py"
       - "scripts/observability-deploy.sh"
       - "scripts/observability-deploy-remote.sh"
@@ -58,5 +64,6 @@ jobs:
         run: >-
           python -m pytest --noconftest
           app/tests/test_deploy_release_commands.py
+          app/tests/test_release_manifest.py
           app/tests/test_observability_remote_deploy.py
           app/tests/test_application_orphans.py -q

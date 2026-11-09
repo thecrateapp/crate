@@ -995,6 +995,16 @@ cmd_agent_context() {
 refresh_running_agent() {
   local services=() service
   [[ -n "$(env_value CRATE_AGENT_IMAGE)" ]] || return 0
+  # A website release still advances CRATE_RELEASE_SHA. Invoking Compose for
+  # the gateway would recreate it for that environment value alone, even when
+  # its image is unchanged. The source snapshot remains versioned; managed
+  # contexts are activated independently above, without restarting processes.
+  if [[ -n "${BACKUP_DIR:-}" && -f "$BACKUP_DIR/.env" && -f "$BACKUP_DIR/changed_services" ]] \
+    && [[ "$(env_file_value "$BACKUP_DIR/.env" CRATE_AGENT_IMAGE)" == "$(env_value CRATE_AGENT_IMAGE)" ]] \
+    && ! grep -qvE '^(crate-site|crate-docs)$' "$BACKUP_DIR/changed_services"; then
+    log "Website-only release; keeping the running agent and operator containers"
+    return 0
+  fi
   if [[ -n "$(docker ps -q -f name='^crate-agent$')" ]]; then
     log "Recreating the running Crate Agent on the release image"
     dc --profile agent up -d --no-build --no-deps crate-agent \

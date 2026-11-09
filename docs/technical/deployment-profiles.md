@@ -66,6 +66,25 @@ The remote deploy snapshots the previous release, pulls only changed images
 and recreates only services whose digest or Compose configuration changed.
 Images not rebuilt for a commit remain pinned to their last promoted digest.
 
+Website-only releases select `crate-site`. Editing the engineering blog's planning
+documents under `docs/technical/engineering-blog*.md` also selects `crate-docs`.
+Neither rebuilds the agent image. Its baked context remains a versioned source
+snapshot at the image's `source_sha`; configured host contexts are exported and
+activated for the exact new release independently of the image.
+
+The image detector compares the jobs in `build-images.yml`: changing only
+`build-site` rebuilds only the site. Changes to shared workflow settings, change
+detection, promotion, the reusable `build-image.yml` or shared actions still
+rebuild every image. Missing/unreadable workflow history or an unavailable release
+baseline also falls back to a complete build. Manual image selections remain
+available through `workflow_dispatch`.
+
+For a site/docs-only deployment with an unchanged agent digest, the deploy leaves
+the running gateway, supervisor and provenance containers alone. In particular,
+the new global release SHA must not recreate them merely through a Compose
+environment change. Image updates and broader application/configuration releases
+continue through the normal agent refresh path.
+
 The remote profile combines `docker-compose.yaml` and
 `docker-compose.project.yaml`; it includes API, readplane, worker families,
 projector, media worker, Admin, Listen, Site, Docs, PostgreSQL, cache Redis,
