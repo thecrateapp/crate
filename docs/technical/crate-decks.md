@@ -20,6 +20,8 @@ sources:
   - app/crate/api/permissions.py
   - app/crate/smart_mix/stems.py
   - app/crate/db/repositories/smart_mix_stems.py
+  - app/crate/db/repositories/smart_mix_stem_files.py
+  - app/crate/smart_mix/stem_files.py
   - app/crate/api/smart_mix_playlists.py
   - app/crate/db/repositories/smart_mix_playlists.py
   - app/crate/api/schemas/playlists.py
@@ -33,6 +35,7 @@ sources:
   - app/tests/test_capabilities_decks.py
   - app/tests/test_capabilities_stems.py
   - app/tests/test_decks_stem_analysis_api.py
+  - app/tests/test_stem_files.py
   - app/tests/test_smart_mix_playlists_api.py
   - app/tests/test_search_playable_audio.py
 ---
@@ -122,9 +125,10 @@ doc (`docs/technical/smart-mix-operations.md`, section "Stem analyses").
 | --------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `GET /api/decks/tracks/{uid}/stem-analysis`               | The analysis Smart Mix uses for the track's current file, as a document |
 | `PUT /api/decks/tracks/{uid}/stem-analysis`               | Upload Decks' own analysis of the track                                 |
+| `GET /api/decks/tracks/{uid}/stems`                       | Download the server's stem file of the track (Smart Mix playlists)      |
 | `GET /api/tracks/by-entity/{uid}/mix-profile?detail=full` | The profile with its `stems` layer, when an analysis applies            |
 
-Both `/api/decks` routes take a Decks session; `crv_` access tokens do not reach
+The `/api/decks` routes take a Decks session; `crv_` access tokens do not reach
 them. A UID outside the server's local library answers 404.
 
 **Read.** `GET` answers the analysis of the track's current source revision, the
@@ -159,6 +163,21 @@ object when an analysis of its current file applies: `producer`,
 `startMs`, `endMs` and the mean level byte of `drums`, `bass`, `other` and
 `vocals`. The summary profile never carries it, because the Go read plane serves
 the summary natively. No planner reads the layer yet (ST3).
+
+**Stem files.** For the tracks of Smart Mix playlists the server also keeps
+the separated audio, when `smart_mix.stems.storage` is true in
+`GET /api/capabilities`. `GET /api/decks/tracks/{uid}/stems` answers one MP4
+(`audio/mp4`) with three AAC streams at 256 kbps, in this order: drums, bass
+and vocals, each named in its handler (`handler_name`), at 44.1 kHz stereo.
+There is no `other` stream: Decks computes it as its own decode minus the three
+stems (STEM-D9). Range requests are served (`206` with `Content-Range`), so a
+download can resume. The route answers 404 when the server has no stem file of
+the track's current file: not separated yet, separated from a file that has
+changed since, evicted by the server's quota, or a server that keeps no stem
+files. Decks then separates the track itself; the analysis may still be there
+(`GET .../stem-analysis`). A download counts as use of the file and of the
+caller's Smart Mix playlists that hold the track, which keeps them from being
+evicted first. A five-minute track is about 29 MB.
 
 ## Smart Mix playlists (Smart Mix Stems ST2)
 
@@ -215,7 +234,7 @@ playlist's state, as in the list; a playlist that was never on answers
 | `ready`     | The server has a stem analysis of the track's current file |
 | `pending`   | Waiting for separation                                     |
 | `analyzing` | Being separated                                            |
-| `failed`    | Separation failed for this file                            |
+| `failed`    | Separation failed for this file; retried up to 3 attempts  |
 
 `estimatedSecondsLeft` is the time left for the playlist's pending and
 analysing tracks at the server's recent pace, without other queued work; it is

@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, RootModel, StrictInt, model_validator
 
 from crate.api.schemas.common import OkResponse
+from crate.smart_mix.stems import MAX_STEM_QUOTA_GIB
 
 
 class WorkerSettingsRequest(BaseModel):
@@ -63,6 +64,7 @@ class SmartMixSettingsUpdateRequest(BaseModel):
     stem_uploads_enabled: bool | None = None
     stem_max_tracks_per_playlist: int | None = Field(default=None, ge=1)
     stem_max_tracks_per_user: int | None = Field(default=None, ge=1)
+    stem_quota_gib: int | None = Field(default=None, ge=0, le=MAX_STEM_QUOTA_GIB)
 
     @model_validator(mode="after")
     def _per_playlist_limit_stays_on(self) -> "SmartMixSettingsUpdateRequest":
@@ -71,6 +73,8 @@ class SmartMixSettingsUpdateRequest(BaseModel):
             and self.stem_max_tracks_per_playlist is None
         ):
             raise ValueError("stem_max_tracks_per_playlist cannot be turned off")
+        if "stem_quota_gib" in self.model_fields_set and self.stem_quota_gib is None:
+            raise ValueError("stem_quota_gib is a size; 0 keeps no stem files")
         return self
 
 
@@ -119,6 +123,9 @@ class SmartMixSettingsResponse(BaseModel):
     # (null: no limit, the default).
     stem_max_tracks_per_playlist: int
     stem_max_tracks_per_user: int | None
+    # Stem files kept for Crate Decks (STEM-D6): their total size in GiB, 50 by
+    # default; 0 keeps none.
+    stem_quota_gib: int
 
 
 class ShowsActiveCityResponse(BaseModel):

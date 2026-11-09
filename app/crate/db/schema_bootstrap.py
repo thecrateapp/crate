@@ -174,3 +174,8 @@ def create_schema(cur):
     )
 
     create_smart_mix_playlists_v157_schema(cur)
+    from crate.db.schema_sections.smart_mix_stem_files_v158 import (
+        create_smart_mix_stem_files_v158_schema,
+    )
+
+    create_smart_mix_stem_files_v158_schema(cur)

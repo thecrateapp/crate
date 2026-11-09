@@ -34,7 +34,9 @@ from crate.smart_mix.stems import (
     DEFAULT_STEM_MAX_TRACKS_PER_PLAYLIST,
     STEM_MAX_TRACKS_PER_PLAYLIST_SETTING,
     STEM_MAX_TRACKS_PER_USER_SETTING,
+    STEM_QUOTA_SETTING,
     STEM_UPLOADS_SETTING,
+    stem_quota_gib,
     stem_track_limit,
 )
 from crate.db.audit import get_db_table_stats
@@ -149,6 +151,7 @@ def _get_smart_mix_settings() -> dict:
         "stem_max_tracks_per_user": stem_track_limit(
             get_setting(STEM_MAX_TRACKS_PER_USER_SETTING), default=None
         ),
+        "stem_quota_gib": stem_quota_gib(get_setting(STEM_QUOTA_SETTING)),
     }
 
 
@@ -381,7 +384,7 @@ def update_paths_settings(request: Request, body: PathsSettingsUpdateRequest):
     "/smart-mix",
     response_model=SettingsUpdateResponse,
     responses=_SETTINGS_RESPONSES,
-    summary="Update Smart Mix AI, stem upload and Smart Mix playlist settings",
+    summary="Update Smart Mix AI, stem upload, Smart Mix playlist and stem quota settings",
 )
 def update_smart_mix_settings(request: Request, body: SmartMixSettingsUpdateRequest):
     _require_settings_manager(request)
@@ -403,6 +406,8 @@ def update_smart_mix_settings(request: Request, body: SmartMixSettingsUpdateRequ
         set_setting(
             STEM_MAX_TRACKS_PER_USER_SETTING, "" if per_user is None else str(per_user)
         )
+    if body.stem_quota_gib is not None:
+        set_setting(STEM_QUOTA_SETTING, str(body.stem_quota_gib))
     # Clients see the change on their next request, not after the gate expires.
     invalidate_refinement_gate()
     return {"ok": True}

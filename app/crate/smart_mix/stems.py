@@ -64,9 +64,17 @@ STEM_UPLOADS_SETTING = "smart_mix_stem_uploads_enabled"
 STEM_MAX_TRACKS_PER_PLAYLIST_SETTING = "smart_mix_stem_max_tracks_per_playlist"
 STEM_MAX_TRACKS_PER_USER_SETTING = "smart_mix_stem_max_tracks_per_user"
 DEFAULT_STEM_MAX_TRACKS_PER_PLAYLIST = 300
-# Until the server has separated tracks, each takes about five minutes: the ST0 spike
-# estimated 3-5 hours per 50 tracks on the i7-7700 with ONNX Runtime CPU.
-ESTIMATED_STEM_SECONDS_PER_TRACK = 300
+# Until the server has separated tracks, each takes about four minutes: separating,
+# the drum beats and the stem file of a five-minute track took 2.5-3.5 minutes with four
+# threads on a development laptop (ST2.PR2), and the i7-7700 is slower per thread.
+ESTIMATED_STEM_SECONDS_PER_TRACK = 240
+# The task that separates the tracks of Smart Mix playlists (ST2.PR3), and the stem
+# files it keeps for Crate Decks (STEM-D6): an admin setting caps their total size, 50
+# GiB by default; 0 keeps none.
+STEM_TASK_TYPE = "analyze_playlist_stems"
+STEM_QUOTA_SETTING = "smart_mix_stem_quota_gib"
+DEFAULT_STEM_QUOTA_GIB = 50
+MAX_STEM_QUOTA_GIB = 100_000
 
 ProducerKind = Literal["server", "decks"]
 SeparatorModel = Literal["htdemucs", "htdemucs_ft"]
@@ -83,6 +91,17 @@ def stem_track_limit(value: str | None, *, default: int | None) -> int | None:
     if limit is None or limit < 1:
         return default
     return limit
+
+
+def stem_quota_gib(value: str | None) -> int:
+    """The stored stem quota in GiB: a whole number from 0, else the default."""
+    try:
+        quota = int(value.strip()) if value is not None else None
+    except ValueError:
+        return DEFAULT_STEM_QUOTA_GIB
+    if quota is None or not 0 <= quota <= MAX_STEM_QUOTA_GIB:
+        return DEFAULT_STEM_QUOTA_GIB
+    return quota
 
 
 def _decode_level_bytes(value: Any) -> Any:
@@ -325,6 +344,10 @@ def _mean_byte(values: bytes) -> int:
 
 __all__ = [
     "DEFAULT_STEM_MAX_TRACKS_PER_PLAYLIST",
+    "DEFAULT_STEM_QUOTA_GIB",
+    "MAX_STEM_QUOTA_GIB",
+    "STEM_QUOTA_SETTING",
+    "STEM_TASK_TYPE",
     "ESTIMATED_STEM_SECONDS_PER_TRACK",
     "LEVEL_FLOOR_DB",
     "MAX_DURATION_MISMATCH",
@@ -348,5 +371,6 @@ __all__ = [
     "duration_matches",
     "encode_levels",
     "stem_phrase_layer",
+    "stem_quota_gib",
     "stem_track_limit",
 ]

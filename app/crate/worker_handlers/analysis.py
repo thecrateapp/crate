@@ -1496,7 +1496,6 @@ def _refresh_live_coverage() -> None:
 def _handle_backfill_smart_mix_profiles(
     task_id: str, params: dict, config: dict
 ) -> dict:
-    del config
     from crate.resource_governor import record_decision, should_defer_task
 
     campaign = get_smart_mix_campaign()
@@ -1515,6 +1514,18 @@ def _handle_backfill_smart_mix_profiles(
                 _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
             ),
             progress=f"Deferred by resource governor: {decision.reason}",
+        )
+
+    # Smart Mix playlists go first (STEM-D2): while one has a track to separate, the
+    # coordinator claims nothing and makes sure the separation runs. Analyses already
+    # accepted finish; the backfill resumes once the playlists' work is done.
+    from crate.worker_handlers import smart_mix_stems
+
+    if smart_mix_stems.playlist_stem_work_pending(config.get("library_path")):
+        smart_mix_stems.wake_stem_task()
+        return run_again_later(
+            smart_mix_stems.BACKFILL_WAIT_SECONDS,
+            progress="Waiting for the stems of Smart Mix playlists",
         )
 
     # Only the claims of this backfill count as in flight; imports and manual

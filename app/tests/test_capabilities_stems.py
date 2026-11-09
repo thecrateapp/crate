@@ -41,8 +41,8 @@ def _capabilities(test_app) -> dict:
 def test_smart_mix_stems_follows_smart_mix(test_app, monkeypatch, uploads) -> None:
     del uploads
     monkeypatch.setenv("CRATE_SMART_MIX_ENABLED", "true")
-    # Smart Mix playlists can be turned on (ST2.PR1); stored stem audio comes in
-    # ST2.PR3.
+    # Smart Mix playlists can be turned on (ST2.PR1); without a stems directory the
+    # API serves no stem files (ST2.PR3).
     assert _capabilities(test_app)["smart_mix"]["stems"] == {
         "available": True,
         "playlists": True,
@@ -109,3 +109,36 @@ def test_the_stems_capability_is_documented(test_app) -> None:
         stems["properties"][name]["type"] == "boolean"
         for name in ("available", "playlists", "storage")
     )
+
+
+@pytest.mark.parametrize(
+    "stems_dir, quota, storage",
+    [
+        ("/stems", "50", True),
+        ("/stems", None, True),
+        ("/stems", "0", False),
+        (None, "50", False),
+    ],
+)
+def test_storage_follows_the_stems_directory_and_the_quota(
+    test_app, monkeypatch, uploads, stems_dir, quota, storage
+) -> None:
+    del uploads
+    from crate.api import capabilities
+
+    monkeypatch.setenv("CRATE_SMART_MIX_ENABLED", "true")
+    if stems_dir is None:
+        monkeypatch.delenv("CRATE_STEMS_DIR", raising=False)
+    else:
+        monkeypatch.setenv("CRATE_STEMS_DIR", stems_dir)
+    monkeypatch.setattr(
+        capabilities,
+        "get_setting",
+        lambda key, default=None: (
+            quota if key == "smart_mix_stem_quota_gib" else default
+        ),
+    )
+
+    assert _capabilities(test_app)["smart_mix"]["stems"]["storage"] is storage
+    monkeypatch.delenv("CRATE_SMART_MIX_ENABLED")
+    assert _capabilities(test_app)["smart_mix"]["stems"]["storage"] is False

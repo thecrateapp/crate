@@ -21,8 +21,9 @@ Only the owner turns it on or off; system playlists have no owner and never are.
   (``track_stem_signals``). A finished job whose analysis no longer applies (the file
   changed) goes back to pending; a failed job only does when the file changed since.
   Removing tracks and turning a playlist off leave jobs and analyses alone, so the
-  separation task (ST2.PR3) is to claim a job only while one of the track's Smart Mix
-  playlists is on.
+  separation task, ``analyze_playlist_stems``, claims a job only while one of the
+  track's Smart Mix playlists is on. Turning a playlist on, and adding tracks that need
+  stems, queues that task in the same transaction (one at a time).
 """
 
 from __future__ import annotations
@@ -44,9 +45,11 @@ from crate.smart_mix.stems import (
     STEM_JOB_STATES,
     STEM_MAX_TRACKS_PER_PLAYLIST_SETTING,
     STEM_MAX_TRACKS_PER_USER_SETTING,
+    STEM_TASK_TYPE,
     StemJobState,
     stem_track_limit,
 )
+from crate.task_dedup_keys import SMART_MIX_STEMS_DEDUP_KEY
 
 LimitKind = Literal["playlist", "user"]
 
@@ -395,6 +398,7 @@ def set_smart_mix_playlist(
         if row["playlist_id"] is not None and row["enabled"] == enabled:
             if enabled:
                 _queue(current, [playlist_id])
+                _wake_separation(current)
             return _state(row)
         state = _state(
             current.execute(
@@ -407,6 +411,7 @@ def set_smart_mix_playlist(
         if enabled:
             _check_limits(current, playlist_id=playlist_id, user_id=user_id)
             _queue(current, [playlist_id])
+            _wake_separation(current)
         return state
 
 
@@ -429,7 +434,8 @@ def smart_mix_playlist_tracks_changed(
     session.execute(_TOUCH, {"playlist_id": playlist_id, "user_id": user_id})
     if added:
         _check_limits(session, playlist_id=playlist_id, user_id=int(user_id))
-        _queue(session, [playlist_id])
+        if _queue(session, [playlist_id]):
+            _wake_separation(session)
 
 
 def queue_smart_mix_stem_jobs(
@@ -646,6 +652,16 @@ def _check_limits(session: Session, *, playlist_id: int, user_id: int) -> None:
         raise SmartMixPlaylistLimitError(
             "user", max_tracks=per_user, tracks=int(row["user_tracks"])
         )
+
+
+def _wake_separation(session: Session) -> None:
+    """Queue analyze_playlist_stems in this transaction, unless one is queued or
+    running; it is sent to the worker after commit."""
+    from crate.db.repositories.tasks import create_task_dedup
+
+    create_task_dedup(
+        STEM_TASK_TYPE, {}, dedup_key=SMART_MIX_STEMS_DEDUP_KEY, session=session
+    )
 
 
 def _queue(session: Session, playlist_ids: Sequence[int] | None) -> int:

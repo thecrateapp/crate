@@ -47,6 +47,11 @@ sources:
   - app/crate/db/repositories/smart_mix_playlists.py
   - app/crate/smart_mix/separation.py
   - app/crate/smart_mix/stem_storage.py
+  - app/crate/smart_mix/stem_files.py
+  - app/crate/worker_handlers/smart_mix_stems.py
+  - app/crate/db/jobs/smart_mix_stems.py
+  - app/crate/db/repositories/smart_mix_stem_files.py
+  - app/crate/db/schema_sections/smart_mix_stem_files_v158.py
   - app/Dockerfile
   - app/crate/db/schema_sections/smart_mix_playlists_v157.py
   - app/crate/api/smart_mix_playlists.py
@@ -597,7 +602,9 @@ D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
   Stored analyses and reads stay as they are. There is no Admin switch yet.
 - **Capability.** `smart_mix.stems` is `{available, playlists, storage}`. `available`
   and `playlists` (Smart Mix playlists, next section) follow `smart_mix.available`;
-  `storage` (stem audio kept on the server) stays false until ST2.PR3.
+  `storage` says the server keeps stem files for Decks: on with `smart_mix.available`,
+  a stems directory in the API (`CRATE_STEMS_DIR`) and a stem quota above 0 (see
+  "Separation task and stem files").
 - **What does not change.** The v8 grid, downbeats, phrases and the YAMNet voice bytes stay
   as they are, and no planner reads the layer yet (ST3).
 
@@ -659,17 +666,17 @@ playlists"); the code is in `crate/db/repositories/smart_mix_playlists.py`.
 - **Status.** A track is `ready` when it has a server analysis of its current file;
   otherwise it has its job's state, and `pending` with no job. The estimate is the
   playlist's pending and analysing tracks times the mean time of the latest 20
-  separations (five minutes per track until there is one, from the ST0 estimate of
-  3-5 hours per 50 tracks), without other queued work.
+  separations (four minutes per track until there is one, from the ST2.PR2
+  measurements below), without other queued work.
 - **Playlist responses.** `GET /api/playlists`, its detail (owner and collaborators)
   and `playlists` in `GET /api/me/playlists-page` carry `smartMix`, which is
   `{enabled, ready, total}`, computed for all of them in one query; `ready` and `total`
   are 0 while off. The toggle invalidates the `playlists` and `playlist:{id}` client
   caches.
-- **Not yet.** Nothing separates the queued tracks until ST2.PR3 (the task
-  `analyze_playlist_stems`); the separation itself is described in the next section.
-  `last_used_at` is set when a playlist is turned on; marking later use is part of
-  ST2.PR3.
+- **Work.** The task `analyze_playlist_stems` separates the queued tracks; the
+  separation is in "Server separation" and the task in "Separation task and stem
+  files". `last_used_at` is set when a playlist is turned on and when its owner
+  downloads one of its stem files.
 
 ### Server separation
 
@@ -766,6 +773,79 @@ Runtime CPU (STEM-D3). There is no PyTorch in the separation. The code is
   stem's mono mix at 22,050 Hz and fills `drumBeatsMs`. They are stored and measured,
   never used for the grid (STEM-D4). Tracks over ten minutes, images without torch and
   a model failure leave them out.
+
+### Separation task and stem files
+
+`analyze_playlist_stems` (`crate/worker_handlers/smart_mix_stems.py`) separates the
+tracks of Smart Mix playlists in `crate-analysis-worker`. Its queries are in
+`crate/db/jobs/smart_mix_stems.py`; the stem files in `crate/smart_mix/stem_files.py`.
+
+- **Queue and order.** `heavy`, priority 2: above the backfill coordinator (3), below
+  interactive work. One runs at a time: turning a Smart Mix playlist on, adding tracks
+  that need stems and the backfill all queue it with the scheduler's dedup key
+  (`schedule:analyze_playlist_stems`), and the scheduler queues it every 30 minutes, which
+  picks up retries and changed files. The resource governor applies; the night window
+  does not. Its time limit is two hours, for one track.
+- **A run.** It fails jobs a dead separation left `analyzing` for over two hours (the
+  attempt counts), queues the tracks whose file changed (`queue_smart_mix_stem_jobs()`),
+  asks for the profiles of up to ten waiting tracks that have none (the analysis is
+  stored under the profile's source revision, so a track waits for its profile), then
+  claims one job and separates its track. It runs again a second later while there is
+  more to claim, two minutes later while tracks wait for profiles, and otherwise ends
+  (`{"status": "idle"}`) after sweeping the stems directory. Without onnxruntime, the
+  graph or a stems directory on the music volume it ends as `skipped` with the reason,
+  and jobs stay `pending`.
+- **Claims.** A job is claimed while one of its track's Smart Mix playlists is on and its
+  track has a current profile of the job's revision: `pending` jobs, oldest request
+  first, then `failed` ones with attempts left once 15 minutes times their attempts have
+  passed. `FOR UPDATE SKIP LOCKED`, like the other claims.
+- **Outcome.** The task checks the file's revision when separation starts and again
+  before storing: a file that changed in between stores nothing. The `stem-analysis/1`
+  (`crate-server/stems-1`), the stem file's row and `ready` are written in one
+  transaction. Any failure ends `failed` with one more attempt and `last_error`; a track
+  gets three attempts, and one over 20 minutes fails for good at once.
+- **The backfill waits.** While a job can be claimed, the backfill coordinator claims
+  nothing, queues the task and comes back a minute later with the progress `Waiting for
+the stems of Smart Mix playlists`; analyses it already queued finish. Once the
+  playlists' work is done (nothing claimable, which includes failed tracks waiting to
+  retry), it resumes where it was. A playlist of 300 tracks therefore holds the backfill
+  for as long as it takes to separate them, about 20 hours at four minutes per track.
+- **Stem files** (STEM-D6). One MP4 per track with three AAC streams at 256 kbps:
+  drums, bass and vocals, in that order, each named in its handler (`handler_name`).
+  `other` is not stored: Decks rebuilds it as the residual against its own decode. A
+  five-minute track is about 29 MB. They live in `CRATE_STEMS_DIR` at
+  `<track id mod 256, hex>/<track id>-<revision prefix>.mp4`; ffmpeg writes each one in
+  the separation's scratch and it is renamed into place, and the writer refuses any
+  path outside that directory or inside its scratch. Migration 158 adds
+  `track_stem_files`: one row per track (deleted with it) with the relative `path`,
+  `bytes`, the separator, the `source_revision` and `last_used_at`. A new separation of
+  the track replaces its file.
+- **Quota.** `PUT /api/settings/smart-mix` with `stem_quota_gib` (setting
+  `smart_mix_stem_quota_gib`, 50 by default, 0 to 100,000): the total size of the stem
+  files, in GiB. After each separation the task evicts until the files fit: first the
+  files of tracks in no Smart Mix playlist that is on, then the rest, each least recently
+  used first. A file's last use is the later of its last download and the last use of the
+  Smart Mix playlists that hold it. 0 keeps no stem files; separation and analyses go
+  on. Evicting a file does not queue the track again: its analysis stays, and Decks
+  separates the track itself.
+- **Sweep.** When it has nothing to claim, the task deletes files of the directory no row
+  refers to and scratch left by a separation that died, once they are over two hours
+  old.
+- **Download.** `GET /api/decks/tracks/{uid}/stems` serves the file with Range support
+  (`audio/mp4`), only while it was separated from the track's current file; 404
+  otherwise, and when the API has no stems directory. The API mounts it read-only. A
+  download marks the file, and the downloader's Smart Mix playlists that are on and hold
+  the track, as used now (at most once an hour each): that is the use the LRU reads.
+  Details for clients are in `docs/technical/crate-decks.md` ("Stem files").
+- **Cost per track.** On the laptop of "Server separation", with 4 threads at a load of
+  3.7, the whole task for a 312 s track took 163 s: 131 s to separate, 15 s for the drum
+  beats, 1 s for the levels and 16 s for the stem file (30 MB). The status estimate uses
+  four minutes per track until real separations exist, since the i7-7700 is slower per
+  thread.
+- **After the deploy.** Before integration, the Crate Decks release asset
+  `models-htdemucs-onnx-1/htdemucs-onnx-1.onnx` must exist (the analysis image downloads
+  it), and `${MEDIA_DIR}/smart-mix-stems` must exist on the host, owned by `PUID:PGID`.
+  Then time a 50-track Smart Mix playlist on the server and record it here.
 
 ### Measurement of the structure
 
@@ -926,6 +1006,7 @@ structure; check `refreshedAt` before reading zeros as a library with nothing pe
 | `backfill_smart_mix_profiles` | `heavy`       | Coordinates batches and enqueues children |
 | `compute_smart_mix_profile`   | `heavy`       | Analysis and publication per track        |
 | `refresh_smart_mix_coverage`  | `maintenance` | Aggregates coverage outside the request   |
+| `analyze_playlist_stems`      | `heavy`       | Stems of Smart Mix playlists, one at once |
 
 The backfill applies resource pressure and limits the work in flight to the limit of the
 [night window](#night-window): 8 at night and 4 by day by default. Its Admin settings accept

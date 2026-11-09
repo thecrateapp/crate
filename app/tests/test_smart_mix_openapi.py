@@ -142,3 +142,20 @@ def test_smart_mix_openapi_types_the_decks_stem_analysis_routes(
         "$ref": "#/components/schemas/StemsLayerResponse"
     }
     assert "stems" not in components["MixProfileResponse"].get("required", [])
+
+
+@pytest.mark.parametrize("spec", ["/openapi.json", "/openapi-crate.json"])
+def test_smart_mix_openapi_types_the_decks_stem_file_download(
+    test_app, spec: str
+) -> None:
+    schema = test_app.get(spec).json()
+    operation = schema["paths"]["/api/decks/tracks/{entity_uid}/stems"]["get"]
+
+    assert operation["tags"] == ["smart-mix"]
+    assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+    for status in ("200", "206"):
+        assert operation["responses"][status]["content"]["audio/mp4"]["schema"] == {
+            "type": "string",
+            "format": "binary",
+        }
+    assert {"401", "404"} <= set(operation["responses"])

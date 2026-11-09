@@ -29,7 +29,13 @@ from crate.db.queries.smart_mix_admin import (
 from crate.db.repositories.smart_mix_stems import stem_uploads_enabled
 from crate.llm.prompts.smart_mix_transition import PROMPT_VERSION
 from crate.smart_mix_ai import gate_reason, provider_kind, refinement_gate
-from crate.smart_mix.stems import STEM_CONTRIBUTE_PERMISSION
+from crate.db.cache_settings import get_setting
+from crate.smart_mix.stem_storage import configured_stems_directory
+from crate.smart_mix.stems import (
+    STEM_CONTRIBUTE_PERMISSION,
+    STEM_QUOTA_SETTING,
+    stem_quota_gib,
+)
 from crate.smart_mix.versions import (
     API_CONTRACT_VERSION,
     PLANNER_IDENTIFIER,
@@ -79,10 +85,13 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             android_bass_handoff=bass_handoff,
             android_long_beatmatch=beatmatch,
             ai_assisted=_ai_assisted(available),
-            # Smart Mix playlists can be turned on (ST2.PR1); stored stem audio
-            # arrives with ST2.PR3.
+            # Smart Mix playlists can be turned on (ST2.PR1); the server keeps
+            # their stem files for Decks (ST2.PR3) unless the quota is 0 or the
+            # API has no stems directory.
             stems=SmartMixStemsCapabilities(
-                available=available, playlists=available, storage=False
+                available=available,
+                playlists=available,
+                storage=available and _stem_storage_available(),
             ),
         ),
         vdj=VDJCapabilities(
@@ -158,6 +167,16 @@ def _decks_features(request: Request) -> list[DecksFeature]:
     if _may_upload_stems(request):
         features.append("stem_upload")
     return features
+
+
+def _stem_storage_available() -> bool:
+    if configured_stems_directory() is None:
+        return False
+    try:
+        return stem_quota_gib(get_setting(STEM_QUOTA_SETTING)) > 0
+    except Exception:
+        log.warning("Could not read the stem quota", exc_info=True)
+        return False
 
 
 def _may_upload_stems(request: Request) -> bool:

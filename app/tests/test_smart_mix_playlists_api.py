@@ -10,7 +10,10 @@ from sqlalchemy import event, text
 from crate.db.cache_settings import set_setting
 from crate.db.repositories.playlists_create import create_playlist
 from crate.db.tx import read_scope, transaction_scope
-from crate.smart_mix.stems import STEM_MAX_TRACKS_PER_PLAYLIST_SETTING
+from crate.smart_mix.stems import (
+    ESTIMATED_STEM_SECONDS_PER_TRACK,
+    STEM_MAX_TRACKS_PER_PLAYLIST_SETTING,
+)
 from tests.test_smart_mix_playlists_repository import (
     _analysed,
     _fill,
@@ -170,8 +173,8 @@ def test_status_lists_per_track_states(pg_db, test_app, monkeypatch) -> None:
             "attempts": 0,
         },
     ]
-    # No separation measured yet: the ST0 estimate of five minutes per track.
-    assert body["estimatedSecondsLeft"] == 2 * 300
+    # No separation measured yet: the estimate per track (four minutes, ST2.PR2).
+    assert body["estimatedSecondsLeft"] == 2 * ESTIMATED_STEM_SECONDS_PER_TRACK
 
     # Once tracks were separated, their measured time replaces the estimate.
     other = _tracks("api-status-history", 2)
