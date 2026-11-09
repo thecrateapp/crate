@@ -395,7 +395,8 @@ class OnnxGraph:
         spec_out, wave_out = self._session.run(
             ["spec_out", "wave_out"], {"mix": mix, "spec": spec}
         )
-        return spec_out, wave_out
+        # Both outputs are dense tensors; ONNX Runtime types run() for every kind.
+        return np.asarray(spec_out), np.asarray(wave_out)
 
 
 def model_path() -> Path:
