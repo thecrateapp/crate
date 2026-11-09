@@ -2274,6 +2274,38 @@ def test_v9_profiles_are_claimed_once_for_v10(pg_db, tmp_path: Path) -> None:
     )
 
 
+def test_older_model_profile_kept_from_a_library_draft_is_claimed(
+    pg_db, tmp_path: Path
+) -> None:
+    # A library reanalysis embeds a current-version draft without the model's beats.
+    # The track keeps its older profile with Beat This!'s beats, so the backfill still
+    # claims it and recomputes it with the model.
+    del pg_db
+    from dataclasses import replace
+
+    from crate.db.jobs.analysis_storage import store_smart_mix_profile_result
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    with read_scope() as session:
+        path = session.execute(
+            text("SELECT path FROM library_tracks WHERE id = :id"), {"id": track_id}
+        ).scalar_one()
+    model = replace(_current_draft(), beat_tracker="beat-this-small0-dbn")
+    assert store_smart_mix_profile_result(
+        track_id, path, replace(model, analyzer_version=PREVIOUS_ANALYZER_VERSION)
+    )
+    library = replace(_current_draft(), beat_tracker=None)
+    assert store_smart_mix_profile_result(track_id, path, library) is False
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=10, max_attempts=3, claimed_by="task:v10"
+    )
+
+    assert [row["id"] for row in claimed] == [track_id]
+    assert store_smart_mix_profile_result(track_id, path, model) is True
+    assert _stored_versions([track_id]) == {(ANALYZER_VERSION, PROFILE_SCHEMA_VERSION)}
+
+
 def test_starting_v10_over_the_v9_campaign_starts_a_new_one(pg_db) -> None:
     del pg_db
     from crate.db.jobs.smart_mix_backfill import (

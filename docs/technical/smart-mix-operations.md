@@ -458,10 +458,14 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   `smart-mix-audio-v7`): a draft that brings a
   tracker the stored profile lacks, or another one (`beat-this-small0-dbn` over the
   `beat-this-small0` of the first, peak-picking builds), replaces it at the same quality,
-  and a run without the model never replaces a profile of the same version whose beats
-  came from it, whatever its quality. The library analysis embeds such runs: before
-  2026-11-10 a reanalysis of a track's BPM, key and loudness replaced its model beats
-  whenever the analyzer's own tracker rated the track higher.
+  and a run without the model never replaces a profile of the same file whose beats came
+  from it, whatever its quality or analyzer version. The library analysis embeds such
+  runs. Across versions the track keeps its older profile, which the backfill still
+  claims (its version is not the target) and recomputes with the model; a changed file
+  (another source revision) takes any draft. Before 2026-11-10 a reanalysis of a track's
+  BPM, key and loudness replaced its model beats whenever the analyzer's own tracker
+  rated the track higher, and before `smart-mix-audio-v10` a reanalysis during a backfill
+  left a current own-tracker profile the backfill never claimed again.
 - **Cost.** With one thread (`TORCH_NUM_THREADS`) on the development machine, `small0`
   takes 12.8 s of CPU on a 237 s track and 21.1 s on a 367 s one, and the DBN 0.8-1.0 s;
   with decoding and resampling, the whole step takes 14.7 s and 25.4 s.
@@ -1253,7 +1257,14 @@ without claiming.
      the arbiter on the 2.5 % that the DBN hears in three.
    - In all, v10 adds about 4 s of CPU per row v9 has already rewritten, and about
      2 s per row it has not, over what v9 would have cost.
-4. **Watch, pause, resume, cancel and close it** as for v9 below. Once it has finished,
+4. **Library reanalyses during the campaign.** A reanalysis of BPM, key and loudness
+   (Admin, or the `.m4a` one of the v9 runbook) never replaces a profile with Beat This!'s
+   beats by its own-tracker draft, of any version: the track keeps its v9 profile, and the
+   campaign still claims and recomputes it. A track whose profile has no model beats
+   (v5, v6, or v8 `.m4a`) still takes the reanalysis' own-tracker v10 profile, which the
+   campaign then counts as current and never recomputes with Beat This!: recompute its
+   Smart Mix profile first (**Reanalyze track**).
+5. **Watch, pause, resume, cancel and close it** as for v9 below. Once it has finished,
    a later release can drop v9 and older versions from `READABLE_ANALYZER_VERSIONS`.
 
 ### Running the v9 backfill
@@ -1314,8 +1325,10 @@ The queues do not change: the coordinator and each analysis run on `heavy`.
 8. **The library analysis of the `.m4a`.** The v9 profiles fix the Smart Mix side only. The
    BPM, key, loudness and mood the library analysis stored for the AAC `.m4a` came from the
    same slowed audio; their reanalysis runs apart, on the library analysis tasks, once
-   the track's v9 profile carries Beat This!'s beats. Earlier, the library analysis
-   would publish its own v9 profile first, and the backfill would never claim the track.
+   the track's profile carries Beat This!'s beats. The library analysis would otherwise
+   publish its own current profile first, and the backfill would never claim the track.
+   From v10 on, a profile with the model's beats of any version (v9 or v10) is enough;
+   before, it had to be of the current version.
 
 ### Running the v8 backfill
 
