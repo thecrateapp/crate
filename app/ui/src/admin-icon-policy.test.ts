@@ -380,6 +380,12 @@ const approvedLibraryControls = new Map<string, number>([
     "app/ui/src/components/album/TrackTable.tsx:@/components/SmartMixStructure:SmartMixTrackStructure",
     1,
   ],
+  // Smart Mix Stems, ST2.PR4: the track dialog's stem lanes. A hand-built SVG
+  // instrument (a level ridge per stem and the drum beats) with no glyph and no button.
+  [
+    "app/ui/src/components/album/TrackTable.tsx:./StemsTab:SmartMixTrackStems",
+    1,
+  ],
   // Audio profile sound spectrum, replacing the nivo radar: a hand-built SVG
   // instrument (density ridges, fills and marks) with no glyph and no button, reached
   // through the audio profile card on the album page and in the track dialog.
@@ -672,6 +678,12 @@ const approvedLibraryControls = new Map<string, number>([
   ],
   [
     "app/ui/src/pages/Analysis.tsx:@/components/SmartMixCoverage:SmartMixCoverage",
+    1,
+  ],
+  // Smart Mix Stems, ST2.PR4: the Smart Mix playlists panel. It imports no glyph;
+  // its glyphs are those of the shared search input and error and loading states.
+  [
+    "app/ui/src/pages/Analysis.tsx:@/components/SmartMixPlaylists:SmartMixPlaylists",
     1,
   ],
   [
