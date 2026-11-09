@@ -1418,9 +1418,10 @@ def _smart_mix_beats(
     analysis keeps its own beat tracker, so a model failure never fails the profile.
 
     Beats stored for this file by the current tracker are reused without running the
-    model (SM3-D16); the model's beats are stored, stamped with ``read_at``, while the
-    file is still the captured one, and a failure to store them only logs. A track
-    the model gives no beats stores nothing.
+    model (SM3-D16), except bars of three madmom never checked: they predate the meter
+    arbiter and run again. The model's beats are stored, stamped with ``read_at``,
+    while the file is still the captured one, and a failure to store them only logs. A
+    track the model gives no beats stores nothing.
     """
     from crate.smart_mix.beat_model import (
         BeatTrack,
@@ -1429,12 +1430,19 @@ def _smart_mix_beats(
     )
 
     tracker = beat_tracker_name()
-    if signals is not None and signals.beat_tracker == tracker and signals.beats_ms:
+    if (
+        signals is not None
+        and signals.beat_tracker == tracker
+        and signals.beats_ms
+        and not (signals.beats_per_bar == 3 and signals.meter_arbiter is None)
+    ):
         return BeatTrack(
             tracker=tracker,
             beats_ms=signals.beats_ms,
             downbeats_ms=signals.downbeats_ms or (),
             beats_per_bar=signals.beats_per_bar,
+            meter_margin=signals.meter_margin,
+            meter_arbiter=signals.meter_arbiter,
         )
     try:
         beats = track_file_beats(path)
@@ -1457,6 +1465,8 @@ def _smart_mix_beats(
             beats_ms=beats.beats_ms,
             downbeats_ms=beats.downbeats_ms,
             beats_per_bar=beats.beats_per_bar,
+            meter_margin=beats.meter_margin,
+            meter_arbiter=beats.meter_arbiter,
             updated_at=read_at,
         )
     except Exception:

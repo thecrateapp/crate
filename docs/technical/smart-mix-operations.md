@@ -371,8 +371,11 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   build reaches that stage through the `madmom-wheel` alias only when the image installs
   torch; without torch the alias points at the empty `madmom-skip` stage and the image
   gets neither madmom nor its licence. madmom's code is BSD (`/app/models/madmom.LICENSE`);
-  its package also ships model files under CC BY-NC-SA 4.0 that Crate does not use (the
-  DBN needs none), which is acceptable for Crate as free and open-source software.
+  its package also ships model files under CC BY-NC-SA 4.0 (Sebastian Böck and the
+  CPJKU, Johannes Kepler University Linz). Since `smart-mix-audio-v10` the meter arbiter
+  runs its downbeat networks (`DOWNBEATS_BLSTM`) in production, which Diego approved on
+  2026-11-09 (gate MG1): Crate is free and open-source software, so the non-commercial
+  licence does not block it. The DBN needs no model file.
 - **Where it runs.** `compute_smart_mix_profile` runs it before the analysis
   (`crate/smart_mix/beat_model.py`), unless the beats of this file are stored (see "Stored
   model signals" below), and passes the beats to the Rust analyzer
@@ -401,7 +404,18 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   its SBR band. Before, every `.m4a` lost the model and kept the analyzer's own tracker.
 - **Meter.** The DBN keeps one bar length per track, 3 or 4 beats, and `beats_per_bar` is
   read from its downbeats: the beats from each downbeat to the next, when every bar has as
-  many (otherwise null). Phrases, the planner and Crate Decks count bars of four, so with
+  many (otherwise null). Since `smart-mix-audio-v10` the worker decodes the DBN itself, one
+  path per bar length over the same Beat This! frames (`beat_model.decode_bar_paths`,
+  identical to madmom's processor for the winner), and when bars of three win it asks
+  madmom's own downbeat network, decoded by a DBN at 100 fps
+  (`crate/smart_mix/meter_arbiter.py`). Bars of three stay only when madmom also prefers
+  three; otherwise the track takes the DBN's four-beat path. Beat This!'s DBN hears fast
+  4/4 punk and metal (d-beat, thrash, death) in three, and since SM3-D16 such tracks lost
+  their bars and phrases. The arbiter costs 50-60 s of CPU and runs only on those tracks,
+  about 2.5 % of the library; if it fails, the DBN's choice stands and the worker logs a
+  warning. `track_mix_signals` keeps `meter_margin` (log p(3) - log p(4) per 1,000 frames)
+  and `meter_arbiter` (`madmom-dbn-3`, `madmom-dbn-4`, or null when it was not asked);
+  stored bars of three without a verdict are recomputed. Phrases, the planner and Crate Decks count bars of four, so with
   any other length (SM3-D16) both analyzers give the profile that `time_signature` and no
   downbeat, cue downbeats or phrases, and the track goes to crossfade. With 4, or without a
   constant bar, the bar is anchored as above and `time_signature` is 4 when the track has a

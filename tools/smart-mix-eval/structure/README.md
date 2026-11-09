@@ -63,13 +63,14 @@ python3 -m venv "$OUT/venv" && "$OUT/venv/bin/pip" install numpy mir_eval==0.8.2
 | Model or library         | Licence                                   | Use here                                  |
 | ------------------------ | ----------------------------------------- | ----------------------------------------- |
 | All-In-One (`allin1`)    | MIT                                       | Reference sections and downbeats, offline |
-| madmom                   | Code BSD; its model files CC BY-NC-SA 4.0 | Downbeat arbiter, offline only            |
+| madmom                   | Code BSD; its model files CC BY-NC-SA 4.0 | Downbeat arbiter; meter arbiter since v10 |
 | Beat This! (`beat_this`) | MIT, code and weights                     | The production beat model (SM3-D14)       |
 | `mir_eval`               | MIT                                       | Boundary detection metric                 |
 
-madmom's network weights are non-commercial: here they are only an offline arbiter. The
-analysis worker image installs madmom for its DBN, which uses no model file; the files the
-package ships stay unused there (see the operations doc).
+madmom's network weights are non-commercial. Here they are an offline arbiter; since
+`smart-mix-audio-v10` the analysis worker also runs its downbeat networks to check bars of
+three, which Diego approved for Crate as free and open-source software (see the operations
+doc).
 
 ## Measurement protocol
 
