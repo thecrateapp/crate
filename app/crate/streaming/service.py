@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
+from stat import S_ISREG
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -69,11 +72,13 @@ def media_type_for_path(path: Path) -> str:
     return STREAM_MEDIA_TYPES.get(path.suffix.lower(), "audio/mpeg")
 
 
-def resolve_source_path(track: dict) -> Path | None:
+def resolve_source_path(
+    track: dict, *, library_root: Path | None = None
+) -> Path | None:
     raw_path = str(track.get("path") or "")
     if not raw_path:
         return None
-    lib = library_path()
+    lib = library_root if library_root is not None else library_path()
     lib_str = str(lib)
     filepath = raw_path
     if filepath.startswith(lib_str):
@@ -85,6 +90,32 @@ def resolve_source_path(track: dict) -> Path | None:
         # (media.ResolveUnder) maps them onto the library root the same way.
         filepath = filepath[len("/data/") :].lstrip("/")
     return safe_path(lib, filepath)
+
+
+def stat_playable_sources(
+    paths: Sequence[str | None],
+) -> list[os.stat_result | None]:
+    """Stat each audio file the stream endpoints could serve, in order.
+
+    Same rule as the stream endpoints: a regular file inside the library.
+    Anything else (no path, missing, not a regular file, outside the library,
+    unreadable) is ``None``. The library root is read once per batch because
+    ``library_path()`` parses the config file on every call.
+    """
+    if not paths:
+        return []
+    library_root = library_path()
+    results: list[os.stat_result | None] = []
+    for path in paths:
+        try:
+            source = resolve_source_path({"path": path}, library_root=library_root)
+            file_stat = source.stat() if source is not None else None
+        except (OSError, ValueError):
+            file_stat = None
+        if file_stat is not None and not S_ISREG(file_stat.st_mode):
+            file_stat = None
+        results.append(file_stat)
+    return results
 
 
 def _source_quality(

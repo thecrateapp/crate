@@ -113,12 +113,53 @@ def test_unreadable_library_counts_as_no_audio(test_app, library):
     tracks = _dj_tracks(library)[:1]
     with (
         patch("crate.api.browse_media.search_dj_tracks", return_value=tracks),
-        patch("pathlib.Path.is_file", side_effect=PermissionError("denied")),
+        patch("pathlib.Path.stat", side_effect=PermissionError("denied")),
     ):
         response = test_app.get("/api/search", params={"q": "noah", "fields": "dj"})
 
     assert response.status_code == 200
     assert response.json()["tracks"][0]["playable"] is False
+
+
+def test_batch_check_matches_the_per_track_check(library):
+    # S3 pages check up to 500 tracks at once; the batch check gives the same
+    # answers as the stream endpoints and returns the stat of each regular file.
+    from crate.streaming.service import stat_playable_sources
+
+    rows = _dj_tracks(library)
+    stats = stat_playable_sources([row["path"] for row in rows])
+
+    assert {
+        row["title"]: file_stat is not None
+        for row, file_stat in zip(rows, stats, strict=True)
+    } == _EXPECTED_PLAYABLE
+    present = stats[0]
+    assert present is not None
+    assert present.st_size == len(b"fLaC")
+
+
+def test_dj_search_reads_the_library_root_once(test_app, library):
+    # library_path() parses config.yaml on every call; a 50-track page must not
+    # pay that 50 times.
+    with (
+        patch(
+            "crate.streaming.service.library_path", return_value=library
+        ) as library_root,
+        patch(
+            "crate.api.browse_media.search_dj_tracks",
+            return_value=_dj_tracks(library),
+        ),
+    ):
+        response = test_app.get(
+            "/api/search", params={"q": "bpm:120-128", "fields": "dj"}
+        )
+
+    assert response.status_code == 200
+    playable = {
+        track["title"]: track["playable"] for track in response.json()["tracks"]
+    }
+    assert playable == _EXPECTED_PLAYABLE
+    assert library_root.call_count == 1
 
 
 def test_local_search_shape_is_unchanged(test_app):
