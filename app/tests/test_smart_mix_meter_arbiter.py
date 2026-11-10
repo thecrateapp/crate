@@ -165,3 +165,36 @@ class _ScoresOnly:
 
     def viterbi(self, observations):
         raise AssertionError("the arbiter needs no path")
+
+
+def test_the_decoded_audio_is_freed_before_the_network_runs(monkeypatch) -> None:
+    """The 44.1 kHz audio (about 100 MB for 600 s) is not held through the network
+    and the DBN, which lowers the process's peak."""
+    import weakref
+
+    from crate.smart_mix import beat_model
+
+    decoded: list[weakref.ref] = []
+    alive_in_network: list[bool] = []
+
+    def load_signal(path, rate):
+        samples = np.zeros(44_100, dtype=np.float32)
+        decoded.append(weakref.ref(samples))
+        return samples, rate
+
+    def network(features):
+        alive_in_network.append(decoded[0]() is not None)
+        return np.zeros((len(features), 2))
+
+    class _Network:
+        processors = (None, network, lambda activations: activations)
+
+    arbiter = object.__new__(meter_arbiter.MadmomMeterArbiter)
+    arbiter._network = _Network()
+    arbiter._dbn = object()
+    monkeypatch.setattr(beat_model, "_load_signal", load_signal)
+    monkeypatch.setattr(arbiter, "features", lambda samples, rate: np.zeros((10, 4)))
+    monkeypatch.setattr(meter_arbiter, "meter_from_activations", lambda dbn, act: 4)
+
+    assert arbiter("track.flac") == 4
+    assert alive_in_network == [False]
