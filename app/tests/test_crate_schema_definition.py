@@ -152,8 +152,8 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("158").down_revision == "157"
     assert scripts.get_revision("159").down_revision == "158"
     assert scripts.get_revision("160").down_revision == "159"
-    # 161 is taken by PR #409 (Smart Mix analyzer v10); 162 follows 160 until it merges.
-    assert scripts.get_revision("162").down_revision == "160"
+    assert scripts.get_revision("161").down_revision == "160"
+    assert scripts.get_revision("162").down_revision == "161"
     assert scripts.get_heads() == ["162"]
 
 

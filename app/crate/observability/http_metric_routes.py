@@ -416,6 +416,8 @@ HTTP_ROUTES = frozenset(
         "/api/curation/playlists/:param",
         "/api/curation/playlists/:param/follow",
         "/api/curation/playlists/category/:param",
+        "/api/decks/containers",
+        "/api/decks/containers/:param/:param/tracks",
         "/api/decks/tracks/:param/stem-analysis",
         "/api/decks/tracks/:param/stems",
         "/api/discover/completeness",

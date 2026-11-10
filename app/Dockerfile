@@ -268,9 +268,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # (SM3-D14). Its PyPI release, 0.16.1, does not build on Python 3.13, so its wheel is
 # built here from a pinned commit, against the numpy of the analysis image, and only
 # the wheel reaches the image, without the compilers. madmom's code is BSD; its package
-# also ships model files under CC BY-NC-SA 4.0 that Crate does not use (the DBN needs
-# none), which is acceptable for Crate as free and open-source software. The licence
-# travels with the wheel and is installed with it as /app/models/madmom.LICENSE.
+# also ships model files under CC BY-NC-SA 4.0. Since smart-mix-audio-v10 the meter
+# arbiter runs its downbeat networks on the tracks Beat This!'s DBN hears in three
+# (crate/smart_mix/meter_arbiter.py, gate MG1), which is acceptable for Crate as free and
+# open-source software. The licence travels with the wheel and is installed with it as
+# /app/models/madmom.LICENSE.
 FROM worker-analysis-python AS madmom-build
 
 ARG MADMOM_COMMIT=27f032e8947204902c675e5e341a3faf5dc86dae

@@ -179,6 +179,20 @@ def _recover_stale_work() -> None:
         log.warning("Released %d dead Smart Mix backfill claim(s)", released)
 
 
+# How often the service loop looks for tracks that became claimable after the Smart
+# Mix campaign completed (new imports, library reanalyses).
+SMART_MIX_WAKE_SECONDS = 600
+
+
+def _wake_smart_mix_backfill() -> None:
+    """Reopen a completed Smart Mix campaign when tracks became claimable since."""
+    from crate.db.jobs.smart_mix_backfill import wake_smart_mix_backfill
+
+    task_id = wake_smart_mix_backfill()
+    if task_id:
+        log.info("Reopened the completed Smart Mix campaign: coordinator %s", task_id)
+
+
 def _env_int(name: str, default: int = 0) -> int:
     try:
         return int(os.environ.get(name, str(default)) or default)
@@ -445,6 +459,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
     last_media_worker_bridge = 0
     last_jam_auto_dj = 0
     last_governor_sample = 0
+    last_smart_mix_wake = 0
 
     while not stop_event.is_set():
         now = _time.time()
@@ -486,6 +501,14 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
                 set_cache("imports_pending", {"count": count})
             except Exception:
                 pass
+
+        # A completed Smart Mix campaign reopens when tracks became claimable since
+        if now - last_smart_mix_wake > SMART_MIX_WAKE_SECONDS:
+            last_smart_mix_wake = now
+            try:
+                _wake_smart_mix_backfill()
+            except Exception:
+                log.debug("Smart Mix backfill wake-up failed", exc_info=True)
 
         # Zombie task cleanup and AI slot reclamation every 30s
         if now - last_zombie_check > 30:

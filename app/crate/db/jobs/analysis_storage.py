@@ -666,19 +666,35 @@ def _replaces_current_profile(
         and draft.analyzer_version != ANALYZER_VERSION
     ):
         return False
+    # A draft from the analyzer's own tracker never replaces a profile of the same file
+    # whose beats came from Beat This! (SM3-D14), whatever its quality or version: its
+    # own constant grid can rate steadier than the model's beats while being the weaker
+    # grid. The library analysis embeds such drafts. Kept, an older profile is still
+    # claimed by the backfill, whose target it misses, and recomputed with the model;
+    # replaced, the track would hold a current own-tracker profile the backfill never
+    # claims again.
+    if (
+        current.source_revision == source_revision
+        and current.beat_tracker is not None
+        and draft.beat_tracker is None
+    ):
+        return False
+    # The other way round, the model's beats replace the analyzer's own for the same
+    # file whatever the quality: the backfill's upgrade of a new import or a library
+    # reanalysis would otherwise fail on every track its own tracker rated higher.
+    if (
+        current.source_revision == source_revision
+        and current.beat_tracker is None
+        and draft.beat_tracker is not None
+        and draft.quality != MixProfileQuality.UNAVAILABLE
+    ):
+        return True
     if (
         current.profile_version != PROFILE_SCHEMA_VERSION
         or current.source_revision != source_revision
         or current.analyzer_version != draft.analyzer_version
     ):
         return True
-    # A draft from the analyzer's own tracker never replaces a profile whose beats came
-    # from Beat This! (SM3-D14), whatever its quality: its own constant grid can rate
-    # steadier than the model's beats while being the weaker grid. The library analysis
-    # embeds such drafts, so without this a reanalysis of BPM, key and loudness stripped
-    # the model's beats from tracks it rated higher.
-    if current.beat_tracker is not None and draft.beat_tracker is None:
-        return False
     current_rank = _QUALITY_RANK[MixProfileQuality(current.quality)]
     draft_rank = _QUALITY_RANK[MixProfileQuality(draft.quality)]
     if draft_rank != current_rank:

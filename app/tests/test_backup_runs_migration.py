@@ -41,8 +41,7 @@ def test_migration_and_bootstrap_use_the_same_schema(monkeypatch):
     create_backup_runs_v162_schema(section)
     create_schema(bootstrap)
 
-    # 161 belongs to PR #409; 162 follows main's head until #409 merges.
-    assert migration.revision == "162" and migration.down_revision == "160"
+    assert migration.revision == "162" and migration.down_revision == "161"
     assert migrated.statements == section.statements
     joined = "\n".join(bootstrap.statements)
     assert all(statement in joined for statement in section.statements)

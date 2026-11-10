@@ -11,6 +11,11 @@ sources:
   - app/crate/api/native_oauth_auth.py
   - app/crate/api/capabilities.py
   - app/crate/api/schemas/capabilities.py
+  - app/crate/api/decks.py
+  - app/crate/api/schemas/decks.py
+  - app/crate/db/queries/decks_library.py
+  - app/crate/db/queries/vdj_catalog.py
+  - app/crate/streaming/service.py
   - app/crate/api/browse_media.py
   - app/crate/api/schemas/media.py
   - app/crate/api/schemas/smart_mix.py
@@ -37,6 +42,10 @@ sources:
   - app/tests/test_decks_stem_analysis_api.py
   - app/tests/test_stem_files.py
   - app/tests/test_smart_mix_playlists_api.py
+  - app/tests/test_decks_library_api.py
+  - app/tests/test_decks_library_queries.py
+  - app/tests/test_openapi_contract.py
+  - app/tests/test_readplane_route_manifest.py
   - app/tests/test_search_playable_audio.py
 ---
 
@@ -73,7 +82,7 @@ need them.
     "available": true,
     "min_client_version": "0.1.0",
     "contract_version": 1,
-    "features": ["stems", "stem_upload", "local_refinement"]
+    "features": ["library_cursor", "stems", "stem_upload", "local_refinement"]
   }
 }
 ```
@@ -103,8 +112,8 @@ Rules:
   | `stem_upload`                                 | Smart Mix Stems ST1, stem analysis uploads (only for a caller who may) |
   | `local_refinement`                            | Smart Mix Stems ST3, candidate menu for local refinement               |
 
-  `stems`, `stem_upload` and `local_refinement` ship so far. `stems` and
-  `local_refinement` are always present. `stem_upload` is present only when the
+  `library_cursor`, `stems`, `stem_upload` and `local_refinement` ship so far.
+  `library_cursor`, `stems` and `local_refinement` are always present. `stem_upload` is present only when the
   caller's session holds `smart_mix.stems.contribute` and an admin has not
   turned uploads off, so it depends on who asks. Decks features never follow
   the Android Smart Mix flags (`CRATE_ANDROID_*`); `smart_mix.android_*`
@@ -114,6 +123,273 @@ The constants live in `app/crate/api/capabilities.py`
 (`DECKS_CONTRACT_VERSION`, `DECKS_MIN_CLIENT_VERSION`, `_decks_features`), and
 the allowed feature names in `DecksFeature`
 (`app/crate/api/schemas/capabilities.py`).
+
+## Library navigation (S3)
+
+Decks mirrors the user's library into its own tables. Two read-only routes
+serve it, announced by the `library_cursor` feature:
+
+- They need a user session. A `crv_` access token gets `401`: the auth
+  middleware never lets one reach `/api/decks`, and the handlers answer `403`
+  if one ever does. A trusted-header user without a Crate account also gets
+  `403`.
+- Each request runs one bounded SQL statement and never aggregates over
+  `library_tracks`.
+- Both answer `If-None-Match` with `304`.
+- The Go read plane does not serve them: no edge routes `/api/decks/*` to it,
+  so they always reach FastAPI (`test_decks_library_routes_stay_on_fastapi`).
+
+### Container tree
+
+`GET /api/decks/containers`
+
+```json
+{
+  "library": { "track_count": 136512 },
+  "containers": [
+    {
+      "id": "28",
+      "kind": "playlist",
+      "name": "Para el coche",
+      "parent_id": null,
+      "track_count": 52,
+      "etag": "6f1e0c2b9a4d7e3f5a8b1c0d2e4f6a8b"
+    },
+    {
+      "id": "8c3c0f8e-1b9e-4f2e-9d55-2f7a1b0c4d6e",
+      "kind": "crate",
+      "name": "Digging",
+      "parent_id": null,
+      "etag": "0b7d4f1a2c3e5d6f7a8b9c0d1e2f3a4b"
+    },
+    {
+      "id": "17",
+      "kind": "genre",
+      "name": "Techno",
+      "parent_id": null,
+      "track_count": 4312,
+      "etag": "9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d"
+    },
+    {
+      "id": "party",
+      "kind": "mood",
+      "name": "Party",
+      "parent_id": null,
+      "etag": "5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
+    },
+    {
+      "id": "me",
+      "kind": "recent",
+      "name": "Recently Played",
+      "parent_id": null,
+      "etag": "1f2e3d4c5b6a79881726354453627180"
+    },
+    {
+      "id": "me",
+      "kind": "likes",
+      "name": "Likes",
+      "parent_id": null,
+      "etag": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+  ]
+}
+```
+
+The tree lists the kinds in this order, and each kind in its own order:
+
+| Kind       | Nodes                                                                                                                      | Id          | Order                  |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------- |
+| `playlist` | Active playlists the user owns or is a member of, and the public or system playlists they follow (the set VirtualDJ lists) | Playlist id | Name                   |
+| `crate`    | Crates the user owns, collaborative crates they are a member of, and public crates they follow                             | Crate UUID  | Name                   |
+| `genre`    | The 40 genres with the most albums (`DECKS_GENRE_LIMIT`, the same top list as VirtualDJ's genre folders)                   | Genre id    | Album count, then name |
+| `mood`     | One node per mood: `aggressive`, `dark`, `happy`, `party`, `relaxed`, `sad`                                                | Mood key    | Fixed (alphabetical)   |
+| `recent`   | One node                                                                                                                   | `me`        | After the moods        |
+| `likes`    | One node                                                                                                                   | `me`        | Last                   |
+
+| Field         | Meaning                                                                                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`          | Unique within its kind, so clients key nodes by `(kind, id)`                                                                                                                                                                                                             |
+| `kind`        | Clients ignore kinds they do not know; new kinds are additive                                                                                                                                                                                                            |
+| `parent_id`   | Always `null` (there are no folders)                                                                                                                                                                                                                                     |
+| `track_count` | Only when the server keeps it precomputed, omitted otherwise: playlists (`playlists.track_count`) and genres (the sum of their albums' `library_albums.track_count`). It counts every entry, including entries without a local track that the tracks endpoint leaves out |
+| `etag`        | A membership and order signal, without reading the tracks: see below. Track metadata and profile changes do not change it; they change the page `ETag`                                                                                                                   |
+
+What changes a node `etag`:
+
+- `playlist`: the playlist's `updated_at`, `editorial_revision`, `generation_epoch` or `track_count` (adding, removing or reordering entries bumps `updated_at`).
+- `crate`: the crate's `updated_at` (album changes bump it), `is_ordered` or `sort_direction`.
+- `genre`: the genre's albums (count and ids) or their track counts.
+- `mood`: never. Mood membership follows the analysis; revalidate mood pages with `If-None-Match`.
+- `recent`: a new play event.
+- `likes`: any like added or removed.
+
+Public and system playlists and public crates that the user does not follow
+are not in the tree, but the tracks endpoint serves them (see access below).
+
+`library.track_count` is the number of tracks in the whole library, the count
+Decks shows for its Library entry:
+
+- It is always present, `0` for an empty library.
+- It adds up the albums' `library_albums.track_count`, the counts the scanner
+  keeps and the genre nodes use, so no request counts `library_tracks`.
+- Like the playlist and genre counts, it includes tracks without an
+  `entity_uid`, which the tracks endpoint leaves out. A track outside any album
+  is not counted.
+- `library` is not a container: it has no node `etag` and no tracks endpoint. A
+  change to it changes the tree's response `ETag` (see caching below).
+
+### Container tracks
+
+`GET /api/decks/containers/{kind}/{id}/tracks?cursor=…&limit=500`
+
+```json
+{
+  "container": { "kind": "playlist", "id": "28" },
+  "tracks": [
+    {
+      "entity_uid": "0f6b3d9e-5a1c-4e2b-8d7f-1a2b3c4d5e6f",
+      "global_track_uid": "6a7b8c9d-0e1f-4a2b-9c3d-4e5f6a7b8c9d",
+      "title": "Noah",
+      "artist": "Converge",
+      "album": "Jane Doe",
+      "duration_ms": 245500,
+      "bpm": 124.0,
+      "camelot": "8A",
+      "energy": 0.72,
+      "genre": "Metalcore",
+      "format": "flac",
+      "bitrate": 1411,
+      "sample_rate": 44100,
+      "bit_depth": 16,
+      "byte_length": 43251877,
+      "source_revision": "432bd8811cde4ee2c4b333c8ea5eeee1ae3ddce8ee248c94d7afea3e74403112",
+      "profile_revision": "98d2b4a5b3372ffe6cc383d06c1dbd22d7feea71ff12728443dce61b61790317",
+      "profile_quality": "full",
+      "playable": true,
+      "cover_url": "/api/vdj/albums/412/cover?size=512"
+    }
+  ],
+  "next_cursor": "WyJwbGF5bGlzdCIsIjI4IixbNTAwLDE4MzRdXQ"
+}
+```
+
+| Field                                           | Type                     | Meaning                                                                                                                                                                                                                                                             |
+| ----------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entity_uid`                                    | string                   | Library track UID: the key for the stream and mix-profile endpoints                                                                                                                                                                                                 |
+| `global_track_uid`                              | string or null           | Global catalog track, when there is one                                                                                                                                                                                                                             |
+| `title`, `artist`                               | string                   | Title (the file name when the tag is empty) and artist                                                                                                                                                                                                              |
+| `album`                                         | string or null           | Album name                                                                                                                                                                                                                                                          |
+| `duration_ms`                                   | integer or null          | Track duration in milliseconds                                                                                                                                                                                                                                      |
+| `bpm`                                           | number or null           | BPM of the Smart Mix profile, else the tag BPM                                                                                                                                                                                                                      |
+| `camelot`, `energy`                             | string, number           | Key and global energy (0 to 1) of the Smart Mix profile; `null` without one                                                                                                                                                                                         |
+| `genre`                                         | string or null           | Track tag, else album tag, else the album's strongest genre                                                                                                                                                                                                         |
+| `format`, `bitrate`, `sample_rate`, `bit_depth` | string, integers or null | As the scanner recorded them                                                                                                                                                                                                                                        |
+| `byte_length`                                   | integer or null          | Size of the audio file the stream endpoints serve (`stat`). When the file is not playable, the size the scanner recorded                                                                                                                                            |
+| `source_revision`                               | string or null           | Revision of the audio file on disk (hash of size, mtime and inode), the same value a current profile records as its source revision. It changes whenever the file changes; `null` when the track is not playable                                                    |
+| `profile_revision`, `profile_quality`           | string or null           | The Smart Mix profile `GET /api/tracks/by-entity/{uid}/mix-profile` serves: any analyzer and schema version, as long as its source is not stale. `null` when there is none. `profile_quality` is `full`, `partial`, `legacy` or `unavailable` (the analysis failed) |
+| `playable`                                      | boolean                  | Same meaning and check as in the DJ search (S9)                                                                                                                                                                                                                     |
+| `cover_url`                                     | string or null           | Album cover (a public route), `null` when the album has none                                                                                                                                                                                                        |
+
+Order, by kind:
+
+- **`playlist`**: playlist position. Entries without a local library track
+  (deleted or remote-only) are left out. Inactive playlists are `404`.
+- **`crate`**: crates hold albums, so a crate expands to the local tracks of its
+  albums: album position in the crate (reversed when the crate is ordered
+  descending), then disc and track number, then track id. Albums without local
+  tracks add nothing, and a track that appears twice keeps its first place.
+- **`genre`**: the tracks of the albums tagged with the genre (`album_genres`),
+  by album id, then disc and track number, then track id. Any genre id works,
+  not only the ones in the tree.
+- **`mood`**: tracks whose score for the mood (`library_tracks.mood_json`) is a
+  number of at least `0.5`, highest score first, ties by track id. These are
+  VirtualDJ's mood folders.
+- **`recent`** (id `me`): the tracks of the user's last 2,000 play events, most
+  recently played first, each once. A play whose track row is gone counts for
+  the library track with the same entity UID; remote-only plays are left out.
+- **`likes`** (id `me`): newest like first. It merges the canonical global likes
+  that have a local track with legacy local likes; a track liked twice appears
+  once.
+
+Only library tracks with an `entity_uid` are listed.
+
+Access: a playlist can be read by its owner and members, or by anyone when it
+is public or a system playlist; a crate by its owner and collaborators, or by
+anyone when it is public. Anything else is `403`, also for admins. Genres and
+moods are the shared library; `recent` and `likes` are always the caller's.
+
+Errors:
+
+| Status | When                                                                                                                                                                                                                        |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | Malformed cursor, or a cursor from another container                                                                                                                                                                        |
+| `401`  | No session, or a `crv_` access token                                                                                                                                                                                        |
+| `403`  | Another user's private playlist or crate; an access token or an accountless trusted-header user reaching the handler                                                                                                        |
+| `404`  | Unknown container, inactive playlist, or an id that is not valid for its kind (a playlist or genre id that is not a number, a crate id that is not a UUID, an unknown mood, `recent` or `likes` with an id other than `me`) |
+| `422`  | Unknown kind, `limit` outside 1 to 500, a container id longer than 64 characters or a cursor longer than 1,024                                                                                                              |
+
+Paging:
+
+- `limit` is 1 to 500 (default 500).
+- `container.id` echoes the canonical id (`007` becomes `7`, a crate UUID its
+  lowercase hyphenated form). The tree already lists canonical ids.
+- `next_cursor` is opaque (base64url, no padding, of the kind, the container id
+  and the last row's sort key). Send it back unchanged as `cursor`. `null` means
+  the last page.
+- Pagination is keyset-based. Rows appended to a container (new playlist
+  entries, crate albums added at the end) show up on later pages, and a client
+  that pages through never gets a row twice or misses one, unless rows are
+  removed or reordered meanwhile. `recent` and `likes` are newest first, so a
+  play or like added while paging shows up on the first page, not on later ones;
+  a mood score that changes while paging can move a track across pages.
+
+Caching:
+
+- Each response carries a strong `ETag` computed from its body (a quoted
+  32-character hex string), so it changes with any change to the response: in
+  the tree, `library.track_count` or any node; in a page, the tracks, any field
+  (`playable` included) or `next_cursor`.
+- `If-None-Match` (one value, a list, `*`, or a weak `W/` value) that matches
+  gets `304` and no body, with the same `ETag`. The server still runs the query;
+  the `304` saves the transfer and the client's parsing.
+- Responses are `Cache-Control: private, no-cache`.
+
+Cost (measured 2026-11-09):
+
+- On a synthetic library sized like production, in its own PostgreSQL:
+  141,715 tracks in 10,900 albums, 400 genres (the largest on 30% of the
+  albums), 134,629 profiles, a 2,000-entry playlist, a 200-album crate, and
+  3,500 likes and 60,000 plays for the user, and 98% of the audio files present.
+- Every page reads its container in order through indexes and stops after the
+  page. No plan reads `library_tracks` sequentially and nothing aggregates over
+  it; `test_explain_uses_index` and `test_no_aggregate_over_library_tracks` pin
+  both. A 500-track page takes 9,000 to 23,000 shared buffer hits, the tree
+  under 1,000.
+- There is no stored genre ranking: the tree ranks `album_genres` (about 26,000
+  rows) on every request, which is most of the tree's cost. It also adds up the
+  albums' track counts for `library.track_count`, one pass over
+  `library_albums` (about 11,000 rows).
+- `playable`, `source_revision` and `byte_length` come from one `stat` per
+  track (`stat_playable_sources`), which resolves the library root once and each
+  folder once per page.
+- The measurement machine was a laptop under heavy unrelated load (load average
+  25 to 31 on 22 hybrid cores), so its times are well above an idle server's.
+  There, PostgreSQL executed a 500-track page in 18 to 74 ms and the tree in
+  24 ms (`EXPLAIN ANALYZE` without per-node timing). At p95, the statement with
+  its rows took 40 to 103 ms, the 500 file checks 17 to 40 ms, and the whole
+  request through the app 110 to 277 ms (85 to 176 ms at the median), where a
+  trivial endpoint (`/api/capabilities`) already took 63 ms (33 ms at the
+  median).
+- Side by side under the same load and on the same data, every page was 1.5 to
+  3.5 times faster at the median than the first S3 implementation, which
+  measured 49 to 61 ms at p95 end to end on a copy of the dev database
+  (2026-11-04). The 150 ms budget therefore holds by that extrapolation, not by
+  a measurement on an idle server, and there is no `playable` column. Cold disk
+  caches add latency to each file check; if that ever breaks the budget,
+  availability moves to a column.
+- Diego accepted on 2026-11-09 the p95 extrapolation above and the two
+  deviations from the plan: genres ranked on every request instead of a
+  precomputed top N, and no migration (no `playable` column).
 
 ## Stem analyses (Smart Mix Stems ST1)
 
@@ -342,17 +618,19 @@ response carries `playable`:
   file, resolves outside the library or cannot be read. Decks should not offer
   it for loading.
 
-The check is the one the stream endpoints use (`resolve_source_path` and
-`is_file()`), done on every request for at most 50 results. The server path is
-used for the check and never returned. Access-token DJ queries (a valid DJ query
+The check is the one the stream endpoints use: the path resolves inside the
+library (`resolve_source_path`) and `stat` finds a regular file. It runs on every
+request, for at most 50 results, through `stat_playable_sources`
+(`app/crate/streaming/service.py`), which reads the library root once per batch.
+The server path is used for the check and never returned. Access-token DJ queries (a valid DJ query
 without `fields=dj`) also carry `playable`.
 
 Plain local, `auto` and federated search do not include `playable`: the Go read
 plane serves plain local search natively and must keep the same JSON. Any
 `/api/search` request with a `fields` parameter falls back from the read plane
 to FastAPI (`searchRoute` in `app/readplane/internal/routes/catalog.go`), so
-`fields=dj` gets the DJ filters and `playable` behind the edge too. The paged
-navigation responses (S3) will carry the same field when they exist.
+`fields=dj` gets the DJ filters and `playable` behind the edge too. The S3
+track pages carry the same field with the same check.
 
 ### Plan and profile fields
 

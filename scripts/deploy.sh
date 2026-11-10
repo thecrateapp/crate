@@ -216,6 +216,12 @@ MONITORING_OVERLAYS=(
   deploy/observability/compose.supervisor-prometheus.yaml
 )
 
+# Build context of the opt-in crate-backup-offsite service (profile offsite-backup).
+BACKUP_TOOLING=(
+  deploy/backup-offsite/Dockerfile
+  deploy/backup-offsite/offsite.sh
+)
+
 prepare_payload() {
   TMP_DIR="$(mktemp -d)"
   mkdir -p "$TMP_DIR/deploy/traefik" "$TMP_DIR/deploy/hermes"
@@ -229,7 +235,7 @@ prepare_payload() {
       cp -a "$ROOT_DIR/deploy/hermes/." "$TMP_DIR/deploy/hermes/"
     fi
     local file
-    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do
+    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}" "${BACKUP_TOOLING[@]}"; do
       if [[ -f "$ROOT_DIR/$file" ]]; then
         mkdir -p "$TMP_DIR/$(dirname "$file")"
         cp "$ROOT_DIR/$file" "$TMP_DIR/$file"
@@ -243,7 +249,7 @@ prepare_payload() {
       git -C "$ROOT_DIR" archive "$DEPLOY_REF" deploy/hermes | tar -x -C "$TMP_DIR"
     fi
     local file
-    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do
+    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}" "${BACKUP_TOOLING[@]}"; do
       if git -C "$ROOT_DIR" cat-file -e "${DEPLOY_REF}:${file}" 2>/dev/null; then
         git -C "$ROOT_DIR" archive "$DEPLOY_REF" "$file" | tar -x -C "$TMP_DIR"
       fi
@@ -369,7 +375,7 @@ sync_config() {
     scp -r "$TMP_DIR/deploy/hermes/." "$REMOTE:$SERVER_PATH/deploy/hermes/"
   fi
   local file
-  for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do
+  for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}" "${BACKUP_TOOLING[@]}"; do
     if [[ -f "$TMP_DIR/$file" ]]; then
       ssh_remote "mkdir -p '$SERVER_PATH/$(dirname "$file")'"
       scp "$TMP_DIR/$file" "$REMOTE:$SERVER_PATH/$file"

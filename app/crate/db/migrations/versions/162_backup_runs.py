@@ -1,7 +1,6 @@
 """Backup runs: the jobs of the backups engine (admin backups, BK1).
 
-Numbered 162 because PR #409 (Smart Mix analyzer v10) takes 161. It follows 160,
-the head of main, until #409 merges; then its down revision becomes 161.
+Follows 161 (Smart Mix meter signals, PR #409).
 """
 
 from alembic import op
@@ -12,7 +11,7 @@ from crate.db.schema_sections.backup_runs_v162 import (
 )
 
 revision = "162"
-down_revision = "160"
+down_revision = "161"
 branch_labels = None
 depends_on = None
 
