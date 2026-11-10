@@ -7,6 +7,7 @@ def test_capabilities_keep_smart_mix_contract_stable(test_app, monkeypatch):
     )
     monkeypatch.setenv("CRATE_SMART_MIX_ENABLED", "true")
     monkeypatch.delenv("CRATE_VDJ_ENABLED", raising=False)
+    monkeypatch.delenv("CRATE_LISTEN_SMART_MIX_V3_ENABLED", raising=False)
 
     response = test_app.get("/api/capabilities")
 
@@ -38,6 +39,8 @@ def test_capabilities_keep_smart_mix_contract_stable(test_app, monkeypatch):
         "planner_version": "smart-mix-v2",
         "planner_versions": ["smart-mix-v2", "smart-mix-v3"],
         "structure": False,
+        # Additive: VirtualDJ reads planner_version, which stays on v2 (LV-D3).
+        "listen_planner_version": "smart-mix-v2",
         "android_native_crossfade": False,
         "android_beatmatch": False,
         "android_bass_handoff": False,

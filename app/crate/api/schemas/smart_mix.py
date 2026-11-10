@@ -702,7 +702,7 @@ class PlaybackContinuationTokenRequest(SmartMixRequestModel):
 
 class PlaybackContinuationRequest(SmartMixRequestModel):
     batch_index: int | None = Field(default=None, alias="batchIndex", ge=0)
-    planner_version: Literal["smart-mix-v2"] = Field(alias="plannerVersion")
+    planner_version: PlannerIdentifier = Field(alias="plannerVersion")
     after_track_entity_uid: UUID | None = Field(
         default=None, alias="afterTrackEntityUid"
     )

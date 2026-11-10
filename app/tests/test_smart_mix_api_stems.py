@@ -407,7 +407,23 @@ def test_live_drum_extreme_metal_stays_out(batch) -> None:
     assert batch["post"]() == plain
 
 
-@pytest.mark.parametrize("source", ["playlist", "radio", "infinite"])
+LISTEN_SOURCES = ["playlist", "radio", "shuffle", "manual", "infinite"]
+
+
+@pytest.mark.parametrize("source", LISTEN_SOURCES)
+def test_listen_batches_read_no_stem_analyses(batch, source) -> None:
+    # The layer serves only Crate Decks (rules revision 5), so a Listen batch on v3
+    # does not query stem analyses at all.
+    batch["analyses"] = {uid: [_analysis(uid)] for uid in REVISIONS}
+    context = {**_edge()["context"], "source": source}
+
+    plan = batch["post_edge"]({**_edge(), "context": context})
+
+    assert batch["stem_reads"] == []
+    assert "stemsUsed" not in plan
+
+
+@pytest.mark.parametrize("source", LISTEN_SOURCES)
 def test_only_crate_decks_gets_the_stems_layer(batch, source) -> None:
     # Rules revision 5 (STEM-G1): Listen and Android sources plan without stems, read
     # no genres and key their plans without them.

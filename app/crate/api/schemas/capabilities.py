@@ -64,6 +64,14 @@ class SmartMixCapabilities(BaseModel):
             "request."
         )
     )
+    listen_planner_version: str | None = Field(
+        description=(
+            "Planner Listen's native engine asks for, in its plan batches and its "
+            "background continuation: smart-mix-v3 with "
+            "CRATE_LISTEN_SMART_MIX_V3_ENABLED, smart-mix-v2 otherwise. Always one "
+            "of planner_versions; null while Smart Mix is off."
+        )
+    )
     android_native_crossfade: bool
     android_beatmatch: bool
     android_bass_handoff: bool
