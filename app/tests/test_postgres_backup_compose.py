@@ -50,7 +50,7 @@ def test_env_example_documents_backup_settings():
         assert re.search(rf"^# {key}=", text, re.MULTILINE), key
 
 
-def _resolved_backup_service(tmp_path, overrides):
+def _resolved_config(tmp_path, overrides, profiles=()):
     docker = shutil.which("docker")
     if docker is None:
         pytest.skip("Docker Compose CLI required; no daemon or containers used")
@@ -74,7 +74,9 @@ def _resolved_backup_service(tmp_path, overrides):
     command += ["--project-name", "crate", "--env-file", str(env_file)]
     for file in files:
         command += ["-f", str(ROOT / file)]
-    command += ["config", "--format", "json", SERVICE]
+    for profile in profiles:
+        command += ["--profile", profile]
+    command += ["config", "--format", "json"]
     # Shell variables override --env-file, so keep only what the Docker CLI needs:
     # the backend suite exports its own DATA_DIR.
     environment = {
@@ -86,7 +88,11 @@ def _resolved_backup_service(tmp_path, overrides):
         command, capture_output=True, text=True, timeout=60, env=environment
     )
     assert result.returncode == 0, result.stderr
-    config = json.loads(result.stdout)
+    return json.loads(result.stdout)
+
+
+def _resolved_backup_service(tmp_path, overrides):
+    config = _resolved_config(tmp_path, overrides)
     return config, config["services"][SERVICE]
 
 
@@ -132,3 +138,65 @@ def test_resolved_named_volume_and_overrides(tmp_path):
         "name": "crate_crate_postgres_backups",
         "driver": "local",
     }
+
+
+OFFSITE = "crate-backup-offsite"
+OFFSITE_SECRETS = (
+    "RESTIC_PASSWORD",
+    "CRATE_OFFSITE_R2_ACCOUNT_ID",
+    "CRATE_OFFSITE_R2_BUCKET",
+    "CRATE_OFFSITE_R2_ACCESS_KEY_ID",
+    "CRATE_OFFSITE_R2_SECRET_ACCESS_KEY",
+    "RCLONE_CONFIG_GDRIVE_TYPE",
+    "RCLONE_CONFIG_GDRIVE_TOKEN",
+    "RCLONE_CONFIG_GDRIVE_CLIENT_ID",
+    "RCLONE_CONFIG_GDRIVE_CLIENT_SECRET",
+)
+
+
+def test_offsite_service_is_opt_in_and_isolated():
+    compose, _ = _service()
+    service = compose["services"][OFFSITE]
+    environment = _environment(service)
+
+    assert service["profiles"] == ["offsite-backup"]
+    assert (ROOT / service["build"]["context"] / "Dockerfile").is_file()
+    assert service["volumes"] == [
+        "${POSTGRES_BACKUP_DIR:-${DATA_DIR}/backups/postgres}:/backups:ro",
+        "crate_backup_offsite:/state",
+    ]
+    # Its own network: the drill must never be able to reach crate-postgres.
+    assert service["networks"] == ["backup-offsite"]
+    assert "depends_on" not in service
+    for key in OFFSITE_SECRETS:
+        assert environment[key] == f"${{{key}:-}}", key
+    assert environment["RCLONE_CONFIG_GDRIVE_SCOPE"] == (
+        "${RCLONE_CONFIG_GDRIVE_SCOPE:-drive.file}"
+    )
+    assert not [key for key in environment if "B2" in key]
+    assert compose["volumes"]["crate_backup_offsite"] == {"driver": "local"}
+
+
+def test_env_example_lists_offsite_keys_without_values():
+    text = (ROOT / ".env.example").read_text()
+    for key in OFFSITE_SECRETS:
+        match = re.search(rf"^# {key}=(.*)$", text, re.MULTILINE)
+        assert match, key
+        assert match.group(1) in {"", "drive"} or "..." in match.group(1), key
+
+
+def test_offsite_service_resolves_only_with_its_profile(tmp_path):
+    default = _resolved_config(tmp_path, {})
+    assert OFFSITE not in default["services"]
+    assert "backup-offsite" not in default.get("networks", {})
+
+    enabled = _resolved_config(
+        tmp_path,
+        {"POSTGRES_BACKUP_DIR": "crate_postgres_backups"},
+        profiles=("offsite-backup",),
+    )
+    service = enabled["services"][OFFSITE]
+    backups = next(v for v in service["volumes"] if v["target"] == "/backups")
+    assert backups["source"] == "crate_postgres_backups"
+    assert backups["read_only"] is True
+    assert list(service["networks"]) == ["backup-offsite"]

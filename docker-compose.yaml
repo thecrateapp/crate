@@ -1,6 +1,8 @@
 networks:
   crate:
     external: true
+  # Internet-only network for crate-backup-offsite: it must not reach crate-postgres.
+  backup-offsite: {}
 
 x-logging: &default-logging
   driver: local
@@ -261,6 +263,40 @@ services:
       - crate
     depends_on:
       - crate-postgres
+
+  # Crate — off-site copies of those dumps (restic to Cloudflare R2 and Google
+  # Drive). Opt-in: `docker compose --profile offsite-backup up -d`. See
+  # docs/operators/postgres-offsite-backups.md.
+  crate-backup-offsite:
+    logging: *default-logging
+    profiles: [offsite-backup]
+    image: crate-backup-offsite:local
+    build:
+      context: ./deploy/backup-offsite
+    container_name: crate-backup-offsite
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - CRATE_OFFSITE_DB=${CRATE_POSTGRES_DB:-crate}
+      - CRATE_OFFSITE_DRILL_OWNER=${CRATE_POSTGRES_USER:-crate}
+      - RESTIC_PASSWORD=${RESTIC_PASSWORD:-}
+      - CRATE_OFFSITE_R2_ACCOUNT_ID=${CRATE_OFFSITE_R2_ACCOUNT_ID:-}
+      - CRATE_OFFSITE_R2_BUCKET=${CRATE_OFFSITE_R2_BUCKET:-}
+      - CRATE_OFFSITE_R2_PATH=${CRATE_OFFSITE_R2_PATH:-}
+      - CRATE_OFFSITE_R2_ACCESS_KEY_ID=${CRATE_OFFSITE_R2_ACCESS_KEY_ID:-}
+      - CRATE_OFFSITE_R2_SECRET_ACCESS_KEY=${CRATE_OFFSITE_R2_SECRET_ACCESS_KEY:-}
+      - CRATE_OFFSITE_GDRIVE_PATH=${CRATE_OFFSITE_GDRIVE_PATH:-crate-backups}
+      - RCLONE_CONFIG_GDRIVE_TYPE=${RCLONE_CONFIG_GDRIVE_TYPE:-}
+      - RCLONE_CONFIG_GDRIVE_SCOPE=${RCLONE_CONFIG_GDRIVE_SCOPE:-drive.file}
+      - RCLONE_CONFIG_GDRIVE_TOKEN=${RCLONE_CONFIG_GDRIVE_TOKEN:-}
+      - RCLONE_CONFIG_GDRIVE_CLIENT_ID=${RCLONE_CONFIG_GDRIVE_CLIENT_ID:-}
+      - RCLONE_CONFIG_GDRIVE_CLIENT_SECRET=${RCLONE_CONFIG_GDRIVE_CLIENT_SECRET:-}
+      - RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID=${RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID:-}
+    volumes:
+      - ${POSTGRES_BACKUP_DIR:-${DATA_DIR}/backups/postgres}:/backups:ro
+      - crate_backup_offsite:/state
+    networks:
+      - backup-offsite
 
   # Crate — Music stack management
   crate-api:
@@ -1191,4 +1227,6 @@ volumes:
   crate_postgres:
     driver: local
   crate_postgres_backups:
+    driver: local
+  crate_backup_offsite:
     driver: local
