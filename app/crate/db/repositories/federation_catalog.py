@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 
+from crate.db.repositories.global_content_cache import invalidate_source_cache
 from crate.db.tx import read_scope, transaction_scope
 from crate.federation.events import emit_global_catalog_source_changed
-from crate.db.repositories.global_content_cache import invalidate_source_cache
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def upsert_catalog_item(
     raw_json: dict | None = None,
     sync_session_uid: str | None = None,
 ) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     search_text = " ".join(filter(None, [title, artist or "", album or ""]))
 
     with transaction_scope() as s:
@@ -129,7 +129,7 @@ def tombstone_catalog_item(
     entity_type: str,
     reason: str = "deleted",
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with transaction_scope() as s:
         s.execute(
             text(
@@ -175,7 +175,7 @@ def tombstone_catalog_items_missing_from_revision(
     if not remote_revision:
         raise ValueError("A completed manifest requires a non-empty revision")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with transaction_scope() as session:
         rows = (
             session.execute(
@@ -237,7 +237,7 @@ def tombstone_catalog_items_missing_from_session(
     node_uid: str, sync_session_uid: str
 ) -> int:
     """Tombstone unseen rows only after a full snapshot session completes."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with transaction_scope() as session:
         rows = (
             session.execute(
@@ -318,7 +318,7 @@ def cleanup_peer_catalog(node_uid: str) -> int:
 
 
 def cleanup_old_tombstones(retention_days: int = 90) -> int:
-    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
     with transaction_scope() as s:
         result = s.execute(
             text(
@@ -342,7 +342,7 @@ def upsert_cursor(
     sync_session_uid: str | None = None,
     full_verified: bool = False,
 ) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with transaction_scope() as s:
         s.execute(
             text(
@@ -407,7 +407,7 @@ def save_catalog_sync_checkpoint(
     sync_session_uid: str | None = None,
 ) -> dict:
     """Persist a resumable full-manifest cursor without marking it complete."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cursor = json.dumps(
         {
             "status": "partial",
@@ -452,7 +452,7 @@ def save_catalog_sync_checkpoint(
 
 
 def record_catalog_sync_error(node_uid: str, error: str) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with transaction_scope() as session:
         session.execute(
             text(
@@ -510,10 +510,12 @@ def is_catalog_stale(node_uid: str) -> bool:
     cursor = get_cursor(node_uid)
     if not cursor:
         return True
-    last = cursor.get("full_sync_completed_at")
+    # Empty successful delta pages are peer heartbeats too. Unchanged rows do
+    # not need rewriting merely to keep the peer's catalogue fresh.
+    last = cursor.get("last_delta_at") or cursor.get("full_sync_completed_at")
     if not last:
         return True
-    return datetime.now(timezone.utc) - last > timedelta(hours=STALE_THRESHOLD_HOURS)
+    return datetime.now(UTC) - last > timedelta(hours=STALE_THRESHOLD_HOURS)
 
 
 # ── Search ────────────────────────────────────────────────────────────────

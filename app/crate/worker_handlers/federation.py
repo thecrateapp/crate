@@ -5,15 +5,15 @@ Phase 4/5/6 worker integration. All long-running operations go through Dramatiq.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
-import uuid
-import hashlib
 import os
 import shutil
 import time
+import uuid
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import quote
@@ -124,6 +124,7 @@ def _sync_peer_catalog_delta(
     current = cursor
     total_applied = 0
     pages = 0
+    previous_sequence = None
     while max_pages is None or pages < max(1, max_pages):
         path = (
             "/api/federation/v1/catalog/delta"
@@ -147,17 +148,24 @@ def _sync_peer_catalog_delta(
         next_cursor = str(data.get("next_cursor") or "")
         if not next_cursor:
             raise RuntimeError("peer delta response is missing next_cursor")
+        scanned_sequence = int(data.get("scanned_sequence") or 0)
+        if data.get("has_more") and (
+            next_cursor == current
+            or (previous_sequence is not None and scanned_sequence <= previous_sequence)
+        ):
+            raise RuntimeError("peer delta response made no forward progress")
         result = apply_federation_delta_page(
             node_uid=str(peer["node_uid"]),
             items=_manifest_page_items(
                 data.get("items") or data.get("operations") or []
             ),
             next_cursor=next_cursor,
-            last_sequence=int(data.get("scanned_sequence") or 0),
+            last_sequence=scanned_sequence,
         )
         total_applied += int(result["applied"])
         pages += 1
         current = next_cursor
+        previous_sequence = scanned_sequence
         if not data.get("has_more"):
             break
     return {
@@ -175,21 +183,20 @@ def _sync_single_peer_catalog(
     *,
     on_page: Callable[[int], None] | None = None,
 ) -> dict:
+    from crate.db.repositories.federation_manifest_import import (
+        apply_federation_manifest_page,
+    )
     from crate.federation.catalog import (
         get_cursor,
         record_catalog_sync_error,
-        save_catalog_sync_checkpoint,
         tombstone_catalog_items_missing_from_revision,
         tombstone_catalog_items_missing_from_session,
-        upsert_catalog_item,
         upsert_cursor,
     )
     from crate.federation.events import (
         emit_catalog_sync_completed,
         emit_catalog_sync_failed,
-        emit_global_catalog_source_changed,
     )
-    from crate.federation.global_content_cache import invalidate_source_cache
 
     peer = repo.get_peer(node_uid)
     if not peer:
@@ -201,7 +208,7 @@ def _sync_single_peer_catalog(
     if not local_node:
         return {"error": "local node not configured"}
 
-    page_size = max(1, min(int(params.get("page_size", 200) or 200), 500))
+    page_size = max(1, min(int(params.get("page_size", 500) or 500), 500))
     base_path = f"/api/federation/v1/catalog/manifest?page_size={page_size}"
     total_count = 0
     revision = ""
@@ -209,16 +216,17 @@ def _sync_single_peer_catalog(
     try:
         stored_cursor = get_cursor(node_uid) or {}
     except Exception:
+        log.debug("Unable to load peer catalog checkpoint", exc_info=True)
         stored_cursor = {}
     retry_after = stored_cursor.get("retry_after")
     if isinstance(retry_after, str):
         try:
-            retry_after = datetime.fromisoformat(retry_after.replace("Z", "+00:00"))
+            retry_after = datetime.fromisoformat(retry_after)
         except ValueError:
             retry_after = None
     if (
         retry_after
-        and retry_after > datetime.now(timezone.utc)
+        and retry_after > datetime.now(UTC)
         and not params.get("ignore_backoff")
     ):
         return {
@@ -227,19 +235,9 @@ def _sync_single_peer_catalog(
             "synced": 0,
         }
     stored_value = stored_cursor.get("cursor")
-    last_verified = stored_cursor.get("last_full_verified_at")
-    if isinstance(last_verified, str):
-        try:
-            last_verified = datetime.fromisoformat(last_verified.replace("Z", "+00:00"))
-        except ValueError:
-            last_verified = None
-    full_verification_due = not last_verified or (
-        datetime.now(timezone.utc) - last_verified > timedelta(days=1)
-    )
     if (
         "start_page" not in params
         and not params.get("force_full")
-        and not full_verification_due
         and _looks_like_opaque_cursor(stored_value)
     ):
         try:
@@ -255,6 +253,7 @@ def _sync_single_peer_catalog(
                 ),
             )
         except Exception as exc:
+            log.warning("Peer catalog delta sync failed", exc_info=True)
             repo.update_peer(node_uid, last_error=str(exc)[:200])
             record_catalog_sync_error(node_uid, str(exc))
             emit_catalog_sync_failed(node_uid, str(exc)[:200])
@@ -271,10 +270,10 @@ def _sync_single_peer_catalog(
     next_cursor = ""
     snapshot_cursor = ""
     snapshot_sequence = 0
-    if "start_page" not in params:
+    if "start_page" not in params and not params.get("force_full"):
         try:
             checkpoint = json.loads(str(stored_cursor.get("cursor") or "{}"))
-        except Exception:
+        except (ValueError, TypeError, RecursionError):
             checkpoint = {}
         if (
             isinstance(checkpoint, dict)
@@ -306,9 +305,26 @@ def _sync_single_peer_catalog(
                 key_id=local_node["active_key_id"],
                 private_key_ref=local_node["private_key_ref"],
             )
+            if (
+                getattr(resp, "status_code", 200) == 410
+                and not restarted_after_revision_change
+            ):
+                # A changed sharing scope invalidates its continuation token.
+                # Restart from a fresh bootstrap, never from the previous cursor.
+                page = 0
+                revision = ""
+                total_count = 0
+                pages_fetched = 0
+                next_cursor = ""
+                snapshot_cursor = ""
+                snapshot_sequence = 0
+                sync_session_uid = str(uuid.uuid4())
+                restarted_after_revision_change = True
+                continue
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
+            log.warning("Peer catalog manifest fetch failed", exc_info=True)
             repo.update_peer(node_uid, last_error=str(e)[:200])
             try:
                 record_catalog_sync_error(node_uid, str(e))
@@ -342,6 +358,10 @@ def _sync_single_peer_catalog(
                 revision = ""
                 total_count = 0
                 pages_fetched = 0
+                next_cursor = ""
+                snapshot_cursor = ""
+                snapshot_sequence = 0
+                sync_session_uid = str(uuid.uuid4())
                 restarted_after_revision_change = True
                 continue
             error = "peer manifest revision changed during pagination"
@@ -365,67 +385,55 @@ def _sync_single_peer_catalog(
             manifest_completed = True
             break
 
-        for item in page_items:
-            entity_type = str(item.get("entity_type") or "")
-            remote_entity_uid = str(
-                item.get("remote_entity_uid") or item.get("entity_uid") or ""
-            )
-            if entity_type not in {"artist", "album", "track"} or not remote_entity_uid:
-                continue
-            upsert_catalog_item(
-                node_uid=node_uid,
-                remote_entity_uid=remote_entity_uid,
-                entity_type=entity_type,
-                title=str(item.get("title") or item.get("name") or ""),
-                artist=item.get("artist"),
-                album=item.get("album"),
-                year=str(item["year"]) if item.get("year") is not None else None,
-                duration_seconds=_duration_seconds(item),
-                track_number=item.get("track_number"),
-                disc_number=item.get("disc_number"),
-                remote_revision=revision,
-                raw_json=item,
-                sync_session_uid=sync_session_uid,
-            )
-            invalidated = invalidate_source_cache(node_uid, remote_entity_uid)
-            if invalidated:
-                emit_global_catalog_source_changed(
-                    node_uid=node_uid,
-                    reason="manifest_revision_changed",
-                    entity_type=entity_type,
-                    remote_entity_uid=remote_entity_uid,
-                )
-            total_count += 1
-
+        response_next_cursor = str(data.get("next_cursor") or "")
+        valid_count = sum(
+            str(item.get("entity_type") or "") in {"artist", "album", "track"}
+            and bool(item.get("remote_entity_uid") or item.get("entity_uid"))
+            for item in page_items
+        )
+        # The staged rows, dirty markers and continuation advance together.
+        applied = apply_federation_manifest_page(
+            node_uid=node_uid,
+            items=page_items,
+            revision=revision,
+            sync_session_uid=sync_session_uid,
+            checkpoint={
+                "next_page": page + 1,
+                "page_size": page_size,
+                "synced": total_count + valid_count,
+                "next_cursor": response_next_cursor or None,
+                "snapshot_cursor": snapshot_cursor or None,
+            },
+        )
+        total_count += int(applied["applied"])
         if on_page is not None:
             on_page(total_count)
-        response_next_cursor = str(data.get("next_cursor") or "")
-        if "has_more" in data and not data.get("has_more"):
-            manifest_completed = True
-            break
+        if "has_more" in data:
+            if not data["has_more"]:
+                manifest_completed = True
+                break
+            if response_next_cursor and response_next_cursor == next_cursor:
+                error = "peer manifest response made no forward progress"
+                record_catalog_sync_error(node_uid, error)
+                emit_catalog_sync_failed(node_uid, error)
+                return {"status": "failed", "error": error, "synced": total_count}
         total_pages = data.get("total_pages")
-        if total_pages is not None and data.get("page", page) >= int(total_pages) - 1:
+        if (
+            "has_more" not in data
+            and total_pages is not None
+            and data.get("page", page) >= int(total_pages) - 1
+        ):
             manifest_completed = True
             break
-        if total_pages is None and len(page_items) < page_size:
+        if (
+            "has_more" not in data
+            and total_pages is None
+            and len(page_items) < page_size
+        ):
             manifest_completed = True
             break
-        checkpoint_kwargs = {
-            "revision": revision,
-            "next_page": page + 1,
-            "page_size": page_size,
-            "synced": total_count,
-        }
         if response_next_cursor:
-            checkpoint_kwargs.update(
-                {
-                    "next_cursor": response_next_cursor,
-                    "snapshot_cursor": snapshot_cursor,
-                    "sync_session_uid": sync_session_uid,
-                }
-            )
             next_cursor = response_next_cursor
-        save_catalog_sync_checkpoint(node_uid, **checkpoint_kwargs)
         page += 1
 
     if not manifest_completed:
@@ -456,6 +464,32 @@ def _sync_single_peer_catalog(
     else:
         tombstoned = tombstone_catalog_items_missing_from_revision(node_uid, revision)
         upsert_cursor(node_uid, revision)
+    delta_synced = 0
+    if snapshot_cursor:
+        try:
+            catch_up = _sync_peer_catalog_delta(
+                peer=peer,
+                local_node=local_node,
+                cursor=snapshot_cursor,
+                page_size=page_size,
+            )
+            if catch_up.get("status") == "full_sync_required":
+                raise RuntimeError(
+                    "catalog changes expired during bootstrap; retry full sync"
+                )
+            delta_synced = int(catch_up.get("synced") or 0)
+        except Exception as exc:
+            log.warning("Peer catalog delta catch-up failed", exc_info=True)
+            error = str(exc)[:200]
+            repo.update_peer(node_uid, last_error=error)
+            record_catalog_sync_error(node_uid, error)
+            emit_catalog_sync_failed(node_uid, error)
+            return {
+                "status": "failed",
+                "error": error,
+                "synced": total_count,
+                "phase": "catch_up_deltas",
+            }
     emit_catalog_sync_completed(node_uid, total_count, revision)
     return {
         "status": "completed",
@@ -463,6 +497,7 @@ def _sync_single_peer_catalog(
         "revision": revision,
         "pages": pages_fetched,
         "tombstoned": tombstoned,
+        "delta_synced": delta_synced,
     }
 
 
@@ -687,6 +722,7 @@ def _handle_federation_import(task_id: str, params: dict, config: dict) -> dict:
         shutil.rmtree(staging_dir, ignore_errors=True)
         return {"status": "completed", "request_id": request_id, **result}
     except Exception as exc:
+        log.warning("Federation album import failed", exc_info=True)
         failure = str(exc).lower()
         if "sha-256" in failure or "digest mismatch" in failure:
             from crate.federation.abuse import observe_risk_signal

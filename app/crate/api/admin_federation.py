@@ -678,15 +678,20 @@ def update_peer_limits(node_uid: str, body: LimitsPatchBody, request: Request):
 def sync_all_peer_catalogs(request: Request):
     require_permission(request, "federation.catalog.sync.manage")
 
-    from crate.db.repositories.tasks import create_task
+    from crate.db.repositories.tasks import create_task_dedup
 
-    task_id = create_task("federation_sync_catalog", {"triggered_by": "admin"})
+    task_id = create_task_dedup(
+        "federation_sync_catalog",
+        {"triggered_by": "admin"},
+        dedup_key="federation:sync:all",
+    )
+    status = "queued" if task_id else "already_running"
     repo.record_audit_event(
         event_type="catalog.sync_all.queued",
-        status="queued",
+        status=status,
         metadata={"task_id": task_id},
     )
-    return {"task_id": task_id, "status": "queued"}
+    return {"task_id": task_id, "status": status}
 
 
 @router.post("/nodes/{node_uid}/sync-catalog")
@@ -699,16 +704,21 @@ def sync_peer_catalog(node_uid: str, request: Request):
     if peer.get("disabled_at") or peer.get("trust_state") != "approved":
         raise HTTPException(status_code=403, detail="Peer is not approved")
 
-    from crate.db.repositories.tasks import create_task
+    from crate.db.repositories.tasks import create_task_dedup
 
-    task_id = create_task("federation_sync_catalog", {"node_uid": node_uid})
+    task_id = create_task_dedup(
+        "federation_sync_catalog",
+        {"node_uid": node_uid},
+        dedup_key=f"federation:sync:{node_uid}",
+    )
+    status = "queued" if task_id else "already_running"
     repo.record_audit_event(
         event_type="catalog.sync.queued",
-        status="queued",
+        status=status,
         node_uid=node_uid,
         metadata={"task_id": task_id},
     )
-    return {"task_id": task_id, "status": "queued"}
+    return {"task_id": task_id, "status": status}
 
 
 @router.post("/nodes/{node_uid}/approve-key-change")
