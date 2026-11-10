@@ -144,10 +144,15 @@ def database_ready(timeout=TIMEOUT_SECONDS):
     try:
         import psycopg2
 
+        settings = postgres_settings()
         connection = psycopg2.connect(
+            host=settings["host"],
+            port=settings["port"],
+            user=settings["user"],
+            password=settings["password"],
+            dbname=settings["dbname"],
             connect_timeout=max(1, int(timeout)),
             application_name="crate-role-readiness",
-            **postgres_settings(),
         )
         try:
             # Raw cursor on purpose: the crate.db facade costs seconds of CPU in
