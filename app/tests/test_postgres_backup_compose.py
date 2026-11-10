@@ -1,6 +1,7 @@
 """The PostgreSQL backup sidecar keeps configurable retention, compression and storage."""
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -74,7 +75,16 @@ def _resolved_backup_service(tmp_path, overrides):
     for file in files:
         command += ["-f", str(ROOT / file)]
     command += ["config", "--format", "json", SERVICE]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+    # Shell variables override --env-file, so keep only what the Docker CLI needs:
+    # the backend suite exports its own DATA_DIR.
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {"PATH", "HOME", "XDG_RUNTIME_DIR"} or key.startswith("DOCKER_")
+    }
+    result = subprocess.run(
+        command, capture_output=True, text=True, timeout=60, env=environment
+    )
     assert result.returncode == 0, result.stderr
     config = json.loads(result.stdout)
     return config, config["services"][SERVICE]
