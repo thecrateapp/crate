@@ -1,5 +1,6 @@
 """Backups engine tasks (admin backups, BK1): the local dump and its retention.
 
+With ``CRATE_LOCAL_BACKUPS_ENABLED`` off both do nothing, whoever queued them.
 Both run on the maintenance queue under one session advisory lock, so a dump and a
 prune never overlap, and both record a ``backup_runs`` row. A dump that fails or is
 cancelled leaves no file and a failed run; after a good dump the retention task is
@@ -19,7 +20,14 @@ from crate.backups.local import (
     dump_database,
     remove_partials,
 )
-from crate.backups.settings import backup_dir, dumps_dir, retention_policy
+from crate.backups.settings import (
+    ENABLED_ENV,
+    backup_dir,
+    dumps_dir,
+    local_backups_enabled,
+    prepare_dumps_dir,
+    retention_policy,
+)
 from crate.db.advisory_locks import try_session_lock
 from crate.db.repositories.backup_runs import (
     close_interrupted_backup_runs,
@@ -42,6 +50,10 @@ def _busy() -> dict:
     return {"status": "skipped", "reason": "Another backup job is running"}
 
 
+def _disabled() -> dict:
+    return {"status": "skipped", "reason": f"Local backups are off ({ENABLED_ENV})"}
+
+
 def _enqueue_retention() -> str | None:
     from crate.db.repositories.tasks import create_task_dedup
 
@@ -51,20 +63,15 @@ def _enqueue_retention() -> str | None:
 def _handle_backup_dump(task_id: str, params: dict, config: dict) -> dict:
     """``pg_dump -Fc`` of the Crate database into the local backup directory."""
     del params, config
+    if not local_backups_enabled():
+        return _disabled()
     with try_session_lock(LOCAL_BACKUP_LOCK) as acquired:
         if not acquired:
             return _busy()
         close_interrupted_backup_runs("dump")
         run_id = start_backup_run("dump", task_id=task_id)
         try:
-            base = backup_dir()
-            if not base.is_dir():
-                raise BackupError(
-                    f"The backup directory {base} does not exist; mount it or set "
-                    "CRATE_BACKUP_DIR"
-                )
-            folder = dumps_dir()
-            folder.mkdir(exist_ok=True)
+            folder = prepare_dumps_dir()
             remove_partials(folder)
             result = dump_database(
                 folder,
@@ -81,7 +88,7 @@ def _handle_backup_dump(task_id: str, params: dict, config: dict) -> dict:
             log.warning("Backup dump failed: %s", message)
             finish_backup_run(run_id, status="failed", error=message)
             return {"status": "failed", "error": message, "run_id": run_id}
-        relative = result.path.relative_to(base).as_posix()
+        relative = result.path.relative_to(backup_dir()).as_posix()
         finish_backup_run(
             run_id,
             status="succeeded",
@@ -102,6 +109,8 @@ def _handle_backup_dump(task_id: str, params: dict, config: dict) -> dict:
 def _handle_backup_local_retention(task_id: str, params: dict, config: dict) -> dict:
     """Grandfather-father-son pruning of the local dumps."""
     del config
+    if not local_backups_enabled():
+        return _disabled()
     try:
         policy = retention_policy(params)
     except ValueError as exc:

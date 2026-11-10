@@ -556,6 +556,10 @@ services:
       - CRATE_MCP_OAUTH_ENABLED=${CRATE_MCP_OAUTH_ENABLED:-false}
       - CRATE_MCP_OAUTH_ISSUER=${CRATE_MCP_OAUTH_ISSUER:-}
       - CRATE_MCP_OAUTH_ALLOW_LOCALHOST=${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
+      # Backups engine (admin backups): off here while crate-postgres-backup makes
+      # the dumps, until BK6 moves production to it. Self-hosted installs keep the
+      # default (on). The scheduler reads it in crate-worker, the tasks in this one.
+      - CRATE_LOCAL_BACKUPS_ENABLED=${CRATE_LOCAL_BACKUPS_ENABLED:-false}
       - SENTRY_SERVICE=worker-default
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
@@ -769,6 +773,10 @@ services:
       - CRATE_MCP_OAUTH_ENABLED=${CRATE_MCP_OAUTH_ENABLED:-false}
       - CRATE_MCP_OAUTH_ISSUER=${CRATE_MCP_OAUTH_ISSUER:-}
       - CRATE_MCP_OAUTH_ALLOW_LOCALHOST=${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
+      # Backups engine (admin backups): off here while crate-postgres-backup makes
+      # the dumps, until BK6 moves production to it. Self-hosted installs keep the
+      # default (on). The scheduler reads it in crate-worker, the tasks in this one.
+      - CRATE_LOCAL_BACKUPS_ENABLED=${CRATE_LOCAL_BACKUPS_ENABLED:-false}
       - SENTRY_SERVICE=worker-maintenance
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}

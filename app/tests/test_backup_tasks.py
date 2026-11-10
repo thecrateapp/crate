@@ -25,6 +25,7 @@ def backup_root(tmp_path, monkeypatch):
     root = tmp_path / "backups"
     root.mkdir()
     monkeypatch.setenv("CRATE_BACKUP_DIR", str(root))
+    monkeypatch.delenv("CRATE_LOCAL_BACKUPS_ENABLED", raising=False)
     monkeypatch.setattr(backups, "is_cancelled", lambda task_id: False)
     return root
 
@@ -145,6 +146,7 @@ def test_a_dump_without_its_backup_directory_fails_without_creating_it(
     del pg_db
     missing = tmp_path / "not-mounted"
     monkeypatch.setenv("CRATE_BACKUP_DIR", str(missing))
+    monkeypatch.delenv("CRATE_LOCAL_BACKUPS_ENABLED", raising=False)
     marker = _pg_dump_on_path(tmp_path, monkeypatch, 'printf "PGDMP" > "$out"\n')
 
     result = backups._handle_backup_dump("task-dump", {}, {})

@@ -1,13 +1,15 @@
 """Settings of the local backup policy, read from the environment (BK1).
 
 - ``CRATE_LOCAL_BACKUPS_ENABLED`` (default on): the scheduler runs the nightly dump
-  and its retention. Production sets it off in ``docker-compose.yaml`` while the
+  and its retention. Off, the scheduler skips them and the tasks do nothing even
+  when queued by hand. Production sets it off in ``docker-compose.yaml`` while the
   ``crate-postgres-backup`` sidecar still makes its dumps (until BK6), so the two
-  never dump side by side. A manual run still works with it off.
+  never dump side by side.
 - ``CRATE_BACKUP_DIR`` (default ``$DATA_DIR/backups``): the backup directory as the
-  maintenance worker sees it. Dumps go to its ``dumps/`` folder. It must exist:
-  the engine never creates it, so an unmounted volume fails instead of filling the
-  container's own disk.
+  maintenance worker sees it, for example the mount of a dedicated volume. Dumps go
+  to its ``dumps/`` folder. A configured directory must exist: the engine never
+  creates it, so an unmounted volume fails instead of filling the container's own
+  disk. The default is created inside ``$DATA_DIR``, which must exist.
 - ``CRATE_BACKUP_KEEP_DAILY``, ``_WEEKLY`` and ``_MONTHLY`` (default 3, 4 and 3):
   how many days, ISO weeks and months of dumps retention keeps.
 """
@@ -19,7 +21,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from crate.backups.local import RetentionPolicy
+from crate.backups.local import BackupError, RetentionPolicy
 
 ENABLED_ENV = "CRATE_LOCAL_BACKUPS_ENABLED"
 BACKUP_DIR_ENV = "CRATE_BACKUP_DIR"
@@ -42,6 +44,22 @@ def backup_dir() -> Path:
 
 def dumps_dir() -> Path:
     return backup_dir() / DUMPS_FOLDER
+
+
+def prepare_dumps_dir() -> Path:
+    """The dumps folder, created if its backup directory is in place."""
+    base = backup_dir()
+    configured = bool(os.environ.get(BACKUP_DIR_ENV, "").strip())
+    if not base.is_dir():
+        if configured or not base.parent.is_dir():
+            raise BackupError(
+                f"The backup directory {base} does not exist; mount it or set "
+                f"{BACKUP_DIR_ENV}"
+            )
+        base.mkdir(exist_ok=True)
+    folder = base / DUMPS_FOLDER
+    folder.mkdir(mode=0o700, exist_ok=True)
+    return folder
 
 
 def _env_count(name: str, default: int) -> int:
@@ -82,5 +100,6 @@ __all__ = [
     "backup_dir",
     "dumps_dir",
     "local_backups_enabled",
+    "prepare_dumps_dir",
     "retention_policy",
 ]

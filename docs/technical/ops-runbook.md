@@ -81,6 +81,34 @@ backup.
    If federation is enabled, also inspect peer/grant state and verify no import
    or stream operation resumed with stale authorization.
 
+## Local dumps from the backups engine
+
+The backups engine managed from Admin (plan:
+`docs/plans/2026-11-10-admin-backups-plan.md`) is replacing the
+`crate-postgres-backup` sidecar. Its first phase makes local dumps:
+
+- `backup_dump` runs every 24 hours on the maintenance queue, inside the
+  maintenance window and under the resource governor. It writes
+  `pg_dump -Fc` to `dumps/crate-<UTC stamp>.dump` in the backup directory, next
+  to a `sha256sum` file, and records the run in `backup_runs`. A failed or
+  cancelled dump leaves no file. Check a dump with `sha256sum -c` and
+  `pg_restore --list`.
+- `backup_local_retention` follows each good dump and keeps the newest dump of
+  each of the last 3 days, 4 ISO weeks and 3 months (UTC), and always the newest.
+- One backup job runs at a time (a PostgreSQL advisory lock).
+
+Settings, on `crate-worker` (the scheduler) and `crate-maintenance-worker`:
+
+- `CRATE_LOCAL_BACKUPS_ENABLED`: on by default, `false` in `docker-compose.yaml`.
+  Off, the scheduler skips the dump and both tasks do nothing even when queued by
+  hand. Production keeps it off while the sidecar makes its dumps, so the two
+  never dump side by side; BK6 turns it on and retires the sidecar.
+- `CRATE_BACKUP_DIR`: the backup directory inside the maintenance worker, by
+  default `$DATA_DIR/backups`. A configured directory must exist (a mounted
+  volume); the default is created inside `$DATA_DIR`.
+- `CRATE_BACKUP_KEEP_DAILY`, `CRATE_BACKUP_KEEP_WEEKLY` and
+  `CRATE_BACKUP_KEEP_MONTHLY`: the retention counts, by default 3, 4 and 3.
+
 ## Redis credential rotation
 
 `REDIS_PASSWORD` is shared by the cache and durable Redis services. Rotation
