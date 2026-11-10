@@ -432,7 +432,7 @@ def test_catalog_manifest_exposes_stable_snapshot_pagination(monkeypatch):
     monkeypatch.setattr(
         federation,
         "_catalog_manifest_items",
-        lambda *, page, page_size, include_genres: [],
+        lambda *, page, page_size, include_genres, policy: [],
     )
 
     first = asyncio.run(federation.catalog_manifest(object(), page=0, page_size=500))

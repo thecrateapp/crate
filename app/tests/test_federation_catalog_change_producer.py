@@ -52,10 +52,10 @@ def test_local_dirty_source_emits_one_idempotent_shareable_change(monkeypatch):
     change_calls = [
         call
         for call in session.calls
-        if "INSERT INTO federation_catalog_changes" in call[0]
+        if "INSERT INTO federation_catalog_change_outbox" in call[0]
     ]
     assert len(change_calls) == 1
-    assert "ON CONFLICT" in change_calls[0][0]
+    assert "ON CONFLICT" not in change_calls[0][0]
     assert change_calls[0][1]["entity_uid"] == "artist-1"
     assert change_calls[0][1]["operation"] == "upsert"
 
@@ -79,7 +79,7 @@ def test_delete_emits_tombstone_without_loading_current_payload(monkeypatch):
     change = next(
         call
         for call in session.calls
-        if "INSERT INTO federation_catalog_changes" in call[0]
+        if "INSERT INTO federation_catalog_change_outbox" in call[0]
     )
     assert change[1]["operation"] == "delete"
     assert change[1]["payload_revision"] == "revision-7"

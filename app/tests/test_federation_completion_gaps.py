@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
+from typing import ClassVar
 
+import httpx
 import pytest
+from fastapi import HTTPException
 from starlette.requests import Request
 
 
@@ -401,7 +404,7 @@ def test_proxy_remote_stream_preserves_206_headers_and_accounts_bytes(monkeypatc
 
     class Upstream:
         status_code = 206
-        headers = {
+        headers: ClassVar[dict[str, str]] = {
             "content-type": "audio/flac",
             "content-range": "bytes 0-5/12",
             "accept-ranges": "bytes",
@@ -523,7 +526,7 @@ def test_proxy_remote_stream_records_midstream_failure_and_releases_slot(monkeyp
 
     class Upstream:
         status_code = 200
-        headers = {"content-type": "audio/mpeg"}
+        headers: ClassVar[dict[str, str]] = {"content-type": "audio/mpeg"}
 
         async def aiter_bytes(self, chunk_size: int):
             del chunk_size
@@ -617,8 +620,6 @@ def test_proxy_remote_stream_records_midstream_failure_and_releases_slot(monkeyp
 
 
 def test_proxy_remote_stream_returns_upstream_416_and_releases_slot(monkeypatch):
-    from fastapi import HTTPException
-
     from crate.api import federation_remote
 
     calls = _install_proxy_stream_mocks(
@@ -644,9 +645,6 @@ def test_proxy_remote_stream_returns_upstream_416_and_releases_slot(monkeypatch)
 
 
 def test_proxy_remote_stream_timeout_before_headers_releases_slot(monkeypatch):
-    from fastapi import HTTPException
-    import httpx
-
     from crate.api import federation_remote
 
     calls = _install_proxy_stream_mocks(
@@ -691,8 +689,6 @@ def test_proxy_remote_stream_downstream_close_releases_slot(monkeypatch):
 
 
 def test_playlist_add_tracks_rejects_non_imported_remote_refs(monkeypatch):
-    from fastapi import HTTPException
-
     from crate.api import playlists
     from crate.api.schemas.playlists import AddTracksRequest
 
@@ -791,8 +787,10 @@ def test_catalog_sync_accepts_manifest_item_list(monkeypatch):
         "crate.federation.client.federated_get", lambda **kwargs: Response()
     )
     monkeypatch.setattr(
-        "crate.federation.catalog.upsert_catalog_item",
-        lambda **kwargs: upserts.append(kwargs),
+        "crate.db.repositories.federation_manifest_import.apply_federation_manifest_page",
+        lambda **kwargs: (
+            upserts.extend(kwargs["items"]) or {"applied": len(kwargs["items"])}
+        ),
     )
     monkeypatch.setattr(
         "crate.federation.catalog.upsert_cursor",
@@ -865,7 +863,8 @@ def test_catalog_sync_consumes_every_manifest_page_without_implicit_cap(monkeypa
 
     monkeypatch.setattr("crate.federation.client.federated_get", federated_get)
     monkeypatch.setattr(
-        "crate.federation.catalog.upsert_catalog_item", lambda **_kwargs: None
+        "crate.db.repositories.federation_manifest_import.apply_federation_manifest_page",
+        lambda **kwargs: {"applied": len(kwargs["items"])},
     )
     monkeypatch.setattr(
         "crate.federation.catalog.upsert_cursor", lambda *_args, **_kwargs: None
@@ -941,7 +940,8 @@ def test_catalog_sync_partial_failure_is_not_marked_completed(monkeypatch):
 
     monkeypatch.setattr("crate.federation.client.federated_get", federated_get)
     monkeypatch.setattr(
-        "crate.federation.catalog.upsert_catalog_item", lambda **_kwargs: None
+        "crate.db.repositories.federation_manifest_import.apply_federation_manifest_page",
+        lambda **kwargs: {"applied": len(kwargs["items"])},
     )
     monkeypatch.setattr(
         "crate.federation.catalog.upsert_cursor",
@@ -1031,7 +1031,8 @@ def test_catalog_sync_resumes_a_matching_partial_manifest(monkeypatch):
 
     monkeypatch.setattr("crate.federation.client.federated_get", federated_get)
     monkeypatch.setattr(
-        "crate.federation.catalog.upsert_catalog_item", lambda **_kwargs: None
+        "crate.db.repositories.federation_manifest_import.apply_federation_manifest_page",
+        lambda **kwargs: {"applied": len(kwargs["items"])},
     )
     monkeypatch.setattr(
         "crate.federation.catalog.save_catalog_sync_checkpoint",
@@ -1111,10 +1112,10 @@ def test_remote_stream_slot_limits_allow_browser_overlap(monkeypatch):
     assert peer_limit >= subject_limit
 
 
-def test_catalog_sync_invalidates_cached_remote_facets(monkeypatch):
+def test_catalog_sync_delegates_remote_facets_to_atomic_page_import(monkeypatch):
     from crate.worker_handlers.federation import _handle_catalog_sync
 
-    invalidations: list[tuple[str, str | None]] = []
+    pages: list[dict] = []
 
     class Response:
         def raise_for_status(self):
@@ -1160,8 +1161,10 @@ def test_catalog_sync_invalidates_cached_remote_facets(monkeypatch):
         lambda **kwargs: Response(),
     )
     monkeypatch.setattr(
-        "crate.federation.catalog.upsert_catalog_item",
-        lambda **kwargs: None,
+        "crate.db.repositories.federation_manifest_import.apply_federation_manifest_page",
+        lambda **kwargs: (
+            pages.append(kwargs) or {"applied": len(kwargs["items"]), "invalidated": 1}
+        ),
     )
     monkeypatch.setattr(
         "crate.federation.catalog.upsert_cursor",
@@ -1175,17 +1178,14 @@ def test_catalog_sync_invalidates_cached_remote_facets(monkeypatch):
         "crate.federation.events.emit_catalog_sync_completed",
         lambda *args, **kwargs: None,
     )
-    monkeypatch.setattr(
-        "crate.federation.global_content_cache.invalidate_source_cache",
-        lambda node_uid, remote_entity_uid=None: (
-            invalidations.append((node_uid, remote_entity_uid)) or 1
-        ),
-    )
-
     result = _handle_catalog_sync("task-1", {"node_uid": "node-b"}, {})
 
     assert result["synced"] == 1
-    assert invalidations == [("node-b", "artist-remote-1")]
+    assert len(pages) == 1
+    assert pages[0]["node_uid"] == "node-b"
+    assert pages[0]["items"][0]["remote_entity_uid"] == "artist-remote-1"
+    assert pages[0]["items"][0]["facets"]["artist_info"]["revision"] == "rev-next"
+    assert pages[0]["checkpoint"]["synced"] == 1
 
 
 def test_federation_event_emitters_append_domain_events(monkeypatch):

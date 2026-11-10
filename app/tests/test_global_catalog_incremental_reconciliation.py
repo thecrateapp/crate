@@ -1,11 +1,40 @@
+import uuid
+
 import pytest
 from sqlalchemy import text
-import uuid
 
 from tests.conftest import PG_AVAILABLE, approve_federation_node
 
-
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+
+
+def test_incremental_backlog_distinguishes_due_retries_and_expired_claims(pg_db):
+    from crate.db.jobs.global_catalog_reconciliation import (
+        reconcile_dirty_catalog_sources,
+    )
+    from crate.db.tx import transaction_scope
+
+    for name in ("Due First", "Due Second", "Deferred", "Claimed", "Stale"):
+        pg_db.upsert_artist({"name": name, "entity_uid": str(uuid.uuid4())})
+    with transaction_scope() as session:
+        session.execute(
+            text("""
+            UPDATE global_catalog_dirty_sources dirty
+            SET next_attempt_at = CASE WHEN artist.name = 'Deferred'
+                                      THEN NOW() + INTERVAL '1 hour' END,
+                claimed_at = CASE WHEN artist.name = 'Claimed' THEN NOW()
+                                  WHEN artist.name = 'Stale'
+                                  THEN NOW() - INTERVAL '1 hour' END
+            FROM library_artists artist
+            WHERE dirty.local_entity_uid = artist.entity_uid
+        """)
+        )
+
+    result = reconcile_dirty_catalog_sources(limit=1)
+
+    assert result["completed"] == 1
+    assert result["remaining"] == 3
+    assert result["ready_remaining"] == 2
 
 
 def test_incremental_reconcile_claims_dirty_sources_without_full_library_scan(
@@ -30,7 +59,13 @@ def test_incremental_reconcile_claims_dirty_sources_without_full_library_scan(
 
     result = global_reconciliation.reconcile_dirty_catalog_sources(limit=10)
 
-    assert result == {"claimed": 1, "completed": 1, "failed": 0, "remaining": 0}
+    assert result == {
+        "claimed": 1,
+        "completed": 1,
+        "failed": 0,
+        "remaining": 0,
+        "ready_remaining": 0,
+    }
     with read_scope() as session:
         canonical = (
             session.execute(
@@ -121,6 +156,7 @@ def test_remote_catalog_upsert_is_projected_from_its_dirty_source(pg_db):
         "completed": 1,
         "failed": 0,
         "remaining": 0,
+        "ready_remaining": 0,
     }
 
     with read_scope() as session:
@@ -173,6 +209,7 @@ def test_incremental_local_source_promotes_matching_remote_artist(pg_db):
         "completed": 1,
         "failed": 0,
         "remaining": 0,
+        "ready_remaining": 0,
     }
 
     assert get_global_catalog_counts() == {
