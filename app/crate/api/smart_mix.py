@@ -101,7 +101,20 @@ def track_mix_profile(
     )
     if profile is None:
         raise HTTPException(status_code=404, detail="Smart Mix profile not found")
-    payload = profile.to_full_dict() if include_beat_grid else profile.to_summary_dict()
+    if not include_beat_grid:
+        return MixProfileResponse.model_validate(profile.to_summary_dict())
+    return full_mix_profile_response(profile, analysis)
+
+
+def full_mix_profile_response(
+    profile: TrackMixProfile, analysis: StemAnalysis | None
+) -> MixProfileResponse:
+    """The `detail=full` profile: the beat grid and, when ``analysis`` applies to the
+    profile's file and phrases, the stems layer (STEM-D4).
+
+    The Crate Decks batch (S4) serves the same, so both stay identical.
+    """
+    payload = profile.to_full_dict()
     layer = None if analysis is None else stem_phrase_layer(profile, analysis)
     if layer is not None:
         payload["stems"] = layer.to_dict()
@@ -844,4 +857,4 @@ def _plan_cache_key(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-__all__ = ["router"]
+__all__ = ["full_mix_profile_response", "router"]
