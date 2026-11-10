@@ -101,6 +101,23 @@ const capabilityListeners = new Set<
   (capabilities: SmartMixCapabilities) => void
 >();
 
+/** The planner the native background continuation asks for: smart-mix-v2 by default. */
+export function continuationPlanner(
+  capabilities: SmartMixCapabilities,
+): SmartMixPlannerIdentifier {
+  return resolvePlannerVersion(capabilities) ?? "smart-mix-v2";
+}
+
+/** LV-D10: with smart-mix-v3 the user's maximum always wins, also in the background. */
+export function continuationLongBeatmatch(
+  capabilities: SmartMixCapabilities,
+): boolean {
+  return (
+    capabilities.androidLongBeatmatch &&
+    continuationPlanner(capabilities) === "smart-mix-v2"
+  );
+}
+
 export function setSmartMixCapabilities(
   capabilities: SmartMixCapabilities,
 ): void {
