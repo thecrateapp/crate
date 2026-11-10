@@ -14,7 +14,6 @@ export const SMART_TRANSITION_LONG_SECONDS = 6;
 export const SMART_TRANSITION_MIXED_QUEUE_SECONDS = 3;
 
 const SMART_TRANSITION_MIN_SIGNAL_WEIGHT = 0.35;
-const SMART_MIX_PLANNER_VERSION = "smart-mix-v2";
 const SMART_MIX_PLANNER_POLICY_VERSION = 2;
 const MAX_TRANSITION_DURATION_MS = 12_000;
 const KEY_TO_PITCH_CLASS: Record<string, number> = {
@@ -187,6 +186,8 @@ interface TransitionEdge {
 
 interface TransitionPlanResponse {
   plannerVersion: number;
+  // smart-mix-v3 only; never copied into the engine plan.
+  structureUsed?: boolean;
   outgoingTrackEntityUid: string;
   incomingTrackEntityUid: string;
   mode: "gapless" | "adaptive" | "beatmatch";
@@ -205,7 +206,7 @@ interface TransitionPlanResponse {
 }
 
 interface TransitionPlanBatchResponse {
-  plannerVersion: typeof SMART_MIX_PLANNER_VERSION;
+  plannerVersion: SmartMixPlannerIdentifier;
   plans: TransitionPlanResponse[];
 }
 
@@ -363,10 +364,11 @@ export class SmartMixTransitionPlanner {
       return orderedPlans(edges, localPlans);
     }
 
+    const plannerVersion = resolvePlannerVersion(input.capabilities);
     const capabilityAvailable =
       input.capabilities.available &&
       input.capabilities.androidNativeCrossfade &&
-      input.capabilities.plannerVersion === SMART_MIX_PLANNER_VERSION;
+      plannerVersion !== null;
     if (!capabilityAvailable) {
       for (const edge of unresolved) {
         localPlans.set(
@@ -416,7 +418,7 @@ export class SmartMixTransitionPlanner {
         "/api/playback/transition-plans",
         "POST",
         {
-          plannerVersion: SMART_MIX_PLANNER_VERSION,
+          plannerVersion,
           edges: requestable.map((edge) => ({
             outgoingTrackEntityUid: edge.outgoing.entityUid,
             incomingTrackEntityUid: edge.incoming.entityUid,
@@ -431,7 +433,10 @@ export class SmartMixTransitionPlanner {
               ...(input.capabilities.androidBassHandoff
                 ? { allowBassHandoff: true }
                 : {}),
-              ...(input.capabilities.androidLongBeatmatch
+              // LV-D10: with smart-mix-v3 the user's maximum always wins, so it
+              // never asks for long blends; v2 keeps today's request.
+              ...(input.capabilities.androidLongBeatmatch &&
+              plannerVersion === "smart-mix-v2"
                 ? { allowLongBeatmatch: true }
                 : {}),
             },
@@ -452,7 +457,7 @@ export class SmartMixTransitionPlanner {
       }
 
       const responsePlans =
-        response?.plannerVersion === SMART_MIX_PLANNER_VERSION &&
+        response?.plannerVersion === plannerVersion &&
         Array.isArray(response.plans)
           ? response.plans
           : [];
