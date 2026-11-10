@@ -12,6 +12,7 @@ const sections = new Set([
   "operations",
   "federation",
   "reference",
+  "decks",
 ]);
 const requiredFrontmatter = [
   "title",
