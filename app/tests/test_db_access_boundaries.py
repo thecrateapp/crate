@@ -18,6 +18,10 @@ REFACTORED_MODULES = [
     Path("api/settings.py"),
     Path("api/tasks.py"),
 ]
+# The worker health check runs every 15 s in CPU-capped containers and must not
+# import the crate.db facade (seconds of CPU there), so it opens one direct
+# psycopg2 connection for its readiness round trip.
+TRANSPORT_EXEMPTIONS = {Path("role_readiness.py"): {".cursor"}}
 
 
 class _DbBoundaryVisitor(ast.NodeVisitor):
@@ -99,7 +103,12 @@ def test_no_transport_calls_outside_db_package():
         if "db" in path.parts:
             continue
         visitor = _parse_file(path)
-        violations = visitor.transport_imports + visitor.transport_calls
+        exempt = TRANSPORT_EXEMPTIONS.get(path.relative_to(APP_ROOT), set())
+        violations = [
+            item
+            for item in visitor.transport_imports + visitor.transport_calls
+            if item.rsplit(":", 1)[0] not in exempt
+        ]
         if violations:
             findings.append(f"{path.relative_to(APP_ROOT)} -> {', '.join(violations)}")
 
