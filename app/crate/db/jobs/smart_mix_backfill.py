@@ -36,6 +36,10 @@ LIVE_COVERAGE_MAX_AGE_SECONDS = 10
 LEGACY_CAMPAIGN_PROFILE_VERSION = 1
 
 
+# ``smart_mix_awaits_model_beats`` reads the stored campaign unless given one.
+_STORED = object()
+
+
 def smart_mix_target_generation() -> str:
     """The claim generation of the current target: analyzer version and schema.
 
@@ -733,7 +737,26 @@ def seconds_since_smart_mix_change(*, session=None) -> float | None:
     return None if seconds is None else float(seconds)
 
 
+def smart_mix_awaits_model_beats(
+    campaign: dict[str, Any] | None | object = _STORED,
+) -> bool:
+    """Whether a target profile on the analyzer's own beats still awaits Beat This!'s.
+
+    Only where the model runs: the coordinator records it in the campaign
+    (``record_smart_mix_model_availability``). Where it cannot run (ARM images,
+    ``PANNS=off``, missing weights), nothing would ever upgrade those profiles, so
+    coverage and Admin count them current. Until a pass has recorded it, the model is
+    assumed, as production has it. Reads the stored campaign unless given one.
+    """
+    if campaign is _STORED:
+        campaign = get_smart_mix_campaign()
+    if not isinstance(campaign, dict):
+        return True
+    return campaign.get("beat_model_available") is not False
+
+
 def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> dict:
+    awaits_model_beats = smart_mix_awaits_model_beats()
     with read_scope() as session:
         row = (
             session.execute(
@@ -751,14 +774,16 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                             profile.quality,
                             -- At the target but on the analyzer's own beats,
                             -- within the length Beat This! runs on: the backfill
-                            -- still owes it the model's beats.
+                            -- still owes it the model's beats, where the model
+                            -- runs (:awaits_model_beats).
                             profile.track_id IS NOT NULL
                                 AND profile.quality <> 'unavailable'
                                 AND profile.profile_version = :profile_version
                                 AND profile.analyzer_version = :analyzer_version
                                 AND profile.source_stale_at IS NULL
                                 AND NOT (
-                                    profile.beat_tracker IS NULL
+                                    CAST(:awaits_model_beats AS boolean)
+                                    AND profile.beat_tracker IS NULL
                                     AND COALESCE(eligible.duration, 0)
                                         <= :model_beats_max_seconds
                                 )
@@ -770,7 +795,8 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                     OR profile.analyzer_version <> :analyzer_version
                                     OR profile.source_stale_at IS NOT NULL
                                     OR (
-                                        profile.beat_tracker IS NULL
+                                        CAST(:awaits_model_beats AS boolean)
+                                        AND profile.beat_tracker IS NULL
                                         AND COALESCE(eligible.duration, 0)
                                             <= :model_beats_max_seconds
                                     )
@@ -783,7 +809,8 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                     profile.profile_version <> :profile_version
                                     OR profile.analyzer_version <> :analyzer_version
                                     OR (
-                                        profile.beat_tracker IS NULL
+                                        CAST(:awaits_model_beats AS boolean)
+                                        AND profile.beat_tracker IS NULL
                                         AND COALESCE(eligible.duration, 0)
                                             <= :model_beats_max_seconds
                                     )
@@ -865,6 +892,7 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                     "target_generation": smart_mix_target_generation(),
                     "max_attempts": max(1, int(max_attempts)),
                     "model_beats_max_seconds": MODEL_BEATS_MAX_SECONDS,
+                    "awaits_model_beats": awaits_model_beats,
                 },
             )
             .mappings()
@@ -1022,6 +1050,10 @@ def start_smart_mix_campaign(
     if not continues:
         campaign.update({"batches": 0, "claimed": 0})
         campaign.setdefault("sequence", int((current or {}).get("sequence") or 0))
+        # Whether the model runs describes the machine, like the night window: keep
+        # it until the new campaign's first pass records it again.
+        if current is not None and "beat_model_available" in current:
+            campaign["beat_model_available"] = current["beat_model_available"]
     save_smart_mix_campaign(campaign)
     return campaign
 
@@ -1202,6 +1234,7 @@ __all__ = [
     "record_smart_mix_model_availability",
     "refresh_smart_mix_coverage",
     "refresh_smart_mix_coverage_after_pass",
+    "smart_mix_awaits_model_beats",
     "release_dead_smart_mix_claims",
     "release_smart_mix_claims",
     "smart_mix_profile_dedup_key",

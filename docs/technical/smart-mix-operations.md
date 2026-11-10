@@ -181,8 +181,9 @@ On the 399 tracks of the stems evaluation sets, the DBN picks three on 10:
 The two that keep three (Azu Tiwaline "Izen Zaren", Movements "Submerge") are the ones
 both models hear in three, likely in 6/8. Swans "Coward", a live-drums control, takes four
 and 19 phrases, which may be less reliable on irregular drums. Nobody has listened to these
-tracks. The arbiter took 86-249 s per three-beat track on the development machine (shared
-with other jobs), and a four-beat track costs what it did under v9.
+tracks. With one native thread, as the analysis worker runs it, the arbiter takes 10-30 s of
+CPU on a three-beat track of two to six minutes and about 50 s on one of 600 s, after Beat
+This!'s 5-35 s; a four-beat track costs what it did under v9.
 
 Readers accept v10, v9, v8, v7, v6 and v5 profiles (`READABLE_ANALYZER_VERSIONS`); writers,
 the backfill and Admin coverage target v10. Stored four-beat signals stay valid (see
@@ -434,9 +435,18 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   (`crate/smart_mix/meter_arbiter.py`). Bars of three stay only when madmom also prefers
   three; otherwise the track takes the DBN's four-beat path. Beat This!'s DBN hears fast
   4/4 punk and metal (d-beat, thrash, death) in three, and since SM3-D16 such tracks lost
-  their bars and phrases. The arbiter costs 50-60 s of CPU and runs only on those tracks,
-  about 2.5 % of the library; if it fails, the DBN's choice stands and the worker logs a
-  warning. `track_mix_signals` keeps `meter_margin` (log p(3) - log p(4) per 1,000 frames)
+  their bars and phrases. The arbiter runs only on those tracks (2.5 % of the evaluation
+  sets, 4.4 % of production's v9 signals) and reads the whole file: about 0.08 s of CPU per
+  second of audio on one thread, so 10-30 s on a track of two to six minutes and about 50 s
+  at 600 s. If it fails, the DBN's choice stands and the worker logs a warning.
+- **Arbiter memory.** madmom's own pipeline peaked at 5.6 GB on a 600 s track (3.6 GB at
+  348 s): it keeps each frame size's STFT of the whole file until the features are stacked,
+  and its Viterbi keeps a back-pointer per frame and state (about 15,000 states for bars of
+  four at 100 fps). The arbiter computes the spectrograms 30 s at a time with madmom's own
+  processors and runs the Viterbi forward pass keeping only scores, since it needs the log
+  probabilities and not the paths. Its input features and verdicts are madmom's (tests
+  compare both), and it no longer raises the process peak: the analysis of a 600 s
+  three-beat track peaks at 0.8-1.0 GB, which is Beat This!'s own peak. `track_mix_signals` keeps `meter_margin` (log p(3) - log p(4) per 1,000 frames)
   and `meter_arbiter` (`madmom-dbn-3`, `madmom-dbn-4`, or null when it was not asked);
   stored bars of three without a verdict are recomputed. Phrases, the planner and Crate Decks count bars of four, so with
   any other length (SM3-D16) both analyzers give the profile that `time_signature` and no
@@ -1045,13 +1055,19 @@ profile. A task that finishes without publishing does not account for a new prof
 `quality` accepts `full`, `partial`, `legacy` and `unavailable`. The Admin track table also
 exposes this profile status, in the implemented order of precedence:
 
-| Profile status   | Meaning                                                                                                                                                                             |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `missing`        | The track has no profile row                                                                                                                                                        |
-| `unavailable`    | A profile exists and its quality is `unavailable`                                                                                                                                   |
-| `source_changed` | Profile flagged by a source change                                                                                                                                                  |
-| `outdated`       | Analyzer or schema version differs from the target, or the profile is at the target but on the analyzer's own beats (no `beat_tracker`) on a track Beat This! runs on (up to 600 s) |
-| `current`        | Profile not flagged stale, with current versions and usable quality, on Beat This!'s beats or on a track over 600 s                                                                 |
+| Profile status   | Meaning                                                                                                                                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `missing`        | The track has no profile row                                                                                                                                                                       |
+| `unavailable`    | A profile exists and its quality is `unavailable`                                                                                                                                                  |
+| `source_changed` | Profile flagged by a source change                                                                                                                                                                 |
+| `outdated`       | Analyzer or schema version differs from the target, or the profile is at the target but on the analyzer's own beats (no `beat_tracker`) on a track Beat This! runs on (up to 600 s), where it runs |
+| `current`        | Profile not flagged stale, with current versions and usable quality, on Beat This!'s beats, on a track over 600 s, or where Beat This! cannot run                                                  |
+
+Where Beat This! cannot run (ARM images, `PANNS=off`, missing weights), nothing would ever give
+an own-tracker profile the model's beats, so coverage and the track list count it `current`.
+The coordinator records whether its worker can run the model in the campaign
+(`beat_model_available`, kept across campaigns); until a pass has recorded it, both assume the
+model, as production has it.
 
 `failed` is a filter on `processingState`, not a sixth profile status. A track can keep a
 usable profile and still record a failed processing attempt. Read `processingAttempts`,
@@ -1114,6 +1130,10 @@ row at most, and does nothing for any other campaign: a paused or cancelled camp
 stopped, a campaign of another target waits for an operator to start the new one, and a setup
 whose analysis worker cannot run Beat This! (the coordinator records it in the campaign as
 `beat_model_available`) never reopens by itself. To stop the reopening, pause or cancel the
+completed campaign: Admin shows **Pause reopening** next to **Start backfill** while the
+campaign of the deployed target is `completed`, and `POST /api/admin/smart-mix/backfill/pause`
+or `/cancel` accept a `completed` campaign. A paused campaign shows **Resume backfill**, which
+runs a pass and turns the reopening back on; after a cancel, **Start backfill** opens a new
 campaign.
 
 ### How a pass claims
@@ -1262,7 +1282,7 @@ without claiming.
 
 1. **Check the starting point** as for v9: `analyzerVersion` `smart-mix-audio-v10`,
    `controlState` `idle`, `campaign.target` `smart-mix-audio-v9` (running or paused) and
-   `activeTask` null or a v9 coordinator about to exit. Migration 159 adds
+   `activeTask` null or a v9 coordinator about to exit. Migration 161 adds
    `meter_margin` and `meter_arbiter` to `track_mix_signals`; existing rows read null.
 2. **Start the campaign** with **Start backfill** (batch size 25, 3 attempts) or
    `POST /api/admin/smart-mix/backfill`. It opens a v10 campaign whose `sequence`
@@ -1280,14 +1300,17 @@ without claiming.
      stored bytes run, as for the v8 rows under v9 (about 31-41 tracks a minute by day
      with four in flight).
    - **Rewritten by v9, three beats to the bar:** about 4.4 % (537). Their stored beats
-     predate the arbiter, so Beat This! runs again (15-25 s) and madmom's network after
-     it (50-60 s).
+     predate the arbiter, so Beat This! runs again (5-35 s) and madmom's network after
+     it (10-30 s, about 50 s at 600 s).
    - **Not yet reached by v9** (v5 and v6 profiles): a whole profile, as under v9, plus
      the arbiter on the 4.4 % that the DBN hears in three.
    - **Own-tracker v10 profiles:** a whole profile each, which the campaign would have
      paid for the same track anyway if the reanalysis had not come first.
-   - In all, v10 adds about 5 s of CPU per row v9 has already rewritten, and about
-     2.5 s per row it has not, over what v9 would have cost.
+   - In all, v10 adds about 3-4 s of CPU per row v9 has already rewritten, and about
+     1 s per row it has not, over what v9 would have cost.
+   - **Memory.** Each process peaks at about 1 GB on a 600 s track, three-beat or not
+     (Beat This!'s peak), so eight night analyses stay near 8 GB of the 14 GB limit
+     whatever share of them are in three.
 5. **Library reanalyses during the campaign are safe.** A reanalysis of BPM, key and
    loudness (Admin, or the `.m4a` one of the v9 runbook) never replaces a profile with
    Beat This!'s beats by its own-tracker draft, of any version: the track keeps its v9
@@ -1299,7 +1322,8 @@ without claiming.
 7. **After it completes,** the campaign reopens by itself when new imports or library
    reanalyses leave claimable profiles (see [Campaign, queues and backfill](#campaign-queues-and-backfill)):
    new tracks get Beat This!'s beats within about ten minutes plus their analysis, under
-   the night window. Pause or cancel the campaign to stop that.
+   the night window. **Pause reopening** in Admin (or pausing or cancelling the
+   completed campaign through the API) stops that.
 
 #### Known issues of v10 (backlog, not in this release)
 

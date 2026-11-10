@@ -31,7 +31,7 @@ import subprocess
 from bisect import bisect_left
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -462,18 +462,22 @@ def track_file_beats(
             exc_info=True,
         )
         return None
-    file_arbiter = arbiter
-    if file_arbiter is None and model is None:
-        from crate.smart_mix.meter_arbiter import load_meter_arbiter
-
-        file_arbiter = load_meter_arbiter()
     source = Path(path)
-    return track_beats(
-        signal,
-        sample_rate,
-        model=beat_model,
-        arbiter=None if file_arbiter is None else (lambda: file_arbiter(source)),
-    )
+    file_arbiter: MeterArbiter | None = None
+    if arbiter is not None:
+        file_arbiter = partial(arbiter, source)
+    elif model is None:
+        file_arbiter = partial(_default_arbiter, source)
+    return track_beats(signal, sample_rate, model=beat_model, arbiter=file_arbiter)
+
+
+def _default_arbiter(source: Path) -> int | None:
+    """madmom's verdict on ``source``, building its networks in this process the first
+    time a track needs them; None when madmom is missing."""
+    from crate.smart_mix.meter_arbiter import load_meter_arbiter
+
+    loaded = load_meter_arbiter()
+    return None if loaded is None else loaded(source)
 
 
 def _milliseconds(seconds: Sequence[float] | np.ndarray) -> tuple[int, ...]:

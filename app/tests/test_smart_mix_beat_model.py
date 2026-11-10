@@ -437,6 +437,34 @@ def test_file_beats_give_the_arbiter_the_file(monkeypatch, tmp_path) -> None:
     assert arbiter.calls == [path]
 
 
+@pytest.mark.parametrize(("three", "loads"), [(-500.0, False), (-400.0, True)])
+def test_the_default_arbiter_loads_only_when_the_dbn_hears_three(
+    monkeypatch, tmp_path, three, loads
+) -> None:
+    # madmom's networks are built in a worker process only for a track that needs
+    # them, about 4 % of tracks, not on its first track.
+    from crate.smart_mix import meter_arbiter
+
+    path = tmp_path / "mono.wav"
+    wavfile.write(path, 44_100, _clicks(12.0, rate=44_100))
+    arbiter = _Arbiter(meter=4)
+    loaded: list[bool] = []
+    monkeypatch.setattr(
+        beat_model,
+        "load_beat_model",
+        lambda: _PathsModel(_bar_paths(three=three, four=-430.0)),
+    )
+    monkeypatch.setattr(
+        meter_arbiter, "load_meter_arbiter", lambda: loaded.append(True) or arbiter
+    )
+
+    track = beat_model.track_file_beats(path)
+
+    assert track is not None and track.beats_per_bar == 4
+    assert loaded == ([True] if loads else [])
+    assert arbiter.calls == ([path] if loads else [])
+
+
 def test_bar_paths_match_the_madmom_dbn() -> None:
     # Decoding each bar length here must give, for the winner, exactly what madmom's
     # processor gives: the same beats and downbeats as Beat This!'s Audio2Beats.

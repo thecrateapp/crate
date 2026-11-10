@@ -19,6 +19,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 log = logging.getLogger(__name__)
 
 ARBITER_NAME = "madmom-dbn"
@@ -26,10 +28,24 @@ ARBITER_NAME = "madmom-dbn"
 ARBITER_SAMPLE_RATE = 44_100
 ARBITER_FPS = 100
 ARBITER_BEATS_PER_BAR = (3, 4)
+# Frames of features per chunk: 30 s at 100 fps. The largest chunk STFT (4,096
+# points) is then about 50 MB, against about 1 GB for a whole 600 s track.
+FEATURE_CHUNK_FRAMES = 3_000
 
 
 class MadmomMeterArbiter:
-    """The bar length (3 or 4) madmom's downbeat network and DBN prefer for a file."""
+    """The bar length (3 or 4) madmom's downbeat network and DBN prefer for a file.
+
+    The same verdict as madmom's ``RNNDownBeatProcessor`` and
+    ``DBNDownBeatTrackingProcessor`` on the whole file, in bounded memory for the
+    analysis worker, which runs several profiles at once. madmom's own pipeline
+    peaked at 5.2 GB on a 555 s track: it keeps each frame size's STFT of the whole
+    file until the features are stacked, and its Viterbi keeps a back-pointer per
+    frame and state. Here the spectrograms are computed ``FEATURE_CHUNK_FRAMES`` at a
+    time with madmom's own processors, and the DBN keeps only scores
+    (``meter_from_activations``), so the arbiter stays under what Beat This! takes in
+    the same process.
+    """
 
     def __init__(self) -> None:
         from madmom.features.downbeats import (
@@ -44,21 +60,110 @@ class MadmomMeterArbiter:
         )
 
     def __call__(self, path: str | Path) -> int | None:
-        from madmom.audio.signal import Signal
-
         from crate.smart_mix.beat_model import _load_signal
 
         samples, rate = _load_signal(Path(path), ARBITER_SAMPLE_RATE)
-        activations = self._network(Signal(samples, sample_rate=rate, num_channels=1))
-        return meter_from_activations(self._dbn, activations)
+        return meter_from_activations(self._dbn, self.activations(samples, rate))
+
+    def activations(self, samples: np.ndarray, rate: int) -> np.ndarray:
+        """madmom's downbeat activations of mono audio, as ``RNNDownBeatProcessor``
+        gives them."""
+        _, network, select = self._network.processors
+        return select(network(self.features(samples, rate)))
+
+    def features(self, samples: np.ndarray, rate: int) -> np.ndarray:
+        """The network's input, as ``RNNDownBeatProcessor``'s pre-processing gives
+        it, with the spectrograms computed a chunk of frames at a time."""
+        from madmom.audio.signal import Signal
+
+        signal_processor, branches, stack = self._network.processors[0].processors
+        signal = signal_processor(Signal(samples, sample_rate=rate, num_channels=1))
+        return stack(
+            [_branch_features(signal, branch) for branch in branches.processors]
+        )
+
+
+def _branch_features(signal: Any, branch: Any) -> np.ndarray:
+    """One frame size's log-filtered spectrogram and its positive difference.
+
+    ``branch`` is madmom's chain (frames, STFT, filterbank, log, difference). Each
+    chunk frames the whole signal with its origin moved, so frame ``i`` of a chunk
+    is frame ``start + i`` of the whole file, padding included; filterbank and log
+    work frame by frame, and the difference runs once on the whole spectrogram.
+    """
+    from madmom.audio.spectrogram import Spectrogram, _diff_frames
+
+    frames, stft, filterbank, logarithm, difference = branch.processors
+    whole = frames(signal)
+    hop = float(whole.hop_size)
+    if not hop.is_integer():
+        raise ValueError(f"madmom's hop of {hop} samples is not whole")
+    chunks = []
+    for start in range(0, whole.num_frames, FEATURE_CHUNK_FRAMES):
+        chunk = frames(
+            signal,
+            origin=-start * int(hop),
+            num_frames=min(FEATURE_CHUNK_FRAMES, whole.num_frames - start),
+        )
+        spectrogram = logarithm(filterbank(stft(chunk)))
+        if difference.diff_frames is None:
+            difference.diff_frames = _diff_frames(
+                difference.diff_ratio,
+                frame_size=spectrogram.stft.frames.frame_size,
+                hop_size=spectrogram.stft.frames.hop_size,
+                window=spectrogram.stft.window,
+            )
+        # A plain copy: the chunk's STFT and spectrogram are freed with it.
+        chunks.append(np.array(spectrogram, copy=True))
+    return difference(np.concatenate(chunks).view(Spectrogram))
 
 
 def meter_from_activations(dbn: Any, activations: Any) -> int | None:
-    """The bar length whose path the DBN scores higher, or None without beats."""
-    from crate.smart_mix.beat_model import decode_bar_paths
+    """The bar length whose path the DBN scores higher, or None without beats.
 
-    best = decode_bar_paths(dbn, activations).best()
-    return None if best is None else best.beats_per_bar
+    The same choice as ``DBNDownBeatTrackingProcessor`` (threshold, one Viterbi pass
+    per bar length, the higher log probability, the first bar length on a tie), but
+    only the log probabilities are needed, not the paths. madmom's Viterbi keeps a
+    back-pointer per frame and state to trace the path: about 15,000 states for bars
+    of four at 100 fps, so 3.3 GB for a 555 s track. ``viterbi_log_probability`` runs
+    the same forward pass in O(states) memory.
+    """
+    from madmom.features.downbeats import threshold_activations
+
+    if dbn.threshold:
+        activations, _ = threshold_activations(activations, dbn.threshold)
+    if not activations.any():
+        return None
+    best: tuple[float, int] | None = None
+    for beats_per_bar, hmm in zip(dbn.beats_per_bar, dbn.hmms):
+        log_probability = viterbi_log_probability(hmm, activations)
+        if best is None or log_probability > best[0]:
+            best = (log_probability, int(beats_per_bar))
+    return None if best is None else best[1]
+
+
+def viterbi_log_probability(hmm: Any, observations: np.ndarray) -> float:
+    """The log probability of madmom's Viterbi path, without the path.
+
+    madmom's ``HiddenMarkovModel.viterbi`` step by step: for each state, the best
+    predecessor's score plus the transition's log probability, plus the state's
+    observation log density; the result is the best final score. Only the previous
+    frame's scores are kept.
+    """
+    transitions = hmm.transition_model
+    starts = np.asarray(transitions.pointers[:-1], dtype=np.intp)
+    if np.any(np.diff(transitions.pointers) <= 0):
+        raise ValueError("every state needs a predecessor")
+    predecessors = np.asarray(transitions.states, dtype=np.intp)
+    transition_log = np.asarray(transitions.log_probabilities, dtype=np.float64)
+    density_of_state = np.asarray(hmm.observation_model.pointers, dtype=np.intp)
+    densities = hmm.observation_model.log_densities(observations)
+    with np.errstate(divide="ignore"):
+        scores = np.log(np.asarray(hmm.initial_distribution, dtype=np.float64))
+    for frame_densities in densities:
+        scores = np.maximum.reduceat(scores[predecessors] + transition_log, starts)
+        scores += frame_densities[density_of_state]
+    return float(scores.max())
 
 
 @lru_cache(maxsize=1)
@@ -80,7 +185,9 @@ __all__ = [
     "ARBITER_FPS",
     "ARBITER_NAME",
     "ARBITER_SAMPLE_RATE",
+    "FEATURE_CHUNK_FRAMES",
     "MadmomMeterArbiter",
     "load_meter_arbiter",
     "meter_from_activations",
+    "viterbi_log_probability",
 ]
