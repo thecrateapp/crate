@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-
-NOW = datetime(2026, 7, 14, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 14, 12, 0, tzinfo=UTC)
 
 
 def _peer(**overrides):
@@ -134,6 +133,100 @@ def test_unknown_constraint_is_rejected_instead_of_ignored():
 
     assert decision.allowed is False
     assert decision.denial_code == "invalid_constraints"
+
+
+@pytest.mark.parametrize(
+    ("preset", "capability"),
+    [
+        ("discovery", "catalog.search"),
+        ("catalog", "catalog.sync"),
+        ("listen", "catalog.sync"),
+        ("listen", "stream.proxy"),
+        ("listen", "stream.transcoded"),
+        ("trusted_library", "stream.original"),
+        ("trusted_library", "import.pull"),
+    ],
+)
+def test_standard_preset_grants_authorize_their_capabilities(preset, capability):
+    from crate.federation.authorization import authorize
+    from crate.federation.grants import resolve_preset
+
+    resolved = resolve_preset(preset)
+    decision = authorize(
+        peer=_peer(),
+        grants=[
+            _grant(
+                capabilities_json=resolved["capabilities"],
+                constraints_json=resolved["constraints"],
+            )
+        ],
+        capability=capability,
+        subject_hash="subject-a",
+        roles=set(),
+        now=NOW,
+    )
+
+    assert decision.allowed is True
+    assert decision.denial_code is None
+
+
+@pytest.mark.parametrize(
+    "delivery", ["balanced", "data_saver", "original", "transcoded"]
+)
+def test_supported_delivery_policies_do_not_invalidate_a_grant(delivery):
+    from crate.federation.authorization import authorize
+
+    decision = authorize(
+        peer=_peer(),
+        grants=[_grant(constraints_json={"delivery": [delivery]})],
+        capability="catalog.search",
+        subject_hash="subject-a",
+        roles=set(),
+        now=NOW,
+    )
+
+    assert decision.allowed is True
+    assert decision.constraints is not None
+    assert decision.constraints.delivery == frozenset({delivery})
+
+
+def test_unknown_delivery_policy_invalidates_the_whole_grant():
+    from crate.federation.authorization import authorize
+
+    decision = authorize(
+        peer=_peer(),
+        grants=[_grant(constraints_json={"delivery": ["balanced", "unrestricted"]})],
+        capability="catalog.search",
+        subject_hash="subject-a",
+        roles=set(),
+        now=NOW,
+    )
+
+    assert decision.allowed is False
+    assert decision.denial_code == "invalid_constraints"
+
+
+def test_listen_preset_does_not_authorize_original_audio():
+    from crate.federation.authorization import authorize
+    from crate.federation.grants import resolve_preset
+
+    resolved = resolve_preset("listen")
+    decision = authorize(
+        peer=_peer(),
+        grants=[
+            _grant(
+                capabilities_json=resolved["capabilities"],
+                constraints_json=resolved["constraints"],
+            )
+        ],
+        capability="stream.original",
+        subject_hash="subject-a",
+        roles=set(),
+        now=NOW,
+    )
+
+    assert decision.allowed is False
+    assert decision.denial_code == "capability_denied"
 
 
 def test_grant_writes_increment_policy_revision(pg_db):

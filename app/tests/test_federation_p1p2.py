@@ -15,6 +15,14 @@ import pytest
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+@pytest.fixture(autouse=True)
+def _catalog_sync_session(monkeypatch):
+    """Handler tests run without PostgreSQL: stub the FED-D11 fence."""
+    monkeypatch.setattr(
+        "crate.federation.catalog.begin_catalog_sync_session", lambda _uid: 1
+    )
+
+
 class TestCatalogSyncPagination:
     def test_catalog_sync_builds_paginated_url(self):
         from crate.worker_handlers.federation import _handle_catalog_sync

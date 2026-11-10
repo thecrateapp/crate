@@ -45,6 +45,39 @@ when changing catalog/readplane paths. Attach the generated fixture/result to
 the release evidence and update the SLO thresholds rather than embedding stale
 numbers in this page.
 
+### Catalog state feed and publication
+
+Library writes stage catalog intents in the same PostgreSQL transaction as the
+source change. The existing outbox relay publishes bounded committed batches in
+a separate transaction; only that publisher assigns public sequence numbers.
+A late-committing intent therefore receives a sequence after the last published
+checkpoint, even when its internal outbox ID is smaller. Publication, intent
+removal and the published watermark commit together. No publication runs inline
+in a catalog HTTP request.
+
+The delta feed synchronizes current state; it is not an audit history. A repeated
+entity/payload/operation moves that state row to its new sequence. For example,
+`A → B → A` can compact to `B, A`, and every earlier cursor still converges to
+`A`. Consumers must tolerate repeated state and sequence gaps, apply operations
+idempotently and checkpoint only a successfully committed page.
+
+Retention removes only a bounded expired prefix and records its actual last
+removed sequence. Compaction and rolled-back sequence allocations do not imply
+a retention gap. The published watermark remains valid even when every retained
+row has been pruned. Reads check the retention boundary and their page in one
+database snapshot, so concurrent pruning cannot silently skip missing changes.
+
+The initial migration conservatively reconstructs the old retention boundary
+from legacy rows because the old schema did not distinguish pruning from gaps.
+That can require one initial full repair for an old cursor; subsequent boundaries
+are explicit. Bootstrap reads live keyset rows against a fixed initial published
+watermark, then catches up deltas. This provides convergence rather than a
+long-lived immutable database snapshot. Migration `159` waits for in-flight
+legacy feed inserts, then installs a bridge that stages later legacy inserts in
+the same outbox. Mixed-version writers therefore share the committed publisher
+during a rolling upgrade. At least one updated publisher must remain active;
+rolling every publisher back requires the explicit recovery procedure below.
+
 ## Local search fallback capacity
 
 The first global reconciliation must not make local search unavailable. The
