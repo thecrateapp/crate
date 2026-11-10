@@ -5,7 +5,7 @@ section: reference
 audience: [developer]
 status: canonical
 order: 35
-verified: 2026-11-09
+verified: 2026-11-10
 sources:
   - app/crate/api/auth.py
   - app/crate/api/native_oauth_auth.py
@@ -14,6 +14,7 @@ sources:
   - app/crate/api/decks.py
   - app/crate/api/schemas/decks.py
   - app/crate/db/queries/decks_library.py
+  - app/crate/db/queries/decks_profiles.py
   - app/crate/db/queries/vdj_catalog.py
   - app/crate/streaming/service.py
   - app/crate/api/browse_media.py
@@ -44,6 +45,7 @@ sources:
   - app/tests/test_smart_mix_playlists_api.py
   - app/tests/test_decks_library_api.py
   - app/tests/test_decks_library_queries.py
+  - app/tests/test_decks_profiles_api.py
   - app/tests/test_openapi_contract.py
   - app/tests/test_readplane_route_manifest.py
   - app/tests/test_search_playable_audio.py
@@ -82,7 +84,13 @@ need them.
     "available": true,
     "min_client_version": "0.1.0",
     "contract_version": 1,
-    "features": ["library_cursor", "stems", "stem_upload", "local_refinement"]
+    "features": [
+      "library_cursor",
+      "profiles_batch",
+      "stems",
+      "stem_upload",
+      "local_refinement"
+    ]
   }
 }
 ```
@@ -112,8 +120,9 @@ Rules:
   | `stem_upload`                                 | Smart Mix Stems ST1, stem analysis uploads (only for a caller who may) |
   | `local_refinement`                            | Smart Mix Stems ST3, candidate menu for local refinement               |
 
-  `library_cursor`, `stems`, `stem_upload` and `local_refinement` ship so far.
-  `library_cursor`, `stems` and `local_refinement` are always present. `stem_upload` is present only when the
+  `library_cursor`, `profiles_batch`, `stems`, `stem_upload` and
+  `local_refinement` ship so far. `library_cursor`, `profiles_batch`, `stems`
+  and `local_refinement` are always present. `stem_upload` is present only when the
   caller's session holds `smart_mix.stems.contribute` and an admin has not
   turned uploads off, so it depends on who asks. Decks features never follow
   the Android Smart Mix flags (`CRATE_ANDROID_*`); `smart_mix.android_*`
@@ -390,6 +399,89 @@ Cost (measured 2026-11-09):
 - Diego accepted on 2026-11-09 the p95 extrapolation above and the two
   deviations from the plan: genres ranked on every request instead of a
   precomputed top N, and no migration (no `playable` column).
+
+## Batch mix profiles (S4)
+
+Decks imports the Smart Mix analysis of a whole playlist or container at once
+(client phase F4) instead of one profile request per track. The route is
+announced by the `profiles_batch` feature.
+
+`POST /api/decks/mix-profiles`
+
+```json
+{
+  "entity_uids": [
+    "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10",
+    "7d1e9b44-3f2a-4e8e-8c0d-61b5a2f4d7aa"
+  ],
+  "detail": "full"
+}
+```
+
+```json
+{
+  "profiles": {
+    "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10": {
+      "trackEntityUid": "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10",
+      "profileRevision": "…",
+      "bpm": 124.0,
+      "beatGridMs": [512, 996, 1480],
+      "stems": { "producer": "crate-server/2026.11.9", "phrases": [] }
+    }
+  },
+  "missing": ["7d1e9b44-3f2a-4e8e-8c0d-61b5a2f4d7aa"]
+}
+```
+
+Request:
+
+- `entity_uids`: 1 to 200 track entity UIDs. A UID sent twice, or in another
+  case, is answered once.
+- `detail`: only `full`, the default.
+
+Response:
+
+- `profiles`: each profile is exactly what
+  `GET /api/tracks/by-entity/{uid}/mix-profile?detail=full` answers for the
+  track, with the same fields, the beat grid and the optional `stems` layer
+  (`full_mix_profile_response` in `app/crate/api/smart_mix.py` serves both).
+  The keys are the UIDs in lowercase hyphenated form, in request order.
+- `missing`: the requested UIDs without a current profile, in request order:
+  not a local library track, never analysed, or a file that changed since its
+  analysis. These are the UIDs the single endpoint answers with `404`.
+
+Access is the same as for the S3 routes: a user session; a `crv_` access token
+gets `401` from the middleware and `403` if it ever reaches the handler, and a
+trusted-header user without a Crate account gets `403`. Profiles are part of
+the shared local library, so every signed-in user reads the same ones, as with
+the single endpoint.
+
+Errors:
+
+| Status | When                                                                                            |
+| ------ | ----------------------------------------------------------------------------------------------- |
+| `401`  | No session, or a `crv_` access token                                                            |
+| `403`  | An access token or an accountless trusted-header user reaching the handler                      |
+| `422`  | No UIDs, more than 200, a value that is not a UUID, `detail` other than `full`, or extra fields |
+
+Cost:
+
+- One SQL statement per request (`get_decks_mix_profiles` in
+  `app/crate/db/queries/decks_profiles.py`, pinned by `test_single_query`): the
+  tracks by `entity_uid = ANY(:entity_uids)` through the unique
+  `idx_lib_tracks_entity_uid`, their current profile by primary key, and their
+  stem analyses of the same source revision by primary key. A track with
+  analyses from both producers comes back on two rows, so at most 400 rows.
+- Nothing aggregates over `library_tracks` and nothing touches the audio files.
+- Measured 2026-11-10 in a Testcontainers PostgreSQL with 140,000 tracks,
+  135,000 profiles and 4,000 tracks with both producers' analyses, on a batch
+  of 200 six-minute tracks (767 beats each), 40 of them with stems: PostgreSQL
+  executes the statement in about 1.3 ms (1,700 shared buffer hits). The time
+  goes to Python, decoding and checking 200 beat grids: 70 to 85 ms at p95 for
+  the read, 120 to 130 ms at p95 for the whole request through the app (about
+  1.4 MB of JSON), on a laptop with a load average of 2 to 3, where
+  `/api/capabilities` took 10 ms at p95. The single endpoint pays the same per
+  track, so one batch replaces 200 requests of that cost.
 
 ## Stem analyses (Smart Mix Stems ST1)
 
