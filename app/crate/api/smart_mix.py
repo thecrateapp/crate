@@ -310,7 +310,11 @@ def playback_continuation(
     ][:32]
     return PlaybackContinuationResponse(
         tracks=tracks,
-        plans=_plan_transition_edges(edges) if edges else [],
+        plans=(
+            _plan_transition_edges(edges, planner_version=payload.planner_version)
+            if edges
+            else []
+        ),
         exhausted=exhausted,
         status=(
             "ok"
