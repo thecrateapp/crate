@@ -77,8 +77,11 @@ the sidecar with `docker compose up -d --no-deps crate-postgres-backup`. The
 volume name carries the compose project prefix (`crate_` on production); use
 the `PUID`/`PGID` of the deployment in `chown`.
 
-These dumps live on the same server as the database. A copy off the server is
-still needed to survive the loss of the host; the options are in
+These dumps live on the same server as the database. To survive the loss of
+the host, the opt-in `crate-backup-offsite` service (compose profile
+`offsite-backup`) copies the weekly and monthly dumps with restic to Cloudflare
+R2 and Google Drive, prunes them, and runs a monthly check and restore drill.
+Setup, credential rotation and restores from each destination are in
 `docs/operators/postgres-offsite-backups.md`.
 
 For home hosting, use a host-managed `pg_dump` schedule or an equivalent backup

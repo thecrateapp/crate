@@ -1,0 +1,59 @@
+name: Off-site backups
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "deploy/backup-offsite/**"
+      - ".github/workflows/test-backup-offsite.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/backup-offsite/**"
+      - ".github/workflows/test-backup-offsite.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-offsite-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  restic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # MinIO no longer publishes community images; the frozen Bitnami build is
+      # pinned by digest and only stands in for Cloudflare R2's S3 API.
+      MINIO_IMAGE: bitnamilegacy/minio@sha256:8935e75fa5d11295c17171e4aa49efe390a1193cd7f12e4d21b92af9ffef09d7
+    steps:
+      - uses: actions/checkout@v6
+      - name: Shellcheck
+        run: >-
+          docker run --rm -v "$PWD/deploy/backup-offsite:/mnt:ro"
+          koalaman/shellcheck:v0.11.0 /mnt/offsite.sh /mnt/test.sh
+      - name: Build the image
+        run: docker build -t crate-backup-offsite:test deploy/backup-offsite
+      - name: Start MinIO
+        run: |
+          docker network create offsite-test
+          docker run -d --name offsite-minio --network offsite-test \
+            -e MINIO_ROOT_USER=testaccess -e MINIO_ROOT_PASSWORD=testsecret123 \
+            "$MINIO_IMAGE"
+          for _ in $(seq 60); do
+            if docker exec offsite-minio curl -fs http://localhost:9000/minio/health/ready; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs offsite-minio
+          exit 1
+      - name: Back up, forget, check, restore and drill
+        run: >-
+          docker run --rm --network offsite-test --entrypoint bash
+          -e CRATE_OFFSITE_TEST_S3_ENDPOINT=http://offsite-minio:9000
+          -e CRATE_OFFSITE_TEST_S3_ACCESS_KEY=testaccess
+          -e CRATE_OFFSITE_TEST_S3_SECRET_KEY=testsecret123
+          -v "$PWD/deploy/backup-offsite/test.sh:/test.sh:ro"
+          crate-backup-offsite:test /test.sh
