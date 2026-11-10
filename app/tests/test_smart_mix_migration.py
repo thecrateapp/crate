@@ -417,9 +417,9 @@ def test_meter_signals_migration_up_down(pg_db, monkeypatch) -> None:
     from crate.db.engine import get_engine
 
     migration = import_module(
-        "crate.db.migrations.versions.159_smart_mix_meter_signals"
+        "crate.db.migrations.versions.161_smart_mix_meter_signals"
     )
-    assert (migration.revision, migration.down_revision) == ("159", "158")
+    assert (migration.revision, migration.down_revision) == ("161", "160")
     with get_engine().connect() as connection:
         assert (
             connection.execute(text("SELECT current_database()"))
@@ -449,7 +449,7 @@ def test_bootstrap_schema_creates_the_meter_signal_columns() -> None:
         ROOT / "app" / "crate" / "db" / "schema_sections" / "library_catalog.py"
     ).read_text()
 
-    assert "create_smart_mix_meter_signals_v159_schema(cur)" in source
+    assert "create_smart_mix_meter_signals_v161_schema(cur)" in source
 
 
 def test_track_signals_go_with_their_track(pg_db) -> None:

@@ -2,19 +2,19 @@
 
 from alembic import op
 
-from crate.db.schema_sections.smart_mix_meter_signals_v159 import (
-    create_smart_mix_meter_signals_v159_schema,
+from crate.db.schema_sections.smart_mix_meter_signals_v161 import (
+    create_smart_mix_meter_signals_v161_schema,
 )
 
 
-revision = "159"
-down_revision = "158"
+revision = "161"
+down_revision = "160"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    create_smart_mix_meter_signals_v159_schema(op)
+    create_smart_mix_meter_signals_v161_schema(op)
 
 
 def downgrade() -> None:

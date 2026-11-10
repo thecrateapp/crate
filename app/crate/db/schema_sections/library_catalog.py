@@ -24,8 +24,8 @@ from crate.db.schema_sections.smart_mix_v149 import (
 from crate.db.schema_sections.smart_mix_v150 import (
     create_smart_mix_track_signals_v150_schema,
 )
-from crate.db.schema_sections.smart_mix_meter_signals_v159 import (
-    create_smart_mix_meter_signals_v159_schema,
+from crate.db.schema_sections.smart_mix_meter_signals_v161 import (
+    create_smart_mix_meter_signals_v161_schema,
 )
 from crate.db.schema_sections.vdj_catalog_v113 import (
     create_vdj_mood_indexes_v113_schema,
@@ -411,7 +411,7 @@ def create_library_catalog_schema(cur) -> None:
     create_smart_mix_vocal_detector_v148_schema(cur)
     create_smart_mix_beat_tracker_v149_schema(cur)
     create_smart_mix_track_signals_v150_schema(cur)
-    create_smart_mix_meter_signals_v159_schema(cur)
+    create_smart_mix_meter_signals_v161_schema(cur)
     create_vdj_mood_indexes_v113_schema(cur)
     cur.execute("""
         CREATE INDEX IF NOT EXISTS idx_track_mix_profiles_source_revision

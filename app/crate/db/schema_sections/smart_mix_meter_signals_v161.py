@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-def create_smart_mix_meter_signals_v159_schema(cur: Any) -> None:
+def create_smart_mix_meter_signals_v161_schema(cur: Any) -> None:
     """How a track's bar length was chosen, kept with its model beats.
 
     ``meter_margin`` is log p(3 beats) - log p(4 beats) of Beat This!'s DBN per 1,000
@@ -20,4 +20,4 @@ def create_smart_mix_meter_signals_v159_schema(cur: Any) -> None:
     )
 
 
-__all__ = ["create_smart_mix_meter_signals_v159_schema"]
+__all__ = ["create_smart_mix_meter_signals_v161_schema"]
