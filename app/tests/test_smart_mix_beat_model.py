@@ -278,24 +278,215 @@ def test_tracker_and_weights_follow_the_checkpoint(monkeypatch) -> None:
 
 
 def test_beat_this_runs_with_its_dbn(monkeypatch, tmp_path) -> None:
-    calls: list[dict] = []
+    # The frames come from Beat This! and the DBN is madmom's, with Beat This!'s own
+    # post-processing settings, decoded here so both bar lengths stay available.
+    calls: list[tuple[str, dict]] = []
 
-    class Audio2Beats:
+    class Audio2Frames:
         def __init__(self, **kwargs):
-            calls.append(kwargs)
+            calls.append(("frames", kwargs))
+
+    class DBNDownBeatTrackingProcessor:
+        def __init__(self, **kwargs):
+            calls.append(("dbn", kwargs))
 
     package = types.ModuleType("beat_this")
     inference = types.ModuleType("beat_this.inference")
-    inference.Audio2Beats = Audio2Beats
+    inference.Audio2Frames = Audio2Frames
     package.inference = inference
-    monkeypatch.setitem(sys.modules, "beat_this", package)
-    monkeypatch.setitem(sys.modules, "beat_this.inference", inference)
+    madmom = types.ModuleType("madmom")
+    features = types.ModuleType("madmom.features")
+    downbeats = types.ModuleType("madmom.features.downbeats")
+    downbeats.DBNDownBeatTrackingProcessor = DBNDownBeatTrackingProcessor
+    for name, module in (
+        ("beat_this", package),
+        ("beat_this.inference", inference),
+        ("madmom", madmom),
+        ("madmom.features", features),
+        ("madmom.features.downbeats", downbeats),
+    ):
+        monkeypatch.setitem(sys.modules, name, module)
     weights = tmp_path / "beat_this-small0.ckpt"
 
     model = beat_model.BeatThisModel(weights, "beat-this-small0-dbn")
 
     assert model.tracker == "beat-this-small0-dbn"
-    assert calls == [{"checkpoint_path": str(weights), "device": "cpu", "dbn": True}]
+    assert calls == [
+        ("frames", {"checkpoint_path": str(weights), "device": "cpu"}),
+        (
+            "dbn",
+            {
+                "beats_per_bar": [3, 4],
+                "min_bpm": 55.0,
+                "max_bpm": 215.0,
+                "fps": 50,
+                "transition_lambda": 100,
+            },
+        ),
+    ]
+
+
+def _bar_paths(*, three: float, four: float, frames: int = 1_000):
+    """A DBN decode where the three- and four-beat bars score ``three`` and ``four``."""
+    beats = np.arange(0.5, 12.0, 0.5)
+    return beat_model.BarPaths(
+        paths=(
+            beat_model.BarPath(3, beats, beats[::3], three),
+            beat_model.BarPath(4, beats, beats[::4], four),
+        ),
+        frames=frames,
+    )
+
+
+class _PathsModel:
+    tracker = "beat-this-fake-dbn"
+
+    def __init__(self, paths):
+        self.paths = paths
+
+    def __call__(self, signal, sample_rate):
+        return self.paths
+
+
+class _Arbiter:
+    def __init__(self, meter=None, error: Exception | None = None):
+        self.meter = meter
+        self.error = error
+        self.calls: list[object] = []
+
+    def __call__(self, source):
+        self.calls.append(source)
+        if self.error is not None:
+            raise self.error
+        return self.meter
+
+
+def test_four_beat_bars_never_ask_the_arbiter() -> None:
+    arbiter = _Arbiter(meter=3)
+    model = _PathsModel(_bar_paths(three=-500.0, four=-400.0))
+
+    track = beat_model.track_beats(
+        _clicks(12.0), SAMPLE_RATE, model=model, arbiter=lambda: arbiter("audio")
+    )
+
+    assert track is not None
+    assert track.beats_per_bar == 4
+    assert track.downbeats_ms == (500, 2_500, 4_500, 6_500, 8_500, 10_500)
+    assert track.meter_arbiter is None
+    # log p3 - log p4 per thousand frames.
+    assert track.meter_margin == pytest.approx(-100.0)
+    assert arbiter.calls == []
+
+
+@pytest.mark.parametrize(
+    ("meter", "beats_per_bar", "arbiter_name"),
+    [(4, 4, "madmom-dbn-4"), (3, 3, "madmom-dbn-3")],
+)
+def test_three_beat_bars_need_the_arbiter_to_agree(
+    meter, beats_per_bar, arbiter_name
+) -> None:
+    # Fast 4/4 punk and metal: Beat This!'s DBN prefers three, madmom's model four.
+    # Only when the second model also hears three does the track keep bars of three.
+    arbiter = _Arbiter(meter=meter)
+    model = _PathsModel(_bar_paths(three=-400.0, four=-430.0))
+
+    track = beat_model.track_beats(
+        _clicks(12.0), SAMPLE_RATE, model=model, arbiter=lambda: arbiter("audio")
+    )
+
+    assert track is not None
+    assert arbiter.calls == ["audio"]
+    assert (track.beats_per_bar, track.meter_arbiter) == (beats_per_bar, arbiter_name)
+    assert track.meter_margin == pytest.approx(30.0)
+    assert track.downbeats_ms[:2] == ((500, 2_000) if meter == 3 else (500, 2_500))
+
+
+def test_a_failing_arbiter_keeps_three_beat_bars_with_a_warning(caplog) -> None:
+    arbiter = _Arbiter(error=RuntimeError("madmom broke"))
+    model = _PathsModel(_bar_paths(three=-400.0, four=-430.0))
+
+    with caplog.at_level(logging.WARNING, logger=beat_model.__name__):
+        track = beat_model.track_beats(
+            _clicks(12.0), SAMPLE_RATE, model=model, arbiter=lambda: arbiter("audio")
+        )
+
+    assert track is not None
+    assert (track.beats_per_bar, track.meter_arbiter) == (3, None)
+    assert "madmom" in _messages(caplog)
+
+
+def test_without_an_arbiter_three_beat_bars_stay() -> None:
+    model = _PathsModel(_bar_paths(three=-400.0, four=-430.0))
+
+    track = beat_model.track_beats(_clicks(12.0), SAMPLE_RATE, model=model)
+
+    assert track is not None
+    assert (track.beats_per_bar, track.meter_arbiter) == (3, None)
+
+
+def test_file_beats_give_the_arbiter_the_file(monkeypatch, tmp_path) -> None:
+    path = tmp_path / "stereo.wav"
+    left = _clicks(12.0, rate=44_100)
+    wavfile.write(path, 44_100, np.stack([left, left], axis=1))
+    arbiter = _Arbiter(meter=4)
+    model = _PathsModel(_bar_paths(three=-400.0, four=-430.0))
+
+    track = beat_model.track_file_beats(path, model=model, arbiter=arbiter)
+
+    assert track is not None and track.beats_per_bar == 4
+    assert arbiter.calls == [path]
+
+
+@pytest.mark.parametrize(("three", "loads"), [(-500.0, False), (-400.0, True)])
+def test_the_default_arbiter_loads_only_when_the_dbn_hears_three(
+    monkeypatch, tmp_path, three, loads
+) -> None:
+    # madmom's networks are built in a worker process only for a track that needs
+    # them, about 4 % of tracks, not on its first track.
+    from crate.smart_mix import meter_arbiter
+
+    path = tmp_path / "mono.wav"
+    wavfile.write(path, 44_100, _clicks(12.0, rate=44_100))
+    arbiter = _Arbiter(meter=4)
+    loaded: list[bool] = []
+    monkeypatch.setattr(
+        beat_model,
+        "load_beat_model",
+        lambda: _PathsModel(_bar_paths(three=three, four=-430.0)),
+    )
+    monkeypatch.setattr(
+        meter_arbiter, "load_meter_arbiter", lambda: loaded.append(True) or arbiter
+    )
+
+    track = beat_model.track_file_beats(path)
+
+    assert track is not None and track.beats_per_bar == 4
+    assert loaded == ([True] if loads else [])
+    assert arbiter.calls == ([path] if loads else [])
+
+
+def test_bar_paths_match_the_madmom_dbn() -> None:
+    # Decoding each bar length here must give, for the winner, exactly what madmom's
+    # processor gives: the same beats and downbeats as Beat This!'s Audio2Beats.
+    downbeats_module = pytest.importorskip("madmom.features.downbeats")
+    dbn = downbeats_module.DBNDownBeatTrackingProcessor(
+        beats_per_bar=[3, 4], min_bpm=55.0, max_bpm=215.0, fps=50, transition_lambda=100
+    )
+    for beats_per_bar in (3, 4):
+        frames = 50 * 30
+        activations = np.full((frames, 2), 1e-3)
+        for index, frame in enumerate(range(10, frames, 25)):  # 120 BPM
+            activations[frame, 1 if index % beats_per_bar == 0 else 0] = 0.9
+
+        expected = dbn(activations)
+        paths = beat_model.decode_bar_paths(dbn, activations)
+
+        assert [path.beats_per_bar for path in paths.paths] == [3, 4]
+        best = paths.best()
+        assert best.beats_per_bar == beats_per_bar
+        assert np.allclose(best.beats, expected[:, 0])
+        assert np.allclose(best.downbeats, expected[expected[:, 1] == 1][:, 0])
+        assert paths.frames > 0
 
 
 def test_missing_madmom_returns_none_with_a_warning(

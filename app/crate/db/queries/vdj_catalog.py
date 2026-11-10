@@ -339,7 +339,10 @@ def _serialize_track(row: Mapping[Any, Any]) -> dict[str, Any]:
 
 __all__ = [
     "VDJ_FOLDER_TRACK_LIMIT",
+    "VDJ_GENRE_FOLDER_LIMIT",
+    "VDJ_MOOD_THRESHOLD",
     "VDJ_MOODS",
+    "VDJ_RECENT_EVENT_WINDOW",
     "get_vdj_folder_page",
     "list_vdj_folders",
     "mood_score_expression",

@@ -26,19 +26,19 @@ CANCELLED_V6_CAMPAIGN = {
     "claimed": 38_865,
     "sequence": 1_600,
 }
-# v9 decodes m4a at its real length and lets off-grid model downbeats abstain from the
-# bar; production holds a paused v8 campaign that had claimed 12,505 tracks in 4,779
-# batches when v9 shipped. The sequence is illustrative.
-PREVIOUS_ANALYZER_VERSION = "smart-mix-audio-v8"
-PAUSED_V8_CAMPAIGN = {
+# v10 asks madmom before giving a track bars of three; production runs the v9 campaign
+# (started 2026-11-09 with sequence 10,277), which v10 supersedes whatever its state.
+# The counters are illustrative.
+PREVIOUS_ANALYZER_VERSION = "smart-mix-audio-v9"
+PREVIOUS_CAMPAIGN = {
     "target": PREVIOUS_ANALYZER_VERSION,
     "profile_version": 1,
     "status": "paused",
     "batch_size": 25,
     "max_attempts": 3,
-    "batches": 4_779,
-    "claimed": 12_505,
-    "sequence": 6_600,
+    "batches": 9_000,
+    "claimed": 30_000,
+    "sequence": 19_277,
 }
 
 
@@ -1082,6 +1082,7 @@ def _insert_profile(
     analyzer: str = "crate-rust",
     quality: str = "full",
     profile_version: int = PROFILE_SCHEMA_VERSION,
+    beat_tracker: str | None = "beat-this-small0-dbn",
 ) -> None:
     with transaction_scope() as session:
         session.execute(
@@ -1089,11 +1090,12 @@ def _insert_profile(
                 """
                 INSERT INTO track_mix_profiles (
                     track_id, profile_version, profile_revision, analyzer,
-                    analyzer_version, source_revision, quality, analyzed_at
+                    analyzer_version, source_revision, quality, analyzed_at,
+                    beat_tracker
                 )
                 VALUES (
                     :track_id, :profile_version, :revision, :analyzer,
-                    :analyzer_version, 'source', :quality, NOW()
+                    :analyzer_version, 'source', :quality, NOW(), :beat_tracker
                 )
                 """
             ),
@@ -1104,6 +1106,7 @@ def _insert_profile(
                 "analyzer": analyzer,
                 "analyzer_version": analyzer_version,
                 "quality": quality,
+                "beat_tracker": beat_tracker,
             },
         )
 
@@ -1584,6 +1587,9 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
         analysis,
         "claim_smart_mix_backfill_batch",
         lambda **kwargs: calls["claims"].append(kwargs) or list(claimed),
+    )
+    monkeypatch.setattr(
+        analysis, "record_smart_mix_model_availability", lambda _available: None
     )
     monkeypatch.setattr(
         "crate.db.repositories.tasks.create_task_dedup",
@@ -2133,6 +2139,8 @@ def _current_draft() -> TrackMixProfileDraft:
         phrases=(),
         energy_curve=bytes(2),
         structure_confidence=0.0,
+        # A profile the worker builds on Beat This!'s beats, as in production.
+        beat_tracker="beat-this-small0-dbn",
     )
 
 
@@ -2235,12 +2243,12 @@ def test_a_freshly_written_current_profile_is_never_claimed_again(
     )
 
 
-def test_v8_profiles_are_claimed_once_for_v9(pg_db, tmp_path: Path) -> None:
+def test_v9_profiles_are_claimed_once_for_v10(pg_db, tmp_path: Path) -> None:
     del pg_db
     track_ids = _create_tracks(tmp_path, count=3)
     for track_id in track_ids:
         _insert_profile(track_id, analyzer_version=PREVIOUS_ANALYZER_VERSION)
-        # Finished by the v8 campaign with its retry budget spent: v9 is a new
+        # Finished by the v9 campaign with its retry budget spent: v10 is a new
         # generation, so the budget starts again.
         _insert_processing(
             track_id,
@@ -2250,7 +2258,7 @@ def test_v8_profiles_are_claimed_once_for_v9(pg_db, tmp_path: Path) -> None:
         )
 
     claimed = claim_smart_mix_backfill_batch(
-        limit=10, max_attempts=3, claimed_by="task:v9"
+        limit=10, max_attempts=3, claimed_by="task:v10"
     )
 
     assert sorted(row["id"] for row in claimed) == sorted(track_ids)
@@ -2267,14 +2275,397 @@ def test_v8_profiles_are_claimed_once_for_v9(pg_db, tmp_path: Path) -> None:
         claim_smart_mix_backfill_batch(
             limit=10,
             max_attempts=3,
-            claimed_by="task:v9",
+            claimed_by="task:v10",
             promote_python_profiles=True,
         )
         == []
     )
 
 
-def test_starting_v9_over_the_paused_v8_campaign_starts_a_new_one(pg_db) -> None:
+def test_older_model_profile_kept_from_a_library_draft_is_claimed(
+    pg_db, tmp_path: Path
+) -> None:
+    # A library reanalysis embeds a current-version draft without the model's beats.
+    # The track keeps its older profile with Beat This!'s beats, so the backfill still
+    # claims it and recomputes it with the model.
+    del pg_db
+    from dataclasses import replace
+
+    from crate.db.jobs.analysis_storage import store_smart_mix_profile_result
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    with read_scope() as session:
+        path = session.execute(
+            text("SELECT path FROM library_tracks WHERE id = :id"), {"id": track_id}
+        ).scalar_one()
+    model = replace(_current_draft(), beat_tracker="beat-this-small0-dbn")
+    assert store_smart_mix_profile_result(
+        track_id, path, replace(model, analyzer_version=PREVIOUS_ANALYZER_VERSION)
+    )
+    library = replace(_current_draft(), beat_tracker=None)
+    assert store_smart_mix_profile_result(track_id, path, library) is False
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=10, max_attempts=3, claimed_by="task:v10"
+    )
+
+    assert [row["id"] for row in claimed] == [track_id]
+    assert store_smart_mix_profile_result(track_id, path, model) is True
+    assert _stored_versions([track_id]) == {(ANALYZER_VERSION, PROFILE_SCHEMA_VERSION)}
+
+
+MODEL = "beat-this-small0-dbn"
+
+
+def _track_path(track_id: int) -> str:
+    with read_scope() as session:
+        return session.execute(
+            text("SELECT path FROM library_tracks WHERE id = :id"), {"id": track_id}
+        ).scalar_one()
+
+
+def _publish_as_child(claimed: list[dict], draft: TrackMixProfileDraft) -> list[str]:
+    """What each claimed track's profile task publishes, under its claim."""
+    from crate.db.jobs.analysis_storage import (
+        capture_smart_mix_source,
+        publish_smart_mix_profile,
+    )
+
+    return [
+        str(
+            publish_smart_mix_profile(
+                capture_smart_mix_source(
+                    int(row["id"]), row["path"], claim_token=row["claim_token"]
+                ),
+                draft,
+            )
+        )
+        for row in claimed
+    ]
+
+
+def _upgrade_claim() -> list[dict]:
+    return claim_smart_mix_backfill_batch(
+        limit=10, max_attempts=3, claimed_by="task:upgrade", upgrade_own_tracker=True
+    )
+
+
+def test_current_profile_without_model_beats_is_claimed_and_upgraded(
+    pg_db, tmp_path: Path
+) -> None:
+    # A new import, or a library reanalysis: the analysis daemon writes a profile of
+    # the current version from the analyzer's own tracker. With the model available
+    # the backfill claims it and Beat This!'s draft replaces it, even rated lower.
+    del pg_db
+    from dataclasses import replace
+
+    from crate.db.jobs.analysis_storage import store_smart_mix_profile_result
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    own = replace(_current_draft(), beat_tracker=None)
+    assert store_smart_mix_profile_result(track_id, _track_path(track_id), own)
+    without_model = claim_smart_mix_backfill_batch(
+        limit=10, max_attempts=3, claimed_by="task:no-model"
+    )
+
+    claimed = _upgrade_claim()
+
+    assert without_model == []
+    assert [row["id"] for row in claimed] == [track_id]
+    model = replace(
+        _current_draft(), beat_tracker=MODEL, quality=MixProfileQuality.PARTIAL
+    )
+    assert _publish_as_child(claimed, model) == ["published"]
+    assert _upgrade_claim() == []
+
+
+def test_model_backed_current_profile_is_never_claimed(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    from dataclasses import replace
+
+    from crate.db.jobs.analysis_storage import store_smart_mix_profile_result
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    model = replace(_current_draft(), beat_tracker=MODEL)
+    assert store_smart_mix_profile_result(track_id, _track_path(track_id), model)
+
+    assert _upgrade_claim() == []
+
+
+def test_upgrades_stop_at_the_retry_budget(pg_db, tmp_path: Path) -> None:
+    # Beat This! fails on this file (or finds no beats): each pass claims it once,
+    # and after the retry budget it is exhausted, not claimed again.
+    del pg_db
+    from dataclasses import replace
+
+    from crate.db.jobs.analysis_storage import store_smart_mix_profile_result
+    from crate.db.jobs.smart_mix_backfill import refresh_smart_mix_coverage
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    own = replace(_current_draft(), beat_tracker=None)
+    assert store_smart_mix_profile_result(track_id, _track_path(track_id), own)
+
+    for attempt in (1, 2, 3):
+        claimed = _upgrade_claim()
+        assert [row["id"] for row in claimed] == [track_id]
+        assert _processing_row(track_id)["attempts"] == attempt
+        _publish_as_child(claimed, own)
+
+    assert _upgrade_claim() == []
+    coverage = refresh_smart_mix_coverage(max_attempts=3)
+    assert coverage["current_profiles"] == 0
+    assert coverage["outdated_profiles"] == 1
+    assert coverage["processing"]["exhausted"] == 1
+
+
+def test_tracks_beyond_the_model_limit_are_not_claimed_for_model_beats(
+    pg_db, tmp_path: Path
+) -> None:
+    # Beat This! never runs on tracks over BEAT_MODEL_MAX_SECONDS: their own-tracker
+    # profile is current and complete.
+    del pg_db
+    from dataclasses import replace
+
+    from crate.db.jobs.analysis_storage import store_smart_mix_profile_result
+    from crate.db.jobs.smart_mix_backfill import refresh_smart_mix_coverage
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE library_tracks SET duration = 3600 WHERE id = :id"),
+            {"id": track_id},
+        )
+    own = replace(_current_draft(), beat_tracker=None)
+    assert store_smart_mix_profile_result(track_id, _track_path(track_id), own)
+
+    assert _upgrade_claim() == []
+    assert refresh_smart_mix_coverage(max_attempts=3)["current_profiles"] == 1
+
+
+def test_an_older_own_tracker_profile_replaced_by_a_library_draft_is_upgraded(
+    pg_db, tmp_path: Path
+) -> None:
+    # The library's .m4a: an older profile without model beats takes the library
+    # reanalysis' current own-tracker draft (the cross-version rule protects only
+    # model beats), and the backfill then upgrades it with Beat This!.
+    del pg_db
+    from dataclasses import replace
+
+    from crate.db.jobs.analysis_storage import store_smart_mix_profile_result
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    path = _track_path(track_id)
+    older = replace(
+        _current_draft(), analyzer_version=PREVIOUS_ANALYZER_VERSION, beat_tracker=None
+    )
+    assert store_smart_mix_profile_result(track_id, path, older)
+    library = replace(_current_draft(), beat_tracker=None)
+    assert store_smart_mix_profile_result(track_id, path, library) is True
+
+    claimed = _upgrade_claim()
+
+    assert [row["id"] for row in claimed] == [track_id]
+    assert _publish_as_child(
+        claimed, replace(_current_draft(), beat_tracker=MODEL)
+    ) == ["published"]
+    assert _upgrade_claim() == []
+
+
+def test_the_coordinator_upgrades_only_with_the_model(monkeypatch) -> None:
+    for available in (True, False):
+        analysis, calls = _handler_harness(
+            monkeypatch, campaigns=[_running_campaign()], in_flight=[0]
+        )
+        monkeypatch.setattr(
+            "crate.smart_mix.beat_model.beat_model_available", lambda: available
+        )
+
+        analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+        assert calls["claims"][0]["upgrade_own_tracker"] is available
+
+
+def _completed_campaign(**overrides) -> dict:
+    return {
+        **_running_campaign(),
+        "status": "completed",
+        "completed_at": "2026-11-10T08:00:00+00:00",
+        "beat_model_available": True,
+        **overrides,
+    }
+
+
+def _touch_profile(track_id: int, when: str) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE track_mix_profiles SET updated_at = CAST(:when AS timestamptz)"
+                " WHERE track_id = :id"
+            ),
+            {"when": when, "id": track_id},
+        )
+
+
+def _wake(monkeypatch) -> list[dict]:
+    from crate.db.jobs.smart_mix_backfill import wake_smart_mix_backfill
+
+    queued: list[dict] = []
+    monkeypatch.setattr(
+        smart_mix_backfill,
+        "queue_next_smart_mix_batch",
+        lambda **kwargs: queued.append(kwargs) or "task-wake",
+    )
+    wake_smart_mix_backfill()
+    return queued
+
+
+def test_an_import_after_the_campaign_completed_reopens_it(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    # The library analysis wrote an own-tracker profile for a new import after the
+    # campaign completed: the service loop reopens the campaign, which claims it under
+    # its window, load checks and retry budget.
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    _insert_profile(track_id, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _touch_profile(track_id, "2026-11-10T09:00:00+00:00")
+    save_smart_mix_campaign(_completed_campaign())
+
+    queued = _wake(monkeypatch)
+
+    assert queued == [{}]
+    assert get_smart_mix_campaign()["status"] == "running"
+
+
+@pytest.mark.parametrize(
+    "campaign",
+    [
+        _completed_campaign(status="paused"),
+        _completed_campaign(status="cancelled"),
+        _completed_campaign(status="running"),
+        _completed_campaign(target="smart-mix-audio-v5"),
+        # The last pass ran where Beat This! cannot: a setup without the model.
+        _completed_campaign(beat_model_available=False),
+        {
+            key: value
+            for key, value in _completed_campaign().items()
+            if key != "beat_model_available"
+        },
+    ],
+)
+def test_the_wake_up_leaves_other_campaigns_alone(
+    pg_db, tmp_path: Path, monkeypatch, campaign
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    _insert_profile(track_id, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _touch_profile(track_id, "2026-11-10T09:00:00+00:00")
+    save_smart_mix_campaign(dict(campaign))
+
+    assert _wake(monkeypatch) == []
+    assert get_smart_mix_campaign()["status"] == campaign["status"]
+
+
+def test_the_wake_up_needs_a_claimable_profile_written_since_completion(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    # Older own-tracker rows (exhausted, or left from before the campaign ended) and
+    # new model-backed rows give nothing to claim: the campaign stays completed.
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+
+    older, modelled, exhausted = _create_tracks(tmp_path, count=3)
+    _insert_profile(older, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _touch_profile(older, "2026-11-10T07:00:00+00:00")
+    _insert_profile(modelled, analyzer_version=ANALYZER_VERSION)
+    _touch_profile(modelled, "2026-11-10T09:00:00+00:00")
+    _insert_profile(exhausted, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _touch_profile(exhausted, "2026-11-10T09:00:00+00:00")
+    _insert_processing(
+        exhausted, state="done", attempts=3, target_generation=ANALYZER_VERSION
+    )
+    save_smart_mix_campaign(_completed_campaign())
+
+    assert _wake(monkeypatch) == []
+    assert get_smart_mix_campaign()["status"] == "completed"
+
+
+def test_completing_a_campaign_records_when(pg_db) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        complete_smart_mix_campaign,
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+
+    save_smart_mix_campaign(_running_campaign())
+
+    assert complete_smart_mix_campaign() is True
+
+    campaign = get_smart_mix_campaign()
+    assert campaign["status"] == "completed"
+    assert datetime.fromisoformat(campaign["completed_at"]).tzinfo is not None
+
+
+def test_each_pass_records_whether_the_model_can_run(pg_db, monkeypatch) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        record_smart_mix_model_availability,
+        save_smart_mix_campaign,
+    )
+
+    save_smart_mix_campaign(_running_campaign())
+    record_smart_mix_model_availability(True)
+    assert get_smart_mix_campaign()["beat_model_available"] is True
+    record_smart_mix_model_availability(False)
+    assert get_smart_mix_campaign()["beat_model_available"] is False
+
+
+def test_the_coordinator_records_the_model_availability(monkeypatch) -> None:
+    analysis, calls = _handler_harness(
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[0]
+    )
+    recorded: list[bool] = []
+    monkeypatch.setattr("crate.smart_mix.beat_model.beat_model_available", lambda: True)
+    monkeypatch.setattr(
+        analysis, "record_smart_mix_model_availability", recorded.append
+    )
+
+    analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert recorded == [True]
+
+
+def test_the_service_loop_step_wakes_the_backfill(monkeypatch) -> None:
+    from crate import worker
+
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        "crate.db.jobs.smart_mix_backfill.wake_smart_mix_backfill",
+        lambda: calls.append(True) or "task-wake",
+    )
+
+    worker._wake_smart_mix_backfill()
+
+    assert calls == [True]
+    assert worker.SMART_MIX_WAKE_SECONDS == 600
+
+
+def test_starting_v10_over_the_v9_campaign_starts_a_new_one(pg_db) -> None:
     del pg_db
     from crate.db.jobs.smart_mix_backfill import (
         campaign_targets_current,
@@ -2283,7 +2674,7 @@ def test_starting_v9_over_the_paused_v8_campaign_starts_a_new_one(pg_db) -> None
         start_smart_mix_campaign,
     )
 
-    save_smart_mix_campaign(dict(PAUSED_V8_CAMPAIGN))
+    save_smart_mix_campaign(dict(PREVIOUS_CAMPAIGN))
     assert campaign_targets_current(get_smart_mix_campaign()) is False
 
     campaign = start_smart_mix_campaign(batch_size=25, max_attempts=3)
@@ -2305,7 +2696,7 @@ def test_starting_v9_over_the_paused_v8_campaign_starts_a_new_one(pg_db) -> None
         "batches": 0,
         "claimed": 0,
         # The sequence keeps growing, so the new batches never reuse a dedup key.
-        "sequence": 6_600,
+        "sequence": 19_277,
     }
     assert campaign_targets_current(get_smart_mix_campaign()) is True
 
@@ -2391,7 +2782,7 @@ def test_campaigns_of_another_target_never_claim_for_the_current_one(
 ) -> None:
     for stale in (
         {**CANCELLED_V6_CAMPAIGN, "status": "running"},
-        {**PAUSED_V8_CAMPAIGN, "status": "running"},
+        {**PREVIOUS_CAMPAIGN, "status": "running"},
         _running_campaign(target="smart-mix-audio-v6"),
         _running_campaign(profile_version=PROFILE_SCHEMA_VERSION - 1),
         # Campaigns written before the schema was recorded targeted schema 1.
@@ -2648,3 +3039,80 @@ def test_campaign_stores_the_night_window_and_keeps_it_when_omitted(pg_db) -> No
         restarted["day_concurrency"],
     ) == (ACROSS_MIDNIGHT, 6, 3)
     assert get_smart_mix_campaign()["day_concurrency"] == 3
+
+
+@pytest.mark.parametrize(
+    ("recorded", "current"),
+    [
+        # No pass has said yet: production has the model, so the profile still owes
+        # its beats.
+        (None, False),
+        (True, False),
+        # ARM images, PANNS=off, missing weights: nothing would ever upgrade it.
+        (False, True),
+    ],
+)
+def test_own_tracker_profiles_await_the_model_only_where_it_runs(
+    pg_db, tmp_path: Path, recorded, current
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        refresh_smart_mix_coverage,
+        save_smart_mix_campaign,
+    )
+
+    own, phrased = _create_tracks(tmp_path, count=2)
+    _insert_profile(own, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _insert_profile(phrased, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE track_mix_profiles SET phrases = CAST(:one AS jsonb) "
+                "WHERE track_id = :track_id"
+            ),
+            {
+                "track_id": phrased,
+                "one": '[{"start_beat": 0, "start_ms": 0, "bars": 8, '
+                '"energy": 0.5, "delta_energy": null, "kind": "body"}]',
+            },
+        )
+    if recorded is not None:
+        save_smart_mix_campaign(_completed_campaign(beat_model_available=recorded))
+
+    snapshot = refresh_smart_mix_coverage(max_attempts=3)
+
+    assert snapshot["current_profiles"] == (2 if current else 0)
+    assert snapshot["outdated_profiles"] == (0 if current else 2)
+    assert snapshot["structure_profiles"] == (1 if current else 0)
+
+
+@pytest.mark.parametrize(
+    ("campaign", "awaits"),
+    [
+        (None, True),
+        ({"beat_model_available": True}, True),
+        ({"beat_model_available": False}, False),
+        ({}, True),
+    ],
+)
+def test_model_beats_are_awaited_unless_a_pass_found_no_model(campaign, awaits) -> None:
+    from crate.db.jobs.smart_mix_backfill import smart_mix_awaits_model_beats
+
+    assert smart_mix_awaits_model_beats(campaign) is awaits
+
+
+def test_a_new_campaign_keeps_the_recorded_model_availability(pg_db) -> None:
+    # It describes the machine, like the night window: a new campaign must not
+    # forget it until its first pass.
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        save_smart_mix_campaign,
+        start_smart_mix_campaign,
+    )
+
+    save_smart_mix_campaign(_completed_campaign(beat_model_available=False))
+
+    campaign = start_smart_mix_campaign(batch_size=25, max_attempts=3)
+
+    assert campaign["batches"] == 0
+    assert campaign["beat_model_available"] is False

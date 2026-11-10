@@ -126,18 +126,18 @@ Backfill campaign -> batch claims -> heavy tasks per track
 These values come from the reviewed code; they were not discovered from a live instance.
 `test_smart_mix_versions.py` checks that this table follows the implemented identifiers.
 
-| Identifier                         | Value                | Meaning                                               |
-| ---------------------------------- | -------------------- | ----------------------------------------------------- |
-| `API_CONTRACT_VERSION`             | `2026-08`            | Advertised integration and capabilities contract      |
-| `PROFILE_SCHEMA_VERSION`           | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`                 | `smart-mix-audio-v9` | Target generation of profile analysis                 |
-| `MEASUREMENT_VERSION`              | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
-| `BEAT_GRID_FORMAT`                 | `delta-ms-v1`        | Beat grid format                                      |
-| `PLANNER_IDENTIFIER`               | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
-| `PLANNER_POLICY_VERSION`           | `2`                  | Numeric version of each individual plan               |
-| `PLANNER_POLICY.rules_revision`    | `7`                  | Internal rules revision included in the cache key     |
-| `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`       | Planner on the stored phrases (SM3-D3)                |
-| `PLANNER_POLICY_V3.rules_revision` | `5`                  | Rules revision of v3, in its cache key                |
+| Identifier                         | Value                 | Meaning                                               |
+| ---------------------------------- | --------------------- | ----------------------------------------------------- |
+| `API_CONTRACT_VERSION`             | `2026-08`             | Advertised integration and capabilities contract      |
+| `PROFILE_SCHEMA_VERSION`           | `1`                   | Schema of the persisted and serialized profile        |
+| `ANALYZER_VERSION`                 | `smart-mix-audio-v10` | Target generation of profile analysis                 |
+| `MEASUREMENT_VERSION`              | `bs1770-v1`           | Loudness and true peak provenance used by the planner |
+| `BEAT_GRID_FORMAT`                 | `delta-ms-v1`         | Beat grid format                                      |
+| `PLANNER_IDENTIFIER`               | `smart-mix-v2`        | Identifier for plan batches and capabilities          |
+| `PLANNER_POLICY_VERSION`           | `2`                   | Numeric version of each individual plan               |
+| `PLANNER_POLICY.rules_revision`    | `7`                   | Internal rules revision included in the cache key     |
+| `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`        | Planner on the stored phrases (SM3-D3)                |
+| `PLANNER_POLICY_V3.rules_revision` | `5`                   | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
 includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
@@ -164,6 +164,30 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
 | `activeEndMs`              | Musical end, by the same rule (for long tracks, over the last 120 s). A fade or reverb tail continues after it, so it falls 1-6 s before a -60 dB end of sound such as Mixxx's. It is not a silence threshold                                                                                                                           |
 | `introCueMs`, `outroCueMs` | Suggested mix points: the first beat at or after `activeStartMs` and the last beat 4 s before `activeEndMs`                                                                                                                                                                                                                             |
 | `beatPhaseOffsetMs`        | Plan field, beatmatch only. In output time and below one outgoing beat: the incoming track starts this much after `incomingCueMs` when the outgoing reaches `outgoingCueMs`. In incoming track time, start at `incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio` (`NativeTransitionPlan.startIncomingCueMs()`); never subtract it |
+
+### Analyzer v10
+
+`smart-mix-audio-v10` asks a second model before giving a track bars of three (see
+**Meter** under [Beats and downbeats](#beats-and-downbeats)). Beat This!'s DBN hears fast
+4/4 punk and metal in three, and since SM3-D16 such tracks get no downbeat and no phrases.
+On the 399 tracks of the stems evaluation sets, the DBN picks three on 10:
+
+| Tracks                                                                    | v9                      | v10                                             |
+| ------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------- |
+| The DBN picks three (Sepultura, Cannibal Corpse, Tragedy, THRICE, Swans…) | 10, all without phrases | 8 take four and gain 5-19 phrases; 2 keep three |
+| Without phrases (all sets)                                                | 30                      | 22                                              |
+| Four-beat sample (30 tracks): beats and downbeats as stored               | -                       | 30 of 30 identical                              |
+
+The two that keep three (Azu Tiwaline "Izen Zaren", Movements "Submerge") are the ones
+both models hear in three, likely in 6/8. Swans "Coward", a live-drums control, takes four
+and 19 phrases, which may be less reliable on irregular drums. Nobody has listened to these
+tracks. With one native thread, as the analysis worker runs it, the arbiter takes 10-30 s of
+CPU on a three-beat track of two to six minutes and about 50 s on one of 600 s, after Beat
+This!'s 5-35 s; a four-beat track costs what it did under v9.
+
+Readers accept v10, v9, v8, v7, v6 and v5 profiles (`READABLE_ANALYZER_VERSIONS`); writers,
+the backfill and Admin coverage target v10. Stored four-beat signals stay valid (see
+[Running the v10 backfill](#running-the-v10-backfill)).
 
 ### Analyzer v9
 
@@ -371,8 +395,11 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   build reaches that stage through the `madmom-wheel` alias only when the image installs
   torch; without torch the alias points at the empty `madmom-skip` stage and the image
   gets neither madmom nor its licence. madmom's code is BSD (`/app/models/madmom.LICENSE`);
-  its package also ships model files under CC BY-NC-SA 4.0 that Crate does not use (the
-  DBN needs none), which is acceptable for Crate as free and open-source software.
+  its package also ships model files under CC BY-NC-SA 4.0 (Sebastian Böck and the
+  CPJKU, Johannes Kepler University Linz). Since `smart-mix-audio-v10` the meter arbiter
+  runs its downbeat networks (`DOWNBEATS_BLSTM`) in production, which Diego approved on
+  2026-11-09 (gate MG1): Crate is free and open-source software, so the non-commercial
+  licence does not block it. The DBN needs no model file.
 - **Where it runs.** `compute_smart_mix_profile` runs it before the analysis
   (`crate/smart_mix/beat_model.py`), unless the beats of this file are stored (see "Stored
   model signals" below), and passes the beats to the Rust analyzer
@@ -401,7 +428,27 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   its SBR band. Before, every `.m4a` lost the model and kept the analyzer's own tracker.
 - **Meter.** The DBN keeps one bar length per track, 3 or 4 beats, and `beats_per_bar` is
   read from its downbeats: the beats from each downbeat to the next, when every bar has as
-  many (otherwise null). Phrases, the planner and Crate Decks count bars of four, so with
+  many (otherwise null). Since `smart-mix-audio-v10` the worker decodes the DBN itself, one
+  path per bar length over the same Beat This! frames (`beat_model.decode_bar_paths`,
+  identical to madmom's processor for the winner), and when bars of three win it asks
+  madmom's own downbeat network, decoded by a DBN at 100 fps
+  (`crate/smart_mix/meter_arbiter.py`). Bars of three stay only when madmom also prefers
+  three; otherwise the track takes the DBN's four-beat path. Beat This!'s DBN hears fast
+  4/4 punk and metal (d-beat, thrash, death) in three, and since SM3-D16 such tracks lost
+  their bars and phrases. The arbiter runs only on those tracks (2.5 % of the evaluation
+  sets, 4.4 % of production's v9 signals) and reads the whole file: about 0.08 s of CPU per
+  second of audio on one thread, so 10-30 s on a track of two to six minutes and about 50 s
+  at 600 s. If it fails, the DBN's choice stands and the worker logs a warning.
+- **Arbiter memory.** madmom's own pipeline peaked at 5.6 GB on a 600 s track (3.6 GB at
+  348 s): it keeps each frame size's STFT of the whole file until the features are stacked,
+  and its Viterbi keeps a back-pointer per frame and state (about 15,000 states for bars of
+  four at 100 fps). The arbiter computes the spectrograms 30 s at a time with madmom's own
+  processors and runs the Viterbi forward pass keeping only scores, since it needs the log
+  probabilities and not the paths. Its input features and verdicts are madmom's (tests
+  compare both), and it no longer raises the process peak: the analysis of a 600 s
+  three-beat track peaks at 0.8-1.0 GB, which is Beat This!'s own peak. `track_mix_signals` keeps `meter_margin` (log p(3) - log p(4) per 1,000 frames)
+  and `meter_arbiter` (`madmom-dbn-3`, `madmom-dbn-4`, or null when it was not asked);
+  stored bars of three without a verdict are recomputed. Phrases, the planner and Crate Decks count bars of four, so with
   any other length (SM3-D16) both analyzers give the profile that `time_signature` and no
   downbeat, cue downbeats or phrases, and the track goes to crossfade. With 4, or without a
   constant bar, the bar is anchored as above and `time_signature` is 4 when the track has a
@@ -421,10 +468,14 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   `smart-mix-audio-v7`): a draft that brings a
   tracker the stored profile lacks, or another one (`beat-this-small0-dbn` over the
   `beat-this-small0` of the first, peak-picking builds), replaces it at the same quality,
-  and a run without the model never replaces a profile of the same version whose beats
-  came from it, whatever its quality. The library analysis embeds such runs: before
-  2026-11-10 a reanalysis of a track's BPM, key and loudness replaced its model beats
-  whenever the analyzer's own tracker rated the track higher.
+  and a run without the model never replaces a profile of the same file whose beats came
+  from it, whatever its quality or analyzer version. The library analysis embeds such
+  runs. Across versions the track keeps its older profile, which the backfill still
+  claims (its version is not the target) and recomputes with the model; a changed file
+  (another source revision) takes any draft. Before 2026-11-10 a reanalysis of a track's
+  BPM, key and loudness replaced its model beats whenever the analyzer's own tracker
+  rated the track higher, and before `smart-mix-audio-v10` a reanalysis during a backfill
+  left a current own-tracker profile the backfill never claimed again.
 - **Cost.** With one thread (`TORCH_NUM_THREADS`) on the development machine, `small0`
   takes 12.8 s of CPU on a 237 s track and 21.1 s on a 367 s one, and the DBN 0.8-1.0 s;
   with decoding and resampling, the whole step takes 14.7 s and 25.4 s.
@@ -1004,13 +1055,19 @@ profile. A task that finishes without publishing does not account for a new prof
 `quality` accepts `full`, `partial`, `legacy` and `unavailable`. The Admin track table also
 exposes this profile status, in the implemented order of precedence:
 
-| Profile status   | Meaning                                                             |
-| ---------------- | ------------------------------------------------------------------- |
-| `missing`        | The track has no profile row                                        |
-| `unavailable`    | A profile exists and its quality is `unavailable`                   |
-| `source_changed` | Profile flagged by a source change                                  |
-| `outdated`       | Analyzer or schema version differs from the target                  |
-| `current`        | Profile not flagged stale, with current versions and usable quality |
+| Profile status   | Meaning                                                                                                                                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `missing`        | The track has no profile row                                                                                                                                                                       |
+| `unavailable`    | A profile exists and its quality is `unavailable`                                                                                                                                                  |
+| `source_changed` | Profile flagged by a source change                                                                                                                                                                 |
+| `outdated`       | Analyzer or schema version differs from the target, or the profile is at the target but on the analyzer's own beats (no `beat_tracker`) on a track Beat This! runs on (up to 600 s), where it runs |
+| `current`        | Profile not flagged stale, with current versions and usable quality, on Beat This!'s beats, on a track over 600 s, or where Beat This! cannot run                                                  |
+
+Where Beat This! cannot run (ARM images, `PANNS=off`, missing weights), nothing would ever give
+an own-tracker profile the model's beats, so coverage and the track list count it `current`.
+The coordinator records whether its worker can run the model in the campaign
+(`beat_model_available`, kept across campaigns); until a pass has recorded it, both assume the
+model, as production has it.
 
 `failed` is a filter on `processingState`, not a sixth profile status. A track can keep a
 usable profile and still record a failed processing attempt. Read `processingAttempts`,
@@ -1061,6 +1118,24 @@ completes has exhausted the claimable work in that pass; it can still leave exha
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
 
+A `completed` campaign of the deployed target reopens by itself (since `smart-mix-audio-v10`).
+Every 10 minutes (`SMART_MIX_WAKE_SECONDS`) the service loop of `crate-worker` looks for one
+claimable profile written since the campaign completed: a new import or a library reanalysis
+on the analyzer's own beats, a profile that became `unavailable`, a source change. If it finds
+one, it sets the campaign back to `running` and queues the coordinator, which claims under the
+same night window, resource governor and `maxAttempts`, and completes it again when nothing is
+left. Admin then shows the campaign `running`, with its counters going on from where they
+were. It reads the profiles written since `completed_at` through the `updated_at` index, one
+row at most, and does nothing for any other campaign: a paused or cancelled campaign stays
+stopped, a campaign of another target waits for an operator to start the new one, and a setup
+whose analysis worker cannot run Beat This! (the coordinator records it in the campaign as
+`beat_model_available`) never reopens by itself. To stop the reopening, pause or cancel the
+completed campaign: Admin shows **Pause reopening** next to **Start backfill** while the
+campaign of the deployed target is `completed`, and `POST /api/admin/smart-mix/backfill/pause`
+or `/cancel` accept a `completed` campaign. A paused campaign shows **Resume backfill**, which
+runs a pass and turns the reopening back on; after a cancel, **Start backfill** opens a new
+campaign.
+
 ### How a pass claims
 
 Ranking the whole library is expensive, and since the night window a pass only claims its free
@@ -1084,8 +1159,16 @@ and whether it is a Python promotion:
   and schema, quality, `target_generation`, attempts, claims in flight, quarantined albums),
   under `FOR UPDATE SKIP LOCKED`, and leaves the ranking once claimed. A row that is no longer
   claimable, for example because a manual reanalysis wrote a current profile, is skipped.
+- **Own-tracker profiles at the target.** Since `smart-mix-audio-v10`, when the coordinator's
+  worker can run Beat This! (torch, `beat_this`, madmom and the weights installed), a profile at
+  the target analyzer and schema without a `beat_tracker` is claimable too, on tracks of 600 s or
+  less. The analysis daemon writes such profiles for new imports and library reanalyses
+  (`crate-cli analyze` runs without the model); the claim gives them Beat This!'s beats. They
+  take the same tiers and order as every other claimable track, and the same retry budget: a
+  file Beat This! fails on is claimed once per pass, up to `maxAttempts`, then counted as
+  `exhausted`. A model draft replaces the own-tracker profile whatever its quality.
 - **Refresh.** The ranking is rebuilt when its inputs change (analyzer version, schema,
-  `maxAttempts` or Python promotion), when it is older than 10 minutes and when it cannot fill a
+  `maxAttempts`, Python promotion or own-tracker upgrades), when it is older than 10 minutes and when it cannot fill a
   pass. Because of the last rule, a pass that claims nothing, which completes the campaign if
   nothing is in flight, always comes from a fresh ranking.
 - **What waits for the next ranking.** A track that becomes claimable between rankings (a failed
@@ -1188,6 +1271,75 @@ therefore often below the night limit, and by day listeners can hold it below th
 as long as they listen. To run all eight at night, raise `max_load_ratio` in the runtime policy;
 the same threshold also applies by day.
 
+### Running the v10 backfill
+
+v10 changes only tracks whose DBN chose bars of three, but the publisher keeps a profile
+of the same version and quality, so a new version is the way to reach them. Production
+runs the v9 campaign (started 2026-11-09 at 19:00 UTC). v10 supersedes it whatever its
+state: after the release with v10 is deployed through the normal process, a new v10
+campaign recomputes the library, and a v9 coordinator still queued exits as `superseded`
+without claiming.
+
+1. **Check the starting point** as for v9: `analyzerVersion` `smart-mix-audio-v10`,
+   `controlState` `idle`, `campaign.target` `smart-mix-audio-v9` (running or paused) and
+   `activeTask` null or a v9 coordinator about to exit. Migration 161 adds
+   `meter_margin` and `meter_arbiter` to `track_mix_signals`; existing rows read null.
+2. **Start the campaign** with **Start backfill** (batch size 25, 3 attempts) or
+   `POST /api/admin/smart-mix/backfill`. It opens a v10 campaign whose `sequence`
+   continues the v9 one; the night window settings carry over.
+3. **What the campaign claims.** Every profile not at v10 (the v9, v8, v7, v6 and v5
+   ones, `unavailable` and source-changed ones, tracks without a profile) and, with
+   Beat This! available in the analysis worker, every v10 profile on the analyzer's own
+   beats of a track up to 600 s: new imports and library reanalyses during the campaign.
+   On 2026-11-09 production held no v9 profile without model beats under 600 s (74 over
+   it), so that class starts empty and grows only with imports and reanalyses.
+4. **What each row costs.**
+   - **Rewritten by v9, four beats to the bar:** about 95.6 % of them in production
+     (11,732 of the 12,278 stored signals on 2026-11-09). The stored beats stay valid,
+     so only decoding, `crate-cli` (about 2 s of CPU) and the phrase voice from the
+     stored bytes run, as for the v8 rows under v9 (about 31-41 tracks a minute by day
+     with four in flight).
+   - **Rewritten by v9, three beats to the bar:** about 4.4 % (537). Their stored beats
+     predate the arbiter, so Beat This! runs again (5-35 s) and madmom's network after
+     it (10-30 s, about 50 s at 600 s).
+   - **Not yet reached by v9** (v5 and v6 profiles): a whole profile, as under v9, plus
+     the arbiter on the 4.4 % that the DBN hears in three.
+   - **Own-tracker v10 profiles:** a whole profile each, which the campaign would have
+     paid for the same track anyway if the reanalysis had not come first.
+   - In all, v10 adds about 3-4 s of CPU per row v9 has already rewritten, and about
+     1 s per row it has not, over what v9 would have cost.
+   - **Memory.** Each process peaks at about 1 GB on a 600 s track, three-beat or not
+     (Beat This!'s peak), so eight night analyses stay near 8 GB of the 14 GB limit
+     whatever share of them are in three.
+5. **Library reanalyses during the campaign are safe.** A reanalysis of BPM, key and
+   loudness (Admin, or the `.m4a` one of the v9 runbook) never replaces a profile with
+   Beat This!'s beats by its own-tracker draft, of any version: the track keeps its v9
+   profile, and the campaign claims and recomputes it. A track whose profile has no
+   model beats (v5, v6, or v8 `.m4a`) takes the reanalysis' own-tracker v10 profile, and
+   the campaign then upgrades it with Beat This!.
+6. **Watch, pause, resume, cancel and close it** as for v9 below. Once it has finished,
+   a later release can drop v9 and older versions from `READABLE_ANALYZER_VERSIONS`.
+7. **After it completes,** the campaign reopens by itself when new imports or library
+   reanalyses leave claimable profiles (see [Campaign, queues and backfill](#campaign-queues-and-backfill)):
+   new tracks get Beat This!'s beats within about ten minutes plus their analysis, under
+   the night window. **Pause reopening** in Admin (or pausing or cancelling the
+   completed campaign through the API) stops that.
+
+#### Known issues of v10 (backlog, not in this release)
+
+- `crate-cli` decodes AAC in MP4 with symphonia, which keeps the encoder delay an MP4 edit
+  list trims (about 46 ms on gapless AAC) and decodes HE-AAC without its SBR band (about
+  22 ms): its own readings (cues, `bpmConfidence`) shift on such files; the grid, from Beat
+  This!, does not.
+- About 20 of the 399 evaluation tracks change bar phase during the track (odd bars, or
+  model slips): a single downbeat anchor cannot hold them, so they keep no phrases.
+- The meter arbiter was measured on the evaluation sets only; the labelled three-beat
+  reference set of its plan (All-In-One) is not built, and nobody has listened to the
+  tracks it changes. Swans "Coward", with irregular live drums, takes bars of four.
+- The analysis worker finds no PANNs model, so the library's mood comes from Essentia.
+- The wake-up only sees profiles written since the campaign completed: a track the
+  analysis daemon never profiled waits for an operator to start a campaign.
+
 ### Running the v9 backfill
 
 Production holds a `paused` campaign with `target` `smart-mix-audio-v8`, paused on
@@ -1245,9 +1397,12 @@ The queues do not change: the coordinator and each analysis run on `heavy`.
    finished, a later release can drop v8, v7, v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
 8. **The library analysis of the `.m4a`.** The v9 profiles fix the Smart Mix side only. The
    BPM, key, loudness and mood the library analysis stored for the AAC `.m4a` came from the
-   same slowed audio; their reanalysis runs apart, on the library analysis tasks, once
-   the track's v9 profile carries Beat This!'s beats. Earlier, the library analysis
-   would publish its own v9 profile first, and the backfill would never claim the track.
+   same slowed audio; their reanalysis runs apart, on the library analysis tasks. Under
+   v9 it had to wait until the track's profile carried Beat This!'s beats: the library
+   analysis would otherwise publish its own current profile first, and the backfill would
+   never claim the track. From v10 on it can run first on every `.m4a`: a profile with
+   the model's beats keeps them, and a profile without them takes the own-tracker v10
+   draft, which the running campaign upgrades with Beat This!.
 
 ### Running the v8 backfill
 
