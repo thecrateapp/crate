@@ -10,7 +10,7 @@ Branch: `feat/admin-backups`, worktree `~/Code/Ninja/crate-agents/admin-backups`
 - **Interim work (phase BK0), in progress by another agent:**
   - configurable retention (3 daily, 4 weekly, 3 monthly) and `-Z6`;
   - dumps moved to a named Docker volume on `/var`;
-  - an off-site `restic` sidecar to **Backblaze B2** and **Google Drive** (rclone, scope `drive.file`).
+  - an off-site `restic` sidecar to **Cloudflare R2** (S3-compatible) and **Google Drive** (rclone, scope `drive.file`). This instance uses those two; Backblaze B2 was discarded on 2026-11-10.
   - That gives off-site protection now. This plan replaces those sidecars with a subsystem Crate manages itself.
 - **Building blocks that already exist:**
   - `app/crate/credentials.py`: Fernet-encrypted secret store (`CRATE_CREDENTIAL_KEY`), with `store_secret`, `load_secret`, `rewrap_secrets` and `revoke_secret`;
@@ -123,7 +123,7 @@ Secrets never go into these tables: only `secret_ref` pointers into `credentials
 
 ### BK0 · Interim protection (in progress, separate agent)
 
-Compose retention, `-Z6`, the Docker volume, and the B2 and Drive restic sidecar with the first snapshots and a restore drill. These keep running until BK6 migrates them.
+Compose retention, `-Z6`, the Docker volume, and the R2 and Drive restic sidecar with the first snapshots and a restore drill. These keep running until BK6 migrates them.
 
 ### BK1 · Engine: dump and local retention
 
@@ -170,7 +170,7 @@ Compose retention, `-Z6`, the Docker volume, and the B2 and Drive restic sidecar
 
 1. Alerts and metrics (§3.7), plus the Grafana panel.
 2. **Migration in production:**
-   - recreate the B2 and Drive destinations from the BK0 sidecar configuration: same repositories, same restic password, imported as secrets;
+   - recreate the R2 (`s3` kind) and Drive destinations from the BK0 sidecar configuration: same repositories, same restic password, imported as secrets;
    - run the engine in parallel with the sidecars for one weekly cycle and compare;
    - **gate BG2 (Diego):** retire the sidecars.
 3. **Operator docs:** setup, providers, the recovery kit, and the CLI restore runbook.
