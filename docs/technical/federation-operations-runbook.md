@@ -5,7 +5,7 @@ section: federation
 audience: [operator]
 status: canonical
 order: 240
-verified: 2026-07-21
+verified: 2026-11-10
 sources:
   [app/crate/api/admin_federation.py, app/crate/federation/health.py, Makefile]
 ---
@@ -55,6 +55,53 @@ existing state.
 | Catalog stale/expired cursor | checkpoint, page digest, peer health, serving mode, projector state              | reset only that source checkpoint and perform documented reconciliation          |
 | Relay error                  | opaque ticket state, grant revision, Range request, owner denial, readplane logs | contain peer/grant first; do not expose a peer URL to a client                   |
 | Import stuck                 | worker task, reservation/lease, manifest digest, staging cleanup                 | reconcile expired lease; resume only the unchanged request                       |
+
+## Pairing transport and permission failures
+
+Use the pairing request's `pairing_uid` when approving it. The peer's `node_uid`
+identifies the instance, not the pairing request. Check direction, state and expiry
+before retrying: outbound offers require approval at the other instance.
+The effective deadline is also bounded by the signed descriptors' validity, so
+it can be shorter than the protocol's maximum offer lifetime.
+
+An interrupted inbound approval can retain a signed acceptance while waiting for
+the remote acknowledgement. Retry the same request while it is valid; do not
+replace its signed envelope, extend its expiry or mark the peer approved without
+verifying the remote acknowledgement. An expired request requires a new offer.
+Retries must preserve permission changes made by either owner after consent;
+they are not a way to reapply the offer's original preset.
+
+If the callback receives HTML with `cf-mitigated: challenge`, Cloudflare has
+issued a browser challenge before the request reaches Crate. Inspect the
+corresponding Security Analytics event to identify the blocking product. A
+signed server-to-server request cannot complete a JavaScript challenge.
+Cloudflare's free [Bot Fight Mode](https://developers.cloudflare.com/bots/get-started/bot-fight-mode/)
+does not support a path or hostname exception;
+do not assume a WAF Skip rule exempts federation. Any zone-wide change requires
+the owner's approval. Keep TLS, URL-policy and protocol-signature checks enabled.
+
+After pairing, verify each owner's grant independently. Mutual `Listen` requires
+both instances to grant it; changing our local preset cannot grant ourselves
+access to their library. A preset change does not require a new pairing.
+`Listen` permits catalogue access and transcoded playback with the `balanced`
+and `data_saver` delivery profiles; original audio remains excluded.
+
+A JSON `invalid_constraints` denial is an application permission failure, not an
+empty catalogue. Validate the complete stored grant with `GrantConstraints`.
+Older builds reject `data_saver` even though the standard Listen preset includes
+it. Deploy the validation fix on both owners. If an operator temporarily narrowed
+a grant to `delivery=["balanced"]`, reapply Listen after upgrading to restore
+data saver. Never clear all delivery restrictions to work around validation.
+A peer with no library should return an empty catalogue successfully.
+
+## Admin status query timeout
+
+If `/api/admin/global-catalog/status` fails with `QueryCanceled` at the database
+statement timeout, inspect its genre-projection query. Active and unmapped
+assertion counts must restrict the relation with `WHERE invalidated_at IS NULL`,
+so PostgreSQL can use the existing partial index. An aggregate `FILTER` alone
+still visits the invalidated history. Preserve exact counts and inspect the
+bounded query plan; increasing the HTTP timeout does not fix that scan.
 
 ## Catalog warming or reconciliation failure
 

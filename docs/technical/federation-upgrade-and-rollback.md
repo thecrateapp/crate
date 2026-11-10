@@ -40,6 +40,42 @@ database/configuration restore. Reconcile catalog checkpoints and active
 reservations after recovery; do not delete global tables to make a dashboard
 look empty/healthy.
 
+Migration `159` adds the catalog intent outbox and a small feed-state singleton;
+it retains the legacy catalog-change unique key and numeric public cursors. A
+database bridge stages direct inserts from old writers in the same outbox while
+an updated publisher remains active. Migration locks establish that bridge only
+after earlier legacy feed transactions have committed.
+
+**An image-only rollback across `159` is unsupported.** Older publishers cannot
+drain the new outbox. Either retain an updated publisher, or stop catalog writers,
+run the explicit `159 → 158` database downgrade, then restart older images. The
+downgrade must complete before the updated publisher is removed; never leave
+legacy writers running against an outbox with no publisher.
+
+An explicit `159` schema downgrade atomically flushes committed pending intents
+into the legacy feed before removing its bridge and dropping its outbox. It deliberately retains
+`federation_catalog_feed_state` as recovery metadata: reconstructing the pruning
+boundary from compacted sequence gaps would incorrectly expire valid cursors on
+re-upgrade. Reapplying `159` preserves that boundary and includes any intervening
+legacy writes in the published watermark. A failed flush rolls back the whole
+downgrade, retaining the intents and schema for retry.
+
+Migration `160` fences catalog sync sessions on the receiver (FED-D11). Each
+sync run increments `federation_catalog_cursors.sync_generation` under the row
+lock when it starts, and every page, tombstone, delta and checkpoint write
+re-checks it, so a stale run stops with a `fenced` result instead of
+tombstoning a newer run's rows or moving its checkpoint back. Within one run
+the checkpoint only moves forward. Disabling a peer, or moving it out of
+`approved`, bumps the generation in the same transaction through a trigger on
+`federation_nodes`, whichever image performs it.
+
+Database guards cover writers older than `160`. They keep working until the
+first fenced run for a peer starts. From then on they cannot move that peer's
+checkpoint or write its catalog rows while it is approved; an old image can
+still disable it. The generation never decreases. Run the explicit `160 → 159`
+downgrade before restarting pre-`160` receivers against this database; it
+removes the guards and the column.
+
 ## Canary evidence
 
 A canary needs both functional and operational proof: descriptor/grant behavior,

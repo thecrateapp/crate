@@ -47,7 +47,7 @@ def test_admin_global_catalog_status_reports_serving_mode(monkeypatch):
     def fake_read_scope():
         yield _Session()
 
-    monkeypatch.setattr(admin_global_catalog, "get_global_catalog_counts", lambda: {})
+    monkeypatch.setattr(admin_global_catalog, "get_global_catalog_counts", dict)
     monkeypatch.setattr(
         admin_global_catalog.global_catalog_state,
         "get_catalog_state",
@@ -95,7 +95,7 @@ def test_admin_status_counts_only_non_merged_matches_as_ambiguous(monkeypatch):
     def fake_read_scope():
         yield _Session()
 
-    monkeypatch.setattr(admin_global_catalog, "get_global_catalog_counts", lambda: {})
+    monkeypatch.setattr(admin_global_catalog, "get_global_catalog_counts", dict)
     monkeypatch.setattr(
         admin_global_catalog.global_catalog_state,
         "get_catalog_state",
@@ -117,6 +117,91 @@ def test_admin_status_counts_only_non_merged_matches_as_ambiguous(monkeypatch):
     assert "source_deleted_at IS NULL" in ambiguity_query
     assert "NOT source_stale" in ambiguity_query
     assert status["ambiguous_candidate_count"] == 7
+
+
+def test_admin_genre_projection_uses_the_active_assertion_index(pg_db, monkeypatch):
+    del pg_db
+    from crate.db.queries import admin_global_catalog
+    from crate.db.tx import read_scope
+    from sqlalchemy import text
+
+    plans = []
+
+    class _PlanRecordingSession:
+        def __init__(self, session):
+            self.session = session
+
+        def execute(self, statement, *args, **kwargs):
+            if "FROM global_catalog_genre_assertions" in str(statement):
+                plans.append(
+                    self.session.execute(
+                        text(f"EXPLAIN (FORMAT JSON) {statement}")
+                    ).scalar_one()
+                )
+            return self.session.execute(statement, *args, **kwargs)
+
+    @contextmanager
+    def indexed_scope():
+        with read_scope() as session:
+            # Prove this request can use an existing partial index, independently
+            # of table size and the planner's preference for tiny test fixtures.
+            session.execute(text("SET LOCAL enable_seqscan = off"))
+            session.execute(text("SET LOCAL jit = off"))
+            yield _PlanRecordingSession(session)
+
+    monkeypatch.setattr(admin_global_catalog, "read_scope", indexed_scope)
+    admin_global_catalog.get_global_catalog_admin_status()
+
+    def indexes(plan):
+        found = {plan["Index Name"]} if "Index Name" in plan else set()
+        for child in plan.get("Plans", []):
+            found.update(indexes(child))
+        return found
+
+    assert len(plans) == 1
+    assert indexes(plans[0][0]["Plan"]) & {
+        "idx_global_catalog_genre_assertions_active",
+        "idx_global_catalog_genre_assertions_source",
+    }
+
+
+def test_admin_genre_projection_excludes_invalidated_history(pg_db):
+    import uuid
+
+    from crate.db.queries.admin_global_catalog import get_global_catalog_admin_status
+    from crate.db.tx import read_scope
+    from crate.federation.global_reconciliation import reconcile_dirty_catalog_sources
+    from sqlalchemy import text
+
+    pg_db.upsert_artist(
+        {"name": "Status Genre Artist", "entity_uid": str(uuid.uuid4())}
+    )
+    pg_db.set_artist_genres(
+        "Status Genre Artist",
+        [("rock", 0.8, "test"), ("unmapped-status-label", 0.6, "test")],
+    )
+    assert reconcile_dirty_catalog_sources(limit=10)["completed"] == 1
+    assert get_global_catalog_admin_status()["genre_projection"] == {
+        "active_assertions": 2,
+        "unmapped_assertions": 1,
+        "memberships": 1,
+    }
+
+    pg_db.set_artist_genres("Status Genre Artist", [("jazz", 0.7, "test")])
+    assert reconcile_dirty_catalog_sources(limit=10)["completed"] == 1
+    with read_scope() as session:
+        history = session.execute(
+            text(
+                "SELECT COUNT(*) FROM global_catalog_genre_assertions "
+                "WHERE invalidated_at IS NOT NULL"
+            )
+        ).scalar_one()
+    assert history == 2
+    assert get_global_catalog_admin_status()["genre_projection"] == {
+        "active_assertions": 1,
+        "unmapped_assertions": 0,
+        "memberships": 1,
+    }
 
 
 def test_duplicate_candidates_exclude_sources_already_on_same_canonical(monkeypatch):
