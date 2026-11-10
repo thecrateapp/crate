@@ -58,6 +58,7 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "library_pipeline": TaskTypeInfo("Library Pipeline", "library"),
     "backup_dump": TaskTypeInfo("Database Backup", "library"),
     "backup_local_retention": TaskTypeInfo("Backup Retention", "library"),
+    "backup_test_destination": TaskTypeInfo("Backup Destination Test", "library"),
     "scan": TaskTypeInfo("Health Check", "library"),
     "health_check": TaskTypeInfo("Health Check", "library"),
     "quality_check": TaskTypeInfo("Library Quality Check", "library"),

@@ -137,9 +137,7 @@ def test_destinations_update_check_and_delete(pg_db):
     assert checked["repository_bytes"] == 4096
     assert checked["last_checked_at"] is not None
     assert checked["repository_initialized_at"] is not None
-    assert record_destination_check(
-        created["id"], status="failing", error="e" * 5000
-    )
+    assert record_destination_check(created["id"], status="failing", error="e" * 5000)
     failing = get_backup_destination(created["id"])
     assert failing is not None
     assert failing["status"] == "failing" and len(failing["last_error"]) == 2000

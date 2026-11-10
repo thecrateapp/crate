@@ -1,4 +1,4 @@
-"""Backups engine tasks (admin backups, BK1): the local dump and its retention.
+"""Backups engine tasks: the local dump and its retention (BK1), destination tests (BK2).
 
 With ``CRATE_LOCAL_BACKUPS_ENABLED`` off both do nothing, whoever queued them.
 Both run on the maintenance queue under one session advisory lock, so a dump and a
@@ -141,9 +141,40 @@ def _handle_backup_local_retention(task_id: str, params: dict, config: dict) -> 
     return {"run_id": run_id, **details}
 
 
+def destination_lock_key(destination_id: str) -> str:
+    """One advisory lock per destination: one job at a time per repository."""
+    return f"crate:backups:destination:{destination_id}"
+
+
+def _handle_backup_test_destination(task_id: str, params: dict, config: dict) -> dict:
+    """Test connection of one destination; the result is stored on it."""
+    del config
+    from crate.backups.connection import test_destination
+    from crate.backups.destinations import DestinationNotFound
+
+    destination_id = str(params.get("destination_id") or "")
+    with try_session_lock(destination_lock_key(destination_id)) as acquired:
+        if not acquired:
+            return run_again_later(
+                LOCK_RETRY_SECONDS,
+                progress="Waiting for the job running on this destination",
+            )
+        try:
+            result = test_destination(
+                destination_id, should_cancel=lambda: is_cancelled(task_id)
+            )
+        except DestinationNotFound:
+            return {"status": "failed", "error": "The destination no longer exists"}
+        except BackupCancelled:
+            return {"cancelled": True}
+    # Nested: a failing destination is a result of the test, not a failed task.
+    return {"destination_id": destination_id, "connection": result.to_dict()}
+
+
 BACKUP_TASK_HANDLERS = {
     "backup_dump": _handle_backup_dump,
     "backup_local_retention": _handle_backup_local_retention,
+    "backup_test_destination": _handle_backup_test_destination,
 }
 
-__all__ = ["BACKUP_TASK_HANDLERS", "LOCAL_BACKUP_LOCK"]
+__all__ = ["BACKUP_TASK_HANDLERS", "LOCAL_BACKUP_LOCK", "destination_lock_key"]
