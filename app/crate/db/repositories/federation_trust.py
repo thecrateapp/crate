@@ -5,12 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 
 from crate.db.tx import read_scope, transaction_scope
-
 
 KEY_TRANSITIONS = {
     "pending": frozenset({"active", "revoked"}),
@@ -37,7 +36,7 @@ PAIRING_STATES = frozenset(
 
 
 def is_key_verifiable(row: dict, *, now: datetime | None = None) -> bool:
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     status = row.get("status")
     if status not in {"pending", "active", "retiring"}:
         return False
@@ -61,7 +60,7 @@ def project_public_keys(
     *,
     now: datetime | None = None,
 ) -> list[dict]:
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     projected: list[dict] = []
     for row in rows:
         status = row.get("status")
@@ -189,7 +188,7 @@ def upsert_peer_key(
 
 
 def get_active_local_key() -> dict | None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with read_scope() as session:
         row = (
             session.execute(
@@ -359,7 +358,9 @@ def create_pairing(
     signature_profile: str | None = None,
     descriptor_digest: str | None = None,
     offer_json: dict | None = None,
+    verified_at: datetime | None = None,
 ) -> dict:
+    """Persist an offer once, optionally retaining its original owner consent time."""
     if direction not in {"inbound", "outbound"}:
         raise ValueError(f"Invalid pairing direction: {direction}")
     if state not in PAIRING_STATES:
@@ -373,14 +374,14 @@ def create_pairing(
                     pairing_uid, remote_node_uid, remote_base_url,
                     direction, state, local_challenge, remote_challenge,
                     negotiated_protocol, signature_profile, descriptor_digest,
-                    offer_json, expires_at
+                    offer_json, expires_at, verified_at
                 )
                 VALUES (
                     CAST(:pairing_uid AS uuid), CAST(:remote_node_uid AS uuid),
                     :remote_base_url, :direction, :state,
                     :local_challenge, :remote_challenge, :negotiated_protocol,
                     :signature_profile, :descriptor_digest,
-                    CAST(:offer_json AS jsonb), :expires_at
+                    CAST(:offer_json AS jsonb), :expires_at, :verified_at
                 )
                 ON CONFLICT (pairing_uid) DO NOTHING
                 """
@@ -398,6 +399,7 @@ def create_pairing(
                 "descriptor_digest": descriptor_digest,
                 "offer_json": json.dumps(offer_json or {}, default=str),
                 "expires_at": expires_at,
+                "verified_at": verified_at,
             },
         )
         row = (
@@ -500,7 +502,7 @@ def get_pairing(pairing_uid: str) -> dict | None:
 
 
 def expire_pairings(*, now: datetime | None = None) -> int:
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     with transaction_scope() as session:
         result = session.execute(
             text(
@@ -635,7 +637,7 @@ def activate_key_rotation(
     *,
     now: datetime | None = None,
 ) -> dict:
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     with transaction_scope() as session:
         rotation = (
             session.execute(
@@ -728,7 +730,7 @@ def retire_key_rotation(
     *,
     now: datetime | None = None,
 ) -> dict:
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     with transaction_scope() as session:
         rotation = (
             session.execute(

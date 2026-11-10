@@ -5,24 +5,30 @@ All endpoints require authentication. Specific capabilities gate each action.
 
 from __future__ import annotations
 
+import base64
 import json as _json
 import logging
 import secrets
-import base64
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response
 from crate.api.permissions import require_any_permission, require_permission
+from crate.db.queries.federation_pairings import list_latest_pairings
 from crate.db.repositories import federation as repo
-from crate.db.repositories import federation_trust as trust_repo
 from crate.db.repositories import federation_directories as directory_repo
 from crate.db.repositories import federation_risk as risk_repo
 from crate.db.repositories import federation_stream_tickets as stream_ticket_repo
+from crate.db.repositories import federation_trust as trust_repo
+from crate.db.repositories.federation_pairing_approval import (
+    check_inbound_pairing_policy,
+    complete_inbound_pairing,
+)
 from crate.federation.client import fetch_descriptor, safe_post_json
+from crate.federation.events import signal_active_stream_revocations
 from crate.federation.grants import (
     PRESET_NAMES,
     resolve_preset,
@@ -30,8 +36,6 @@ from crate.federation.grants import (
 from crate.federation.identity import (
     load_private_key,
 )
-from crate.federation.events import signal_active_stream_revocations
-from crate.federation.key_verify import get_key_material_health
 from crate.federation.key_rotation import (
     activate_local_rotation,
     announce_local_rotation,
@@ -39,12 +43,14 @@ from crate.federation.key_rotation import (
     prepare_local_rotation,
     retire_local_rotation,
 )
+from crate.federation.key_verify import get_key_material_health
 from crate.federation.pairing import (
     build_acceptance,
     build_offer,
+    verify_acceptance,
     verify_ack,
+    verify_offer,
 )
-
 
 # ── Pydantic request bodies ───────────────────────────────────────────────
 
@@ -148,7 +154,31 @@ def get_status(request: Request):
     _require_nodes_view(request)
     node = repo.get_local_node()
     peers = repo.list_peers()
-    pending = [p for p in peers if p["trust_state"] == "pending"]
+    # Newest-created first, including terminal/expired latest requests so a
+    # client never falls back to an obsolete inbound offer for the same peer.
+    pairings = [
+        {
+            key: pairing[key]
+            for key in (
+                "pairing_uid",
+                "remote_node_uid",
+                "direction",
+                "state",
+                "expires_at",
+            )
+        }
+        for pairing in list_latest_pairings()
+    ]
+    latest_by_peer = {}
+    for pairing in pairings:
+        latest_by_peer.setdefault(str(pairing["remote_node_uid"]), pairing)
+    now = datetime.now(UTC)
+    pending = [
+        pairing
+        for pairing in latest_by_peer.values()
+        if pairing["state"] in {"created", "offered", "remote_pending", "accepted"}
+        and pairing["expires_at"] > now
+    ]
 
     return {
         "local_node": _public_local_node(node),
@@ -159,6 +189,7 @@ def get_status(request: Request):
         "pending_pairing_count": len(pending),
         "key_health": get_key_material_health(),
         "peers": peers,
+        "pairings": pairings,
     }
 
 
@@ -209,6 +240,8 @@ def probe_node(body: ProbeBody, request: Request):
 @router.post("/pairing/start")
 def start_pairing(body: PairingStartBody, request: Request):
     _require_nodes_manage(request)
+    # Owner policy edits during a slow probe must remain newer than this consent.
+    consent_at = datetime.now(UTC)
 
     url = body.url.strip()
     if not url:
@@ -239,7 +272,7 @@ def start_pairing(body: PairingStartBody, request: Request):
         target_descriptor=descriptor,
         challenge=challenge,
         private_key=load_private_key(active_key["key_id"]),
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+        expires_at=datetime.now(UTC) + timedelta(minutes=10),
         outbound_grant=body.outbound_grant,
     )
     remote_node_uid = str(descriptor["node_uid"])
@@ -255,6 +288,7 @@ def start_pairing(body: PairingStartBody, request: Request):
         descriptor_digest=descriptor["descriptor_digest"],
         offer_json=offer,
         expires_at=datetime.fromisoformat(offer["expires_at"]),
+        verified_at=consent_at,
     )
     public_keys = descriptor.get("public_keys", [])
     for key in public_keys:
@@ -321,88 +355,153 @@ def approve_pairing(
     body: PairingApprovalBody | None = None,
 ):
     _require_nodes_manage(request)
-    body = body or PairingApprovalBody()
-
     pairing = trust_repo.get_pairing(request_uid)
     if not pairing:
         raise HTTPException(status_code=404, detail="Pairing request not found")
-
-    if pairing["direction"] != "inbound" or pairing["state"] != "remote_pending":
+    if pairing["direction"] != "inbound":
+        raise HTTPException(
+            status_code=400, detail="Only inbound pairings can be approved"
+        )
+    # A completed retry must not replay the handshake or overwrite a grant that
+    # the owner changed after pairing (for example Discovery -> Listen).
+    if pairing["state"] == "completed":
+        return pairing
+    if pairing["expires_at"] <= datetime.now(UTC):
+        raise HTTPException(
+            status_code=410, detail="Pairing request expired; start a new pairing"
+        )
+    if pairing["state"] not in {"remote_pending", "accepted"}:
         raise HTTPException(status_code=400, detail="Pairing request is not pending")
-    if body.outbound_grant not in PRESET_NAMES:
+    requested_preset = body.outbound_grant if body else None
+    if requested_preset is not None and requested_preset not in PRESET_NAMES:
         raise HTTPException(status_code=400, detail="Invalid outbound grant preset")
 
     from crate.api.federation import _build_local_descriptor
-    from crate.api.schemas.federation import PairingOfferV1
+    from crate.api.schemas.federation import PairingAcceptanceV1
 
-    offer = PairingOfferV1.model_validate(pairing["offer_json"])
-    local_descriptor = _build_local_descriptor(request)
-    active_key = trust_repo.get_active_local_key()
-    if active_key is None:
+    # Capture consent before reading owner policy: a concurrent policy edit while
+    # signing must remain newer than this approval, rather than be overwritten.
+    consent_at = datetime.now(UTC)
+    peer = repo.get_peer(str(pairing["remote_node_uid"]))
+    if (
+        not peer
+        or peer.get("disabled_at")
+        or peer["trust_state"] not in {"pending", "approved"}
+    ):
+        raise HTTPException(status_code=409, detail="Peer is disabled or unavailable")
+    if pairing["state"] == "accepted":
+        try:
+            saved = PairingAcceptanceV1.model_validate(pairing["acceptance_json"])
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=409, detail="Stored pairing acceptance is invalid"
+            ) from exc
+        acceptance = pairing["acceptance_json"]
+        local_descriptor = saved.source_descriptor.model_dump(mode="json")
+        preset = saved.outbound_grant
+        if requested_preset is not None and requested_preset != preset:
+            raise HTTPException(
+                status_code=409, detail="Cannot change an already signed pairing grant"
+            )
+    else:
+        acceptance = None
+        local_descriptor = _build_local_descriptor(request)
+        preset = requested_preset or "discovery"
+    try:
+        offer = verify_offer(pairing["offer_json"], local_descriptor=local_descriptor)
+        local = repo.get_local_node()
+        if (
+            not local
+            or offer.pairing_uid != request_uid
+            or offer.source_node_uid != str(pairing["remote_node_uid"])
+            or offer.target_node_uid != str(local["node_uid"])
+            or offer.source_descriptor.api_base_url.rstrip("/")
+            != pairing["remote_base_url"].rstrip("/")
+        ):
+            raise ValueError("Pairing identities do not match the stored request")
+        if acceptance is not None:
+            verify_acceptance(
+                acceptance,
+                pairing_offer=pairing["offer_json"],
+                local_descriptor=offer.source_descriptor.model_dump(mode="json"),
+            )
+    except ValueError as exc:
         raise HTTPException(
-            status_code=503, detail="Federation signing key unavailable"
+            status_code=400,
+            detail="Pairing request could not be verified; start a new pairing",
+        ) from exc
+    if preset not in PRESET_NAMES:
+        raise HTTPException(status_code=400, detail="Invalid outbound grant preset")
+    if acceptance is None:
+        active_key = trust_repo.get_active_local_key()
+        if active_key is None:
+            raise HTTPException(
+                status_code=503, detail="Federation signing key unavailable"
+            )
+        acceptance = build_acceptance(
+            offer=offer,
+            source_descriptor=local_descriptor,
+            challenge=secrets.token_hex(16),
+            private_key=load_private_key(active_key["key_id"]),
+            outbound_grant=preset,
         )
-    acceptance = build_acceptance(
-        offer=offer,
-        source_descriptor=local_descriptor,
-        challenge=secrets.token_hex(16),
-        private_key=load_private_key(active_key["key_id"]),
-        outbound_grant=body.outbound_grant,
-    )
-    trust_repo.update_pairing(
-        request_uid,
-        expected_states={"remote_pending"},
-        state="accepted",
-        remote_challenge=acceptance["challenge"],
-        acceptance_json=acceptance,
-        verified_at=datetime.now(timezone.utc),
-    )
+        try:
+            trust_repo.update_pairing(
+                request_uid,
+                expected_states={"remote_pending"},
+                state="accepted",
+                remote_challenge=acceptance["challenge"],
+                acceptance_json=acceptance,
+                verified_at=consent_at,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="Pairing state changed; refresh and retry approval",
+            ) from exc
+    try:
+        check_inbound_pairing_policy(request_uid)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     try:
         response = safe_post_json(
             pairing["remote_base_url"],
             "/api/federation/v1/pairing/acceptances",
             acceptance,
         )
+        if response.headers.get("cf-mitigated") == "challenge":
+            raise HTTPException(
+                status_code=502,
+                detail="Remote Cloudflare challenge blocked pairing; fix the peer's bot protection and retry approval before expiry",
+            )
         response.raise_for_status()
         verify_ack(
             response.json(),
             pairing_acceptance=acceptance,
             local_descriptor=local_descriptor,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
+        log.warning(
+            "Remote pairing callback failed for %s (%s)",
+            request_uid,
+            type(exc).__name__,
+        )
         raise HTTPException(
             status_code=502,
             detail="Remote pairing acceptance failed; retry approval",
         ) from exc
-    approved = trust_repo.update_pairing(
-        request_uid,
-        expected_states={"accepted"},
-        state="completed",
-        completed_at=datetime.now(timezone.utc),
-    )
-    node_uid = str(pairing["remote_node_uid"])
-    repo.update_peer(
-        node_uid,
-        trust_state="approved",
-        default_grant_preset=body.outbound_grant,
-    )
-    resolved_grant = resolve_preset(body.outbound_grant)
-    repo.upsert_peer_grant(
-        node_uid=node_uid,
-        principal_selector=f"peer_users:{node_uid}",
-        preset=body.outbound_grant,
-        capabilities_json=resolved_grant["capabilities"],
-        constraints_json=resolved_grant["constraints"],
-    )
-
-    repo.record_audit_event(
-        event_type="pairing.approved",
-        status="approved",
-        node_uid=node_uid,
-        metadata={"pairing_uid": request_uid},
-    )
-
-    return approved
+    resolved_grant = resolve_preset(preset)
+    try:
+        return complete_inbound_pairing(
+            request_uid,
+            preset=preset,
+            capabilities=resolved_grant["capabilities"],
+            constraints=resolved_grant["constraints"],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 # ── Peer management ───────────────────────────────────────────────────────
@@ -446,9 +545,7 @@ def rotate_local_key(
     if not local or str(local["node_uid"]) != node_uid:
         raise HTTPException(status_code=403, detail="Can only rotate local node key")
 
-    activate_at = datetime.now(timezone.utc) + timedelta(
-        seconds=body.activate_in_seconds
-    )
+    activate_at = datetime.now(UTC) + timedelta(seconds=body.activate_in_seconds)
     rotation = prepare_local_rotation(
         node_uid=node_uid,
         activate_at=activate_at,

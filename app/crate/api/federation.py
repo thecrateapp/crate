@@ -6,15 +6,15 @@ The descriptor (/.well-known/crate-node) is public.
 
 from __future__ import annotations
 
-import base64
 import asyncio
+import base64
 import hashlib
 import json as _json
 import logging
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -24,7 +24,6 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from crate.api import browse_artist as browse_artist_api
-from crate.artist_bio import normalize_artist_bio
 from crate.api.openapi_responses import error_response
 from crate.api.schemas.federation import (
     FederatedPlaybackPrepareBody,
@@ -32,21 +31,29 @@ from crate.api.schemas.federation import (
     PairingAcceptanceV1,
     PairingOfferV1,
 )
-from crate.db.queries.federation_manifest import (
-    get_federation_manifest_revision_row,
-    list_federation_manifest_rows,
-)
+from crate.artist_bio import normalize_artist_bio
 from crate.db.jobs.federation_catalog_changes import (
     catalog_high_water_mark,
     catalog_retention_floor,
     list_catalog_changes,
 )
+from crate.db.queries.federation_manifest import (
+    get_federation_manifest_revision_row,
+    list_federation_manifest_rows,
+)
 from crate.db.repositories import federation as repo
 from crate.db.repositories import federation_trust as trust_repo
+from crate.db.repositories.federation_pairing_approval import complete_outbound_pairing
 from crate.db.repositories.streaming import get_track_delivery_row_by_entity_uid
+from crate.federation.assertions import verify_signed_assertion
 from crate.federation.authorization import AuthorizationDecision, authorize
 from crate.federation.contracts import CAPABILITIES
 from crate.federation.identity import build_signed_descriptor, load_private_key
+from crate.federation.pairing import (
+    build_ack,
+    verify_acceptance,
+    verify_offer,
+)
 from crate.federation.playback_prepare import (
     PrepareReservation,
     acquire_prepare_reservation,
@@ -54,15 +61,8 @@ from crate.federation.playback_prepare import (
     record_playback_prepare_result,
     record_remote_playback_delivery,
 )
-from crate.federation.pairing import (
-    build_ack,
-    verify_acceptance,
-    verify_offer,
-)
 from crate.federation.policy import apply_result_limit, entity_is_allowed
-from crate.federation.url_policy import FederationURLPolicy
 from crate.federation.search import handle_remote_search
-from crate.federation.assertions import verify_signed_assertion
 from crate.federation.signing import (
     SIGNATURE_VERSION,
     SIGNED_HEADERS,
@@ -70,6 +70,7 @@ from crate.federation.signing import (
     validate_timestamp,
     verify_signature,
 )
+from crate.federation.url_policy import FederationURLPolicy
 from crate.release_types import classify_release
 from crate.streaming.service import inspect_playback_preparation, prepare_playback
 
@@ -455,10 +456,7 @@ def _catalog_policy_allows_item(item: dict[str, Any], policy: dict[str, Any]) ->
         return False
 
     denied_entity_uids = set(catalog_filter.get("deny_entity_uids") or [])
-    if item.get("remote_entity_uid") in denied_entity_uids:
-        return False
-
-    return True
+    return item.get("remote_entity_uid") not in denied_entity_uids
 
 
 def _catalog_policy_allows_live_search(policy: dict[str, Any]) -> bool:
@@ -1086,7 +1084,7 @@ def _json_list(value: Any) -> list:
     if isinstance(value, str) and value:
         try:
             decoded = _json.loads(value)
-        except Exception:
+        except (ValueError, RecursionError):
             return []
         return decoded if isinstance(decoded, list) else []
     return []
@@ -1670,7 +1668,7 @@ def _manifest_genres(item: dict[str, Any]) -> list[str]:
     if isinstance(genres, str):
         try:
             genres = _json.loads(genres)
-        except Exception:
+        except (ValueError, RecursionError):
             genres = []
 
     values: list[str] = []
@@ -1838,7 +1836,11 @@ def pairing_offer(body: PairingOfferV1, request: Request):
         signature_profile=source.signature_profile,
         descriptor_digest=source.descriptor_digest,
         offer_json=serialized_offer,
-        expires_at=offer.expires_at,
+        expires_at=min(
+            offer.expires_at,
+            offer.source_descriptor.expires_at,
+            offer.target_descriptor.expires_at,
+        ),
     )
     for key in source.public_keys:
         trust_repo.upsert_peer_key(
@@ -1878,60 +1880,34 @@ def pairing_accept(body: PairingAcceptanceV1, request: Request):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    source = acceptance.source_descriptor
     offer = PairingOfferV1.model_validate(pairing["offer_json"])
-    for key in source.public_keys:
-        trust_repo.upsert_peer_key(
-            node_uid=source.node_uid,
-            key_id=key.key_id,
-            public_key=key.public_key,
-            status=key.status,
-            not_before=key.not_before,
-            not_after=key.not_after,
-        )
-    repo.upsert_peer(
-        node_uid=source.node_uid,
-        display_name=source.name,
-        api_base_url=source.api_base_url,
-        listen_base_url=source.listen_base_url,
-        active_key_id=source.active_key_id,
-        public_keys_json=[key.model_dump(mode="json") for key in source.public_keys],
-        capabilities_json={name: True for name in source.capabilities},
-        trust_state="approved",
-        direction="outbound",
-        default_grant_preset=offer.outbound_grant,
-    )
-    from crate.federation.grants import resolve_preset
-
-    resolved_grant = resolve_preset(offer.outbound_grant)
-    repo.upsert_peer_grant(
-        node_uid=source.node_uid,
-        principal_selector=f"peer_users:{source.node_uid}",
-        preset=offer.outbound_grant,
-        capabilities_json=resolved_grant["capabilities"],
-        constraints_json=resolved_grant["constraints"],
-    )
-    if pairing["state"] != "completed":
-        trust_repo.update_pairing(
-            body.pairing_uid,
-            expected_states={"offered", "accepted"},
-            state="completed",
-            remote_node_uid=source.node_uid,
-            remote_challenge=acceptance.challenge,
-            acceptance_json=acceptance.model_dump(mode="json"),
-            verified_at=datetime.now(timezone.utc),
-            completed_at=datetime.now(timezone.utc),
-        )
     active_key = trust_repo.get_active_local_key()
-    if active_key is None:
+    if active_key is None or active_key["key_id"] != local_descriptor["active_key_id"]:
         raise HTTPException(
-            status_code=503, detail="Federation signing key unavailable"
+            status_code=503,
+            detail="Federation signing key unavailable; retry acceptance",
         )
-    return build_ack(
+    # Prepare the ACK before granting trust: a missing signing key must not
+    # leave a completed peer which could never receive its response.
+    ack = build_ack(
         acceptance=acceptance,
         source_descriptor=local_descriptor,
         private_key=load_private_key(active_key["key_id"]),
     )
+    from crate.federation.grants import resolve_preset
+
+    resolved_grant = resolve_preset(offer.outbound_grant)
+    try:
+        complete_outbound_pairing(
+            body.pairing_uid,
+            acceptance=acceptance.model_dump(mode="json"),
+            preset=offer.outbound_grant,
+            capabilities=resolved_grant["capabilities"],
+            constraints=resolved_grant["constraints"],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return ack
 
 
 @router.post("/key-rotation")
@@ -1944,7 +1920,7 @@ async def key_rotation(body: KeyRotationBody, request: Request):
             status_code=400,
             detail="new_key_id and new_public_key are required",
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if body.activate_at <= now or body.grace_until <= body.activate_at:
         raise HTTPException(status_code=400, detail="Invalid rotation window")
     try:
@@ -2034,9 +2010,12 @@ async def create_stream_ticket(body: StreamTicketBody, request: Request):
             _require_capability, peer, "stream.transcoded", assertion=assertion
         )
     constraints = decision.constraints
-    if constraints and constraints.delivery:
-        if body.delivery_policy not in constraints.delivery:
-            raise HTTPException(status_code=403, detail="delivery_mode_denied")
+    if (
+        constraints
+        and constraints.delivery
+        and body.delivery_policy not in constraints.delivery
+    ):
+        raise HTTPException(status_code=403, detail="delivery_mode_denied")
 
     ticket = await asyncio.to_thread(
         create_ticket,
