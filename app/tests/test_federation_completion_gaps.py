@@ -10,6 +10,14 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 
+@pytest.fixture
+def catalog_sync_session(monkeypatch):
+    """Catalog sync handler tests run without PostgreSQL: stub the fence."""
+    monkeypatch.setattr(
+        "crate.federation.catalog.begin_catalog_sync_session", lambda _uid: 1
+    )
+
+
 def test_signed_user_assertion_round_trip_and_tamper_rejection():
     from crate.federation.assertions import (
         build_assertion,
@@ -729,7 +737,7 @@ def test_worker_registry_uses_real_federation_import_album_handler():
     assert TASK_HANDLERS["federation_import_album"] is _handle_federation_import
 
 
-def test_catalog_sync_accepts_manifest_item_list(monkeypatch):
+def test_catalog_sync_accepts_manifest_item_list(monkeypatch, catalog_sync_session):
     from crate.worker_handlers.federation import _handle_catalog_sync
 
     upserts: list[dict] = []
@@ -794,7 +802,7 @@ def test_catalog_sync_accepts_manifest_item_list(monkeypatch):
     )
     monkeypatch.setattr(
         "crate.federation.catalog.upsert_cursor",
-        lambda node_uid, cursor: cursors.append((node_uid, cursor)),
+        lambda node_uid, cursor, **_kwargs: cursors.append((node_uid, cursor)),
     )
     monkeypatch.setattr(
         "crate.federation.catalog.tombstone_catalog_items_missing_from_revision",
@@ -812,7 +820,9 @@ def test_catalog_sync_accepts_manifest_item_list(monkeypatch):
     assert cursors == [("node-b", "rev-list")]
 
 
-def test_catalog_sync_consumes_every_manifest_page_without_implicit_cap(monkeypatch):
+def test_catalog_sync_consumes_every_manifest_page_without_implicit_cap(
+    monkeypatch, catalog_sync_session
+):
     from urllib.parse import parse_qs, urlsplit
 
     from crate.worker_handlers.federation import _handle_catalog_sync
@@ -875,7 +885,7 @@ def test_catalog_sync_consumes_every_manifest_page_without_implicit_cap(monkeypa
     )
     monkeypatch.setattr(
         "crate.federation.catalog.tombstone_catalog_items_missing_from_revision",
-        lambda node_uid, revision: pruned.append((node_uid, revision)) or 0,
+        lambda node_uid, revision, **_kwargs: pruned.append((node_uid, revision)) or 0,
     )
     monkeypatch.setattr(
         "crate.federation.events.emit_catalog_sync_completed",
@@ -892,7 +902,9 @@ def test_catalog_sync_consumes_every_manifest_page_without_implicit_cap(monkeypa
     assert pruned == [("node-b", "rev-12-pages")]
 
 
-def test_catalog_sync_partial_failure_is_not_marked_completed(monkeypatch):
+def test_catalog_sync_partial_failure_is_not_marked_completed(
+    monkeypatch, catalog_sync_session
+):
     from crate.worker_handlers.federation import _handle_catalog_sync
 
     calls = {"request": 0, "cursor": 0, "completed": 0, "failed": 0}
@@ -970,7 +982,9 @@ def test_catalog_sync_partial_failure_is_not_marked_completed(monkeypatch):
     assert calls == {"request": 2, "cursor": 0, "completed": 0, "failed": 1}
 
 
-def test_catalog_sync_resumes_a_matching_partial_manifest(monkeypatch):
+def test_catalog_sync_resumes_a_matching_partial_manifest(
+    monkeypatch, catalog_sync_session
+):
     import json
     from urllib.parse import parse_qs, urlsplit
 
@@ -1112,7 +1126,9 @@ def test_remote_stream_slot_limits_allow_browser_overlap(monkeypatch):
     assert peer_limit >= subject_limit
 
 
-def test_catalog_sync_delegates_remote_facets_to_atomic_page_import(monkeypatch):
+def test_catalog_sync_delegates_remote_facets_to_atomic_page_import(
+    monkeypatch, catalog_sync_session
+):
     from crate.worker_handlers.federation import _handle_catalog_sync
 
     pages: list[dict] = []
@@ -1168,7 +1184,7 @@ def test_catalog_sync_delegates_remote_facets_to_atomic_page_import(monkeypatch)
     )
     monkeypatch.setattr(
         "crate.federation.catalog.upsert_cursor",
-        lambda node_uid, cursor: None,
+        lambda node_uid, cursor, **_kwargs: None,
     )
     monkeypatch.setattr(
         "crate.federation.catalog.tombstone_catalog_items_missing_from_revision",

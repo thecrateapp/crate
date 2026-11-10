@@ -9,6 +9,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crate.db.domain_events import append_domain_event
+from crate.db.repositories.federation_catalog_fence import (
+    checkpoint_moves_forward,
+    fence_catalog_sync_write,
+)
 from crate.db.repositories.tasks import create_task_dedup
 from crate.db.tx import optional_scope
 
@@ -50,6 +54,7 @@ def apply_federation_manifest_page(
     items: list[dict],
     revision: str,
     sync_session_uid: str,
+    sync_generation: int,
     checkpoint: dict | None = None,
     session: Session | None = None,
 ) -> dict:
@@ -58,6 +63,10 @@ def apply_federation_manifest_page(
     Projection remains asynchronous. This import never scans or reconciles the
     cached catalogue, and its SQL/transaction count is independent of page size.
     Callers validate protocol and owner policy before handing us the page.
+
+    The page is fenced (FED-D11): it raises ``CatalogSyncFenced`` without
+    writing when ``sync_generation`` is no longer the peer's current one, and
+    within one session the checkpoint never moves back.
     """
     if len(items) > 500:
         raise ValueError("Federation manifest pages cannot exceed 500 items")
@@ -70,6 +79,7 @@ def apply_federation_manifest_page(
     }
     invalidated = 0
     with optional_scope(session) as current:
+        locked_cursor = fence_catalog_sync_write(current, node_uid, sync_generation)
         if rows:
             current.execute(
                 text(
@@ -154,7 +164,7 @@ def apply_federation_manifest_page(
                     "remote_uids": list({row["remote_entity_uid"] for row in rows}),
                 },
             )
-            invalidated = int(deleted.rowcount or 0)
+            invalidated = int(getattr(deleted, "rowcount", 0) or 0)
             if invalidated:
                 append_domain_event(
                     "global_catalog.source.changed",
@@ -167,7 +177,9 @@ def apply_federation_manifest_page(
                     subject_key=node_uid,
                     session=current,
                 )
-        if checkpoint is not None:
+        if checkpoint is not None and checkpoint_moves_forward(
+            locked_cursor, sync_session_uid, int(checkpoint["next_page"])
+        ):
             cursor = {
                 "status": "partial",
                 "revision": revision,
@@ -181,10 +193,9 @@ def apply_federation_manifest_page(
             current.execute(
                 text(
                     """
-                    INSERT INTO federation_catalog_cursors (node_uid, cursor, last_error, updated_at)
-                    VALUES (CAST(:node_uid AS uuid), :cursor, NULL, NOW())
-                    ON CONFLICT (node_uid) DO UPDATE SET
-                        cursor = EXCLUDED.cursor, last_error = NULL, updated_at = NOW()
+                    UPDATE federation_catalog_cursors
+                    SET cursor = :cursor, last_error = NULL, updated_at = NOW()
+                    WHERE node_uid = CAST(:node_uid AS uuid)
                     """
                 ),
                 {"node_uid": node_uid, "cursor": json.dumps(cursor, sort_keys=True)},

@@ -210,13 +210,18 @@ def test_remote_items_from_unapproved_peers_are_not_projected(pg_db):
 
 
 def test_completed_manifest_tombstones_items_missing_from_revision(pg_db):
-    from crate.db.tx import read_scope
+    from crate.db.tx import read_scope, transaction_scope
     from crate.federation.catalog import (
+        begin_catalog_sync_session,
         tombstone_catalog_items_missing_from_revision,
         upsert_catalog_item,
     )
+    from tests.conftest import approve_federation_node
 
     node_uid = str(uuid.uuid4())
+    with transaction_scope() as session:
+        approve_federation_node(session, node_uid)
+    generation = begin_catalog_sync_session(node_uid)
     upsert_catalog_item(
         node_uid,
         "artist-current",
@@ -232,7 +237,9 @@ def test_completed_manifest_tombstones_items_missing_from_revision(pg_db):
         remote_revision="rev-previous",
     )
 
-    tombstoned = tombstone_catalog_items_missing_from_revision(node_uid, "rev-current")
+    tombstoned = tombstone_catalog_items_missing_from_revision(
+        node_uid, "rev-current", sync_generation=generation
+    )
 
     with read_scope() as session:
         rows = (

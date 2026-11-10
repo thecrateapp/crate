@@ -60,6 +60,22 @@ re-upgrade. Reapplying `159` preserves that boundary and includes any intervenin
 legacy writes in the published watermark. A failed flush rolls back the whole
 downgrade, retaining the intents and schema for retry.
 
+Migration `160` fences catalog sync sessions on the receiver (FED-D11). Each
+sync run increments `federation_catalog_cursors.sync_generation` under the row
+lock when it starts, and every page, tombstone, delta and checkpoint write
+re-checks it, so a stale run stops with a `fenced` result instead of
+tombstoning a newer run's rows or moving its checkpoint back. Within one run
+the checkpoint only moves forward. Disabling a peer, or moving it out of
+`approved`, bumps the generation in the same transaction through a trigger on
+`federation_nodes`, whichever image performs it.
+
+Database guards cover writers older than `160`. They keep working until the
+first fenced run for a peer starts. From then on they cannot move that peer's
+checkpoint or write its catalog rows while it is approved; an old image can
+still disable it. The generation never decreases. Run the explicit `160 → 159`
+downgrade before restarting pre-`160` receivers against this database; it
+removes the guards and the column.
+
 ## Canary evidence
 
 A canary needs both functional and operational proof: descriptor/grant behavior,

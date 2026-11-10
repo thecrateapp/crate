@@ -78,14 +78,27 @@ def sync_worker(monkeypatch):
     for name in (
         "tombstone_catalog_items_missing_from_revision",
         "tombstone_catalog_items_missing_from_session",
-        "record_catalog_sync_error",
     ):
         monkeypatch.setattr(f"crate.federation.catalog.{name}", lambda *_a, **_k: 0)
+    state.errors = []
+    monkeypatch.setattr(
+        "crate.federation.catalog.record_catalog_sync_error",
+        lambda uid, error, **kwargs: state.errors.append((uid, error, kwargs)) or True,
+    )
     for name in ("emit_catalog_sync_completed", "emit_catalog_sync_failed"):
         monkeypatch.setattr(f"crate.federation.events.{name}", lambda *_a, **_k: None)
     monkeypatch.setattr(
         "crate.db.jobs.global_catalog_reconciliation.apply_federation_delta_page",
         lambda **kwargs: {"applied": len(kwargs["items"])},
+    )
+    state.generations = []
+
+    def begin_session(uid):
+        state.generations.append(uid)
+        return len(state.generations)
+
+    monkeypatch.setattr(
+        "crate.federation.catalog.begin_catalog_sync_session", begin_session
     )
     state.run = lambda **params: federation._sync_single_peer_catalog("peer", params)
     return state
@@ -265,14 +278,21 @@ def test_unchanged_rows_stay_available_after_an_empty_delta_heartbeat(pg_db):
     )
     from crate.db.tx import read_scope, transaction_scope
 
+    from crate.db.repositories.federation_catalog_fence import (
+        begin_catalog_sync_session,
+        declare_catalog_maintenance_write,
+    )
+
     del pg_db
     node_uid = str(uuid4())
     with transaction_scope() as session:
         approve_federation_node(session, node_uid)
+    generation = begin_catalog_sync_session(node_uid)
     apply_federation_manifest_page(
         node_uid=node_uid,
         revision="r1",
         sync_session_uid=str(uuid4()),
+        sync_generation=generation,
         items=[
             {
                 "entity_type": "artist",
@@ -283,6 +303,8 @@ def test_unchanged_rows_stay_available_after_an_empty_delta_heartbeat(pg_db):
         checkpoint={"next_page": 1, "page_size": 500, "synced": 1},
     )
     with transaction_scope() as session:
+        # Age the rows and the checkpoint as an operator repair would.
+        declare_catalog_maintenance_write(session)
         session.execute(
             text(
                 "UPDATE federation_catalog_items SET indexed_at = NOW() - INTERVAL '30 days' WHERE node_uid = CAST(:uid AS uuid)"
@@ -304,7 +326,11 @@ def test_unchanged_rows_stay_available_after_an_empty_delta_heartbeat(pg_db):
         ).scalar_one()
 
     apply_federation_delta_page(
-        node_uid=node_uid, items=[], next_cursor="current-delta", last_sequence=1
+        node_uid=node_uid,
+        items=[],
+        next_cursor="current-delta",
+        last_sequence=1,
+        sync_generation=generation,
     )
 
     assert not is_catalog_stale(node_uid)
@@ -321,3 +347,102 @@ def test_unchanged_rows_stay_available_after_an_empty_delta_heartbeat(pg_db):
             ).scalar_one()
             == indexed_before
         )
+
+
+# ── FED-D11 fencing in the worker ──────────────────────────────────────────
+
+
+def test_every_session_write_carries_the_session_generation(sync_worker, monkeypatch):
+    deltas = []
+    monkeypatch.setattr(
+        "crate.db.jobs.global_catalog_reconciliation.apply_federation_delta_page",
+        lambda **kwargs: deltas.append(kwargs) or {"applied": 0},
+    )
+    sync_worker.responses = [
+        _manifest(snapshot_cursor="initial-" + "x" * 50, snapshot_sequence=3),
+        _delta(),
+    ]
+
+    result = sync_worker.run()
+
+    assert result["status"] == "completed"
+    assert sync_worker.generations == ["peer"]
+    assert [batch["sync_generation"] for batch in sync_worker.batches] == [1]
+    assert [cursor[2]["sync_generation"] for cursor in sync_worker.cursors] == [1]
+    assert [delta["sync_generation"] for delta in deltas] == [1]
+
+
+def test_superseded_run_stops_without_tombstoning_or_checkpointing(
+    sync_worker, monkeypatch
+):
+    from crate.federation.catalog import CatalogSyncFenced
+
+    def superseded_page(**kwargs):
+        sync_worker.batches.append(kwargs)
+        if len(sync_worker.batches) == 2:
+            raise CatalogSyncFenced("peer", expected_generation=1, current_generation=2)
+        return {"applied": len(kwargs["items"]), "invalidated": 0}
+
+    tombstones = []
+    monkeypatch.setattr(
+        "crate.db.repositories.federation_manifest_import.apply_federation_manifest_page",
+        superseded_page,
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.tombstone_catalog_items_missing_from_session",
+        lambda *args, **kwargs: tombstones.append(args) or 0,
+    )
+    sync_worker.responses = [
+        _manifest(has_more=True, next_cursor="two", snapshot_cursor="s" * 50),
+        _manifest(uid="track-b", snapshot_cursor="s" * 50),
+    ]
+
+    result = sync_worker.run()
+
+    assert result["status"] == "fenced"
+    assert "superseded" in result["error"]
+    assert "generation 1" in result["error"] and "generation 2" in result["error"]
+    assert tombstones == []
+    assert sync_worker.cursors == []
+    assert sync_worker.errors == []
+
+
+def test_stale_run_failure_is_not_recorded_over_the_newer_run(sync_worker, monkeypatch):
+    updates = []
+    monkeypatch.setattr(
+        "crate.federation.catalog.record_catalog_sync_error",
+        lambda *_args, **_kwargs: False,
+    )
+    from crate.worker_handlers import federation
+
+    monkeypatch.setattr(
+        federation.repo, "update_peer", lambda *args, **kwargs: updates.append(kwargs)
+    )
+    sync_worker.responses = [{"status_code": 500}]
+
+    result = sync_worker.run()
+
+    assert result["status"] == "fenced"
+    assert updates == []
+
+
+def test_disabled_or_revoked_peer_is_skipped_before_any_request(
+    sync_worker, monkeypatch
+):
+    from crate.federation.catalog import CatalogSyncFenced
+
+    def refuse(uid):
+        raise CatalogSyncFenced(
+            uid,
+            expected_generation=None,
+            current_generation=None,
+            reason="catalog sync for peer not started: the peer is disabled",
+        )
+
+    monkeypatch.setattr("crate.federation.catalog.begin_catalog_sync_session", refuse)
+
+    result = sync_worker.run()
+
+    assert result["status"] == "skipped"
+    assert sync_worker.paths == []
+    assert sync_worker.batches == []

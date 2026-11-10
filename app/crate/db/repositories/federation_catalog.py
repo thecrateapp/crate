@@ -12,6 +12,12 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 
+from crate.db.repositories.federation_catalog_fence import (
+    CatalogSyncFenced,
+    checkpoint_moves_forward,
+    declare_catalog_maintenance_write,
+    fence_catalog_sync_write,
+)
 from crate.db.repositories.global_content_cache import invalidate_source_cache
 from crate.db.tx import read_scope, transaction_scope
 from crate.federation.events import emit_global_catalog_source_changed
@@ -43,6 +49,7 @@ def upsert_catalog_item(
     search_text = " ".join(filter(None, [title, artist or "", album or ""]))
 
     with transaction_scope() as s:
+        declare_catalog_maintenance_write(s)
         s.execute(
             text(
                 """
@@ -131,6 +138,7 @@ def tombstone_catalog_item(
 ) -> None:
     now = datetime.now(UTC)
     with transaction_scope() as s:
+        declare_catalog_maintenance_write(s)
         s.execute(
             text(
                 "UPDATE federation_catalog_items SET "
@@ -169,14 +177,18 @@ def tombstone_catalog_item(
 
 
 def tombstone_catalog_items_missing_from_revision(
-    node_uid: str, remote_revision: str
+    node_uid: str, remote_revision: str, *, sync_generation: int
 ) -> int:
-    """Tombstone peer rows absent from a successfully completed full manifest."""
+    """Tombstone peer rows absent from a successfully completed full manifest.
+
+    Raises ``CatalogSyncFenced`` without writing when the session is stale.
+    """
     if not remote_revision:
         raise ValueError("A completed manifest requires a non-empty revision")
 
     now = datetime.now(UTC)
     with transaction_scope() as session:
+        fence_catalog_sync_write(session, node_uid, sync_generation)
         rows = (
             session.execute(
                 text(
@@ -234,11 +246,15 @@ def tombstone_catalog_items_missing_from_revision(
 
 
 def tombstone_catalog_items_missing_from_session(
-    node_uid: str, sync_session_uid: str
+    node_uid: str, sync_session_uid: str, *, sync_generation: int
 ) -> int:
-    """Tombstone unseen rows only after a full snapshot session completes."""
+    """Tombstone unseen rows only after a full snapshot session completes.
+
+    Raises ``CatalogSyncFenced`` without writing when the session is stale.
+    """
     now = datetime.now(UTC)
     with transaction_scope() as session:
+        fence_catalog_sync_write(session, node_uid, sync_generation)
         rows = (
             session.execute(
                 text(
@@ -341,9 +357,12 @@ def upsert_cursor(
     snapshot_cursor: int | None = None,
     sync_session_uid: str | None = None,
     full_verified: bool = False,
+    sync_generation: int,
 ) -> dict:
+    """Mark a full sync session complete. Fenced like every session write."""
     now = datetime.now(UTC)
     with transaction_scope() as s:
+        fence_catalog_sync_write(s, node_uid, sync_generation)
         s.execute(
             text(
                 "INSERT INTO federation_catalog_cursors "
@@ -405,8 +424,13 @@ def save_catalog_sync_checkpoint(
     next_cursor: str | None = None,
     snapshot_cursor: str | None = None,
     sync_session_uid: str | None = None,
+    sync_generation: int,
 ) -> dict:
-    """Persist a resumable full-manifest cursor without marking it complete."""
+    """Persist a resumable full-manifest cursor without marking it complete.
+
+    Fenced like every session write; within one sync session the checkpoint
+    only moves forward.
+    """
     now = datetime.now(UTC)
     cursor = json.dumps(
         {
@@ -422,21 +446,18 @@ def save_catalog_sync_checkpoint(
         sort_keys=True,
     )
     with transaction_scope() as session:
-        session.execute(
-            text(
-                """
-                INSERT INTO federation_catalog_cursors
-                    (node_uid, cursor, last_error, updated_at)
-                VALUES
-                    (CAST(:node_uid AS uuid), :cursor, NULL, :updated_at)
-                ON CONFLICT (node_uid) DO UPDATE SET
-                    cursor = EXCLUDED.cursor,
-                    last_error = NULL,
-                    updated_at = EXCLUDED.updated_at
-                """
-            ),
-            {"node_uid": node_uid, "cursor": cursor, "updated_at": now},
-        )
+        locked = fence_catalog_sync_write(session, node_uid, sync_generation)
+        if checkpoint_moves_forward(locked, sync_session_uid, int(next_page)):
+            session.execute(
+                text(
+                    """
+                    UPDATE federation_catalog_cursors
+                    SET cursor = :cursor, last_error = NULL, updated_at = :updated_at
+                    WHERE node_uid = CAST(:node_uid AS uuid)
+                    """
+                ),
+                {"node_uid": node_uid, "cursor": cursor, "updated_at": now},
+            )
         row = (
             session.execute(
                 text(
@@ -451,9 +472,21 @@ def save_catalog_sync_checkpoint(
     return dict(row)
 
 
-def record_catalog_sync_error(node_uid: str, error: str) -> None:
+def record_catalog_sync_error(
+    node_uid: str, error: str, *, sync_generation: int | None = None
+) -> bool:
+    """Record a sync failure and its backoff.
+
+    With ``sync_generation``, a superseded session records nothing (and this
+    returns ``False``): its failure must not put the newer session in backoff.
+    """
     now = datetime.now(UTC)
     with transaction_scope() as session:
+        if sync_generation is not None:
+            try:
+                fence_catalog_sync_write(session, node_uid, sync_generation)
+            except CatalogSyncFenced:
+                return False
         session.execute(
             text(
                 """
@@ -491,6 +524,7 @@ def record_catalog_sync_error(node_uid: str, error: str) -> None:
                 "updated_at": now,
             },
         )
+    return True
 
 
 def get_cursor(node_uid: str) -> dict | None:

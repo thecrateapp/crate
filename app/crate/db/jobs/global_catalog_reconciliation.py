@@ -54,8 +54,17 @@ def apply_federation_delta_page(
     items: list[dict[str, Any]],
     next_cursor: str,
     last_sequence: int | None = None,
+    sync_generation: int,
 ) -> dict[str, int]:
-    """Apply a remote delta page and advance its checkpoint atomically."""
+    """Apply a remote delta page and advance its checkpoint atomically.
+
+    Fenced like every catalog sync write (FED-D11): a superseded session
+    raises ``CatalogSyncFenced`` without writing. The cursor only moves
+    forward: a page whose sequence is behind the stored one keeps it.
+    """
+    from crate.db.repositories.federation_catalog_fence import (
+        fence_catalog_sync_write,
+    )
     from crate.db.repositories.global_catalog_dirty_sources import (
         enqueue_federated_dirty_source,
     )
@@ -65,6 +74,7 @@ def apply_federation_delta_page(
         [int(item.get("sequence") or 0) for item in items] + [int(last_sequence or 0)]
     )
     with transaction_scope() as session:
+        fence_catalog_sync_write(session, node_uid, sync_generation)
         for item in items:
             entity_type = str(item.get("entity_type") or "")
             entity_uid = str(item.get("remote_entity_uid") or "")
@@ -164,7 +174,12 @@ def apply_federation_delta_page(
                     0, NULL, NULL, NOW()
                 )
                 ON CONFLICT (node_uid) DO UPDATE SET
-                    cursor = EXCLUDED.cursor,
+                    cursor = CASE
+                        WHEN EXCLUDED.last_applied_cursor >= COALESCE(
+                            federation_catalog_cursors.last_applied_cursor, 0
+                        ) THEN EXCLUDED.cursor
+                        ELSE federation_catalog_cursors.cursor
+                    END,
                     last_applied_cursor = GREATEST(
                         COALESCE(federation_catalog_cursors.last_applied_cursor, 0),
                         EXCLUDED.last_applied_cursor

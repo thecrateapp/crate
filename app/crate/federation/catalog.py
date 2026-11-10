@@ -27,6 +27,10 @@ from crate.db.repositories.federation_catalog import (
     upsert_catalog_item,
     upsert_cursor,
 )
+from crate.db.repositories.federation_catalog_fence import (
+    CatalogSyncFenced,
+    begin_catalog_sync_session,
+)
 
 
 class InvalidCatalogCursor(ValueError):
@@ -115,8 +119,10 @@ def decode_catalog_cursor(cursor: str, *, peer_uid: str) -> dict[str, Any]:
 
 __all__ = [
     "STALE_THRESHOLD_HOURS",
+    "CatalogSyncFenced",
     "InvalidCatalogCursor",
     "_FED_SEARCH_SQL",
+    "begin_catalog_sync_session",
     "cleanup_old_tombstones",
     "cleanup_peer_catalog",
     "count_catalog_items",

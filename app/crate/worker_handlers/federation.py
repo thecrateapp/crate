@@ -114,6 +114,7 @@ def _sync_peer_catalog_delta(
     local_node: dict,
     cursor: str,
     page_size: int,
+    sync_generation: int,
     max_pages: int | None = None,
 ) -> dict:
     from crate.db.jobs.global_catalog_reconciliation import (
@@ -161,6 +162,7 @@ def _sync_peer_catalog_delta(
             ),
             next_cursor=next_cursor,
             last_sequence=scanned_sequence,
+            sync_generation=sync_generation,
         )
         total_applied += int(result["applied"])
         pages += 1
@@ -183,36 +185,21 @@ def _sync_single_peer_catalog(
     *,
     on_page: Callable[[int], None] | None = None,
 ) -> dict:
-    from crate.db.repositories.federation_manifest_import import (
-        apply_federation_manifest_page,
-    )
     from crate.federation.catalog import (
+        CatalogSyncFenced,
+        begin_catalog_sync_session,
         get_cursor,
-        record_catalog_sync_error,
-        tombstone_catalog_items_missing_from_revision,
-        tombstone_catalog_items_missing_from_session,
-        upsert_cursor,
-    )
-    from crate.federation.events import (
-        emit_catalog_sync_completed,
-        emit_catalog_sync_failed,
     )
 
     peer = repo.get_peer(node_uid)
     if not peer:
         return {"error": "peer not found"}
 
-    from crate.federation.client import federated_get
-
     local_node = repo.get_local_node()
     if not local_node:
         return {"error": "local node not configured"}
 
     page_size = max(1, min(int(params.get("page_size", 500) or 500), 500))
-    base_path = f"/api/federation/v1/catalog/manifest?page_size={page_size}"
-    total_count = 0
-    revision = ""
-    page = max(0, int(params.get("start_page", 0) or 0))
     try:
         stored_cursor = get_cursor(node_uid) or {}
     except Exception:
@@ -234,6 +221,84 @@ def _sync_single_peer_catalog(
             "retry_after": retry_after.isoformat(),
             "synced": 0,
         }
+    # FED-D11: every write of this run is fenced by this generation. A newer
+    # run, a disable or a revocation bumps it, and this run then stops
+    # without writing instead of undoing the newer run's work.
+    try:
+        sync_generation = begin_catalog_sync_session(node_uid)
+    except CatalogSyncFenced as exc:
+        return {"status": "skipped", "reason": str(exc), "synced": 0}
+    try:
+        return _sync_peer_catalog_session(
+            node_uid,
+            params,
+            peer=peer,
+            local_node=local_node,
+            stored_cursor=stored_cursor,
+            page_size=page_size,
+            sync_generation=sync_generation,
+            on_page=on_page,
+        )
+    except CatalogSyncFenced as exc:
+        log.warning("Peer catalog sync stopped: %s", exc)
+        return {
+            "status": "fenced",
+            "error": str(exc),
+            "synced": 0,
+            "sync_generation": sync_generation,
+        }
+
+
+def _sync_peer_catalog_session(
+    node_uid: str,
+    params: dict,
+    *,
+    peer: dict,
+    local_node: dict,
+    stored_cursor: dict,
+    page_size: int,
+    sync_generation: int,
+    on_page: Callable[[int], None] | None,
+) -> dict:
+    from crate.db.repositories.federation_manifest_import import (
+        apply_federation_manifest_page,
+    )
+    from crate.federation.catalog import (
+        CatalogSyncFenced,
+        record_catalog_sync_error,
+        tombstone_catalog_items_missing_from_revision,
+        tombstone_catalog_items_missing_from_session,
+        upsert_cursor,
+    )
+    from crate.federation.client import federated_get
+    from crate.federation.events import (
+        emit_catalog_sync_completed,
+        emit_catalog_sync_failed,
+    )
+
+    def record_failure(error: str) -> None:
+        # A superseded run records nothing: its failure must not put the
+        # newer run in backoff or overwrite the peer's status.
+        try:
+            recorded = record_catalog_sync_error(
+                node_uid, error, sync_generation=sync_generation
+            )
+        except Exception:
+            log.debug("Unable to persist peer sync error", exc_info=True)
+            recorded = True
+        if not recorded:
+            raise CatalogSyncFenced(
+                node_uid,
+                expected_generation=sync_generation,
+                current_generation=None,
+            )
+        repo.update_peer(node_uid, last_error=error[:200])
+        emit_catalog_sync_failed(node_uid, error[:200])
+
+    base_path = f"/api/federation/v1/catalog/manifest?page_size={page_size}"
+    total_count = 0
+    revision = ""
+    page = max(0, int(params.get("start_page", 0) or 0))
     stored_value = stored_cursor.get("cursor")
     if (
         "start_page" not in params
@@ -246,17 +311,18 @@ def _sync_single_peer_catalog(
                 local_node=local_node,
                 cursor=str(stored_value),
                 page_size=page_size,
+                sync_generation=sync_generation,
                 max_pages=(
                     int(params["max_pages"])
                     if params.get("max_pages") is not None
                     else None
                 ),
             )
+        except CatalogSyncFenced:
+            raise
         except Exception as exc:
             log.warning("Peer catalog delta sync failed", exc_info=True)
-            repo.update_peer(node_uid, last_error=str(exc)[:200])
-            record_catalog_sync_error(node_uid, str(exc))
-            emit_catalog_sync_failed(node_uid, str(exc)[:200])
+            record_failure(str(exc))
             return {"status": "failed", "error": str(exc)[:200], "synced": 0}
         if delta_result.get("status") != "full_sync_required":
             emit_catalog_sync_completed(
@@ -325,12 +391,7 @@ def _sync_single_peer_catalog(
             data = resp.json()
         except Exception as e:
             log.warning("Peer catalog manifest fetch failed", exc_info=True)
-            repo.update_peer(node_uid, last_error=str(e)[:200])
-            try:
-                record_catalog_sync_error(node_uid, str(e))
-            except Exception:
-                log.debug("Unable to persist peer sync error", exc_info=True)
-            emit_catalog_sync_failed(node_uid, str(e)[:200])
+            record_failure(str(e))
             return {
                 "status": "failed",
                 "error": str(e)[:200],
@@ -342,9 +403,7 @@ def _sync_single_peer_catalog(
         page_revision = str(data.get("revision") or "")
         if not page_revision:
             error = "peer manifest is missing a revision"
-            repo.update_peer(node_uid, last_error=error)
-            record_catalog_sync_error(node_uid, error)
-            emit_catalog_sync_failed(node_uid, error)
+            record_failure(error)
             return {
                 "status": "failed",
                 "error": error,
@@ -365,9 +424,7 @@ def _sync_single_peer_catalog(
                 restarted_after_revision_change = True
                 continue
             error = "peer manifest revision changed during pagination"
-            repo.update_peer(node_uid, last_error=error)
-            record_catalog_sync_error(node_uid, error)
-            emit_catalog_sync_failed(node_uid, error)
+            record_failure(error)
             return {
                 "status": "failed",
                 "error": error,
@@ -397,6 +454,7 @@ def _sync_single_peer_catalog(
             items=page_items,
             revision=revision,
             sync_session_uid=sync_session_uid,
+            sync_generation=sync_generation,
             checkpoint={
                 "next_page": page + 1,
                 "page_size": page_size,
@@ -414,8 +472,7 @@ def _sync_single_peer_catalog(
                 break
             if response_next_cursor and response_next_cursor == next_cursor:
                 error = "peer manifest response made no forward progress"
-                record_catalog_sync_error(node_uid, error)
-                emit_catalog_sync_failed(node_uid, error)
+                record_failure(error)
                 return {"status": "failed", "error": error, "synced": total_count}
         total_pages = data.get("total_pages")
         if (
@@ -438,9 +495,7 @@ def _sync_single_peer_catalog(
 
     if not manifest_completed:
         error = "peer manifest sync stopped before the final page"
-        repo.update_peer(node_uid, last_error=error)
-        record_catalog_sync_error(node_uid, error)
-        emit_catalog_sync_failed(node_uid, error)
+        record_failure(error)
         return {
             "status": "failed",
             "error": error,
@@ -451,7 +506,7 @@ def _sync_single_peer_catalog(
 
     if snapshot_cursor:
         tombstoned = tombstone_catalog_items_missing_from_session(
-            node_uid, sync_session_uid
+            node_uid, sync_session_uid, sync_generation=sync_generation
         )
         upsert_cursor(
             node_uid,
@@ -460,10 +515,13 @@ def _sync_single_peer_catalog(
             snapshot_cursor=snapshot_sequence,
             sync_session_uid=sync_session_uid,
             full_verified=True,
+            sync_generation=sync_generation,
         )
     else:
-        tombstoned = tombstone_catalog_items_missing_from_revision(node_uid, revision)
-        upsert_cursor(node_uid, revision)
+        tombstoned = tombstone_catalog_items_missing_from_revision(
+            node_uid, revision, sync_generation=sync_generation
+        )
+        upsert_cursor(node_uid, revision, sync_generation=sync_generation)
     delta_synced = 0
     if snapshot_cursor:
         try:
@@ -472,18 +530,19 @@ def _sync_single_peer_catalog(
                 local_node=local_node,
                 cursor=snapshot_cursor,
                 page_size=page_size,
+                sync_generation=sync_generation,
             )
             if catch_up.get("status") == "full_sync_required":
                 raise RuntimeError(
                     "catalog changes expired during bootstrap; retry full sync"
                 )
             delta_synced = int(catch_up.get("synced") or 0)
+        except CatalogSyncFenced:
+            raise
         except Exception as exc:
             log.warning("Peer catalog delta catch-up failed", exc_info=True)
             error = str(exc)[:200]
-            repo.update_peer(node_uid, last_error=error)
-            record_catalog_sync_error(node_uid, error)
-            emit_catalog_sync_failed(node_uid, error)
+            record_failure(error)
             return {
                 "status": "failed",
                 "error": error,

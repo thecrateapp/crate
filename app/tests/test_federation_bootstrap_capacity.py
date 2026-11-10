@@ -66,11 +66,15 @@ def _profile_bootstrap(*, artists, albums, tracks, node_uid, deadline=600):
         get_global_catalog_counts,
         search_global_catalog,
     )
+    from crate.db.repositories.federation_catalog_fence import (
+        begin_catalog_sync_session,
+    )
     from crate.db.repositories.federation_manifest_import import (
         apply_federation_manifest_page,
     )
     from crate.db.tx import read_scope
 
+    sync_generation = begin_catalog_sync_session(node_uid)
     engine = get_engine()
     counters = {"queries": 0, "commits": 0}
     sql_seconds = Counter()
@@ -104,6 +108,7 @@ def _profile_bootstrap(*, artists, albums, tracks, node_uid, deadline=600):
                 items=page,
                 revision="capacity-revision",
                 sync_session_uid=sync_uid,
+                sync_generation=sync_generation,
                 checkpoint={
                     "next_page": pages,
                     "page_size": 500,

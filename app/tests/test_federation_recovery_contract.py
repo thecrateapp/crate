@@ -46,10 +46,17 @@ def test_failed_delta_page_rolls_back_items_and_cursor(pg_db):
     from crate.db.jobs.global_catalog_reconciliation import (
         apply_federation_delta_page,
     )
-    from crate.db.tx import read_scope
+    from crate.db.repositories.federation_catalog_fence import (
+        begin_catalog_sync_session,
+    )
+    from crate.db.tx import read_scope, transaction_scope
+    from tests.conftest import approve_federation_node
 
     peer_uid = str(uuid.uuid4())
     first_uid = f"artist-{uuid.uuid4()}"
+    with transaction_scope() as session:
+        approve_federation_node(session, peer_uid)
+    generation = begin_catalog_sync_session(peer_uid)
 
     with pytest.raises(ValueError, match="Invalid federation delta entity"):
         apply_federation_delta_page(
@@ -73,6 +80,7 @@ def test_failed_delta_page_rolls_back_items_and_cursor(pg_db):
                 },
             ],
             next_cursor="cursor-42",
+            sync_generation=generation,
         )
 
     with read_scope() as session:
@@ -86,10 +94,10 @@ def test_failed_delta_page_rolls_back_items_and_cursor(pg_db):
             ),
             {"node_uid": peer_uid, "entity_uid": first_uid},
         ).scalar_one()
-        cursor_count = session.execute(
+        stored_cursor = session.execute(
             text(
                 """
-                SELECT COUNT(*) FROM federation_catalog_cursors
+                SELECT cursor FROM federation_catalog_cursors
                 WHERE node_uid = CAST(:node_uid AS uuid)
                 """
             ),
@@ -97,7 +105,8 @@ def test_failed_delta_page_rolls_back_items_and_cursor(pg_db):
         ).scalar_one()
 
     assert item_count == 0
-    assert cursor_count == 0
+    # Only the session's fence row exists; the failed page wrote no cursor.
+    assert stored_cursor is None
 
 
 def test_partial_federated_search_is_not_cached_as_complete(monkeypatch):

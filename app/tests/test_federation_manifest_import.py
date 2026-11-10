@@ -7,6 +7,9 @@ from contextlib import contextmanager
 import pytest
 from sqlalchemy import event, text
 
+from crate.db.repositories.federation_catalog_fence import (
+    declare_catalog_maintenance_write,
+)
 from tests.conftest import approve_federation_node
 
 
@@ -14,6 +17,9 @@ from tests.conftest import approve_federation_node
 def peer(pg_db, monkeypatch):
     del pg_db
     from crate.db.repositories import tasks_mutations, tasks_shared
+    from crate.db.repositories.federation_catalog_fence import (
+        begin_catalog_sync_session,
+    )
     from crate.db.tx import transaction_scope
 
     dispatched = []
@@ -25,7 +31,8 @@ def peer(pg_db, monkeypatch):
     node_uid = str(uuid.uuid4())
     with transaction_scope() as session:
         approve_federation_node(session, node_uid)
-    return node_uid, dispatched
+    generation = begin_catalog_sync_session(node_uid)
+    return node_uid, dispatched, generation
 
 
 def _checkpoint(synced):
@@ -73,7 +80,7 @@ def test_manifest_page_preserves_metadata_and_projects_all_entity_types(peer):
     )
     from crate.db.tx import read_scope
 
-    node_uid, dispatched = peer
+    node_uid, dispatched, generation = peer
     sync_uid = str(uuid.uuid4())
     _cache(node_uid, "artist-1", "changed-cache")
     _cache(node_uid, "other-artist", "retained-cache")
@@ -108,6 +115,7 @@ def test_manifest_page_preserves_metadata_and_projects_all_entity_types(peer):
         items=items,
         revision="revision-1",
         sync_session_uid=sync_uid,
+        sync_generation=generation,
         checkpoint=_checkpoint(3),
     )
 
@@ -192,7 +200,7 @@ def test_manifest_page_rollback_preserves_checkpoint_cache_and_queue(peer):
     )
     from crate.db.tx import read_scope, transaction_scope
 
-    node_uid, dispatched = peer
+    node_uid, dispatched, generation = peer
     _cache(node_uid, "artist-1", "existing-cache")
     with (
         pytest.raises(RuntimeError, match="abort page"),
@@ -209,6 +217,7 @@ def test_manifest_page_rollback_preserves_checkpoint_cache_and_queue(peer):
             ],
             revision="new-revision",
             sync_session_uid=str(uuid.uuid4()),
+            sync_generation=generation,
             checkpoint=_checkpoint(1),
             session=session,
         )
@@ -219,7 +228,6 @@ def test_manifest_page_rollback_preserves_checkpoint_cache_and_queue(peer):
     with read_scope() as session:
         for table in (
             "federation_catalog_items",
-            "federation_catalog_cursors",
             "global_catalog_dirty_sources",
             "tasks",
             "domain_event_outbox",
@@ -227,6 +235,13 @@ def test_manifest_page_rollback_preserves_checkpoint_cache_and_queue(peer):
             assert (
                 session.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar_one() == 0
             )
+        # The session's fence row exists; the page never wrote a checkpoint.
+        assert (
+            session.execute(
+                text("SELECT cursor FROM federation_catalog_cursors")
+            ).scalar_one()
+            is None
+        )
         assert (
             session.execute(
                 text("SELECT cache_key FROM global_content_cache")
@@ -263,7 +278,7 @@ def test_manifest_page_query_and_commit_counts_do_not_grow_per_item(peer, reques
     )
     from crate.db.tx import read_scope
 
-    node_uid, dispatched = peer
+    node_uid, dispatched, generation = peer
     session_uid = str(uuid.uuid4())
     # Keep the real deduplicated projection task pending for both measurements.
     apply_federation_manifest_page(
@@ -271,6 +286,7 @@ def test_manifest_page_query_and_commit_counts_do_not_grow_per_item(peer, reques
         items=[{"entity_type": "artist", "entity_uid": "seed", "title": "Seed"}],
         revision="revision-1",
         sync_session_uid=session_uid,
+        sync_generation=generation,
     )
     measurements = []
     for size in (1, 200):
@@ -287,6 +303,7 @@ def test_manifest_page_query_and_commit_counts_do_not_grow_per_item(peer, reques
                 ],
                 revision="revision-1",
                 sync_session_uid=session_uid,
+                sync_generation=generation,
                 checkpoint=_checkpoint(size),
             )
         measurements.append(counts)
@@ -317,14 +334,17 @@ def test_manifest_page_last_duplicate_wins_and_reopens_completed_dirty_source(pe
     )
     from crate.db.tx import read_scope, transaction_scope
 
-    node_uid, _ = peer
+    node_uid, _, generation = peer
     apply_federation_manifest_page(
         node_uid=node_uid,
         items=[{"entity_type": "artist", "entity_uid": "artist-1", "title": "Before"}],
         revision="revision-1",
         sync_session_uid=str(uuid.uuid4()),
+        sync_generation=generation,
     )
     with transaction_scope() as session:
+        # Simulate an earlier tombstone written by a maintenance path.
+        declare_catalog_maintenance_write(session)
         session.execute(
             text(
                 'UPDATE federation_catalog_items SET deleted_at = NOW(), tombstone_json = \'{"reason":"old"}\'::jsonb'
@@ -350,6 +370,7 @@ def test_manifest_page_last_duplicate_wins_and_reopens_completed_dirty_source(pe
         ],
         revision="revision-2",
         sync_session_uid=sync_uid,
+        sync_generation=generation,
     )
 
     assert result["applied"] == 2
@@ -394,7 +415,7 @@ def test_manifest_page_rejects_unbounded_batches_without_writing(peer):
     )
     from crate.db.tx import read_scope
 
-    node_uid, _ = peer
+    node_uid, _, generation = peer
     with pytest.raises(ValueError, match="500"):
         apply_federation_manifest_page(
             node_uid=node_uid,
@@ -404,6 +425,7 @@ def test_manifest_page_rejects_unbounded_batches_without_writing(peer):
             ],
             revision="revision-1",
             sync_session_uid=str(uuid.uuid4()),
+            sync_generation=generation,
             checkpoint=_checkpoint(501),
         )
     with read_scope() as session:
@@ -422,12 +444,12 @@ def test_page_checkpoint_failure_rolls_back_import_cache_and_dispatch(peer):
     )
     from crate.db.tx import read_scope
 
-    node_uid, dispatched = peer
+    node_uid, dispatched, generation = peer
     _cache(node_uid, "artist-1", "cached-before-failure")
     engine = get_engine()
 
     def fail_checkpoint(_conn, _cursor, statement, *_args):
-        if "INSERT INTO federation_catalog_cursors" in statement:
+        if "UPDATE federation_catalog_cursors" in statement:
             raise RuntimeError("checkpoint connection lost")
 
     event.listen(engine, "before_cursor_execute", fail_checkpoint)
@@ -444,6 +466,7 @@ def test_page_checkpoint_failure_rolls_back_import_cache_and_dispatch(peer):
                 ],
                 revision="revision-1",
                 sync_session_uid=str(uuid.uuid4()),
+                sync_generation=generation,
                 checkpoint=_checkpoint(1),
             )
     finally:
@@ -453,7 +476,6 @@ def test_page_checkpoint_failure_rolls_back_import_cache_and_dispatch(peer):
     with read_scope() as session:
         for table in (
             "federation_catalog_items",
-            "federation_catalog_cursors",
             "global_catalog_dirty_sources",
             "tasks",
             "domain_event_outbox",
@@ -461,6 +483,13 @@ def test_page_checkpoint_failure_rolls_back_import_cache_and_dispatch(peer):
             assert (
                 session.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar_one() == 0
             )
+        # The session's fence row exists; the page never wrote a checkpoint.
+        assert (
+            session.execute(
+                text("SELECT cursor FROM federation_catalog_cursors")
+            ).scalar_one()
+            is None
+        )
         assert (
             session.execute(
                 text("SELECT cache_key FROM global_content_cache")
@@ -479,13 +508,14 @@ def test_manifest_update_keeps_inflight_claim_and_survives_its_completion(peer):
     )
     from crate.db.tx import read_scope, transaction_scope
 
-    node_uid, _ = peer
+    node_uid, _, generation = peer
     item = {"entity_type": "artist", "entity_uid": "artist-1", "title": "Original"}
     apply_federation_manifest_page(
         node_uid=node_uid,
         items=[item],
         revision="revision-1",
         sync_session_uid=str(uuid.uuid4()),
+        sync_generation=generation,
     )
     with transaction_scope() as session:
         original = claim_dirty_sources(10, session=session)[0]
@@ -495,6 +525,7 @@ def test_manifest_update_keeps_inflight_claim_and_survives_its_completion(peer):
         items=[item],
         revision="revision-2",
         sync_session_uid=str(uuid.uuid4()),
+        sync_generation=generation,
     )
     with read_scope() as session:
         claimed_at = session.execute(
