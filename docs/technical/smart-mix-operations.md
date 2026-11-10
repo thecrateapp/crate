@@ -1258,7 +1258,9 @@ On the project server (i7-7700, 4 cores and 8 threads) set `ANALYSIS_WORKER_PROC
 `.env` and recreate the service with `docker compose up -d crate-analysis-worker`.
 `docker-compose.project.yaml` gives it `cpus: "7.0"`, which leaves a logical CPU for Postgres and
 the API at night, and `mem_limit: 14g`, which covers the 1.5 GB at which each process recycles
-itself plus the parent with the import analysis daemons. Watch its memory during the first night
+itself plus the parent with the import analysis daemons. The limit is the process's current
+resident set after a task, and `ANALYSIS_WORKER_MAX_RSS_MB` in `.env` changes it (default 1500); a
+process over it finishes its task and exits, and only that process starts again. Watch its memory during the first night
 with `docker stats crate-analysis-worker`. Eight analyses on four cores share them through
 Hyper-Threading, so the night gains less than double the day's throughput.
 

@@ -48,3 +48,9 @@ def test_dev_llm_workers_receive_provider_environment() -> None:
     for service_name in ("worker", "maintenance-worker"):
         environment_keys = _environment_keys("docker-compose.dev.yaml", service_name)
         assert required_keys <= environment_keys
+
+
+def test_analysis_worker_receives_its_recycling_limit() -> None:
+    compose = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())
+    environment = compose["services"]["crate-analysis-worker"]["environment"]
+    assert "CRATE_WORKER_MAX_RSS_MB=${ANALYSIS_WORKER_MAX_RSS_MB:-1500}" in environment
