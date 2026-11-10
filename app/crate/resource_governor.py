@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 
 RESOURCE_GOVERNED_TASK_TYPES = frozenset(
     {
+        "backup_dump",
         "refresh_collection_insights",
         "backfill_track_audio_fingerprints",
         "backfill_smart_mix_profiles",
@@ -75,6 +76,8 @@ LISTENER_INSENSITIVE_GOVERNED_TASK_TYPES = frozenset({"generate_cast_spectrum"})
 
 MAINTENANCE_WINDOW_TASK_TYPES = frozenset(
     {
+        # The nightly database dump (admin backups, BK1) runs inside the window.
+        "backup_dump",
         "batch_retag",
         "export_rich_metadata",
         "fix_issues",

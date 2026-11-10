@@ -246,6 +246,11 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Daily retention of AI refinements (SM3-D5): records queued reads, then
     # deletes rows unread for 180 days. No model call.
     "cleanup_smart_mix_refinements": TaskPoolConfig("maintenance", 3, 600, 0),
+    # Backups engine (admin backups, BK1): pg_dump of the database and the
+    # grandfather-father-son pruning of the local dumps. Scheduled work, priority 2;
+    # no retries, a failed run waits for the next schedule or a manual run.
+    "backup_dump": TaskPoolConfig("maintenance", 2, 14400, 0),
+    "backup_local_retention": TaskPoolConfig("maintenance", 2, 600, 0),
     "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
     "index_genres": TaskPoolConfig("maintenance", 3, 600, 0),
     "infer_genre_taxonomy": TaskPoolConfig("ai_bulk", 3, 3600, 0),
