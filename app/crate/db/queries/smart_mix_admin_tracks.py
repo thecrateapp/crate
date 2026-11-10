@@ -26,10 +26,12 @@ SMART_MIX_TRACK_STATUSES = (
     "failed",
 )
 # At the target but on the analyzer's own beats, within the length Beat This! runs
-# on: the backfill still owes the track the model's beats, so it is outdated.
+# on: where the model runs, the backfill still owes the track its beats, so it is
+# outdated (``smart_mix_awaits_model_beats``).
 _AWAITS_MODEL_BEATS = """
     (
-        profile.beat_tracker IS NULL
+        CAST(:awaits_model_beats AS boolean)
+        AND profile.beat_tracker IS NULL
         AND COALESCE(track.duration, 0) <= :model_beats_max_seconds
     )
 """
@@ -71,6 +73,7 @@ def list_smart_mix_tracks(
     search: str | None = None,
     before_track_id: int | None = None,
     limit: int = 50,
+    awaits_model_beats: bool = True,
     session: Session | None = None,
 ) -> list[dict]:
     if status not in _STATUS_PREDICATES:
@@ -81,6 +84,7 @@ def list_smart_mix_tracks(
         "pipeline": SMART_MIX_PIPELINE,
         "limit": int(limit),
         "model_beats_max_seconds": MODEL_BEATS_MAX_SECONDS,
+        "awaits_model_beats": bool(awaits_model_beats),
     }
     predicates = [_STATUS_PREDICATES[status]]
     if before_track_id is not None:
@@ -141,7 +145,10 @@ def list_smart_mix_tracks(
             .mappings()
             .all()
         )
-        return [_track_status(dict(row)) for row in rows]
+        return [
+            _track_status(dict(row), awaits_model_beats=awaits_model_beats)
+            for row in rows
+        ]
 
     if session is not None:
         return _impl(session)
@@ -149,7 +156,7 @@ def list_smart_mix_tracks(
         return _impl(current)
 
 
-def _track_status(row: dict) -> dict:
+def _track_status(row: dict, *, awaits_model_beats: bool) -> dict:
     if row["analyzer_version"] is None:
         status = "missing"
     elif row["quality"] == "unavailable":
@@ -160,7 +167,8 @@ def _track_status(row: dict) -> dict:
         row["analyzer_version"] != SMART_MIX_ANALYZER_VERSION
         or row["profile_version"] != SMART_MIX_PROFILE_VERSION
         or (
-            row.get("beat_tracker") is None
+            awaits_model_beats
+            and row.get("beat_tracker") is None
             and (row.get("duration") or 0) <= MODEL_BEATS_MAX_SECONDS
         )
     ):

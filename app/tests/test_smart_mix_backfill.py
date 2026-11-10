@@ -3039,3 +3039,80 @@ def test_campaign_stores_the_night_window_and_keeps_it_when_omitted(pg_db) -> No
         restarted["day_concurrency"],
     ) == (ACROSS_MIDNIGHT, 6, 3)
     assert get_smart_mix_campaign()["day_concurrency"] == 3
+
+
+@pytest.mark.parametrize(
+    ("recorded", "current"),
+    [
+        # No pass has said yet: production has the model, so the profile still owes
+        # its beats.
+        (None, False),
+        (True, False),
+        # ARM images, PANNS=off, missing weights: nothing would ever upgrade it.
+        (False, True),
+    ],
+)
+def test_own_tracker_profiles_await_the_model_only_where_it_runs(
+    pg_db, tmp_path: Path, recorded, current
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        refresh_smart_mix_coverage,
+        save_smart_mix_campaign,
+    )
+
+    own, phrased = _create_tracks(tmp_path, count=2)
+    _insert_profile(own, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    _insert_profile(phrased, analyzer_version=ANALYZER_VERSION, beat_tracker=None)
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE track_mix_profiles SET phrases = CAST(:one AS jsonb) "
+                "WHERE track_id = :track_id"
+            ),
+            {
+                "track_id": phrased,
+                "one": '[{"start_beat": 0, "start_ms": 0, "bars": 8, '
+                '"energy": 0.5, "delta_energy": null, "kind": "body"}]',
+            },
+        )
+    if recorded is not None:
+        save_smart_mix_campaign(_completed_campaign(beat_model_available=recorded))
+
+    snapshot = refresh_smart_mix_coverage(max_attempts=3)
+
+    assert snapshot["current_profiles"] == (2 if current else 0)
+    assert snapshot["outdated_profiles"] == (0 if current else 2)
+    assert snapshot["structure_profiles"] == (1 if current else 0)
+
+
+@pytest.mark.parametrize(
+    ("campaign", "awaits"),
+    [
+        (None, True),
+        ({"beat_model_available": True}, True),
+        ({"beat_model_available": False}, False),
+        ({}, True),
+    ],
+)
+def test_model_beats_are_awaited_unless_a_pass_found_no_model(campaign, awaits) -> None:
+    from crate.db.jobs.smart_mix_backfill import smart_mix_awaits_model_beats
+
+    assert smart_mix_awaits_model_beats(campaign) is awaits
+
+
+def test_a_new_campaign_keeps_the_recorded_model_availability(pg_db) -> None:
+    # It describes the machine, like the night window: a new campaign must not
+    # forget it until its first pass.
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        save_smart_mix_campaign,
+        start_smart_mix_campaign,
+    )
+
+    save_smart_mix_campaign(_completed_campaign(beat_model_available=False))
+
+    campaign = start_smart_mix_campaign(batch_size=25, max_attempts=3)
+
+    assert campaign["batches"] == 0
+    assert campaign["beat_model_available"] is False

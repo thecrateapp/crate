@@ -267,6 +267,18 @@ def test_track_list_classifies_profiles_and_filters_by_status(pg_db) -> None:
         ), status
     by_version = list_smart_mix_tracks(analyzer_version="smart-mix-audio-v3")
     assert [row["track_id"] for row in by_version] == [outdated]
+    # Where the model cannot run, nothing would ever upgrade the analyzer's own
+    # beats: the profile is current.
+    no_model = {
+        row["track_id"]: row
+        for row in list_smart_mix_tracks(limit=100, awaits_model_beats=False)
+    }
+    assert no_model[own]["status"] == "current"
+    for status, expected in (("current", [own, current]), ("outdated", [outdated])):
+        rows = list_smart_mix_tracks(status=status, limit=100, awaits_model_beats=False)
+        assert [row["track_id"] for row in rows if row["track_id"] in every] == (
+            expected
+        ), status
 
 
 def test_track_list_searches_and_pages_by_track_id(pg_db) -> None:
@@ -306,6 +318,7 @@ def test_track_route_pages_and_rejects_short_searches(test_app, monkeypatch) -> 
         ][: kwargs["limit"]]
 
     monkeypatch.setattr(smart_mix_admin, "list_smart_mix_tracks", fake_list)
+    monkeypatch.setattr(smart_mix_admin, "smart_mix_awaits_model_beats", lambda: False)
 
     page = test_app.get("/api/admin/smart-mix/tracks?status=missing&q=Fazer&limit=2")
     short = test_app.get("/api/admin/smart-mix/tracks?q=ab")
@@ -320,6 +333,7 @@ def test_track_route_pages_and_rejects_short_searches(test_app, monkeypatch) -> 
         "search": "Fazer",
         "before_track_id": None,
         "limit": 3,
+        "awaits_model_beats": False,
     }
     assert short.status_code == 422
     assert unknown.status_code == 422

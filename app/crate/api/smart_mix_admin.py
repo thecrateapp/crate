@@ -20,6 +20,7 @@ from crate.db.jobs.smart_mix_backfill import (
     campaign_targets_current,
     queue_next_smart_mix_batch,
     set_smart_mix_campaign_status,
+    smart_mix_awaits_model_beats,
     smart_mix_profile_dedup_key,
     start_smart_mix_campaign,
 )
@@ -154,6 +155,7 @@ def smart_mix_tracks(
         search=q.strip() if q else None,
         before_track_id=before,
         limit=limit + 1,
+        awaits_model_beats=smart_mix_awaits_model_beats(),
     )
     page = rows[:limit]
     return SmartMixTrackListResponse.model_validate(
