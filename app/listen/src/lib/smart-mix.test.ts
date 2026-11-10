@@ -14,6 +14,7 @@ import {
   SMART_TRANSITION_LONG_SECONDS,
   SMART_TRANSITION_SHORT_SECONDS,
   keepServerPlans,
+  resolvePlannerVersion,
   SmartMixTransitionPlanner,
   type SmartMixCapabilities,
   type SmartMixRequest,
@@ -35,6 +36,12 @@ const ENABLED_CAPABILITIES: SmartMixCapabilities = {
   androidBassHandoff: false,
   androidLongBeatmatch: false,
   plannerVersion: "smart-mix-v2",
+};
+
+const V3_CAPABILITIES: SmartMixCapabilities = {
+  ...ENABLED_CAPABILITIES,
+  plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+  listenPlannerVersion: "smart-mix-v3",
 };
 
 const PLAYLIST_SOURCE: PlaySource = {
@@ -878,5 +885,55 @@ describe("effective Smart Mix capabilities", () => {
     setNativeSmartMixEnabledPreference(false);
 
     expect(getSmartMixCapabilities().androidNativeCrossfade).toBe(true);
+  });
+});
+
+describe("resolvePlannerVersion", () => {
+  it("uses the planner the server recommends for Listen", () => {
+    expect(resolvePlannerVersion(V3_CAPABILITIES)).toBe("smart-mix-v3");
+  });
+
+  it("stays on smart-mix-v2 on a server without a Listen recommendation", () => {
+    expect(
+      resolvePlannerVersion({
+        ...ENABLED_CAPABILITIES,
+        plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+      }),
+    ).toBe("smart-mix-v2");
+  });
+
+  it("ignores a recommendation the server does not list or the client does not know", () => {
+    expect(
+      resolvePlannerVersion({
+        ...V3_CAPABILITIES,
+        plannerVersions: ["smart-mix-v2"],
+      }),
+    ).toBe("smart-mix-v2");
+    expect(
+      resolvePlannerVersion({
+        ...V3_CAPABILITIES,
+        plannerVersions: ["smart-mix-v2", "smart-mix-v9"],
+        listenPlannerVersion: "smart-mix-v9",
+      }),
+    ).toBe("smart-mix-v2");
+  });
+
+  it("has no planner while Smart Mix is off", () => {
+    expect(
+      resolvePlannerVersion({ ...ENABLED_CAPABILITIES, plannerVersion: null }),
+    ).toBeNull();
+  });
+
+  it("normalises a server without the new fields", () => {
+    setSmartMixCapabilities(ENABLED_CAPABILITIES);
+    expect(getServerSmartMixCapabilities()).toMatchObject({
+      plannerVersions: [],
+      listenPlannerVersion: null,
+    });
+    setSmartMixCapabilities(V3_CAPABILITIES);
+    expect(getServerSmartMixCapabilities()).toMatchObject({
+      plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+      listenPlannerVersion: "smart-mix-v3",
+    });
   });
 });

@@ -41,6 +41,13 @@ const KEY_TO_PITCH_CLASS: Record<string, number> = {
   cb: 11,
 };
 
+export type SmartMixPlannerIdentifier = "smart-mix-v2" | "smart-mix-v3";
+
+const SUPPORTED_PLANNERS: readonly SmartMixPlannerIdentifier[] = [
+  "smart-mix-v2",
+  "smart-mix-v3",
+];
+
 export interface SmartMixCapabilities {
   available: boolean;
   androidNativeCrossfade: boolean;
@@ -48,6 +55,9 @@ export interface SmartMixCapabilities {
   androidBassHandoff: boolean;
   androidLongBeatmatch: boolean;
   plannerVersion?: string | null;
+  // Planners the server accepts, and the one it recommends for Listen (LV-D1).
+  plannerVersions?: string[];
+  listenPlannerVersion?: string | null;
 }
 
 const DISABLED_SMART_MIX_CAPABILITIES: SmartMixCapabilities = {
@@ -57,7 +67,35 @@ const DISABLED_SMART_MIX_CAPABILITIES: SmartMixCapabilities = {
   androidBassHandoff: false,
   androidLongBeatmatch: false,
   plannerVersion: null,
+  plannerVersions: [],
+  listenPlannerVersion: null,
 };
+
+function isSupportedPlanner(
+  planner: string | null | undefined,
+): planner is SmartMixPlannerIdentifier {
+  return SUPPORTED_PLANNERS.includes(planner as SmartMixPlannerIdentifier);
+}
+
+/**
+ * The planner Listen plans with: the server's recommendation for Listen when this
+ * client knows it and the server lists it, else the server's default planner when
+ * this client knows it (older servers: smart-mix-v2), else none.
+ */
+export function resolvePlannerVersion(
+  capabilities: SmartMixCapabilities,
+): SmartMixPlannerIdentifier | null {
+  const recommended = capabilities.listenPlannerVersion;
+  if (
+    isSupportedPlanner(recommended) &&
+    (capabilities.plannerVersions ?? []).includes(recommended)
+  ) {
+    return recommended;
+  }
+  return isSupportedPlanner(capabilities.plannerVersion)
+    ? capabilities.plannerVersion
+    : null;
+}
 
 let smartMixCapabilities = DISABLED_SMART_MIX_CAPABILITIES;
 const capabilityListeners = new Set<
@@ -74,6 +112,8 @@ export function setSmartMixCapabilities(
     androidBassHandoff: capabilities.androidBassHandoff === true,
     androidLongBeatmatch: capabilities.androidLongBeatmatch === true,
     plannerVersion: capabilities.plannerVersion ?? null,
+    plannerVersions: [...(capabilities.plannerVersions ?? [])],
+    listenPlannerVersion: capabilities.listenPlannerVersion ?? null,
   };
   notifyCapabilityListeners();
 }

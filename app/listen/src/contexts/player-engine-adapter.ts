@@ -345,7 +345,9 @@ function sameCapabilities(
     left.androidBeatmatch === right.androidBeatmatch &&
     left.androidBassHandoff === right.androidBassHandoff &&
     left.androidLongBeatmatch === right.androidLongBeatmatch &&
-    left.plannerVersion === right.plannerVersion
+    left.plannerVersion === right.plannerVersion &&
+    left.listenPlannerVersion === right.listenPlannerVersion &&
+    (left.plannerVersions ?? []).join() === (right.plannerVersions ?? []).join()
   );
 }
 
