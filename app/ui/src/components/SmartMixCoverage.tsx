@@ -56,6 +56,9 @@ interface SmartMixAdminStatus {
   versions?: SmartMixVersionCount[];
   refreshedAt: string | null;
   controlState: SmartMixControlState;
+  // The stored campaign; a completed one reopens by itself when tracks become
+  // claimable, until it is paused.
+  campaign?: { target: string; status: string } | null;
   activeTask: {
     id: string;
     status: string;
@@ -150,6 +153,10 @@ export function SmartMixCoverage() {
   }
 
   const percent = Math.max(0, Math.min(data.coveragePercent, 100));
+  const reopens =
+    data.controlState === "idle" &&
+    data.campaign?.status === "completed" &&
+    data.campaign.target === data.analyzerVersion;
 
   return (
     <div className="space-y-4">
@@ -187,6 +194,23 @@ export function SmartMixCoverage() {
                 />
               ) : null}
               Start backfill
+            </Button>
+          ) : null}
+          {reopens ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={activeAction !== null}
+              onClick={() => void runAction("pause")}
+            >
+              {activeAction === "pause" ? (
+                <Loader2
+                  data-admin-ux="mix-pause-reopening-loading"
+                  className="animate-spin"
+                />
+              ) : null}
+              Pause reopening
             </Button>
           ) : null}
           {data.controlState === "paused" ? (

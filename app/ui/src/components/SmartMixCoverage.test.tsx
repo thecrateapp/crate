@@ -142,6 +142,55 @@ describe("SmartMixCoverage", () => {
     expect(refetchMock).toHaveBeenCalled();
   });
 
+  it("pauses the automatic reopening of a completed campaign", async () => {
+    const user = userEvent.setup();
+    useApiMock.mockReturnValue({
+      data: {
+        ...status,
+        controlState: "idle",
+        activeTask: null,
+        campaign: { target: "smart-mix-v1", status: "completed" },
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    apiMock.mockResolvedValue({ taskId: null, status: "paused" });
+
+    render(<SmartMixCoverage />);
+
+    expect(
+      screen.getByRole("button", { name: "Start backfill" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Pause reopening" }));
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/smart-mix/backfill/pause",
+        "POST",
+      );
+    });
+    expect(refetchMock).toHaveBeenCalled();
+  });
+
+  it.each([
+    { target: "smart-mix-v0", status: "completed" },
+    { target: "smart-mix-v1", status: "cancelled" },
+  ])("offers no reopening pause for $status $target", (campaign) => {
+    useApiMock.mockReturnValue({
+      data: { ...status, controlState: "idle", activeTask: null, campaign },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(<SmartMixCoverage />);
+
+    expect(
+      screen.queryByRole("button", { name: "Pause reopening" }),
+    ).toBeNull();
+  });
+
   it("counts full and partial over current profiles only", () => {
     useApiMock.mockReturnValue({
       data: {

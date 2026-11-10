@@ -718,15 +718,47 @@ def test_pause_cancel_and_resume_drive_the_campaign(test_app, monkeypatch) -> No
 
     assert paused.json()["status"] == "paused"
     assert cancelled.json()["status"] == "cancelled"
+    # A completed campaign can be paused or cancelled too: that stops the automatic
+    # reopening.
     assert transitions == [
-        ("paused", {"running"}),
-        ("cancelled", {"running", "paused"}),
+        ("paused", {"running", "completed"}),
+        ("cancelled", {"running", "paused", "completed"}),
     ]
     assert resumed.json() == {
         "taskId": "task-resumed",
         "status": "resumed",
         "deduplicated": False,
     }
+
+
+@pytest.mark.parametrize("action", ["pause", "cancel"])
+def test_stopping_a_completed_campaign_stops_its_reopening(
+    pg_db, test_app, action
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+        wake_smart_mix_backfill,
+    )
+    from crate.smart_mix.versions import PROFILE_SCHEMA_VERSION
+
+    save_smart_mix_campaign(
+        {
+            **_campaign("completed"),
+            "profile_version": PROFILE_SCHEMA_VERSION,
+            "completed_at": "2026-11-10T08:00:00+00:00",
+            "beat_model_available": True,
+        }
+    )
+
+    response = test_app.post(f"/api/admin/smart-mix/backfill/{action}")
+
+    assert response.status_code == 200
+    expected = {"pause": "paused", "cancel": "cancelled"}[action]
+    assert response.json()["status"] == expected
+    assert get_smart_mix_campaign()["status"] == expected
+    assert wake_smart_mix_backfill() is None
 
 
 def test_pause_without_a_running_campaign_conflicts(test_app, monkeypatch) -> None:

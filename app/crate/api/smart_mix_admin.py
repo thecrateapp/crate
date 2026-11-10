@@ -270,13 +270,15 @@ def resume_smart_mix_backfill(
 @router.post("/backfill/pause", response_model=SmartMixBackfillResponse)
 def pause_smart_mix_backfill(request: Request) -> SmartMixBackfillResponse:
     _require_manage(request)
-    return _stop_backfill("paused", allowed_from={"running"})
+    # A completed campaign reopens by itself when tracks become claimable; pausing or
+    # cancelling it stops that (``wake_smart_mix_backfill``).
+    return _stop_backfill("paused", allowed_from={"running", "completed"})
 
 
 @router.post("/backfill/cancel", response_model=SmartMixBackfillResponse)
 def cancel_smart_mix_backfill(request: Request) -> SmartMixBackfillResponse:
     _require_manage(request)
-    return _stop_backfill("cancelled", allowed_from={"running", "paused"})
+    return _stop_backfill("cancelled", allowed_from={"running", "paused", "completed"})
 
 
 def _queue_backfill(
