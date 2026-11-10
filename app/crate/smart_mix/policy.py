@@ -163,6 +163,14 @@ class PlannerPolicy:
     # Decks"): the context sources the layer serves. Listen's short blends measured
     # worse with it on the industrial set; Android and VirtualDJ never ask for it.
     stems_layer_sources: tuple[str, ...] = ("decks",)
+    # Listen's caps (LV-D9, LV-G1 2026-11-10: 10 s and 20 s): the most incoming intro a
+    # served v3 plan skips and the most outgoing outro it cuts, measured as
+    # ``evaluation.music_left_out`` does. For a capped source the menu serves its
+    # best candidate within both caps, else v2's own plan. None turns them off (v2).
+    listen_max_skipped_intro_ms: int | None = None
+    listen_max_unplayed_outro_ms: int | None = None
+    # Sources the caps never apply to: Crate Decks keeps v3's own menu.
+    listen_cap_exempt_sources: tuple[str, ...] = ("decks",)
 
 
 PLANNER_POLICY = PlannerPolicy()
@@ -172,12 +180,15 @@ PLANNER_POLICY = PlannerPolicy()
 # it to the beatmatch family and takes voice from the vocal stem or YAMNet; revision 4
 # lets the machine-drum industrial family in (candidates.stems_gate_prior); revision 5
 # serves the layer to Crate Decks only. Without stems on both tracks, outside the family
-# or for any other client, its menus are revision 1's.
+# or for any other client, its menus are revision 1's. Revision 6 (LV-G1) serves every
+# source but Crate Decks within Listen's caps, so Decks' menus stay revision 5's.
 PLANNER_POLICY_V3 = replace(
     PLANNER_POLICY,
     identifier="smart-mix-v3",
-    rules_revision=5,
+    rules_revision=6,
     stems_layer=True,
+    listen_max_skipped_intro_ms=10_000,
+    listen_max_unplayed_outro_ms=20_000,
 )
 
 

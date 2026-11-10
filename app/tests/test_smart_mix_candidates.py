@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 from crate.smart_mix.candidates import plan_transition_candidates
-from crate.smart_mix.evaluation import phrase_alignment, policy_violations
+from crate.smart_mix.evaluation import (
+    music_left_out,
+    phrase_alignment,
+    policy_violations,
+)
 from crate.smart_mix.evaluation import vocal_clash_ms
 from crate.smart_mix.models import (
     TrackMixProfile,
@@ -75,8 +79,9 @@ def test_v3_policy_copies_the_v2_safety_limits() -> None:
     assert PLANNER_POLICY_V3.identifier == "smart-mix-v3"
     # Revision 2 added the stems layer (Smart Mix Stems, ST3); revision 3 keeps it to
     # the beatmatch family with voice from either detector (STEM-G1); revision 4 lets
-    # the machine-drum industrial family in; revision 5 serves it to Crate Decks only.
-    assert PLANNER_POLICY_V3.rules_revision == 5
+    # the machine-drum industrial family in; revision 5 serves it to Crate Decks only;
+    # revision 6 serves every other source within Listen's caps (LV-G1).
+    assert PLANNER_POLICY_V3.rules_revision == 6
     assert PLANNER_POLICY_V3.phrase_lengths == (8, 16, 32)
     assert PLANNER_POLICY_V3.max_candidates == 8
     for name in (
@@ -125,11 +130,16 @@ def test_all_candidates_pass_policy(
             == ()
         )
     scores = [candidate.score for candidate in candidates]
-    structured = [candidate for candidate in candidates if candidate.structure_used]
+    assert all(0.0 <= score <= 1.0 for score in scores)
+    # The ranking itself, before Listen's caps reorder it (LV-D9).
+    ranked = _candidates(outgoing, incoming, ctx, _uncapped())
+    structured = [candidate for candidate in ranked if candidate.structure_used]
     assert [candidate.score for candidate in structured] == sorted(
         (candidate.score for candidate in structured), reverse=True
     )
-    assert all(0.0 <= score <= 1.0 for score in scores)
+    assert {c.to_plan() for c in candidates} <= {c.to_plan() for c in ranked} | {
+        _v2(outgoing, incoming, ctx, PLANNER_POLICY_V3)
+    }
 
 
 def test_at_most_eight_candidates() -> None:
@@ -288,3 +298,130 @@ def test_candidates_deterministic() -> None:
     assert _candidates(with_grid, incoming, context()) == _candidates(
         outgoing, incoming, context()
     )
+
+
+# --- Listen's caps (LV-D9, LV-G1: 10 s of intro, 20 s of outro) ---------------
+
+
+def _uncapped() -> object:
+    return replace(
+        PLANNER_POLICY_V3,
+        listen_max_skipped_intro_ms=None,
+        listen_max_unplayed_outro_ms=None,
+    )
+
+
+def _within_caps(
+    candidate: TransitionCandidate,
+    outgoing: TrackMixProfile,
+    incoming: TrackMixProfile,
+    intro_ms: int = 10_000,
+    outro_ms: int = 20_000,
+) -> bool:
+    left_out = music_left_out(candidate.to_plan(), outgoing, incoming)
+    assert left_out is not None
+    return (
+        left_out.incoming_skipped_ms <= intro_ms
+        and left_out.outgoing_unplayed_ms <= outro_ms
+    )
+
+
+def test_v3_policy_carries_listen_caps_and_v2_none() -> None:
+    assert PLANNER_POLICY_V3.listen_max_skipped_intro_ms == 10_000
+    assert PLANNER_POLICY_V3.listen_max_unplayed_outro_ms == 20_000
+    assert PLANNER_POLICY_V3.listen_cap_exempt_sources == ("decks",)
+    assert PLANNER_POLICY.listen_max_skipped_intro_ms is None
+    assert PLANNER_POLICY.listen_max_unplayed_outro_ms is None
+    # The caps change v3's served plans, so they come with a new rules revision.
+    assert PLANNER_POLICY_V3.rules_revision == 6
+
+
+# An outgoing track whose last phrases are a short break and a short outro: v3's first
+# choice mixes at the outro and cuts 9.4 s; its menu also mixes at the very end.
+SHORT_OUTRO_LAYOUT: tuple[tuple[str, int, float], ...] = (
+    ("intro", 16, 0.45),
+    ("build", 8, 0.6),
+    ("peak", 32, 0.8),
+    ("break", 8, 0.5),
+    ("outro", 8, 0.5),
+)
+
+
+@pytest.mark.parametrize(
+    "source", ["playlist", "radio", "shuffle", "manual", "infinite"]
+)
+def test_listen_caps_serve_the_best_candidate_within_them(source) -> None:
+    outgoing = profile(OUTGOING_UID, layout=SHORT_OUTRO_LAYOUT)
+    incoming = profile(INCOMING_UID, layout=INCOMING_LAYOUT)
+    ctx = replace(context(**LISTEN), source=source)
+    # Caps tighter than LV-G1's, so that v3's own first choice breaks them.
+    policy = replace(
+        PLANNER_POLICY_V3,
+        listen_max_skipped_intro_ms=10_000,
+        listen_max_unplayed_outro_ms=5_000,
+    )
+    uncapped = _candidates(outgoing, incoming, ctx, _uncapped())
+    assert not _within_caps(uncapped[0], outgoing, incoming, 10_000, 5_000)
+    within = [c for c in uncapped if _within_caps(c, outgoing, incoming, 10_000, 5_000)]
+    assert within
+
+    capped = _candidates(outgoing, incoming, ctx, policy)
+
+    assert [c.index for c in capped] == list(range(len(capped)))
+    assert len(capped) <= PLANNER_POLICY_V3.max_candidates
+    # The candidates within both caps first, in their rank order, then the rest.
+    assert [c.to_plan() for c in capped[: len(within)]] == [c.to_plan() for c in within]
+    assert {c.to_plan() for c in capped} == {c.to_plan() for c in uncapped}
+    assert (
+        plan_transition_v3(
+            outgoing,
+            incoming,
+            ctx,
+            outgoing_track_entity_uid=OUTGOING_UID,
+            incoming_track_entity_uid=INCOMING_UID,
+            policy=policy,
+        ).plan
+        == within[0].to_plan()
+    )
+    # Crate Decks keeps v3's own order.
+    decks = _candidates(outgoing, incoming, replace(ctx, source="decks"), policy)
+    assert [c.to_plan() for c in decks] == [c.to_plan() for c in uncapped]
+
+
+def test_listen_caps_fall_back_to_v2s_plan() -> None:
+    outgoing = profile(OUTGOING_UID, layout=OUTGOING_LAYOUT)
+    incoming = profile(INCOMING_UID, layout=INCOMING_LAYOUT)
+    ctx = context(**LISTEN)
+    # Caps no plan keeps: the served plan is v2's own, even beyond the caps.
+    strict = replace(
+        PLANNER_POLICY_V3,
+        listen_max_skipped_intro_ms=-1,
+        listen_max_unplayed_outro_ms=-1,
+    )
+    uncapped = _candidates(outgoing, incoming, ctx, _uncapped())
+
+    capped = _candidates(outgoing, incoming, ctx, strict)
+
+    v2_plan = plan_transition(
+        outgoing,
+        incoming,
+        ctx,
+        outgoing_track_entity_uid=OUTGOING_UID,
+        incoming_track_entity_uid=INCOMING_UID,
+        policy=strict,
+    )
+    assert capped[0].to_plan() == v2_plan
+    assert [c.index for c in capped] == list(range(len(capped)))
+    # The rest keep their rank order after it.
+    rest = [c.to_plan() for c in uncapped if c.to_plan() != v2_plan]
+    assert [c.to_plan() for c in capped[1:]] == rest[: len(capped) - 1]
+
+
+def test_v2_ignores_the_listen_caps() -> None:
+    plans = {
+        name: _v2(outgoing, incoming, ctx).to_dict()
+        for name, outgoing, incoming, ctx in CASES
+    }
+
+    assert plans == GOLDEN_V2
+    assert PLANNER_POLICY.listen_max_skipped_intro_ms is None
