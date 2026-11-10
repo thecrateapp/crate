@@ -682,7 +682,7 @@ services:
       - SENTRY_SERVICE=worker-fast
     mem_limit: 768m
     mem_reservation: 256m
-    cpus: "0.35"
+    cpus: "${FAST_WORKER_CPUS:-0.5}"
     command:
       [
         "worker",
