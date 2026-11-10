@@ -1599,6 +1599,10 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 - **Without phrases on both tracks** (v5 and v6 profiles, unsegmented tracks, 3/4) the menu is
   v2's bar heuristic with v2's plan first, so v3 plans exactly as v2. Album, manual and missing
   profile transitions keep v2's single plan.
+- **Listen** asks for the planner in `/api/capabilities` `smart_mix.listen_planner_version`:
+  `smart-mix-v3` when `CRATE_LISTEN_SMART_MIX_V3_ENABLED` is on, `smart-mix-v2` otherwise, and
+  v2 when the field is absent (older servers). `planner_version` and VirtualDJ's
+  `vdj.planner_version` stay on v2 whatever the switch says, so older APKs never change planner.
 - **Safety**: every candidate goes through `TransitionPlan` and the planner policy
   (`evaluation.policy_violations`); v3 copies v2's limits on tempo, gain, true peak and
   durations.
@@ -1768,7 +1772,12 @@ authentication.
 `CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED`; beatmatch depends on both and on
 `CRATE_ANDROID_BEATMATCH_ENABLED`; bass handoff adds `CRATE_ANDROID_BASS_HANDOFF_ENABLED`.
 The configuration helpers default to false. VirtualDJ also uses `CRATE_VDJ_ENABLED` and, for
-automation, `CRATE_VDJ_AUTOMATION_ENABLED`. The client applies the user's preferences.
+automation, `CRATE_VDJ_AUTOMATION_ENABLED`.
+`CRATE_LISTEN_SMART_MIX_V3_ENABLED` (default false) moves only Listen to `smart-mix-v3`: with it
+on, `/api/capabilities` gives `smart_mix.listen_planner_version: "smart-mix-v3"`, and Listen
+uses it for its plan batches and its native continuation from its next app start. Rollback:
+turn it off and restart `crate-api`; clients go back to v2 at their next app start, with no app
+release. The client applies the user's preferences.
 Do not infer deployed values from defaults or from the existence of the code.
 
 The plan keeps an R1 physical gate that was deferred on 18 October: an external capture of the
