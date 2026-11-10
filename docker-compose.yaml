@@ -247,10 +247,16 @@ services:
       - POSTGRES_USER=${CRATE_POSTGRES_USER}
       - POSTGRES_PASSWORD=${CRATE_POSTGRES_PASSWORD}
       - SCHEDULE=@daily
-      - BACKUP_KEEP_DAYS=7
-      - BACKUP_KEEP_WEEKS=4
+      # Retention counts days, ISO weeks and months of dumps; the image hard-links
+      # one dump into daily/, weekly/ and monthly/, so overlaps cost no extra space.
+      - BACKUP_KEEP_DAYS=${POSTGRES_BACKUP_KEEP_DAYS:-3}
+      - BACKUP_KEEP_WEEKS=${POSTGRES_BACKUP_KEEP_WEEKS:-4}
+      - BACKUP_KEEP_MONTHS=${POSTGRES_BACKUP_KEEP_MONTHS:-3}
+      - POSTGRES_EXTRA_OPTS=${POSTGRES_BACKUP_EXTRA_OPTS:--Z6}
     volumes:
-      - ${DATA_DIR}/backups/postgres:/backups
+      # A host path (default) or the named volume `crate_postgres_backups`. Never
+      # point it inside MUSIC_DIR: dumps hold credentials and the library is shared.
+      - ${POSTGRES_BACKUP_DIR:-${DATA_DIR}/backups/postgres}:/backups
     networks:
       - crate
     depends_on:
@@ -682,7 +688,7 @@ services:
       - SENTRY_SERVICE=worker-fast
     mem_limit: 768m
     mem_reservation: 256m
-    cpus: "0.35"
+    cpus: "${FAST_WORKER_CPUS:-0.5}"
     command:
       [
         "worker",
@@ -1183,4 +1189,6 @@ volumes:
   crate_redis_durable:
     driver: local
   crate_postgres:
+    driver: local
+  crate_postgres_backups:
     driver: local

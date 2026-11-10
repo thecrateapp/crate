@@ -107,7 +107,7 @@ from crate.streaming.service import (
     prepare_playback,
     resolution_to_payload,
     resolve_playback,
-    resolve_source_path,
+    stat_playable_sources,
 )
 
 log = logging.getLogger(__name__)
@@ -171,23 +171,18 @@ def _queue_completeness_refresh() -> str:
     return task_id
 
 
-def _has_playable_audio(path: str | None) -> bool:
-    # Same check as the stream endpoints: a regular file inside the library.
-    try:
-        source = resolve_source_path({"path": path})
-        return source is not None and source.is_file()
-    except (OSError, ValueError):
-        return False
-
-
 def _with_playable_audio(tracks: list[dict]) -> list[dict]:
-    """Replace each server path with `playable` (S9); never leak the path."""
+    """Replace each server path with `playable` (S9); never leak the path.
+
+    Same check as the stream endpoints: a regular file inside the library.
+    """
+    stats = stat_playable_sources([track.get("path") for track in tracks])
     return [
         {
             **{key: value for key, value in track.items() if key != "path"},
-            "playable": _has_playable_audio(track.get("path")),
+            "playable": file_stat is not None,
         }
-        for track in tracks
+        for track, file_stat in zip(tracks, stats, strict=True)
     ]
 
 
