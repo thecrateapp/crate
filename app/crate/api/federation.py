@@ -33,6 +33,7 @@ from crate.api.schemas.federation import (
 )
 from crate.artist_bio import normalize_artist_bio
 from crate.db.jobs.federation_catalog_changes import (
+    CatalogHistoryExpired,
     catalog_high_water_mark,
     catalog_retention_floor,
     list_catalog_changes,
@@ -441,7 +442,17 @@ def _catalog_share_policy() -> dict[str, Any]:
     return dict(raw_policy)
 
 
+def _catalog_scope_allows_item(item: dict[str, Any], scope: dict[str, Any]) -> bool:
+    allowed_types = scope.get("allowed_entity_types") or []
+    if allowed_types and item.get("entity_type") not in allowed_types:
+        return False
+    allowed_uids = scope.get("allowed_entity_uids") or []
+    return not allowed_uids or item.get("remote_entity_uid") in allowed_uids
+
+
 def _catalog_policy_allows_item(item: dict[str, Any], policy: dict[str, Any]) -> bool:
+    if not _catalog_scope_allows_item(item, policy.get("_grant_scope") or {}):
+        return False
     catalog_filter = policy.get("catalog_filter") or {}
     expected_scope = catalog_filter.get("share_scope")
     if expected_scope:
@@ -1301,25 +1312,36 @@ async def catalog_manifest(
     peer = await _require_signed_node_request(request)
     decision = await asyncio.to_thread(_require_capability, peer, "catalog.sync")
     capped_page = max(0, page)
+    # max_results bounds interactive search, not a whole permitted-catalog
+    # transfer. Applying it here made Listen fetch only 20 rows per request.
     capped_page_size = max(1, min(page_size, 500))
-    if (
-        decision is not None
-        and decision.constraints
-        and decision.constraints.max_results is not None
-    ):
-        capped_page_size = min(
-            capped_page_size,
-            decision.constraints.max_results,
-        )
     genres_allowed = await asyncio.to_thread(
         _peer_has_capability, peer, "catalog.metadata.genres"
     )
+    metadata_decision = (
+        await asyncio.to_thread(_require_capability, peer, "catalog.metadata.genres")
+        if genres_allowed
+        else None
+    )
     policy = await asyncio.to_thread(_catalog_share_policy)
-    snapshot = await asyncio.to_thread(_catalog_manifest_snapshot, policy)
+    policy = _catalog_policy_for_grant(
+        policy,
+        decision,
+        include_genres=genres_allowed,
+        metadata_decision=metadata_decision,
+    )
+    policy_digest = hashlib.sha256(
+        _json.dumps(
+            _catalog_manifest_policy_params(policy),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
     peer_uid = str(peer["node_uid"])
     after_entity_type = ""
     after_entity_uid = ""
-    snapshot_sequence = int(snapshot.get("snapshot_sequence") or 0)
+    snapshot = None
+    position = {}
     if cursor:
         from crate.federation.catalog import (
             InvalidCatalogCursor,
@@ -1344,7 +1366,32 @@ async def catalog_manifest(
         position = decoded["position"]
         after_entity_type = str(position.get("entity_type") or "")
         after_entity_uid = str(position.get("entity_uid") or "")
-        snapshot_sequence = int(position.get("snapshot_sequence") or 0)
+        if position.get("policy_digest"):
+            if position["policy_digest"] != policy_digest:
+                raise HTTPException(
+                    status_code=410,
+                    detail={
+                        "code": "full_sync_required",
+                        "message": "Catalog sharing policy changed during bootstrap",
+                    },
+                )
+            snapshot = {
+                "revision": str(position["revision"]),
+                "total_items": int(position["total_items"]),
+                "snapshot_sequence": int(position.get("snapshot_sequence") or 0),
+            }
+    if snapshot is None:
+        snapshot = await asyncio.to_thread(_catalog_manifest_snapshot, policy)
+        if cursor:
+            # Upgrade legacy keyset cursors without replacing their starting
+            # watermark. Rows remain live; deltas replay changes from this point.
+            snapshot["snapshot_sequence"] = int(position.get("snapshot_sequence") or 0)
+            snapshot["revision"] = _catalog_manifest_revision(
+                policy,
+                int(snapshot["total_items"]),
+                int(snapshot["snapshot_sequence"]),
+            )
+    snapshot_sequence = int(snapshot.get("snapshot_sequence") or 0)
 
     if not cursor:
         # Compatibility for one release. The query remains keyset-based.
@@ -1353,6 +1400,7 @@ async def catalog_manifest(
             page=page,
             page_size=capped_page_size,
             include_genres=genres_allowed,
+            policy=policy,
         )
         items = compatibility_items
     else:
@@ -1362,6 +1410,7 @@ async def catalog_manifest(
             after_entity_uid=after_entity_uid,
             page_size=capped_page_size,
             include_genres=genres_allowed,
+            policy=policy,
         )
     try:
         items, byte_truncated = _cap_catalog_items_by_bytes(
@@ -1379,7 +1428,7 @@ async def catalog_manifest(
     snapshot_cursor = encode_catalog_cursor(
         peer_uid=peer_uid,
         mode="delta",
-        position={"sequence": snapshot_sequence},
+        position={"sequence": snapshot_sequence, "policy_digest": policy_digest},
     )
     next_cursor = None
     if items:
@@ -1391,6 +1440,9 @@ async def catalog_manifest(
                 "entity_type": last["entity_type"],
                 "entity_uid": last["remote_entity_uid"],
                 "snapshot_sequence": snapshot_sequence,
+                "revision": snapshot["revision"],
+                "total_items": snapshot["total_items"],
+                "policy_digest": policy_digest,
             },
         )
     payload = {
@@ -1415,7 +1467,29 @@ async def catalog_manifest(
 @router.get("/catalog/delta")
 async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
     peer = await _require_signed_node_request(request)
-    await asyncio.to_thread(_require_capability, peer, "catalog.sync")
+    decision = await asyncio.to_thread(_require_capability, peer, "catalog.sync")
+    genres_allowed = await asyncio.to_thread(
+        _peer_has_capability, peer, "catalog.metadata.genres"
+    )
+    metadata_decision = (
+        await asyncio.to_thread(_require_capability, peer, "catalog.metadata.genres")
+        if genres_allowed
+        else None
+    )
+    policy = await asyncio.to_thread(_catalog_share_policy)
+    policy = _catalog_policy_for_grant(
+        policy,
+        decision,
+        include_genres=genres_allowed,
+        metadata_decision=metadata_decision,
+    )
+    policy_digest = hashlib.sha256(
+        _json.dumps(
+            _catalog_manifest_policy_params(policy),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
     from crate.federation.catalog import (
         InvalidCatalogCursor,
         decode_catalog_cursor,
@@ -1438,6 +1512,15 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
                 detail={"code": "invalid_cursor", "message": "Expected delta cursor"},
             )
         after_sequence = int(decoded["position"].get("sequence") or 0)
+        old_scope = decoded["position"].get("policy_digest")
+        if old_scope and old_scope != policy_digest:
+            raise HTTPException(
+                status_code=410,
+                detail={
+                    "code": "full_sync_required",
+                    "message": "Catalog sharing scope changed",
+                },
+            )
 
     floor = await asyncio.to_thread(catalog_retention_floor)
     if floor and after_sequence < floor - 1:
@@ -1450,12 +1533,20 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
         )
 
     capped_limit = max(1, min(int(limit), 500))
-    changes = await asyncio.to_thread(
-        list_catalog_changes,
-        after_sequence=after_sequence,
-        limit=capped_limit + 1,
-    )
-    policy = await asyncio.to_thread(_catalog_share_policy)
+    try:
+        changes = await asyncio.to_thread(
+            list_catalog_changes,
+            after_sequence=after_sequence,
+            limit=capped_limit + 1,
+        )
+    except CatalogHistoryExpired as exc:
+        raise HTTPException(
+            status_code=410,
+            detail={
+                "code": "full_sync_required",
+                "message": "Catalog cursor predates retained changes",
+            },
+        ) from exc
     items: list[dict[str, Any]] = []
     scanned_sequence = after_sequence
     for change in changes:
@@ -1468,6 +1559,17 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
         }
         if not _catalog_policy_allows_item(candidate, policy):
             continue
+        if not genres_allowed or not _catalog_scope_allows_item(
+            candidate, policy.get("_genre_scope") or {}
+        ):
+            for key in (
+                "genre",
+                "genres",
+                "genres_json",
+                "genre_assertions",
+                "taxonomy",
+            ):
+                payload.pop(key, None)
         items.append(
             {
                 "sequence": scanned_sequence,
@@ -1498,7 +1600,7 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
     next_cursor = encode_catalog_cursor(
         peer_uid=peer_uid,
         mode="delta",
-        position={"sequence": scanned_sequence},
+        position={"sequence": scanned_sequence, "policy_digest": policy_digest},
     )
     digest_input = _json.dumps(
         items, sort_keys=True, separators=(",", ":"), default=str
@@ -1508,7 +1610,9 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
         "operations": items,
         "next_cursor": next_cursor,
         "cursor": next_cursor,
-        "has_more": byte_truncated or scanned_sequence < high_water,
+        # The publisher may advance after this page's statement snapshot. An
+        # empty read is caught up for now, not a non-advancing pagination loop.
+        "has_more": byte_truncated or (bool(changes) and scanned_sequence < high_water),
         "high_water_mark": high_water,
         "scanned_sequence": scanned_sequence,
         "digest": f"sha256:{hashlib.sha256(digest_input.encode()).hexdigest()}",
@@ -1520,6 +1624,7 @@ def _catalog_manifest_items(
     page_size: int,
     *,
     include_genres: bool = True,
+    policy: dict[str, Any] | None = None,
 ) -> list[dict]:
     after_entity_type = ""
     after_entity_uid = ""
@@ -1530,6 +1635,7 @@ def _catalog_manifest_items(
             after_entity_uid=after_entity_uid,
             page_size=page_size,
             include_genres=include_genres,
+            policy=policy,
         )
         if not items:
             break
@@ -1544,8 +1650,9 @@ def _catalog_manifest_items_after(
     after_entity_uid: str,
     page_size: int,
     include_genres: bool = True,
+    policy: dict[str, Any] | None = None,
 ) -> list[dict]:
-    policy = _catalog_share_policy()
+    policy = policy if policy is not None else _catalog_share_policy()
     policy_params = _catalog_manifest_policy_params(policy)
     rows = list_federation_manifest_rows(
         after_entity_type=after_entity_type,
@@ -1564,7 +1671,9 @@ def _catalog_manifest_items_after(
                 secondary_types=list(item.get("release_group_secondary_types") or []),
                 title=str(item.get("title") or ""),
             )
-        if include_genres:
+        if include_genres and _catalog_scope_allows_item(
+            item, policy.get("_genre_scope") or {}
+        ):
             item["genres"] = _manifest_genres(item)
             item["genre_assertions"] = _manifest_genre_assertions(item)
         _normalize_manifest_audio(item)
@@ -1589,25 +1698,66 @@ def _catalog_manifest_snapshot(policy: dict[str, Any]) -> dict[str, Any]:
 
     total_items = int(row["total_items"] or 0)
     snapshot_sequence = catalog_high_water_mark()
+    return {
+        "revision": _catalog_manifest_revision(policy, total_items, snapshot_sequence),
+        "total_items": total_items,
+        "snapshot_sequence": snapshot_sequence,
+    }
+
+
+def _catalog_manifest_revision(
+    policy: dict[str, Any], total_items: int, snapshot_sequence: int
+) -> str:
     revision_input = _json.dumps(
         {
-            "policy": policy_params,
+            "policy": _catalog_manifest_policy_params(policy),
             "total_items": total_items,
             "snapshot_sequence": snapshot_sequence,
         },
         sort_keys=True,
         separators=(",", ":"),
     )
+    return f"sha256:{hashlib.sha256(revision_input.encode()).hexdigest()}"
+
+
+def _catalog_policy_for_grant(
+    policy: dict[str, Any],
+    decision: AuthorizationDecision | None,
+    *,
+    include_genres: bool,
+    metadata_decision: AuthorizationDecision | None = None,
+) -> dict[str, Any]:
+    constraints = decision.constraints if decision is not None else None
+    metadata_constraints = (
+        metadata_decision.constraints if metadata_decision is not None else None
+    )
     return {
-        "revision": f"sha256:{hashlib.sha256(revision_input.encode()).hexdigest()}",
-        "total_items": total_items,
-        "snapshot_sequence": snapshot_sequence,
+        **policy,
+        "_grant_scope": {
+            "allowed_entity_types": sorted(constraints.allowed_entity_types)
+            if constraints
+            else [],
+            "allowed_entity_uids": sorted(constraints.allowed_entity_uids)
+            if constraints
+            else [],
+            "include_genres": include_genres,
+        },
+        "_genre_scope": {
+            "allowed_entity_types": sorted(metadata_constraints.allowed_entity_types)
+            if metadata_constraints
+            else [],
+            "allowed_entity_uids": sorted(metadata_constraints.allowed_entity_uids)
+            if metadata_constraints
+            else [],
+        },
     }
 
 
 def _catalog_manifest_policy_params(policy: dict[str, Any]) -> dict[str, Any]:
     catalog_filter = policy.get("catalog_filter") or {}
     expected_scope = catalog_filter.get("share_scope")
+    grant_scope = policy.get("_grant_scope") or {}
+    genre_scope = policy.get("_genre_scope") or {}
     return {
         "share_allowed": expected_scope in (None, "", "library"),
         "allowed_entity_uids": sorted(
@@ -1624,6 +1774,19 @@ def _catalog_manifest_policy_params(policy: dict[str, Any]) -> dict[str, Any]:
         ),
         "denied_entity_uids": sorted(
             str(value) for value in catalog_filter.get("deny_entity_uids") or []
+        ),
+        "grant_allowed_entity_types": sorted(
+            grant_scope.get("allowed_entity_types") or []
+        ),
+        "grant_allowed_entity_uids": sorted(
+            grant_scope.get("allowed_entity_uids") or []
+        ),
+        "grant_include_genres": bool(grant_scope.get("include_genres")),
+        "genre_allowed_entity_types": sorted(
+            genre_scope.get("allowed_entity_types") or []
+        ),
+        "genre_allowed_entity_uids": sorted(
+            genre_scope.get("allowed_entity_uids") or []
         ),
     }
 
