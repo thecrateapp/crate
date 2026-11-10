@@ -204,12 +204,6 @@ export function SmartMixCoverage() {
               disabled={activeAction !== null}
               onClick={() => void runAction("pause")}
             >
-              {activeAction === "pause" ? (
-                <Loader2
-                  data-admin-ux="mix-pause-reopening-loading"
-                  className="animate-spin"
-                />
-              ) : null}
               Pause reopening
             </Button>
           ) : null}
