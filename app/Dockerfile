@@ -51,7 +51,72 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --prefer-binary -r requirements-worker-core.txt
 
 
+# restic and rclone for the backups engine (admin backups, BK1): pinned release
+# binaries checked against the SHA-256 their projects publish (restic SHA256SUMS,
+# downloads.rclone.org SHA256SUMS). Only the two binaries reach the worker image.
+# The build args carry a CRATE_ prefix: rclone reads any RCLONE_* variable as a flag.
+FROM python:3.13-slim AS backup-tools
+
+ARG TARGETARCH
+ARG CRATE_RESTIC_VERSION=0.19.1
+ARG CRATE_RESTIC_SHA256_AMD64=f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c
+ARG CRATE_RESTIC_SHA256_ARM64=a5f64aaab53d51e311fa3829124c5b703f2d14cf187d8640b6be3b2b49376465
+ARG CRATE_RCLONE_VERSION=1.76.0
+ARG CRATE_RCLONE_SHA256_AMD64=b00f00b3266c3764413afe599d3ec316f6f43b3e0ea8a0bc1d186d2133e46df7
+ARG CRATE_RCLONE_SHA256_ARM64=ee169016675e23a69d77240565133ff7dbc9b33d16fa8f7053d4af39f1eaeb78
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bzip2 ca-certificates curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /backup-tools
+RUN set -eu; \
+    arch="${TARGETARCH:-amd64}"; \
+    case "$arch" in \
+        amd64) restic_sha="$CRATE_RESTIC_SHA256_AMD64"; rclone_sha="$CRATE_RCLONE_SHA256_AMD64" ;; \
+        arm64) restic_sha="$CRATE_RESTIC_SHA256_ARM64"; rclone_sha="$CRATE_RCLONE_SHA256_ARM64" ;; \
+        *) echo "no pinned restic/rclone for $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL --retry 5 -o restic.bz2 \
+        "https://github.com/restic/restic/releases/download/v${CRATE_RESTIC_VERSION}/restic_${CRATE_RESTIC_VERSION}_linux_${arch}.bz2"; \
+    echo "${restic_sha}  restic.bz2" | sha256sum -c -; \
+    bunzip2 restic.bz2; \
+    install -m 0755 restic /usr/local/bin/restic; \
+    curl -fsSL --retry 5 -o rclone.zip \
+        "https://downloads.rclone.org/v${CRATE_RCLONE_VERSION}/rclone-v${CRATE_RCLONE_VERSION}-linux-${arch}.zip"; \
+    echo "${rclone_sha}  rclone.zip" | sha256sum -c -; \
+    unzip -q rclone.zip; \
+    install -m 0755 "rclone-v${CRATE_RCLONE_VERSION}-linux-${arch}/rclone" /usr/local/bin/rclone; \
+    restic version | grep -q "^restic ${CRATE_RESTIC_VERSION} "; \
+    rclone version | head -n 1 | grep -qx "rclone v${CRATE_RCLONE_VERSION}"
+
+
 FROM worker-core-deps AS worker-core
+
+# Backups engine (admin backups, BK1): pg_dump and pg_restore 15 from the PostgreSQL
+# apt repository, matching the PostgreSQL 15 server (Debian's own client is 17, whose
+# archives a 15 pg_restore cannot read). The repository key is checked by SHA-256
+# (fingerprint B97B 0AFC AA1A 47F0 44F2 44A0 7FCC 7D46 ACCC 4CF8) and the package
+# version is pinned; apt checks every package against the signed index. Bump
+# PG_CLIENT_VERSION when PGDG drops it from the pool (the build fails loudly).
+ARG PGDG_ACCC4CF8_ASC_SHA256=0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76
+ARG PG_CLIENT_VERSION=15.19-1.pgdg13+2
+RUN set -eu; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl; \
+    curl -fsSL --retry 5 -o /usr/share/keyrings/pgdg.asc \
+        https://www.postgresql.org/media/keys/ACCC4CF8.asc; \
+    echo "${PGDG_ACCC4CF8_ASC_SHA256}  /usr/share/keyrings/pgdg.asc" | sha256sum -c -; \
+    . /etc/os-release; \
+    echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends "postgresql-client-15=${PG_CLIENT_VERSION}"; \
+    apt-get purge -y --auto-remove curl; \
+    rm -rf /var/lib/apt/lists/*
+ENV PATH="/usr/lib/postgresql/15/bin:${PATH}"
+COPY --from=backup-tools /usr/local/bin/restic /usr/local/bin/rclone /usr/local/bin/
+RUN pg_dump --version | grep -q "^pg_dump (PostgreSQL) 15\." && \
+    pg_restore --version | grep -q "^pg_restore (PostgreSQL) 15\." && \
+    restic version && rclone version | head -n 1
 
 COPY alembic.ini .
 COPY crate ./crate
