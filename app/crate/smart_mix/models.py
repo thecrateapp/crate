@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import operator
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -362,19 +363,10 @@ class TrackMixProfile:
         ):
             _require_non_negative_ms(field_name, getattr(self, field_name))
         object.__setattr__(
-            self,
-            "beat_grid_ms",
-            tuple(
-                _validated_ms("beat_grid_ms", position)
-                for position in self.beat_grid_ms
-            ),
+            self, "beat_grid_ms", _validated_grid_ms(tuple(self.beat_grid_ms))
         )
-        if any(
-            current <= previous
-            for previous, current in zip(
-                self.beat_grid_ms, self.beat_grid_ms[1:], strict=False
-            )
-        ):
+        # previous >= current, compared without a Python call per beat.
+        if any(map(operator.ge, self.beat_grid_ms, self.beat_grid_ms[1:])):
             raise ValueError("beat_grid_ms must be strictly increasing")
         for field_name in (
             "bpm_confidence",
@@ -954,6 +946,17 @@ def _require_positive_int(name: str, value: int) -> None:
 def _validated_ms(name: str, value: int) -> int:
     _require_non_negative_ms(name, value)
     return value
+
+
+def _validated_grid_ms(grid: tuple[int, ...]) -> tuple[int, ...]:
+    """``grid`` when every position is non-negative integer milliseconds.
+
+    Plain ints (what the codec decodes) are checked without a call per beat; anything
+    else goes through the per-position check, which raises the precise error.
+    """
+    if not grid or (set(map(type, grid)) == {int} and min(grid) >= 0):
+        return grid
+    return tuple(_validated_ms("beat_grid_ms", position) for position in grid)
 
 
 def _require_non_negative_ms(name: str, value: int | None) -> None:
