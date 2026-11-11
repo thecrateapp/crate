@@ -57,6 +57,9 @@ is legacy (`worker --legacy` only); do not extend it or `claim_next_task`.
    garbage, trims glibc's heap and reads again. A process still over the limit takes no further
    message and SIGTERMs itself: the task is acked, the process exits 0 and `run_worker()` starts
    a new pool in its place.
+7. A pool that consumes `heavy` runs with `dramatiq_queue_prefetch=1` (`_pool_environment()` in
+   `crate/worker.py`): one thread and analyses of tens of seconds, so it takes a message only
+   when that thread is free instead of holding one behind the running analysis.
 
 Healing: service loop marks zombies (no heartbeat 5 min) and redispatches `pending` rows older
 than 300s. The `tasks` row is the source of truth; Redis messages can be lost or duplicated.

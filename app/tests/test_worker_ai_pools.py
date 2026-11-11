@@ -188,6 +188,25 @@ def test_ai_pools_size_their_database_pool_from_their_threads(monkeypatch):
     assert worker._pool_environment(interactive)["CRATE_SQLALCHEMY_POOL_SIZE"] == "8"
 
 
+def test_heavy_pools_take_no_message_while_they_run_one(monkeypatch):
+    """A busy heavy process must not hold a queued analysis behind its own.
+
+    Dramatiq prefetches twice the thread count; with one thread a process that
+    runs a 25 s profile would keep the next one waiting until it finishes,
+    while another process sits idle.
+    """
+    monkeypatch.delenv("dramatiq_queue_prefetch", raising=False)
+    heavy, mixed = (
+        worker._dramatiq_commands(["heavy"], 1)[0],
+        worker._dramatiq_commands(["default", "heavy"], 1)[0],
+    )
+    (general,) = worker._dramatiq_commands(["default", "fast"], 1)
+
+    assert worker._pool_environment(heavy)["dramatiq_queue_prefetch"] == "1"
+    assert worker._pool_environment(mixed)["dramatiq_queue_prefetch"] == "1"
+    assert worker._pool_environment(general) is None
+
+
 def test_a_pool_that_exits_cleanly_is_replaced_alone():
     """A recycled process exits 0 after its task; only its pool starts again."""
     import signal
