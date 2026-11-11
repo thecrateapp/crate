@@ -80,7 +80,7 @@ import math
 import re
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cache
 
 from crate.smart_mix.camelot import CamelotRelationship, camelot_relationship
@@ -90,6 +90,7 @@ from crate.smart_mix.evaluation import (
     PHRASE_TOLERANCE_BEATS,
     bass_cut_db,
     crossfade_gains,
+    music_left_out,
     policy_violations,
 )
 from crate.smart_mix.models import (
@@ -311,12 +312,19 @@ def plan_transition_candidates(
             # v2's own plan stays on the menu, scored on the same phrases: it can
             # mix in the tail after the last phrase or over the incoming lead-in,
             # which no phrase start reaches.
-            options.append(
-                _fixed_option(edge, baseline, outgoing_phrases, incoming_phrases)
+            own = _fixed_option(edge, baseline, outgoing_phrases, incoming_phrases)
+            options.append(own)
+            return _within_listen_caps(
+                edge, _menu(edge, _ranked(options, policy)), own, outgoing, incoming
             )
-            return _menu(edge, _ranked(options, policy))
     first = _fixed_option(edge, baseline, None, None)
-    return _menu(edge, [first, *_ranked(_heuristic_options(edge, baseline), policy)])
+    return _within_listen_caps(
+        edge,
+        _menu(edge, [first, *_ranked(_heuristic_options(edge, baseline), policy)]),
+        first,
+        outgoing,
+        incoming,
+    )
 
 
 def recompose_candidate(
@@ -1389,6 +1397,52 @@ def _menu(edge: _Edge, options: list[_Option]) -> list[TransitionCandidate]:
         if len(menu) >= edge.policy.max_candidates:
             break
     return menu
+
+
+def _within_listen_caps(
+    edge: _Edge,
+    menu: list[TransitionCandidate],
+    own: _Option,
+    outgoing: TrackMixProfile,
+    incoming: TrackMixProfile,
+) -> list[TransitionCandidate]:
+    """The menu reordered for Listen's caps (LV-D9): the candidates within both caps
+    first, in their rank order, then v2's own plan, then the rest.
+
+    v2's plan is the fallback even when it leaves out more than the caps; when the
+    menu's length cut it off, it is added back. Crate Decks (and any policy without
+    caps) keeps the menu as ranked."""
+    policy = edge.policy
+    max_intro = policy.listen_max_skipped_intro_ms
+    max_outro = policy.listen_max_unplayed_outro_ms
+    if (max_intro is None and max_outro is None) or (
+        edge.context.source in policy.listen_cap_exempt_sources
+    ):
+        return menu
+
+    def within(candidate: TransitionCandidate) -> bool:
+        left_out = music_left_out(candidate.to_plan(), outgoing, incoming)
+        return left_out is None or (
+            (max_intro is None or left_out.incoming_skipped_ms <= max_intro)
+            and (max_outro is None or left_out.outgoing_unplayed_ms <= max_outro)
+        )
+
+    own_identity = _plan_identity(own.plan) if own.plan is not None else None
+    kept = [candidate for candidate in menu if within(candidate)]
+    v2 = [
+        candidate
+        for candidate in menu
+        if _plan_identity(candidate.to_plan()) == own_identity
+    ] or _menu(edge, [own])
+    rest = [candidate for candidate in menu if candidate not in kept + v2]
+    ordered: list[TransitionCandidate] = []
+    for candidate in (*kept, *v2, *rest):
+        if candidate not in ordered:
+            ordered.append(candidate)
+    return [
+        replace(candidate, index=index)
+        for index, candidate in enumerate(ordered[: policy.max_candidates])
+    ]
 
 
 def _single(plan: TransitionPlan, policy: PlannerPolicy) -> TransitionCandidate:

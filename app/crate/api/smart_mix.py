@@ -310,7 +310,11 @@ def playback_continuation(
     ][:32]
     return PlaybackContinuationResponse(
         tracks=tracks,
-        plans=_plan_transition_edges(edges) if edges else [],
+        plans=(
+            _plan_transition_edges(edges, planner_version=payload.planner_version)
+            if edges
+            else []
+        ),
         exhausted=exhausted,
         status=(
             "ok"
@@ -392,7 +396,7 @@ def _plan_transition_edges(
     profiles = get_track_mix_profiles_by_entity_uids(
         entity_uids, include_structure=False
     )
-    stems = _applicable_stem_analyses(entity_uids, profiles, policy)
+    stems = _applicable_stem_analyses(entity_uids, profiles, policy, edges=unique_edges)
     genre_priors = _genre_priors(unique_edges, stems, policy)
     edge_profiles = _edge_profiles(unique_edges, entity_uids, profiles)
     cache_keys = [
@@ -458,10 +462,15 @@ def _applicable_stem_analyses(
     entity_uids: list[str],
     profiles: list[TrackMixProfile | None],
     policy: PlannerPolicy,
+    *,
+    edges: list[TransitionEdgeRequest],
 ) -> dict[str, StemAnalysis]:
     """The stem analysis that applies to each profile (STEM-D4), for a planner that
-    scores with the stems layer; one bounded query, none for other planners."""
+    scores with the stems layer; one bounded query, none for other planners or for
+    a batch with no edge from a source the layer serves (Listen's, revision 5)."""
     if not (planner_reads_structure(policy.identifier) and policy.stems_layer):
+        return {}
+    if not any(edge.context.source in policy.stems_layer_sources for edge in edges):
         return {}
     current = {
         uid: profile

@@ -14,7 +14,6 @@ export const SMART_TRANSITION_LONG_SECONDS = 6;
 export const SMART_TRANSITION_MIXED_QUEUE_SECONDS = 3;
 
 const SMART_TRANSITION_MIN_SIGNAL_WEIGHT = 0.35;
-const SMART_MIX_PLANNER_VERSION = "smart-mix-v2";
 const SMART_MIX_PLANNER_POLICY_VERSION = 2;
 const MAX_TRANSITION_DURATION_MS = 12_000;
 const KEY_TO_PITCH_CLASS: Record<string, number> = {
@@ -41,6 +40,13 @@ const KEY_TO_PITCH_CLASS: Record<string, number> = {
   cb: 11,
 };
 
+export type SmartMixPlannerIdentifier = "smart-mix-v2" | "smart-mix-v3";
+
+const SUPPORTED_PLANNERS: readonly SmartMixPlannerIdentifier[] = [
+  "smart-mix-v2",
+  "smart-mix-v3",
+];
+
 export interface SmartMixCapabilities {
   available: boolean;
   androidNativeCrossfade: boolean;
@@ -48,6 +54,9 @@ export interface SmartMixCapabilities {
   androidBassHandoff: boolean;
   androidLongBeatmatch: boolean;
   plannerVersion?: string | null;
+  // Planners the server accepts, and the one it recommends for Listen (LV-D1).
+  plannerVersions?: string[];
+  listenPlannerVersion?: string | null;
 }
 
 const DISABLED_SMART_MIX_CAPABILITIES: SmartMixCapabilities = {
@@ -57,12 +66,57 @@ const DISABLED_SMART_MIX_CAPABILITIES: SmartMixCapabilities = {
   androidBassHandoff: false,
   androidLongBeatmatch: false,
   plannerVersion: null,
+  plannerVersions: [],
+  listenPlannerVersion: null,
 };
+
+function isSupportedPlanner(
+  planner: string | null | undefined,
+): planner is SmartMixPlannerIdentifier {
+  return SUPPORTED_PLANNERS.includes(planner as SmartMixPlannerIdentifier);
+}
+
+/**
+ * The planner Listen plans with: the server's recommendation for Listen when this
+ * client knows it and the server lists it, else the server's default planner when
+ * this client knows it (older servers: smart-mix-v2), else none.
+ */
+export function resolvePlannerVersion(
+  capabilities: SmartMixCapabilities,
+): SmartMixPlannerIdentifier | null {
+  const recommended = capabilities.listenPlannerVersion;
+  if (
+    isSupportedPlanner(recommended) &&
+    (capabilities.plannerVersions ?? []).includes(recommended)
+  ) {
+    return recommended;
+  }
+  return isSupportedPlanner(capabilities.plannerVersion)
+    ? capabilities.plannerVersion
+    : null;
+}
 
 let smartMixCapabilities = DISABLED_SMART_MIX_CAPABILITIES;
 const capabilityListeners = new Set<
   (capabilities: SmartMixCapabilities) => void
 >();
+
+/** The planner the native background continuation asks for: smart-mix-v2 by default. */
+export function continuationPlanner(
+  capabilities: SmartMixCapabilities,
+): SmartMixPlannerIdentifier {
+  return resolvePlannerVersion(capabilities) ?? "smart-mix-v2";
+}
+
+/** LV-D10: with smart-mix-v3 the user's maximum always wins, also in the background. */
+export function continuationLongBeatmatch(
+  capabilities: SmartMixCapabilities,
+): boolean {
+  return (
+    capabilities.androidLongBeatmatch &&
+    continuationPlanner(capabilities) === "smart-mix-v2"
+  );
+}
 
 export function setSmartMixCapabilities(
   capabilities: SmartMixCapabilities,
@@ -74,6 +128,8 @@ export function setSmartMixCapabilities(
     androidBassHandoff: capabilities.androidBassHandoff === true,
     androidLongBeatmatch: capabilities.androidLongBeatmatch === true,
     plannerVersion: capabilities.plannerVersion ?? null,
+    plannerVersions: [...(capabilities.plannerVersions ?? [])],
+    listenPlannerVersion: capabilities.listenPlannerVersion ?? null,
   };
   notifyCapabilityListeners();
 }
@@ -147,6 +203,8 @@ interface TransitionEdge {
 
 interface TransitionPlanResponse {
   plannerVersion: number;
+  // smart-mix-v3 only; never copied into the engine plan.
+  structureUsed?: boolean;
   outgoingTrackEntityUid: string;
   incomingTrackEntityUid: string;
   mode: "gapless" | "adaptive" | "beatmatch";
@@ -165,7 +223,7 @@ interface TransitionPlanResponse {
 }
 
 interface TransitionPlanBatchResponse {
-  plannerVersion: typeof SMART_MIX_PLANNER_VERSION;
+  plannerVersion: SmartMixPlannerIdentifier;
   plans: TransitionPlanResponse[];
 }
 
@@ -323,10 +381,11 @@ export class SmartMixTransitionPlanner {
       return orderedPlans(edges, localPlans);
     }
 
+    const plannerVersion = resolvePlannerVersion(input.capabilities);
     const capabilityAvailable =
       input.capabilities.available &&
       input.capabilities.androidNativeCrossfade &&
-      input.capabilities.plannerVersion === SMART_MIX_PLANNER_VERSION;
+      plannerVersion !== null;
     if (!capabilityAvailable) {
       for (const edge of unresolved) {
         localPlans.set(
@@ -376,7 +435,7 @@ export class SmartMixTransitionPlanner {
         "/api/playback/transition-plans",
         "POST",
         {
-          plannerVersion: SMART_MIX_PLANNER_VERSION,
+          plannerVersion,
           edges: requestable.map((edge) => ({
             outgoingTrackEntityUid: edge.outgoing.entityUid,
             incomingTrackEntityUid: edge.incoming.entityUid,
@@ -391,7 +450,10 @@ export class SmartMixTransitionPlanner {
               ...(input.capabilities.androidBassHandoff
                 ? { allowBassHandoff: true }
                 : {}),
-              ...(input.capabilities.androidLongBeatmatch
+              // LV-D10: with smart-mix-v3 the user's maximum always wins, so it
+              // never asks for long blends; v2 keeps today's request.
+              ...(input.capabilities.androidLongBeatmatch &&
+              plannerVersion === "smart-mix-v2"
                 ? { allowLongBeatmatch: true }
                 : {}),
             },
@@ -412,7 +474,7 @@ export class SmartMixTransitionPlanner {
       }
 
       const responsePlans =
-        response?.plannerVersion === SMART_MIX_PLANNER_VERSION &&
+        response?.plannerVersion === plannerVersion &&
         Array.isArray(response.plans)
           ? response.plans
           : [];
