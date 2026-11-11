@@ -86,9 +86,11 @@ _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
 # The night-window limit keeps only a few analyses in flight, so a slot freed by
 # a finished analysis should be refilled within seconds rather than a poll later.
 # The coordinator waits as a pending task, not in a worker process, and checks
-# less often the longer its slots stay as they are.
+# less often the longer its slots stay as they are, but at least every 10 s: an
+# analysis takes about 25 s, so a longer wait would leave a freed slot idle for a
+# good part of one.
 _SMART_MIX_BACKFILL_POLL_SECONDS = 3
-_SMART_MIX_BACKFILL_MAX_POLL_SECONDS = 30
+_SMART_MIX_BACKFILL_MAX_POLL_SECONDS = 10
 
 
 def _now() -> datetime:
@@ -1640,7 +1642,7 @@ def _smart_mix_backfill_poll_seconds() -> int:
 
     As long as the slots have stayed as they are: 3 s right after a claim or a
     finished analysis, then about double each time while nothing changes, up to
-    30 s. Each check is a whole actor cycle, so a long analysis or a child the
+    10 s. Each check is a whole actor cycle, so a long analysis or a child the
     governor defers no longer costs one every 3 s.
     """
     since_change = seconds_since_smart_mix_change()
