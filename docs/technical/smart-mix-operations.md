@@ -1221,8 +1221,15 @@ attempts, and the start and resume calls take it in the same body:
   once nothing is in flight.
 - The wait follows how long the slots have stayed as they are, measured from the last change to
   a `smart_mix` processing row (a claim, a finished or failed analysis): 3 s right after one,
-  then about double each time while nothing changes, up to 30 s. A freed slot is therefore
-  refilled within 30 s at worst and within a few seconds while analyses finish often.
+  then about double each time while nothing changes, up to 10 s. A freed slot is therefore
+  refilled within 10 s at worst and within a few seconds while analyses finish often. With
+  30 s, the cap until 2026-11-11, a freed slot waited about 10 s on average for analyses of
+  about 25 s.
+- The analysis worker's pools take a message only when their single thread is free
+  (`dramatiq_queue_prefetch=1`, set by `run_worker()` for every pool that consumes `heavy`).
+  With Dramatiq's default prefetch of two, a busy process held the next child behind the
+  analysis it was running while other processes sat idle: the median child started at once, but
+  one in ten waited 30 s or more.
 - If the resource governor denies the coordinator after the actor admitted it, the coordinator
   goes back to the queue the same way, for the governor's delay and at most five minutes, with
   the progress `Deferred by resource governor: <reason>`. It never sleeps in a worker process.
@@ -1258,7 +1265,9 @@ On the project server (i7-7700, 4 cores and 8 threads) set `ANALYSIS_WORKER_PROC
 `.env` and recreate the service with `docker compose up -d crate-analysis-worker`.
 `docker-compose.project.yaml` gives it `cpus: "7.0"`, which leaves a logical CPU for Postgres and
 the API at night, and `mem_limit: 14g`, which covers the 1.5 GB at which each process recycles
-itself plus the parent with the import analysis daemons. Watch its memory during the first night
+itself plus the parent with the import analysis daemons. The limit is the process's current
+resident set after a task, and `ANALYSIS_WORKER_MAX_RSS_MB` in `.env` changes it (default 1500); a
+process over it finishes its task and exits, and only that process starts again. Watch its memory during the first night
 with `docker stats crate-analysis-worker`. Eight analyses on four cores share them through
 Hyper-Threading, so the night gains less than double the day's throughput.
 

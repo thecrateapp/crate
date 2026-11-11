@@ -1769,12 +1769,14 @@ def test_saturated_backfill_runs_again_later_without_holding_a_process(
     [
         # Right after a claim or a finished analysis: check again in 3 s.
         (0.4, 3),
-        # Nothing has changed for 12 s: wait as long again, so the checks
+        # Nothing has changed for 6 s: wait as long again, so the checks
         # about double while the slots stay full.
-        (12.2, 12),
-        # Never more than 30 s, so a freed slot waits at most that long.
-        (300, 30),
-        (None, 30),
+        (6.2, 6),
+        # Never more than 10 s: an analysis takes about 25 s, so a longer
+        # wait leaves its freed slot idle for a good part of one.
+        (12.2, 10),
+        (300, 10),
+        (None, 10),
     ],
 )
 @pytest.mark.parametrize("in_flight", [4, 2], ids=["saturated", "last-analyses"])
