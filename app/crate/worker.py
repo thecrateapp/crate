@@ -84,12 +84,19 @@ def _dramatiq_commands(queues: Sequence[str], processes: int) -> list[list[str]]
 
 
 def _pool_environment(command: Sequence[str]) -> dict[str, str] | None:
-    """Environment for an AI pool process; None keeps the inherited one.
+    """Environment for an AI or heavy pool process; None keeps the inherited one.
 
     Every running task holds a handler session and a heartbeat session, so an
     AI pool with T threads needs at least 2T pooled connections.
+
+    Dramatiq prefetches twice the thread count. A heavy pool has one thread and
+    runs analyses of tens of seconds, so a prefetched message waits behind the
+    running one while other processes sit idle; a heavy pool takes a message
+    only when its thread is free.
     """
     queues = list(command[command.index("--queues") + 1 :])
+    if "heavy" in queues:
+        return {**os.environ, "dramatiq_queue_prefetch": "1"}
     if not queues or any(queue not in AI_QUEUES for queue in queues):
         return None
     threads = int(command[command.index("--threads") + 1])
