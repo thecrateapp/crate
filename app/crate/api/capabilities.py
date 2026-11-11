@@ -177,9 +177,9 @@ def _decks_features(request: Request) -> list[DecksFeature]:
     # Each feature is added by the server change that serves its contract: S3
     # library_cursor (/api/decks), S4 profiles_batch, S5
     # beatmatch/bass_handoff/long_beatmatch, S7 cues, Smart Mix Stems ST1
-    # stems/stem_upload and ST3 local_refinement. S4, S5 and S7 are not served
-    # yet. Do not derive them from the Android Smart Mix flags.
-    features: list[DecksFeature] = ["library_cursor", "stems"]
+    # stems/stem_upload and ST3 local_refinement. S5 and S7 are not served yet.
+    # Do not derive them from the Android Smart Mix flags.
+    features: list[DecksFeature] = ["library_cursor", "profiles_batch", "stems"]
     if _may_upload_stems(request):
         features.append("stem_upload")
     # smart-mix-v3 serves the candidate menu and policy limits to the decks context.

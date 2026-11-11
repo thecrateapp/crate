@@ -1,4 +1,5 @@
-"""Crate Decks library navigation (S3): container tree and cursor-paged tracks.
+"""Crate Decks library navigation (S3): container tree and cursor-paged tracks; and
+batch mix profiles (S4).
 
 Session users only: `crv_` access tokens never reach these routes (the auth
 middleware drops them) and the handlers refuse them too.
@@ -25,8 +26,11 @@ from crate.api.schemas.decks import (
     DecksContainerNodeResponse,
     DecksContainersResponse,
     DecksLibraryResponse,
+    DecksMixProfilesRequest,
+    DecksMixProfilesResponse,
     DecksTracksPageResponse,
 )
+from crate.api.smart_mix import full_mix_profile_response
 from crate.db.queries.decks_library import (
     DECKS_PAGE_LIMIT,
     coerce_after,
@@ -34,7 +38,9 @@ from crate.db.queries.decks_library import (
     get_decks_containers,
     normalize_container_id,
 )
+from crate.db.queries.decks_profiles import get_decks_mix_profiles
 from crate.smart_mix.source import smart_mix_source_revision_from_stat
+from crate.smart_mix.stems import choose_analysis
 from crate.streaming.service import stat_playable_sources
 
 router = APIRouter(prefix="/api/decks", tags=["browse"])
@@ -136,6 +142,47 @@ def decks_container_tracks(
         }
     ).model_dump(mode="json")
     return _conditional_json(request, payload)
+
+
+@router.post(
+    "/mix-profiles",
+    response_model=DecksMixProfilesResponse,
+    response_model_exclude_none=True,
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES,
+        {
+            403: error_response(
+                "An access token, or a trusted-header user without a Crate account."
+            ),
+            422: error_response(
+                "No UIDs, more than 200, a UID that is not one, or a detail other "
+                "than full."
+            ),
+        },
+    ),
+    summary="Read the full Smart Mix profiles of up to 200 tracks",
+)
+def decks_mix_profiles(
+    request: Request, payload: DecksMixProfilesRequest
+) -> DecksMixProfilesResponse:
+    """The `detail=full` profile of each track, as the single profile endpoint
+    serves it, in one bounded query; tracks without a current profile are listed in
+    `missing`."""
+    _require_session_user(request)
+    uids = list(dict.fromkeys(str(uid) for uid in payload.entity_uids))
+    reads = get_decks_mix_profiles(uids)
+    profiles = {}
+    missing = []
+    for uid in uids:
+        read = reads.get(uid)
+        if read is None:
+            missing.append(uid)
+            continue
+        analysis = choose_analysis(
+            read.analyses, source_revision=read.profile.source_revision
+        )
+        profiles[uid] = full_mix_profile_response(read.profile, analysis)
+    return DecksMixProfilesResponse(profiles=profiles, missing=missing)
 
 
 def _with_audio_state(tracks: list[dict]) -> list[dict]:
