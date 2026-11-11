@@ -20,10 +20,12 @@ Long-form background: `docs/technical/03-worker-tasks-and-background-services.md
 | `crate-media-worker` (Rust) | HTTP on :8687                                                         | album/track ZIP packages, Redis progress/cancel                                                                                                                          | ro       |
 
 `run_worker()` in `worker.py` starts optional threads per CLI flag, then runs
-`python -m dramatiq crate.actors --processes N --threads 1 --queues ...` for the general
-queues plus one `--processes 1 --threads T` pool per AI lane it consumes
-(`CRATE_AI_WORKER_THREADS`, default 2; `CRATE_AI_BULK_WORKER_THREADS`, default 1). When any
-pool exits, the others stop and the container restarts. `orchestrator.py`
+N pools of `python -m dramatiq crate.actors --processes 1 --threads 1 --queues ...` for the
+general queues plus one `--processes 1 --threads T` pool per AI lane it consumes
+(`CRATE_AI_WORKER_THREADS`, default 2; `CRATE_AI_BULK_WORKER_THREADS`, default 1). Each process
+has a pool of its own because Dramatiq stops a whole pool when one of its processes exits. A pool
+that exits with 0 recycled its process and is started again alone; when any pool exits otherwise,
+the others stop and the container restarts. `orchestrator.py`
 is legacy (`worker --legacy` only); do not extend it or `claim_next_task`.
 
 ## Task lifecycle
@@ -50,7 +52,11 @@ is legacy (`worker --legacy` only); do not extend it or `claim_next_task`.
    exception or `TimeLimitExceeded` -> `fail_or_retry_task` (DB `retry_count < max_retries`
    -> back to `pending`). A `task_done` event is published in every case except
    `run_again_later`.
-6. After each message `_check_memory()` SIGTERMs the process above 1500 MB RSS; Dramatiq respawns it.
+6. After each message `_check_memory()` (`crate/process_recycle.py`) reads the current RSS (not
+   `ru_maxrss`, the lifetime peak); above `CRATE_WORKER_MAX_RSS_MB` (default 1500) it collects
+   garbage, trims glibc's heap and reads again. A process still over the limit takes no further
+   message and SIGTERMs itself: the task is acked, the process exits 0 and `run_worker()` starts
+   a new pool in its place.
 
 Healing: service loop marks zombies (no heartbeat 5 min) and redispatches `pending` rows older
 than 300s. The `tasks` row is the source of truth; Redis messages can be lost or duplicated.

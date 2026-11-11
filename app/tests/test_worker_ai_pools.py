@@ -26,15 +26,18 @@ def test_crate_worker_runs_ai_lanes_in_separate_pools():
 
     assert [_queues(command) for command in commands] == [
         ["default", "fast"],
+        ["default", "fast"],
+        ["default", "fast"],
         ["ai"],
         ["ai_bulk"],
     ]
-    general, interactive, bulk = commands
-    assert general[:4] == [sys.executable, "-m", "dramatiq", "crate.actors"]
-    assert (_option(general, "--processes"), _option(general, "--threads")) == (
-        "3",
-        "1",
-    )
+    *general, interactive, bulk = commands
+    for pool in general:
+        assert pool[:4] == [sys.executable, "-m", "dramatiq", "crate.actors"]
+        assert (_option(pool, "--processes"), _option(pool, "--threads")) == (
+            "1",
+            "1",
+        )
     assert (_option(interactive, "--processes"), _option(interactive, "--threads")) == (
         "1",
         "2",
@@ -60,12 +63,14 @@ def test_invalid_lane_threads_stay_bounded(monkeypatch, raw):
     assert int(_option(command, "--threads")) >= 1
 
 
-def test_workers_without_ai_lanes_keep_a_single_pool():
-    (command,) = worker._dramatiq_commands(["fast"], 2)
+def test_each_general_process_is_a_pool_of_its_own():
+    """Dramatiq stops a whole pool when one of its processes exits, so a process
+    that recycles itself must be alone in its pool to go alone."""
+    commands = worker._dramatiq_commands(["fast"], 2)
 
-    assert _queues(command) == ["fast"]
-    assert _option(command, "--processes") == "2"
-    assert _option(command, "--threads") == "1"
+    assert [_queues(command) for command in commands] == [["fast"], ["fast"]]
+    assert all(_option(command, "--processes") == "1" for command in commands)
+    assert all(_option(command, "--threads") == "1" for command in commands)
 
 
 def test_default_worker_queues_include_ai_lanes():
@@ -170,14 +175,69 @@ def test_pools_stop_within_the_shared_shutdown_timeout():
 def test_ai_pools_size_their_database_pool_from_their_threads(monkeypatch):
     monkeypatch.setenv("CRATE_AI_WORKER_THREADS", "3")
     monkeypatch.delenv("CRATE_SQLALCHEMY_POOL_SIZE", raising=False)
-    general, interactive, bulk = worker._dramatiq_commands(
+    *general, interactive, bulk = worker._dramatiq_commands(
         ["default", "ai", "ai_bulk"], 2
     )
 
     # Each running task holds a handler and a heartbeat session.
-    assert worker._pool_environment(general) is None
+    assert all(worker._pool_environment(pool) is None for pool in general)
     assert worker._pool_environment(interactive)["CRATE_SQLALCHEMY_POOL_SIZE"] == "6"
     assert worker._pool_environment(bulk)["CRATE_SQLALCHEMY_POOL_SIZE"] == "2"
 
     monkeypatch.setenv("CRATE_SQLALCHEMY_POOL_SIZE", "8")
     assert worker._pool_environment(interactive)["CRATE_SQLALCHEMY_POOL_SIZE"] == "8"
+
+
+def test_a_pool_that_exits_cleanly_is_replaced_alone():
+    """A recycled process exits 0 after its task; only its pool starts again."""
+    import signal
+    import threading
+    import time
+
+    recycled = _pool(0.0, exit_after=0.3, code=0)
+    sibling = _pool(0.2)
+    pools = [recycled, sibling]
+    replaced = []
+
+    def respawn(index):
+        replaced.append(index)
+        return _pool(0.2)
+
+    stopping = threading.Event()
+    sibling_alive_before_stop = []
+
+    def stop_later():
+        time.sleep(1.5)
+        sibling_alive_before_stop.append(sibling.poll() is None)
+        worker._request_pool_stop(pools, stopping, signal.SIGTERM)
+
+    stopper = threading.Thread(target=stop_later)
+    stopper.start()
+    code = worker._supervise_pools(
+        pools, stopping=stopping, poll_seconds=0.05, respawn=respawn
+    )
+    stopper.join()
+
+    assert code == 0
+    assert replaced == [0]
+    assert sibling_alive_before_stop == [True]
+    assert pools[0] is not recycled
+    assert pools[0].returncode == 0
+    assert sibling.returncode == 0
+
+
+def test_a_crashed_pool_still_stops_every_pool():
+    general = _pool(0.0, exit_after=0.3, code=3)
+    lane = _pool(0.5)
+    replaced = []
+
+    code = worker._supervise_pools(
+        [general, lane],
+        grace_seconds=10,
+        poll_seconds=0.05,
+        respawn=lambda index: replaced.append(index),
+    )
+
+    assert code == 3
+    assert replaced == []
+    assert lane.returncode == 0
