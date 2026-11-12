@@ -64,6 +64,28 @@ jobs:
         run: pip install -r requirements-test.txt
         working-directory: app
 
+      - name: Install the worker image's PostgreSQL 15 client
+        # The runner's own client is newer: its dumps carry settings (for example
+        # transaction_timeout) that PostgreSQL 15 rejects on restore. The worker
+        # image pairs a 15 client with the 15 server; so do the tests.
+        run: |
+          set -eu
+          if ! grep -rqs apt.postgresql.org /etc/apt/sources.list.d/; then
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -fsSL --retry 5 -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+              https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+              | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          fi
+          for attempt in 1 2 3; do
+            if sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-15; then
+              break
+            fi
+            [ "$attempt" = 3 ] && exit 1
+            sleep 20
+          done
+          echo /usr/lib/postgresql/15/bin >> "$GITHUB_PATH"
+
       - name: Install the worker image's restic and rclone
         run: |
           arg() { sed -n "s/^ARG $1=//p" app/Dockerfile; }
@@ -93,6 +115,6 @@ jobs:
           POSTGRES_SUPERUSER_DB: crate_test
           CRATE_BACKUP_INTEGRATION_REQUIRED: "1"
         run: |
-          restic version && rclone version | head -n 1
+          restic version && rclone version | head -n 1 && pg_restore --version
           python -m pytest tests/test_backup_*.py -q -rs --tb=short
         working-directory: app
