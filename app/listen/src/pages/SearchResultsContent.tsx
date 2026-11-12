@@ -6,26 +6,46 @@ import type { PlayerActionsValue } from "@/contexts/player-context";
 
 import { SearchAlbumResults } from "./SearchAlbumResults";
 import { SearchArtistResults } from "./SearchArtistResults";
+import { SearchNetworkResults } from "./SearchNetworkResults";
 import { SearchNoResultsState } from "./SearchNoResultsState";
 import { SearchTrackResults } from "./SearchTrackResults";
+import {
+  canSearchNetworkAgain,
+  networkCoverageSummary,
+  networkSearchInvolved,
+  networkStillSearching,
+  searchDataIsEmpty,
+} from "./search-network-model";
 import type { SearchData } from "./search-results-model";
+import type { NetworkSearchState } from "./use-search-results";
 
 export function SearchResultsContent({
   data,
   query,
   trackRowData,
   playAll,
+  network = null,
+  onSearchNetworkAgain,
 }: {
   data: SearchData;
   query: string;
   trackRowData: TrackRowData[];
   playAll: PlayerActionsValue["playAll"];
+  network?: NetworkSearchState | null;
+  onSearchNetworkAgain?: () => void;
 }) {
   const { t } = useTranslation();
-  const noResults =
-    data.artists.length === 0 &&
-    data.albums.length === 0 &&
-    data.tracks.length === 0;
+  const noLocalResults = searchDataIsEmpty(data);
+  const withNetwork = networkSearchInvolved(network) ? network : null;
+  const networkEmptyAndDone =
+    withNetwork !== null &&
+    !networkStillSearching(withNetwork) &&
+    searchDataIsEmpty(withNetwork.results);
+  // With nothing local and nothing remote, the empty state carries the
+  // coverage; otherwise the network section does.
+  const showNetworkSection =
+    withNetwork !== null && !(noLocalResults && networkEmptyAndDone);
+  const searchAgain = onSearchNetworkAgain ?? (() => undefined);
 
   return (
     <div className="space-y-8">
@@ -44,7 +64,23 @@ export function SearchResultsContent({
           playAll={playAll}
         />
       ) : null}
-      {noResults ? <SearchNoResultsState /> : null}
+      {showNetworkSection ? (
+        <SearchNetworkResults
+          network={withNetwork}
+          query={query}
+          playAll={playAll}
+          onSearchAgain={searchAgain}
+        />
+      ) : null}
+      {noLocalResults && !withNetwork ? <SearchNoResultsState /> : null}
+      {noLocalResults && networkEmptyAndDone ? (
+        <SearchNoResultsState
+          message={networkCoverageSummary(withNetwork, t)}
+          onSearchAgain={
+            canSearchNetworkAgain(withNetwork) ? searchAgain : undefined
+          }
+        />
+      ) : null}
     </div>
   );
 }
