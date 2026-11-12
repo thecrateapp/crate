@@ -544,6 +544,10 @@ _DJ_RESULTS = """
         p.key_camelot AS camelot,
         p.global_energy AS energy,
         (p.track_id IS NULL) AS analysis_required,
+        t.format,
+        t.bitrate,
+        t.sample_rate,
+        current_profile.quality AS profile_quality,
         t.path,
         COALESCE(
             ts_rank(t.search_vector, to_tsquery('simple', :fts_query)), 0
@@ -554,6 +558,12 @@ _DJ_RESULTS = """
     LEFT JOIN track_mix_profiles p
       ON p.track_id = t.id AND p.quality <> 'unavailable'
       AND p.source_stale_at IS NULL
+    -- The profile the Decks track pages (S3) report: any quality, failed
+    -- analyses included, as long as its source is not stale. One primary-key
+    -- probe per result row.
+    LEFT JOIN track_mix_profiles current_profile
+      ON current_profile.track_id = t.id
+      AND current_profile.source_stale_at IS NULL
     WHERE (CAST(:artist AS text) IS NULL OR t.artist ILIKE :artist ESCAPE '\\')
       AND (CAST(:album AS text) IS NULL OR a.name ILIKE :album ESCAPE '\\')
       AND (CAST(:bpm_min AS double precision) IS NULL OR p.bpm >= :bpm_min)

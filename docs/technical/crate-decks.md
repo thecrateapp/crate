@@ -5,7 +5,7 @@ section: reference
 audience: [developer]
 status: canonical
 order: 35
-verified: 2026-11-10
+verified: 2026-11-11
 sources:
   - app/crate/api/auth.py
   - app/crate/api/native_oauth_auth.py
@@ -723,6 +723,28 @@ plane serves plain local search natively and must keep the same JSON. Any
 to FastAPI (`searchRoute` in `app/readplane/internal/routes/catalog.go`), so
 `fields=dj` gets the DJ filters and `playable` behind the edge too. The S3
 track pages carry the same field with the same check.
+
+### Audio and profile fields in DJ search
+
+DJ search tracks also carry the S3 fields Decks needs to import a result
+without opening its container, with the same names, types and meaning as the
+[container tracks](#container-tracks) table:
+
+- `format`, `bitrate`, `sample_rate`: as the scanner recorded them.
+- `source_revision`: revision of the audio file on disk, from the same `stat`
+  as `playable`; it matches a current profile's source revision.
+- `profile_quality`: quality of the profile
+  `GET /api/tracks/by-entity/{uid}/mix-profile` serves, any quality as long as
+  its source is not stale. `unavailable` means the analysis failed; such a
+  track still has `analysis_required: true` and no `camelot` or `energy`, as
+  before.
+
+They come from the same statement as the rest of the result (one primary-key
+probe on `track_mix_profiles` per row, at most 50 rows), so the search does not
+run another query per track. Search omits `null` fields
+(`response_model_exclude_none`), where the S3 pages send them: a missing field
+means `null`. Access-token DJ queries carry the same fields; plain local,
+`auto` and federated search do not change.
 
 ### Plan and profile fields
 
