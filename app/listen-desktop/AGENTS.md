@@ -96,14 +96,28 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   `app.cratemusic.crate.desktop`, which matches the desktop entries' `StartupWMClass`
   (it used to report `crate-desktop`).
 - **Control socket** (`desktop_control.rs`): `$XDG_RUNTIME_DIR/crate/control.sock`
-  (dir 0700, socket 0600), JSON lines, protocol 1. Server sends `hello`, then `state`
-  on every change, and `ack`/`error` per command. Commands: `play`, `pause`,
-  `play_pause`, `next`, `previous`, `show`, `seek`, `set_volume`, `set_shuffle`,
+  (dir 0700, socket 0600), JSON lines, protocol 1. Server sends `hello` (with
+  `commands`, every `cmd` accepted; `COMMANDS` in Rust, kept in step by a test), then
+  `state` on every change, and `ack`/`error` per command. Commands: `play`, `pause`,
+  `play_pause`, `next`, `previous`, `show` (optional `item`: raise and open that ref's
+  artist/album page, a track's album with `?track=`; `DesktopControlNavigator` in
+  `src/components` navigates), `seek`, `set_volume`, `set_shuffle`,
   `set_repeat`, `eq_enabled`, `eq_mode` (`smart|genre|adaptive|manual`), `eq_preset`,
   `eq_gains`, `search` (acked with a `request` id, answered later with a `result`
-  line to that client only, through `desktop_control_reply`) and `play_item` (a
-  search result's `ref`). Refs never carry media URLs: Crate signs those with a
-  `media_ticket` (`lib/desktop-control-search.ts` strips them). Transport goes through `handle_playback_menu_event` (same path as the
+  line to that client only, through `desktop_control_reply`), `play_item` (a
+  search result's `ref`) and `queue_item` (append a ref to the queue; acked or refused
+  only after Listen answers `desktop_control_done`, 2.5 s timeout). Result items carry
+  `kind`, `title`, `subtitle`, `ref`, `duration` (tracks, whole seconds) and `art`.
+  Refs never carry media URLs: Crate signs those with a
+  `media_ticket` (`lib/desktop-control-search.ts` strips them).
+- **Launcher art** (`desktop_launcher_art.rs`, `app/listen/src/lib/desktop-launcher-art.ts`):
+  `art` is an absolute path in `$XDG_CACHE_HOME/crate/launcher-art/` (else
+  `~/.cache/...`, dir 0700), named `<first 32 hex of sha256("crate-launcher-art/v1/<key>/256")>-256.<jpg|png|webp>`,
+  where the key is `album:<id>` or `artist:<id>` (ids only, never URLs). Listen tags
+  items with `art_key`; `desktop_control_reply` swaps it for `art` when cached and
+  returns `missingArt`; Listen fetches those with its session, crops 256 px JPEG
+  squares and sends bytes to `store_launcher_art` (temp file + rename, mtime LRU,
+  100 MB cap pruned at most every 5 min). A miss sends no `art`; the reply never waits. Transport goes through `handle_playback_menu_event` (same path as the
   tray and `--crate-command`); the rest is the `crate:control-command` event, which
   `tauri-init.ts` validates again and hands to Listen
   (`app/listen/src/lib/desktop-control.ts`, `use-desktop-control-bridge.ts`). Listen
@@ -125,7 +139,8 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   `search_library` and `play_result`.
 - **Launcher** (`crate-desktop --launcher`): a rofi-script provider (Ryoku's launcher
   Script provider, or rofi): pass 1 prints search rows with the ref as `info`, pass 2
-  (`ROFI_RETV=1`) plays the pick. Also returns before the single-instance plugin.
+  (`ROFI_RETV=1`) plays the pick; a row's icon is the item's `art` when present. Also
+  returns before the single-instance plugin.
 - **Arch package:** `packaging/aur/crate-desktop-bin/` (PKGBUILD + .SRCINFO from the
   release `.deb`; bump the sha256 from the GitHub asset digest, not crate-checksums.txt).
 - **Volume caveat:** Listen's player volume is the webview's own gain, not the system
