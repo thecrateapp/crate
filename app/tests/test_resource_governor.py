@@ -448,3 +448,94 @@ def test_record_decision_emits_deferral_metrics(monkeypatch):
     ]
     assert ("worker.resource.defer_seconds", 600.0, counters[0][1]) in records
     assert ("worker.resource.load_ratio", 0.5, counters[0][1]) in records
+
+
+def _io_snapshot(governor, *, iowait, io_pressure):
+    return governor.ResourceSnapshot(
+        cpu_count=8,
+        load_1m=1.0,
+        load_ratio=0.125,
+        iowait_percent=iowait,
+        io_pressure_percent=io_pressure,
+        swap_used_percent=0.0,
+        active_users=0,
+        active_streams=0,
+    )
+
+
+@pytest.mark.parametrize(
+    ("io_pressure", "deferred"),
+    [
+        # A 50 ms iowait sample catches a burst while the disks are idle: the
+        # kernel's 10 s IO pressure stays low, so the task runs.
+        (0.4, False),
+        # Sustained IO pressure confirms the sample: the task waits.
+        (18.0, True),
+        # Without PSI (old kernel, no /proc/pressure) the sample decides alone.
+        (None, True),
+    ],
+    ids=["burst", "sustained", "no-psi"],
+)
+def test_iowait_defers_only_under_sustained_io_pressure(
+    monkeypatch, io_pressure, deferred
+):
+    from crate import resource_governor as governor
+
+    monkeypatch.setenv("CRATE_RESOURCE_GOVERNOR_ENABLED", "true")
+    monkeypatch.setenv("CRATE_MAINTENANCE_WINDOW_ENABLED", "false")
+    monkeypatch.setenv("CRATE_RESOURCE_MAX_IOWAIT_PERCENT", "25")
+    monkeypatch.delenv("CRATE_RESOURCE_MIN_IO_PRESSURE_PERCENT", raising=False)
+    monkeypatch.setattr(
+        governor,
+        "build_snapshot",
+        lambda include_playback=True: _io_snapshot(
+            governor, iowait=38.5, io_pressure=io_pressure
+        ),
+    )
+
+    decision = governor.should_defer_task("library_sync")
+
+    assert decision.allowed is (not deferred)
+    if deferred:
+        assert "iowait 38.5%>25.0%" in decision.reason
+
+
+def test_io_pressure_reads_the_kernels_ten_second_average(monkeypatch, tmp_path):
+    from crate import resource_governor as governor
+
+    pressure = tmp_path / "io"
+    pressure.write_text(
+        "some avg10=12.34 avg60=0.54 avg300=0.49 total=150614986521\n"
+        "full avg10=0.10 avg60=0.28 avg300=0.23 total=135301263370\n"
+    )
+    monkeypatch.setattr(governor, "IO_PRESSURE_PATH", str(pressure))
+    assert governor._read_io_pressure_percent() == 12.34
+
+    monkeypatch.setattr(governor, "IO_PRESSURE_PATH", str(tmp_path / "missing"))
+    assert governor._read_io_pressure_percent() is None
+
+
+def test_a_deferred_backfill_coordinator_checks_again_within_half_a_minute(
+    monkeypatch,
+):
+    from crate import resource_governor as governor
+
+    monkeypatch.setenv("CRATE_RESOURCE_GOVERNOR_ENABLED", "true")
+    monkeypatch.setenv("CRATE_MAINTENANCE_WINDOW_ENABLED", "false")
+    monkeypatch.setenv("CRATE_RESOURCE_MAX_LOAD_RATIO", "0.50")
+    monkeypatch.setenv("CRATE_RESOURCE_DEFER_SECONDS", "300")
+    monkeypatch.setattr(
+        governor,
+        "build_snapshot",
+        lambda include_playback=True: governor.ResourceSnapshot(
+            cpu_count=4, load_1m=4.0, load_ratio=1.0, active_users=0, active_streams=0
+        ),
+    )
+
+    coordinator = governor.should_defer_task("backfill_smart_mix_profiles")
+    batch = governor.should_defer_task("library_sync")
+
+    # The coordinator only counts slots; its analyses are governed themselves.
+    assert coordinator.allowed is False
+    assert coordinator.defer_seconds == 30
+    assert batch.defer_seconds == 300
