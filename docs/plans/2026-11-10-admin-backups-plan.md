@@ -199,6 +199,8 @@ Compose retention, `-Z6`, the Docker volume, and the R2 and Drive restic sidecar
 
 - The endpoints in §3.5, behind permission `system.backups.manage`, with audit entries and write-only secrets.
 - Plus the test-without-saving endpoint (BG1-9), the kit "I stored it" confirmation (BG1-4) and the disabled-until-tested rule (BG1-11).
+- Migration 165 caches each destination's last snapshot listing (written by tests, copies and verifications), because the API cannot run restic; the snapshots tab reads it.
+- `system.backups.manage` belongs to owner and admin only: the kit opens every repository.
 - Tests: OpenAPI contract, permissions (403 without the permission), and the re-auth requirement for the recovery kit.
 
 ### BK5 · Admin UI

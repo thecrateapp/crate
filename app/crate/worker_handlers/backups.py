@@ -94,7 +94,9 @@ def _enqueue_retention() -> str | None:
     return _enqueue(RETENTION_TASK, {}, RETENTION_TASK)
 
 
-def _queue_policy_copies(policy: dict, dump_path: str, taken_at: datetime) -> list[str]:
+def _queue_policy_copies(
+    policy: dict, dump_path: str, taken_at: datetime, *, ignore_window: bool = False
+) -> list[str]:
     """One ``backup_offsite`` per usable destination whose tiers are due."""
     now = local_now()
     destinations = {row["id"]: row for row in list_backup_destinations()}
@@ -123,6 +125,7 @@ def _queue_policy_copies(policy: dict, dump_path: str, taken_at: datetime) -> li
                 "destination_tiers": list(tiers),
                 "taken_at": taken_at.isoformat(),
                 "ignore_maintenance_window": True,
+                **({"ignore_window": True} if ignore_window else {}),
             },
             f"backup_offsite:{policy['id']}:{destination_id}",
         )
@@ -180,7 +183,11 @@ def _handle_backup_dump(task_id: str, params: dict, config: dict) -> dict:
     retention_task_id = _enqueue_retention()
     offsite_task_ids = (
         _queue_policy_copies(
-            policy, relative, parse_dump_name(result.path.name) or datetime.now(UTC)
+            policy,
+            relative,
+            parse_dump_name(result.path.name) or datetime.now(UTC),
+            # Run now from Admin: the operator asked for it now, window or not.
+            ignore_window=bool(params.get("ignore_window")),
         )
         if policy
         else []
@@ -338,7 +345,7 @@ def _handle_backup_offsite(task_id: str, params: dict, config: dict) -> dict:
         return {"status": "failed", "error": "The destination no longer exists"}
     if not row["enabled"]:
         return {"status": "skipped", "reason": "The destination is disabled"}
-    waiting = _wait_for_window(policy)
+    waiting = None if params.get("ignore_window") else _wait_for_window(policy)
     if waiting:
         return waiting
     tags = [str(t) for t in params.get("tags") or []]

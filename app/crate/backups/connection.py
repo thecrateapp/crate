@@ -204,7 +204,7 @@ def probe_unsaved(
     Crate generates only when the destination is saved, so the full test runs
     after saving; its first pass enables the destination.
     """
-    if tools_available():
+    if any("rclone" in tool for tool in tools_available()):
         return ConnectionResult(
             "unavailable", "This worker has no rclone; use the standard image"
         )

@@ -187,7 +187,93 @@ def latest_tier_copies(
         return _impl(current)
 
 
+def repository_size_series(
+    *, days: int = 90, session: Session | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """Per destination, the repository size after the last good copy of each day."""
+
+    def _impl(current: Session) -> dict[str, list[dict[str, Any]]]:
+        rows = current.execute(
+            text(
+                """
+                SELECT DISTINCT ON (destination_id, day)
+                    destination_id::text AS destination_id, day,
+                    (details ->> 'repository_bytes')::bigint AS bytes
+                FROM (
+                    SELECT destination_id, details, started_at,
+                           (started_at AT TIME ZONE 'UTC')::date AS day
+                    FROM backup_runs
+                    WHERE kind = 'offsite' AND status = 'succeeded'
+                      AND destination_id IS NOT NULL
+                      AND started_at >= now() - make_interval(days => :days)
+                      AND jsonb_typeof(details -> 'repository_bytes') = 'number'
+                ) copies
+                ORDER BY destination_id, day, started_at DESC
+                """
+            ),
+            {"days": max(1, min(int(days), 366))},
+        ).mappings()
+        out: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            out.setdefault(row["destination_id"], []).append(
+                {"day": row["day"].isoformat(), "bytes": int(row["bytes"])}
+            )
+        return out
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def count_backup_runs(
+    *,
+    kind: str | None = None,
+    status: str | None = None,
+    destination_id: str | None = None,
+    policy_id: str | None = None,
+    since: datetime | None = None,
+    before: datetime | None = None,
+    session: Session | None = None,
+) -> int:
+    def _impl(current: Session) -> int:
+        return int(
+            current.execute(
+                text(
+                    """
+                    SELECT count(*) FROM backup_runs
+                    WHERE (CAST(:kind AS text) IS NULL OR kind = :kind)
+                      AND (CAST(:status AS text) IS NULL OR status = :status)
+                      AND (CAST(:destination_id AS uuid) IS NULL
+                           OR destination_id = CAST(:destination_id AS uuid))
+                      AND (CAST(:policy_id AS uuid) IS NULL
+                           OR policy_id = CAST(:policy_id AS uuid))
+                      AND (CAST(:since AS timestamptz) IS NULL
+                           OR started_at >= CAST(:since AS timestamptz))
+                      AND (CAST(:before AS timestamptz) IS NULL
+                           OR started_at < CAST(:before AS timestamptz))
+                    """
+                ),
+                {
+                    "kind": kind,
+                    "status": status,
+                    "destination_id": destination_id,
+                    "policy_id": policy_id,
+                    "since": since,
+                    "before": before,
+                },
+            ).scalar_one()
+        )
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 __all__ = [
+    "count_backup_runs",
+    "repository_size_series",
     "get_backup_run",
     "latest_tier_copies",
     "latest_destination_runs",
