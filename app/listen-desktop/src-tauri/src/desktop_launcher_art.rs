@@ -18,6 +18,8 @@
 //!   reply always names a complete image.
 //! - The cache is an LRU (mtime, touched on every hit) capped at
 //!   `MAX_CACHE_BYTES`, pruned after writes, at most every `PRUNE_INTERVAL`.
+//! - Listen also prewarms it with what the user plays: `launcher_art_missing`
+//!   tells it which keys have no image yet (`partition_missing`).
 
 use std::{
     fs::{self, OpenOptions},
@@ -224,6 +226,27 @@ pub fn prune_if_due(root: &Path) {
     let _ = prune(root, MAX_CACHE_BYTES);
 }
 
+/// At most this many keys are checked per call (prewarm sends ~300).
+pub const MAX_CHECK_KEYS: usize = 1000;
+
+/// Split `keys` into cached images (to touch) and valid keys with no image
+/// yet, without duplicates, in order. Invalid keys are dropped.
+pub fn partition_missing(root: &Path, keys: &[String]) -> (Vec<PathBuf>, Vec<String>) {
+    let mut hits = Vec::new();
+    let mut missing: Vec<String> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for key in keys.iter().take(MAX_CHECK_KEYS) {
+        if !valid_key(key) || !seen.insert(key.as_str()) {
+            continue;
+        }
+        match lookup(root, key) {
+            Some(path) => hits.push(path),
+            None => missing.push(key.clone()),
+        }
+    }
+    (hits, missing)
+}
+
 /// Swap each item's internal `art_key` for `art` (an absolute path) when the
 /// image is cached. Any `art` the caller sent is dropped first, so the value on
 /// the wire only ever comes from here. Returns the cache hits (to touch) and
@@ -423,6 +446,33 @@ mod tests {
         assert!(paths[0].exists());
         assert!(!stale_tmp.exists());
         assert!(prune(&root, 1500).unwrap().is_empty());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn partitions_keys_into_cache_hits_and_misses() {
+        let root = temp_root("partition");
+        let cached = store(&root, "album:1", JPEG).unwrap();
+        let keys: Vec<String> = [
+            "album:1",
+            "album:2",
+            "artist:3",
+            "album:2",
+            "album:https://x?ticket=1",
+            "track:4",
+        ]
+        .iter()
+        .map(|k| k.to_string())
+        .collect();
+        let (hits, missing) = partition_missing(&root, &keys);
+        assert_eq!(hits, vec![cached]);
+        assert_eq!(missing, vec!["album:2".to_string(), "artist:3".to_string()]);
+
+        let many: Vec<String> = (0..MAX_CHECK_KEYS + 50)
+            .map(|i| format!("album:{i}"))
+            .collect();
+        let (_, missing) = partition_missing(&root, &many);
+        assert_eq!(missing.len(), MAX_CHECK_KEYS - 1, "album:1 is cached");
         let _ = fs::remove_dir_all(&root);
     }
 

@@ -794,6 +794,22 @@ fn desktop_control_done(request: u64, error: Option<String>) -> bool {
     desktop_control::confirm(request, error.map_or(Ok(()), Err))
 }
 
+/// Which launcher-art keys have no cached image yet, for Listen's prewarm
+/// (what the user plays). Cache hits count as used (LRU). `None` where the
+/// launcher cache does not exist (off Linux), so Listen skips the prewarm.
+#[cfg(desktop)]
+#[tauri::command]
+async fn launcher_art_missing(keys: Vec<String>) -> Option<Vec<String>> {
+    let root = desktop_launcher_art::cache_root()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let (hits, missing) = desktop_launcher_art::partition_missing(&root, &keys);
+        desktop_launcher_art::touch(&hits);
+        missing
+    })
+    .await
+    .ok()
+}
+
 /// A launcher image (a square 256 px JPEG, PNG or WebP) that Listen fetched
 /// for an `art_key` reported as missing. Written atomically off the main
 /// thread; the cache is pruned afterwards.
@@ -1573,6 +1589,7 @@ pub fn run() {
             desktop_control_reply,
             desktop_control_done,
             store_launcher_art,
+            launcher_art_missing,
             register_deep_link_listener,
             offline_storage::register_offline_transfer,
             offline_storage::cancel_offline_transfer,
@@ -1699,6 +1716,23 @@ mod tests {
             assert!(result.missing_art.is_empty());
         }
         assert!(super::desktop_control_reply(0, serde_json::json!({})).is_err());
+    }
+
+    #[test]
+    fn launcher_art_missing_lists_uncached_keys_or_none_without_a_cache() {
+        let keys = vec![
+            "album:launcher-art-test-never-cached".to_string(),
+            "album:https://x?ticket=1".to_string(),
+        ];
+        let missing = tauri::async_runtime::block_on(super::launcher_art_missing(keys));
+        if super::desktop_launcher_art::cache_root().is_some() {
+            assert_eq!(
+                missing,
+                Some(vec!["album:launcher-art-test-never-cached".to_string()])
+            );
+        } else {
+            assert_eq!(missing, None);
+        }
     }
 
     #[test]
