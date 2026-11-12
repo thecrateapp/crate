@@ -336,7 +336,7 @@ export function BackupsOverview({
           nextPolicy ? (
             <span className="font-mono text-label text-text-subtle">
               {nextPolicy.name} policy · next run{" "}
-              {formatStamp(nextPolicy.next_run)}
+              {formatNext(nextPolicy.next_run, now).toLowerCase()}
             </span>
           ) : undefined
         }
