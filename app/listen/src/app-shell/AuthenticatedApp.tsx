@@ -15,6 +15,8 @@ type CapabilitiesResponse = {
   smart_mix: {
     available: boolean;
     planner_version: string | null;
+    planner_versions?: string[];
+    listen_planner_version?: string | null;
     android_native_crossfade: boolean;
     android_beatmatch: boolean;
     android_bass_handoff?: boolean;
@@ -33,6 +35,8 @@ export function AuthenticatedApp() {
         setAndroidNativeSmartMixCapabilities({
           available: smartMix.available,
           plannerVersion: smartMix.planner_version,
+          plannerVersions: smartMix.planner_versions ?? [],
+          listenPlannerVersion: smartMix.listen_planner_version ?? null,
           androidNativeCrossfade: smartMix.android_native_crossfade,
           androidBeatmatch: smartMix.android_beatmatch,
           androidBassHandoff: smartMix.android_bass_handoff === true,
@@ -44,6 +48,8 @@ export function AuthenticatedApp() {
         setAndroidNativeSmartMixCapabilities({
           available: false,
           plannerVersion: null,
+          plannerVersions: [],
+          listenPlannerVersion: null,
           androidNativeCrossfade: false,
           androidBeatmatch: false,
           androidBassHandoff: false,

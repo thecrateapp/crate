@@ -53,6 +53,12 @@ def test_smart_mix_openapi_offers_planner_v3(test_app, spec: str) -> None:
         "smart-mix-v2",
         "smart-mix-v3",
     ]
+    continuation = components["PlaybackContinuationRequest"]
+    assert continuation["properties"]["plannerVersion"]["enum"] == [
+        "smart-mix-v2",
+        "smart-mix-v3",
+    ]
+    assert "plannerVersion" in continuation["required"]
     plan = components["TransitionPlanResponse"]["properties"]
     assert "structureUsed" in plan
     # Smart Mix Stems ST3: optional, absent unless the stems layer scored the plan.

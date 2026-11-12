@@ -156,12 +156,115 @@ public class NativeContinuationClientTest {
     public void ignoresAResponseFromAnotherPlannerVersion() throws Exception {
         List<JSONObject> plans = NativeContinuationClient.parsePlans(
             "{\"plannerVersion\":\"smart-mix-v1\",\"plans\":[]}",
+            NativeContinuationClient.DEFAULT_PLANNER_VERSION,
             tracks,
             0,
             4
         );
 
         assertTrue(plans.isEmpty());
+    }
+
+    @Test
+    public void requestsTheConfiguredPlanner() throws Exception {
+        NativeContinuationClient.Config config = NativeContinuationClient.Config.fromJson(
+            new JSONObject("{\"token\":\"crv_x\",\"plannerVersion\":\"smart-mix-v3\"}")
+        );
+
+        assertEquals(
+            "smart-mix-v3",
+            NativeContinuationClient.requestBody(config, tracks, 0, 4).getString("plannerVersion")
+        );
+        assertEquals(
+            "smart-mix-v3",
+            NativeContinuationClient.continuationBody(config, tracks, 10)
+                .getString("plannerVersion")
+        );
+    }
+
+    @Test
+    public void fallsBackToV2ForAMissingOrUnknownPlanner() throws Exception {
+        for (String payload : new String[] {
+            "{\"token\":\"crv_x\"}",
+            "{\"token\":\"crv_x\",\"plannerVersion\":\"smart-mix-v9\"}",
+        }) {
+            assertEquals(
+                "smart-mix-v2",
+                NativeContinuationClient.Config.fromJson(new JSONObject(payload)).plannerVersion
+            );
+        }
+        assertEquals("smart-mix-v2", CONFIG.plannerVersion);
+        assertEquals("smart-mix-v3", NativeContinuationClient.supportedPlanner("smart-mix-v3"));
+        assertEquals("smart-mix-v2", NativeContinuationClient.supportedPlanner(null));
+    }
+
+    @Test
+    public void acceptsOnlyTheResponseOfTheRequestedPlanner() throws Exception {
+        assertTrue(
+            NativeContinuationClient.parsePlans(
+                planResponse("smart-mix-v2"), "smart-mix-v3", tracks, 0, 4
+            ).isEmpty()
+        );
+        assertEquals(
+            1,
+            NativeContinuationClient.parsePlans(
+                planResponse("smart-mix-v3"), "smart-mix-v3", tracks, 0, 4
+            ).size()
+        );
+    }
+
+    @Test
+    public void installsTheContinuationPlansOfTheConfiguredPlanner() throws Exception {
+        NativeContinuationClient.Config v3 = NativeContinuationClient.Config.fromJson(
+            new JSONObject(
+                "{\"token\":\"crv_x\",\"apiBase\":\"https://api.example\","
+                    + "\"plannerVersion\":\"smart-mix-v3\"}"
+            )
+        );
+        String body = new JSONObject()
+            .put(
+                "tracks",
+                new JSONArray().put(
+                    new JSONObject()
+                        .put("id", "uid-6")
+                        .put("entityUid", "uid-6")
+                        .put("url", "/api/tracks/by-entity/uid-6/stream")
+                        .put("durationMs", 201_500L)
+                )
+            )
+            .put(
+                "plans",
+                new JSONArray().put(
+                    new JSONObject()
+                        .put("outgoingTrackEntityUid", "uid-5")
+                        .put("incomingTrackEntityUid", "uid-6")
+                        .put("plannerVersion", 2)
+                        .put("outgoingCueMs", 170_000L)
+                )
+            )
+            .toString();
+
+        NativeContinuationClient.Continuation continuation =
+            NativeContinuationClient.parseContinuation(body, v3, tracks);
+
+        assertEquals(1, continuation.plans.size());
+    }
+
+    private static String planResponse(String plannerVersion) throws Exception {
+        return new JSONObject()
+            .put("plannerVersion", plannerVersion)
+            .put(
+                "plans",
+                new JSONArray().put(
+                    new JSONObject()
+                        .put("outgoingTrackEntityUid", "uid-4")
+                        .put("incomingTrackEntityUid", "uid-5")
+                        .put("plannerVersion", 2)
+                        .put("mode", "adaptive")
+                        .put("outgoingCueMs", 204_101L)
+                )
+            )
+            .toString();
     }
 
     @Test
