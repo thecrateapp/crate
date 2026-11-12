@@ -6,11 +6,13 @@ import type { Track } from "@/contexts/player-types";
 import { usePlayerPlatformIntegrations } from "./use-player-platform-integrations";
 
 const {
+  useDesktopControlBridge,
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
   useMediaSession,
   usePlayerShortcuts,
 } = vi.hoisted(() => ({
+  useDesktopControlBridge: vi.fn(),
   useDesktopTrayCommands: vi.fn(),
   useDesktopTrayNowPlaying: vi.fn(),
   useMediaSession: vi.fn(),
@@ -21,6 +23,7 @@ vi.mock("./use-desktop-tray-commands", () => ({
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
 }));
+vi.mock("./use-desktop-control-bridge", () => ({ useDesktopControlBridge }));
 vi.mock("./use-media-session", () => ({ useMediaSession }));
 vi.mock("./use-player-shortcuts", () => ({ usePlayerShortcuts }));
 
@@ -49,6 +52,10 @@ describe("usePlayerPlatformIntegrations", () => {
       resume: vi.fn(),
       seek: vi.fn(),
       setVolume: vi.fn(),
+      toggleShuffle: vi.fn(),
+      setRepeatMode: vi.fn(),
+      play: vi.fn(),
+      playAll: vi.fn(),
     };
     const isPlayingRef = { current: true };
     const currentTrack = createTrack();
@@ -62,6 +69,8 @@ describe("usePlayerPlatformIntegrations", () => {
         isPlaying: true,
         isPlayingRef,
         lastNonZeroVolume: 0.8,
+        repeat: "all",
+        shuffle: true,
         volume: 0.5,
       }),
     );
@@ -90,6 +99,17 @@ describe("usePlayerPlatformIntegrations", () => {
     expect(useDesktopTrayNowPlaying).toHaveBeenCalledWith({
       currentTrack,
       isPlaying: true,
+    });
+    expect(useDesktopControlBridge).toHaveBeenCalledWith({
+      play: actions.play,
+      playAll: actions.playAll,
+      repeat: "all",
+      seek: actions.seek,
+      setRepeatMode: actions.setRepeatMode,
+      setVolume: actions.setVolume,
+      shuffle: true,
+      toggleShuffle: actions.toggleShuffle,
+      volume: 0.5,
     });
     expect(useMediaSession).toHaveBeenCalledWith({
       currentTime: 12,

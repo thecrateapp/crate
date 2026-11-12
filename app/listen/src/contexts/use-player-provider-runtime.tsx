@@ -346,6 +346,12 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     prev,
     seek,
     setVolume,
+    shuffle,
+    toggleShuffle,
+    repeat,
+    setRepeatMode,
+    play,
+    playAll,
   });
 
   const { actionsValue, progressValue, stateValue } = usePlayerContextValues({

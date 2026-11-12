@@ -1,0 +1,147 @@
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { api } = vi.hoisted(() => ({ api: vi.fn() }));
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  api,
+}));
+vi.mock("@/lib/remote-track-playback", () => ({
+  resolveRemotePlayableTrack: (track: unknown) => Promise.resolve(track),
+}));
+
+vi.mock("@/lib/platform", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/platform")>()),
+  isTauriRuntime: true,
+}));
+
+import {
+  DESKTOP_CONTROL_COMMAND_EVENT,
+  resetDesktopControlStateForTests,
+} from "@/lib/desktop-control";
+
+import { useDesktopControlBridge } from "./use-desktop-control-bridge";
+
+function input() {
+  return {
+    play: vi.fn(),
+    playAll: vi.fn(),
+    repeat: "off" as const,
+    seek: vi.fn(),
+    setRepeatMode: vi.fn(),
+    setVolume: vi.fn(),
+    shuffle: false,
+    toggleShuffle: vi.fn(),
+    volume: 0.5,
+  };
+}
+
+describe("useDesktopControlBridge", () => {
+  beforeEach(() => {
+    resetDesktopControlStateForTests();
+    localStorage.clear();
+    window.__crateTauriInvoke = vi.fn().mockResolvedValue(undefined);
+  });
+  afterEach(() => {
+    delete window.__crateTauriInvoke;
+  });
+
+  it("publishes the player and equalizer state to the shell", () => {
+    renderHook(() => useDesktopControlBridge(input()));
+    expect(window.__crateTauriInvoke).toHaveBeenCalledWith(
+      "update_desktop_control_state",
+      {
+        state: expect.objectContaining({
+          player: { volume: 0.5, shuffle: false, repeat: "off" },
+          eq: expect.objectContaining({
+            mode: expect.any(String),
+            gains: expect.any(Array),
+          }),
+        }),
+      },
+    );
+  });
+
+  it("applies relayed commands to the player", () => {
+    const value = input();
+    renderHook(() => useDesktopControlBridge(value));
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(DESKTOP_CONTROL_COMMAND_EVENT, {
+          detail: { cmd: "set_volume", volume: 0.25 },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent(DESKTOP_CONTROL_COMMAND_EVENT, {
+          detail: { cmd: "set_shuffle", on: true },
+        }),
+      );
+      window.dispatchEvent(
+        new CustomEvent(DESKTOP_CONTROL_COMMAND_EVENT, {
+          detail: { cmd: "quit" },
+        }),
+      );
+    });
+    expect(value.setVolume).toHaveBeenCalledWith(0.25);
+    expect(value.toggleShuffle).toHaveBeenCalledTimes(1);
+  });
+
+  it("changes the stored equalizer mode", () => {
+    renderHook(() => useDesktopControlBridge(input()));
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(DESKTOP_CONTROL_COMMAND_EVENT, {
+          detail: { cmd: "eq_mode", mode: "genre" },
+        }),
+      );
+    });
+    expect(localStorage.getItem("listen-eq-genre-adaptive")).toBe("true");
+    expect(localStorage.getItem("listen-eq-enabled")).toBe("true");
+  });
+
+  it("answers a search with the results and plays a picked track", async () => {
+    api.mockResolvedValue({
+      artists: [{ name: "Repion", id: 3 }],
+      albums: [],
+      tracks: [
+        {
+          id: 9,
+          title: "Barrio Somavilla",
+          artist: "Repion",
+          album: "Pronto",
+          path: "a.flac",
+        },
+      ],
+    });
+    const value = input();
+    renderHook(() => useDesktopControlBridge(value));
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(DESKTOP_CONTROL_COMMAND_EVENT, {
+          detail: { cmd: "search", query: "repion", request: 5 },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(api).toHaveBeenCalledWith("/api/catalog/search?q=repion&limit=8");
+    const reply = (
+      window.__crateTauriInvoke as ReturnType<typeof vi.fn>
+    ).mock.calls.find(([name]) => name === "desktop_control_reply");
+    expect(reply?.[1].request).toBe(5);
+    const items = reply?.[1].items as { kind: string; ref: unknown }[];
+    expect(items.map((i) => i.kind)).toEqual(["artist", "track"]);
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(DESKTOP_CONTROL_COMMAND_EVENT, {
+          detail: { cmd: "play_item", item: items[1]?.ref },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(value.play).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Barrio Somavilla" }),
+      { type: "queue", name: "Search" },
+    );
+  });
+});

@@ -3,6 +3,7 @@ import type { MutableRefObject } from "react";
 import type { PlayerActionsValue } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
 
+import { useDesktopControlBridge } from "./use-desktop-control-bridge";
 import {
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
@@ -12,7 +13,18 @@ import { usePlayerShortcuts } from "./use-player-shortcuts";
 
 type PlayerPlatformActions = Pick<
   PlayerActionsValue,
-  "next" | "pause" | "prev" | "resume" | "seek" | "setVolume"
+  | "next"
+  | "pause"
+  | "prev"
+  | "resume"
+  | "seek"
+  | "setVolume"
+  | "shuffle"
+  | "toggleShuffle"
+  | "repeat"
+  | "setRepeatMode"
+  | "play"
+  | "playAll"
 >;
 
 interface PlayerPlatformIntegrationsInput extends PlayerPlatformActions {
@@ -38,6 +50,12 @@ export function usePlayerPlatformIntegrations({
   resume,
   seek,
   setVolume,
+  shuffle,
+  toggleShuffle,
+  repeat,
+  setRepeatMode,
+  play,
+  playAll,
   volume,
 }: PlayerPlatformIntegrationsInput) {
   usePlayerShortcuts({
@@ -63,6 +81,17 @@ export function usePlayerPlatformIntegrations({
     resume,
   });
   useDesktopTrayNowPlaying({ currentTrack, isPlaying });
+  useDesktopControlBridge({
+    play,
+    playAll,
+    repeat,
+    seek,
+    setRepeatMode,
+    setVolume,
+    shuffle,
+    toggleShuffle,
+    volume,
+  });
 
   useMediaSession({
     currentTime,
