@@ -117,7 +117,13 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   items with `art_key`; `desktop_control_reply` swaps it for `art` when cached and
   returns `missingArt`; Listen fetches those with its session, crops 256 px JPEG
   squares and sends bytes to `store_launcher_art` (temp file + rename, mtime LRU,
-  100 MB cap pruned at most every 5 min). A miss sends no `art`; the reply never waits. Transport goes through `handle_playback_menu_event` (same path as the
+  100 MB cap pruned at most every 5 min). A miss sends no `art`; the reply never waits.
+  A search's misses share one batched ticket request and load 4 at a time; an image the
+  webview already loaded at >= 256 px (resource timing) is reused with `force-cache`.
+  Prewarm (`use-launcher-art-prewarm.ts`, `desktop-launcher-prewarm.ts`): at startup the
+  top artists, last 500 plays (cap 200 albums + 100 artists) and follows; each new
+  track; the queue (100 tracks, 3 s debounce). `launcher_art_missing` (null off Linux)
+  filters what is cached; background fetches are low priority, idle-time, 2 in total. Transport goes through `handle_playback_menu_event` (same path as the
   tray and `--crate-command`); the rest is the `crate:control-command` event, which
   `tauri-init.ts` validates again and hands to Listen
   (`app/listen/src/lib/desktop-control.ts`, `use-desktop-control-bridge.ts`). Listen
