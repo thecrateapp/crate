@@ -252,6 +252,12 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Test connection of a backup destination (BK2): asked from Admin, so priority 0
     # on the default queue; restic init plus a probe stay well under 15 minutes.
     "backup_test_destination": TaskPoolConfig("default", 0, 900, 0),
+    # Backup policies (BK3): copies, verification and drills hold one destination's
+    # lock each; the tick only reads and queues.
+    "backup_offsite": TaskPoolConfig("maintenance", 2, 21600, 0),
+    "backup_verify": TaskPoolConfig("maintenance", 3, 21600, 0),
+    "backup_restore_drill": TaskPoolConfig("maintenance", 3, 14400, 0),
+    "backup_policies_tick": TaskPoolConfig("maintenance", 1, 300, 0),
     "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
     "index_genres": TaskPoolConfig("maintenance", 3, 600, 0),
     "infer_genre_taxonomy": TaskPoolConfig("ai_bulk", 3, 3600, 0),

@@ -175,6 +175,62 @@ Settings, on `crate-worker` (the scheduler) and `crate-maintenance-worker`:
   volume); the default is created inside `$DATA_DIR`.
 - `CRATE_BACKUP_KEEP_DAILY`, `CRATE_BACKUP_KEEP_WEEKLY` and
   `CRATE_BACKUP_KEEP_MONTHLY`: the retention counts, by default 3, 4 and 3.
+  Counts set from Admin (stored in `settings` as `backups.local_keep_*`) win
+  over these. They are the local dumps' own counts, apart from the off-site
+  policies.
+
+## Backup policies and off-site copies
+
+Policies say when the engine copies the database, to which destinations, and
+how long each destination keeps the copies.
+
+- `backup_policies_tick` runs every 5 minutes while an enabled scheduled policy
+  exists; then the default nightly `backup_dump` stands down, because each
+  policy run makes its own dump. A due policy queues `backup_dump` with its id;
+  after a good dump, one `backup_offsite` goes to each enabled destination that
+  passed a test and whose tiers are due.
+- Tiers: every scheduled run is a daily copy. It is also the weekly copy when no
+  weekly copy went to that destination since the start of the last Sunday, and
+  the monthly copy when none went this calendar month. A destination receives a
+  run only for its own tiers.
+- `backup_offsite` runs `restic backup --stdin` of the dump as `/crate.dump`,
+  host `crate`, tagged with the tiers and `dump:<file>`, then
+  `restic forget --host crate --group-by host --keep-last 1` plus the policy's
+  counts for that destination's tiers, then `prune` when something was
+  forgotten. The off-site sidecar's snapshots share the host, so they are pruned
+  with the engine's. Manual policies back up as host `crate-manual` and prune
+  only their own snapshots.
+- `backup_verify` runs `restic check --read-data-subset=<n>%` on each
+  destination every `verify_every_days`.
+- `backup_restore_drill` runs every `drill_every_days` per policy, from the
+  destination whose last drill is the oldest (or a fixed one). It restores the
+  newest `/crate.dump` into `crate_restore_drill_<hex>` on the same PostgreSQL
+  server, with `pg_restore --no-owner --no-privileges --exit-on-error`, counts
+  rows of a few tables, reads the Alembic revision and drops the database. It
+  never names the production database. The database user needs `CREATEDB`
+  (the compose `POSTGRES_USER` is a superuser).
+- Each copy, verification and drill holds its destination's advisory lock;
+  drills also hold one drill lock. After a worker restart the next job closes
+  that destination's interrupted runs, runs `restic unlock` (stale locks only)
+  and drops leftover drill databases.
+- An optional window bounds when copies, verifications and drills start; a copy
+  already uploading at the end finishes.
+
+### Before upgrades
+
+A policy marked "run before upgrades" (manual schedule) is the deploy's safety
+copy. Run it and wait:
+
+```bash
+make backup-before-upgrade                     # docker compose in this directory
+make backup-before-upgrade BACKUP_DC="docker compose -f docker-compose.home.yaml"
+```
+
+It runs `python -m crate.backups.cli before-upgrade --wait` inside
+`crate-maintenance-worker`: one dump per policy and its copies. It exits 0 when
+every copy succeeded or no policy is marked, 1 when one failed, 2 on timeout
+(`BACKUP_TIMEOUT`, 3 hours by default). With `CRATE_LOCAL_BACKUPS_ENABLED` off
+the dump is skipped and the command exits 1. `make deploy` does not call it yet.
 
 ## Redis credential rotation
 

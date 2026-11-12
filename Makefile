@@ -908,6 +908,22 @@ agent-smoke: _agent-profile ## Check MCP discovery and one real model reply from
 	@$(AGENT_SETUP) smoke $(AGENT_ARGS)
 
 # ===========================================================================
+# BACKUPS
+# ===========================================================================
+
+# The "before upgrades" backup policies (admin backups, BG1-15): one dump each and
+# its copies, waited for. Exit 1 if a copy fails, 2 on timeout. Runs where the
+# compose stack runs; BACKUP_DC picks the compose files (home installs:
+# BACKUP_DC="docker compose -f docker-compose.home.yaml"). Not wired into
+# `make deploy`: the deploy runbook decides when to call it.
+BACKUP_DC      ?= $(DC)
+BACKUP_TIMEOUT ?= 10800
+
+.PHONY: backup-before-upgrade
+backup-before-upgrade: ## Run the "before upgrades" backup policies and wait (BACKUP_DC=, BACKUP_TIMEOUT=)
+	@$(BACKUP_DC) exec -T crate-maintenance-worker python -m crate.backups.cli before-upgrade --wait --timeout $(BACKUP_TIMEOUT)
+
+# ===========================================================================
 # DEPLOY (production)
 # ===========================================================================
 
