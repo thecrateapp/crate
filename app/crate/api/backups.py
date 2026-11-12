@@ -108,9 +108,15 @@ TEST_TASK = "backup_test_destination"
 PROBE_TASK = "backup_probe_destination"
 UI_PATH = "/backups"
 
-_NOT_FOUND: OpenApiResponses = {404: error_response("The destination or policy does not exist.")}
-_BAD: OpenApiResponses = {400: error_response("The settings are not valid; the message says why.")}
-_CONFLICT: OpenApiResponses = {409: error_response("The request conflicts with the current state.")}
+_NOT_FOUND: OpenApiResponses = {
+    404: error_response("The destination or policy does not exist.")
+}
+_BAD: OpenApiResponses = {
+    400: error_response("The settings are not valid; the message says why.")
+}
+_CONFLICT: OpenApiResponses = {
+    409: error_response("The request conflicts with the current state.")
+}
 _KIT_FILE: OpenApiResponses = {
     200: {
         "content": {"application/octet-stream": {}},
