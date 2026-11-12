@@ -202,6 +202,11 @@ export function CommandPalette() {
       capabilities: ["ops.runtime.manage"],
     },
     {
+      label: "Backups",
+      path: "/backups",
+      capabilities: ["system.backups.manage"],
+    },
+    {
       label: "Federation",
       path: "/federation",
       capabilities: COMMAND_FEDERATION_VIEW,
