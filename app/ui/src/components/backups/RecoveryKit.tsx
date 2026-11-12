@@ -236,7 +236,7 @@ export function RecoveryKitDialog({
               the passphrase.
             </p>
             {formError ? (
-              <p role="alert" className="text-sm text-state-danger-text">
+              <p role="alert" className="text-sm text-state-warning-text">
                 {formError}
               </p>
             ) : null}

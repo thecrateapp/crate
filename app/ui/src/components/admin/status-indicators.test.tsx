@@ -1,6 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { SeverityMeter, severityTone } from "./status-indicators";
+import {
+  SeverityMeter,
+  severityTextClass,
+  severityTone,
+} from "./status-indicators";
 
 describe("SeverityMeter", () => {
   it.each([
@@ -38,6 +42,12 @@ describe("SeverityMeter", () => {
     );
     expect(fatal).toHaveClass("outline-1");
     expect(error).not.toHaveClass("outline-1");
+  });
+
+  it("gives severity copy the same scale as the meter", () => {
+    expect(severityTextClass("error")).toBe("text-state-danger-text");
+    expect(severityTextClass("warning")).toBe("text-state-warning-text");
+    expect(severityTextClass(undefined)).toBe("text-text-secondary");
   });
 
   it("normalizes casing and whitespace", () => {

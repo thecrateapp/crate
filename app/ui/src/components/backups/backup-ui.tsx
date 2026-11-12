@@ -19,7 +19,10 @@ import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 
-import { SeverityMeter } from "@/components/admin/status-indicators";
+import {
+  SeverityMeter,
+  severityTextClass,
+} from "@/components/admin/status-indicators";
 import {
   HEALTH_LABEL,
   RUN_STATUS_LABEL,
@@ -159,7 +162,7 @@ export function Facts({
             className={cn(
               "m-0 mt-1 truncate font-mono text-sm tabular-nums",
               item.tone === "danger"
-                ? "text-state-danger-text"
+                ? severityTextClass("error")
                 : item.tone === "warning"
                   ? "text-state-warning-text"
                   : "text-text-primary",
@@ -194,7 +197,7 @@ export function TestResult({
       className={cn(
         "space-y-2 rounded-md border p-4",
         ok === false
-          ? "border-state-danger/25 bg-state-danger/10"
+          ? "border-border-quiet bg-raised-surface"
           : ok
             ? "border-border-quiet bg-raised-surface"
             : "border-dashed border-border-quiet",
@@ -221,7 +224,9 @@ export function TestResult({
               key={index}
               className={cn(
                 "text-sm",
-                ok === false ? "text-state-danger-text" : "text-text-secondary",
+                ok === false
+                  ? severityTextClass("error")
+                  : "text-text-secondary",
               )}
             >
               {line}

@@ -21,6 +21,8 @@ import {
   type BackupDestinationHealth,
 } from "@/lib/backups";
 
+import { severityTextClass } from "@/components/admin/status-indicators";
+
 import { HealthDot, KindMark } from "./backup-ui";
 import { displayHealth } from "./BackupsOverview";
 
@@ -30,7 +32,7 @@ function statusNote(d: BackupDestinationHealth, now: number) {
   const health = displayHealth(d);
   if (health === "failing")
     return (
-      <p className="max-w-64 text-xs text-state-danger-text">
+      <p className={cn("max-w-64 text-xs", severityTextClass("error"))}>
         {d.last_error || "The last test or copy failed"}
       </p>
     );

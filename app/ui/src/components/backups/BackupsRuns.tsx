@@ -32,6 +32,8 @@ import {
   type BackupRunList,
 } from "@/lib/backups";
 
+import { severityTextClass } from "@/components/admin/status-indicators";
+
 import { CopyAction, RunStatusDot } from "./backup-ui";
 
 const TH = "font-mono text-label uppercase tracking-caps";
@@ -142,14 +144,19 @@ function RunDetail({
       className={cn(
         "space-y-4 rounded-md border p-4",
         failed
-          ? "border-state-danger/25 bg-state-danger/10"
+          ? "border-border-quiet bg-raised-surface"
           : "border-border-quiet bg-raised-surface",
       )}
     >
       {failed ? (
         <div className="space-y-2">
           <MonoLabel as="p">Error</MonoLabel>
-          <pre className="m-0 whitespace-pre-wrap break-all font-mono text-label text-state-danger-text">
+          <pre
+            className={cn(
+              "m-0 whitespace-pre-wrap break-all font-mono text-label",
+              severityTextClass("error"),
+            )}
+          >
             {run.error || "The run failed without a message"}
           </pre>
         </div>

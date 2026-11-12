@@ -1,8 +1,12 @@
+import { cn } from "@crate/ui/lib/cn";
 import { Button } from "@crate/ui/shadcn/button";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
 import { OpsStatTile, OpsSurface } from "@/components/admin/ops-surfaces";
-import { SeverityMeter } from "@/components/admin/status-indicators";
+import {
+  SeverityMeter,
+  severityTextClass,
+} from "@/components/admin/status-indicators";
 import {
   formatAgo,
   formatBackupBytes,
@@ -138,7 +142,7 @@ function DestinationCard({
         <p
           className={
             failing
-              ? "text-sm text-state-danger-text"
+              ? cn("text-sm", severityTextClass("error"))
               : late
                 ? "text-sm text-state-warning-text"
                 : "text-sm text-text-muted"
