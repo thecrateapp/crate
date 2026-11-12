@@ -35,7 +35,7 @@ describe("useNetworkSearchQuery", () => {
     const { rerender } = renderHook(
       ({ query }) => {
         const value = useNetworkSearchQuery(query, true);
-        if (sent.at(-1) !== value) sent.push(value);
+        if (sent[sent.length - 1] !== value) sent.push(value);
         return value;
       },
       { initialProps: { query: "joy" } },
