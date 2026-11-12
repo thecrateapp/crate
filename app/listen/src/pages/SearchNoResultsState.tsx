@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { EmptyState } from "@crate/ui/domain/states";
-import { Button } from "@crate/ui/shadcn/button";
+import { SectionActionButton } from "@crate/ui/domain/lists";
 
 export function SearchNoResultsState({
   message,
@@ -20,9 +20,9 @@ export function SearchNoResultsState({
       message={message ?? t("search.noMusicHint")}
       action={
         onSearchAgain ? (
-          <Button variant="outline" onClick={onSearchAgain}>
+          <SectionActionButton onClick={onSearchAgain}>
             {t("search.network.again")}
-          </Button>
+          </SectionActionButton>
         ) : undefined
       }
     />
