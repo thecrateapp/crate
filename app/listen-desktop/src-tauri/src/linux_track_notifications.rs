@@ -42,6 +42,29 @@ fn should_notify(
     }
 }
 
+/// One media-session update: notify now, and which track id to remember.
+///
+/// Only an update that carries an id replaces the remembered one. Updates
+/// without an id arrive repeatedly during playback; letting them clear the
+/// memory made the next update with the id look like a new track and
+/// re-announce it. A track that started while the window was focused, or
+/// paused, is remembered too: the user saw it begin, so it is not announced
+/// later on focus loss or resume.
+fn decide(
+    remembered: Option<&str>,
+    media_id: Option<&str>,
+    playing: bool,
+    focused: bool,
+) -> (bool, Option<String>) {
+    match media_id.map(str::trim).filter(|id| !id.is_empty()) {
+        Some(id) => (
+            should_notify(remembered, Some(id), playing, focused),
+            Some(id.to_string()),
+        ),
+        None => (false, remembered.map(str::to_string)),
+    }
+}
+
 /// Notification bodies may carry markup (Ryoku and most daemons support it).
 fn escape(text: &str) -> String {
     text.replace('&', "&amp;")
@@ -74,24 +97,25 @@ pub fn install(app: &tauri::AppHandle) {
     }
 }
 
-/// Called for every media-session update; remembers the track either way.
+/// Called for every media-session update; remembers the track (see `decide`).
 pub fn track_update(app: &tauri::AppHandle, payload: &DesktopMediaSessionPayload) {
     use tauri::Manager;
-    let current = payload.media_id.clone().filter(|id| !id.trim().is_empty());
-    let previous = {
-        let mut last = LAST_MEDIA.lock().unwrap_or_else(|p| p.into_inner());
-        std::mem::replace(&mut *last, current.clone())
-    };
     let focused = app
         .get_webview_window("main")
         .and_then(|window| window.is_focused().ok())
         .unwrap_or(false);
-    if !should_notify(
-        previous.as_deref(),
-        current.as_deref(),
-        payload.is_playing,
-        focused,
-    ) {
+    let announce = {
+        let mut last = LAST_MEDIA.lock().unwrap_or_else(|p| p.into_inner());
+        let (announce, next) = decide(
+            last.as_deref(),
+            payload.media_id.as_deref(),
+            payload.is_playing,
+            focused,
+        );
+        *last = next;
+        announce
+    };
+    if !announce {
         return;
     }
     let Some(title) = payload
@@ -198,6 +222,75 @@ mod tests {
             "window focused"
         );
         assert!(!should_notify(Some("a"), None, true, false), "no track");
+    }
+
+    /// Feed updates through `decide` and count the notifications.
+    fn notifications(updates: &[(Option<&str>, bool, bool)]) -> usize {
+        let mut remembered: Option<String> = None;
+        let mut count = 0;
+        for (media_id, playing, focused) in updates {
+            let (notify, next) = decide(remembered.as_deref(), *media_id, *playing, *focused);
+            count += usize::from(notify);
+            remembered = next;
+        }
+        count
+    }
+
+    #[test]
+    fn an_update_without_an_id_does_not_reannounce_the_track() {
+        assert_eq!(
+            notifications(&[
+                (Some("a"), true, false),
+                (None, true, false),
+                (Some(""), true, false),
+                (Some("  "), true, false),
+                (Some("a"), true, false),
+            ]),
+            1
+        );
+    }
+
+    #[test]
+    fn each_new_track_is_announced_once() {
+        assert_eq!(
+            notifications(&[
+                (Some("a"), true, false),
+                (Some("a"), true, false),
+                (Some("b"), true, false),
+                (Some("b"), true, false),
+            ]),
+            2
+        );
+    }
+
+    #[test]
+    fn pause_and_resume_of_the_same_track_is_not_announced_again() {
+        assert_eq!(
+            notifications(&[
+                (Some("a"), true, false),
+                (Some("a"), false, false),
+                (None, false, false),
+                (Some("a"), true, false),
+            ]),
+            1
+        );
+    }
+
+    #[test]
+    fn a_track_that_started_while_focused_is_not_announced_after_unfocus() {
+        assert_eq!(
+            notifications(&[(Some("a"), true, true), (Some("a"), true, false)]),
+            0
+        );
+        // the next track still is
+        assert_eq!(
+            notifications(&[
+                (Some("a"), true, true),
+                (Some("a"), true, false),
+                (Some("b"), true, false),
+            ]),
+            1
+        );
     }
 
     #[test]
