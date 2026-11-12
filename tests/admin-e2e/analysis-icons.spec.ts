@@ -10,6 +10,26 @@ import analysis from "./fixtures/analysis-status.json";
 // Readings reuse the form-field rhythm; the Smart Mix backfill settings are
 // real form fields with inputs.
 const readings = '.crate-form-field:not([data-slot="form-field"])';
+// No playlist has Smart Mix on yet.
+const smartMixPlaylists = {
+  playlists: [],
+  overview: {
+    playlistsOn: 0,
+    playlistsOff: 0,
+    tracks: 0,
+    counts: { pending: 0, analyzing: 0, ready: 0, failed: 0 },
+    estimatedSecondsLeft: null,
+    secondsPerTrack: 300,
+    serverSeparator: "htdemucs-onnx-1",
+    storage: { usedBytes: 0, files: 0, evictableBytes: 0 },
+    settings: {
+      maxTracksPerPlaylist: 300,
+      maxTracksPerUser: null,
+      quotaGib: 50,
+      uploadsEnabled: true,
+    },
+  },
+};
 for (const width of [1440, 768, 390]) {
   test.describe(`Analysis text controls ${width}`, () => {
     test.use({ viewport: { width, height: 1100 } });
@@ -19,6 +39,7 @@ for (const width of [1440, 768, 390]) {
       adminApi,
     }) => {
       adminApi.respondTo("/api/admin/ops-snapshot", { ...snapshot, analysis });
+      adminApi.respondTo("/api/admin/smart-mix/playlists", smartMixPlaylists);
       await openAdminPage("/analysis");
       const main = page.getByRole("main");
       await expect(
@@ -50,13 +71,15 @@ for (const width of [1440, 768, 390]) {
         await expect(reading).toHaveCSS("font-family", /JetBrains Mono/);
         await expect(reading).toHaveCSS("font-variant-numeric", "tabular-nums");
       }
-      await expect(main.locator("svg")).toHaveCount(6);
+      await expect(main.locator("svg")).toHaveCount(7);
       await expect(main.locator('svg[data-admin-ux^="header-"]')).toHaveCount(
         5,
       );
-      await expect(main.locator("svg:not([data-admin-ux])")).toHaveClass(
-        /solar-magnifier-outline/,
-      );
+      // The coverage search and the Smart Mix playlists search.
+      const searches = main.locator("svg:not([data-admin-ux])");
+      await expect(searches).toHaveCount(2);
+      for (const icon of await searches.all())
+        await expect(icon).toHaveClass(/solar-magnifier-outline/);
       await expect(
         main.getByText("1,200 tracks", { exact: true }),
       ).toBeVisible();

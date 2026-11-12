@@ -441,13 +441,36 @@ def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
     }
     for file in tooling:
         assert (ROOT / file).is_file(), file
-    loop = 'for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do'
+    loop = (
+        'for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}" '
+        '"${BACKUP_TOOLING[@]}"; do'
+    )
     payload = deploy[
         deploy.index("prepare_payload() {") : deploy.index("sync_config() {")
     ]
     assert payload.count(loop) == 2
     sync = deploy[deploy.index("sync_config() {") :]
     assert sync.index(loop) < sync.index("deploy-remote.sh")
+
+
+def test_deploy_ships_the_offsite_backup_build_context() -> None:
+    deploy = (ROOT / "scripts/deploy.sh").read_text()
+    block = deploy[deploy.index("BACKUP_TOOLING=(") :]
+    files = block[len("BACKUP_TOOLING=(") : block.index(")")].split()
+
+    assert files == [
+        "deploy/backup-offsite/Dockerfile",
+        "deploy/backup-offsite/offsite.sh",
+    ]
+    for file in files:
+        assert (ROOT / file).is_file(), file
+    dockerfile = (ROOT / "deploy/backup-offsite/Dockerfile").read_text()
+    copied = {
+        line.split()[1]
+        for line in dockerfile.splitlines()
+        if line.startswith("COPY ") and "--from" not in line
+    }
+    assert copied <= {Path(file).name for file in files}
 
 
 PROJECTOR_OVERLAY = "deploy/observability/compose.projector-prometheus.yaml"

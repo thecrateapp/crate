@@ -6,6 +6,12 @@ ARG BEAT_THIS_CHECKPOINT=small0
 # every architecture (release images), auto on x86_64 only, off nowhere (see
 # worker-analysis-deps).
 ARG PANNS=auto
+# htdemucs exported to ONNX for the Smart Mix Stems separation (STEM-D3): release
+# downloads the Crate Decks release asset, context takes the file from the named build
+# context htdemucs-onnx (local and dev builds, see htdemucs-onnx-context). Both check
+# the same SHA-256.
+ARG HTDEMUCS_ONNX_SOURCE=release
+ARG HTDEMUCS_ONNX_SHA256=808790c0f71069e6fa42572bc5b97752add35a49b4c40559098d92bc342d6a08
 
 FROM python:3.13-slim AS base
 
@@ -136,6 +142,51 @@ RUN curl -fsSL --retry 5 -o "beat_this-${BEAT_THIS_CHECKPOINT}.ckpt" \
     echo "$BEAT_THIS_LICENSE_SHA256  beat_this.LICENSE" | sha256sum -c -
 
 
+# htdemucs (Demucs v4, Meta AI; code MIT) exported to ONNX by Crate Decks: the network
+# only, run on ONNX Runtime CPU for the stems of Smart Mix playlists (STEM-D3). The
+# weights state no licence of their own and were trained partly on research-only data;
+# Diego accepted them at STEM-G0 for Crate, which is free and non-commercial, and they
+# ship with the attribution below. The graph is fetched and checked here, so the worker
+# never downloads it. The default URL is the planned Crate Decks release asset, which
+# must be published before an image can build from it.
+FROM python:3.13-slim AS htdemucs-onnx-release
+
+ARG HTDEMUCS_ONNX_URL=https://github.com/thecrateapp/crate-decks/releases/download/models-htdemucs-onnx-1/htdemucs-onnx-1.onnx
+ARG HTDEMUCS_ONNX_SHA256
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /htdemucs
+RUN curl -fsSL --retry 5 -o htdemucs-onnx-1.onnx "$HTDEMUCS_ONNX_URL" && \
+    echo "$HTDEMUCS_ONNX_SHA256  htdemucs-onnx-1.onnx" | sha256sum -c -
+
+
+# Local and dev builds take the same file from a named build context, with the same
+# check: docker build --build-arg HTDEMUCS_ONNX_SOURCE=context
+# --build-context htdemucs-onnx=<directory with htdemucs-onnx-1.onnx> ...
+FROM python:3.13-slim AS htdemucs-onnx-context
+
+ARG HTDEMUCS_ONNX_SHA256
+WORKDIR /htdemucs
+COPY --from=htdemucs-onnx htdemucs-onnx-1.onnx ./
+RUN echo "$HTDEMUCS_ONNX_SHA256  htdemucs-onnx-1.onnx" | sha256sum -c -
+
+
+FROM htdemucs-onnx-${HTDEMUCS_ONNX_SOURCE} AS htdemucs-onnx-weights
+
+RUN printf '%s\n' \
+    "htdemucs-onnx-1: Hybrid Transformer Demucs (htdemucs) by Simon Rouard, Francisco" \
+    "Massa and Alexandre Defossez, Meta AI (Hybrid Transformers for Music Source" \
+    "Separation, ICASSP 2023, arXiv:2211.08553). Code: https://github.com/facebookresearch/demucs" \
+    "and https://github.com/adefossez/demucs, MIT licence. Weights:" \
+    "https://huggingface.co/adefossez/HTDemucs (revision" \
+    "cbc8a9b1a87023b7fd74e7b3412e6321c0eab003); they carry no licence of their own" \
+    "beyond the repository's MIT licence and were trained on MUSDB18-HQ, licensed for" \
+    "research use only, plus Meta's internal songs. Exported to ONNX (network only, no" \
+    "retraining) by Crate Decks, tools/crate-stems/export_htdemucs.py. Used by Crate, a" \
+    "free and non-commercial project, as accepted at STEM-G0." \
+    > htdemucs-onnx-1.NOTICE
+
+
 FROM worker-core-deps AS worker-analysis-python
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -152,9 +203,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # (SM3-D14). Its PyPI release, 0.16.1, does not build on Python 3.13, so its wheel is
 # built here from a pinned commit, against the numpy of the analysis image, and only
 # the wheel reaches the image, without the compilers. madmom's code is BSD; its package
-# also ships model files under CC BY-NC-SA 4.0 that Crate does not use (the DBN needs
-# none), which is acceptable for Crate as free and open-source software. The licence
-# travels with the wheel and is installed with it as /app/models/madmom.LICENSE.
+# also ships model files under CC BY-NC-SA 4.0. Since smart-mix-audio-v10 the meter
+# arbiter runs its downbeat networks on the tracks Beat This!'s DBN hears in three
+# (crate/smart_mix/meter_arbiter.py, gate MG1), which is acceptable for Crate as free and
+# open-source software. The licence travels with the wheel and is installed with it as
+# /app/models/madmom.LICENSE.
 FROM worker-analysis-python AS madmom-build
 
 ARG MADMOM_COMMIT=27f032e8947204902c675e5e341a3faf5dc86dae
@@ -247,6 +300,10 @@ COPY --from=yamnet-weights /yamnet/LICENSE /app/models/yamnet.LICENSE
 ARG BEAT_THIS_CHECKPOINT
 ENV CRATE_BEAT_THIS_CHECKPOINT=${BEAT_THIS_CHECKPOINT}
 COPY --from=beat-this-weights /beat-this/ /app/models/
+
+# Smart Mix Stems separation (STEM-D3): the htdemucs ONNX graph and its attribution.
+# ONNX Runtime needs no torch, so PANNS=off images separate too.
+COPY --from=htdemucs-onnx-weights /htdemucs/ /app/models/
 
 
 FROM worker-analysis-deps AS worker-analysis

@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import (
     ARRAY,
     BIGINT,
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -122,6 +123,8 @@ class TrackMixSignalsRow(Base):
     beats_ms: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     downbeats_ms: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     beats_per_bar: Mapped[int | None] = mapped_column(SmallInteger)
+    meter_margin: Mapped[float | None] = mapped_column(REAL)
+    meter_arbiter: Mapped[str | None] = mapped_column(Text)
     vocal_detector: Mapped[str | None] = mapped_column(Text)
     voice_hop_ms: Mapped[int | None] = mapped_column(SmallInteger)
     voice_scores: Mapped[bytes | None] = mapped_column(LargeBinary)
@@ -130,3 +133,123 @@ class TrackMixSignalsRow(Base):
         nullable=False,
         server_default=text("NOW()"),
     )
+
+
+class TrackStemSignalsRow(Base):
+    """A track's stem analysis by one producer (``stem-analysis/1``, STEM-D1)."""
+
+    __tablename__ = "track_stem_signals"
+    __table_args__ = (
+        CheckConstraint("producer_kind IN ('server', 'decks')"),
+        CheckConstraint("hop_ms > 0"),
+        CheckConstraint("duration_ms > 0"),
+        CheckConstraint("producer LIKE ('crate-' || producer_kind || '/%')"),
+        CheckConstraint("producer_kind = 'decks' OR contributed_by IS NULL"),
+        CheckConstraint("octet_length(drums_levels) > 0"),
+        CheckConstraint("octet_length(bass_levels) = octet_length(drums_levels)"),
+        CheckConstraint("octet_length(other_levels) = octet_length(drums_levels)"),
+        CheckConstraint("octet_length(vocals_levels) = octet_length(drums_levels)"),
+    )
+
+    track_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey("library_tracks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    producer_kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    producer: Mapped[str] = mapped_column(Text, nullable=False)
+    separator_model: Mapped[str] = mapped_column(Text, nullable=False)
+    separator_version: Mapped[str] = mapped_column(Text, nullable=False)
+    source_revision: Mapped[str] = mapped_column(Text, nullable=False)
+    hop_ms: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    drums_levels: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    bass_levels: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    other_levels: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    vocals_levels: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    drum_beats_ms: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    contributed_by: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+
+
+class SmartMixPlaylistRevisionRow(Base):
+    """A user's Smart Mix playlist revision counter, for Decks sync (STEM-D2)."""
+
+    __tablename__ = "smart_mix_playlist_revisions"
+    __table_args__ = (CheckConstraint("revision > 0"),)
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    revision: Mapped[int] = mapped_column(BIGINT, nullable=False)
+
+
+class SmartMixPlaylistRow(Base):
+    """A playlist its owner marked for Smart Mix (STEM-D2); off keeps the row."""
+
+    __tablename__ = "smart_mix_playlists"
+    __table_args__ = (
+        CheckConstraint("revision > 0"),
+        CheckConstraint("enabled = (disabled_at IS NULL)"),
+    )
+
+    playlist_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("playlists.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    enabled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(BIGINT, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+
+
+class TrackStemJobRow(Base):
+    """The server's stem separation work for one track (STEM-D2)."""
+
+    __tablename__ = "track_stem_jobs"
+    __table_args__ = (
+        CheckConstraint("state IN ('pending', 'analyzing', 'ready', 'failed')"),
+        CheckConstraint("attempts >= 0"),
+    )
+
+    track_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey("library_tracks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    state: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'pending'")
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    last_error: Mapped[str | None] = mapped_column(Text)
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_revision: Mapped[str | None] = mapped_column(Text)

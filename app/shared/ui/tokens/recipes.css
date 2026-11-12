@@ -1893,6 +1893,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Icon only: a circle as wide as the badge is high (Smart Mix mark on phones). */
+.crate-info-badge[data-variant="icon"] {
+  width: var(--info-badge-height);
+  min-width: var(--info-badge-height);
+  padding: 0;
+}
+
 .crate-info-badge[data-surface="overlay"] {
   border-color: color-mix(in srgb, var(--text-primary) 14%, transparent);
   background: color-mix(in srgb, var(--surface-canvas) 62%, transparent);

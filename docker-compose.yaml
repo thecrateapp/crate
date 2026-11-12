@@ -1,6 +1,8 @@
 networks:
   crate:
     external: true
+  # Internet-only network for crate-backup-offsite: it must not reach crate-postgres.
+  backup-offsite: {}
 
 x-logging: &default-logging
   driver: local
@@ -247,14 +249,54 @@ services:
       - POSTGRES_USER=${CRATE_POSTGRES_USER}
       - POSTGRES_PASSWORD=${CRATE_POSTGRES_PASSWORD}
       - SCHEDULE=@daily
-      - BACKUP_KEEP_DAYS=7
-      - BACKUP_KEEP_WEEKS=4
+      # Retention counts days, ISO weeks and months of dumps; the image hard-links
+      # one dump into daily/, weekly/ and monthly/, so overlaps cost no extra space.
+      - BACKUP_KEEP_DAYS=${POSTGRES_BACKUP_KEEP_DAYS:-3}
+      - BACKUP_KEEP_WEEKS=${POSTGRES_BACKUP_KEEP_WEEKS:-4}
+      - BACKUP_KEEP_MONTHS=${POSTGRES_BACKUP_KEEP_MONTHS:-3}
+      - POSTGRES_EXTRA_OPTS=${POSTGRES_BACKUP_EXTRA_OPTS:--Z6}
     volumes:
-      - ${DATA_DIR}/backups/postgres:/backups
+      # A host path (default) or the named volume `crate_postgres_backups`. Never
+      # point it inside MUSIC_DIR: dumps hold credentials and the library is shared.
+      - ${POSTGRES_BACKUP_DIR:-${DATA_DIR}/backups/postgres}:/backups
     networks:
       - crate
     depends_on:
       - crate-postgres
+
+  # Crate — off-site copies of those dumps (restic to Cloudflare R2 and Google
+  # Drive). Opt-in: `docker compose --profile offsite-backup up -d`. See
+  # docs/operators/postgres-offsite-backups.md.
+  crate-backup-offsite:
+    logging: *default-logging
+    profiles: [offsite-backup]
+    image: crate-backup-offsite:local
+    build:
+      context: ./deploy/backup-offsite
+    container_name: crate-backup-offsite
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - CRATE_OFFSITE_DB=${CRATE_POSTGRES_DB:-crate}
+      - CRATE_OFFSITE_DRILL_OWNER=${CRATE_POSTGRES_USER:-crate}
+      - RESTIC_PASSWORD=${RESTIC_PASSWORD:-}
+      - CRATE_OFFSITE_R2_ACCOUNT_ID=${CRATE_OFFSITE_R2_ACCOUNT_ID:-}
+      - CRATE_OFFSITE_R2_BUCKET=${CRATE_OFFSITE_R2_BUCKET:-}
+      - CRATE_OFFSITE_R2_PATH=${CRATE_OFFSITE_R2_PATH:-}
+      - CRATE_OFFSITE_R2_ACCESS_KEY_ID=${CRATE_OFFSITE_R2_ACCESS_KEY_ID:-}
+      - CRATE_OFFSITE_R2_SECRET_ACCESS_KEY=${CRATE_OFFSITE_R2_SECRET_ACCESS_KEY:-}
+      - CRATE_OFFSITE_GDRIVE_PATH=${CRATE_OFFSITE_GDRIVE_PATH:-crate-backups}
+      - RCLONE_CONFIG_GDRIVE_TYPE=${RCLONE_CONFIG_GDRIVE_TYPE:-}
+      - RCLONE_CONFIG_GDRIVE_SCOPE=${RCLONE_CONFIG_GDRIVE_SCOPE:-drive.file}
+      - RCLONE_CONFIG_GDRIVE_TOKEN=${RCLONE_CONFIG_GDRIVE_TOKEN:-}
+      - RCLONE_CONFIG_GDRIVE_CLIENT_ID=${RCLONE_CONFIG_GDRIVE_CLIENT_ID:-}
+      - RCLONE_CONFIG_GDRIVE_CLIENT_SECRET=${RCLONE_CONFIG_GDRIVE_CLIENT_SECRET:-}
+      - RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID=${RCLONE_CONFIG_GDRIVE_ROOT_FOLDER_ID:-}
+    volumes:
+      - ${POSTGRES_BACKUP_DIR:-${DATA_DIR}/backups/postgres}:/backups:ro
+      - crate_backup_offsite:/state
+    networks:
+      - backup-offsite
 
   # Crate — Music stack management
   crate-api:
@@ -376,9 +418,12 @@ services:
       - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES=${CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES:-250000000000}
       - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES=${CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES:-10737418240}
       - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=${CRATE_FEDERATION_IMPORT_LEASE_SECONDS:-18000}
+      # Smart Mix Stems: stem files Crate Decks downloads (written by the analysis worker).
+      - CRATE_STEMS_DIR=/stems
     volumes:
       - ./app/config.yaml:/app/config.yaml:ro
       - ${MEDIA_DIR}/music:/music:ro
+      - ${STEMS_DIR:-${MEDIA_DIR}/smart-mix-stems}:/stems:ro
       - ${DATA_DIR}/crate:/data
       - ${CACHE_DIR:-./data/cache}:/cache:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -679,7 +724,7 @@ services:
       - SENTRY_SERVICE=worker-fast
     mem_limit: 768m
     mem_reservation: 256m
-    cpus: "0.35"
+    cpus: "${FAST_WORKER_CPUS:-0.5}"
     command:
       [
         "worker",
@@ -929,6 +974,8 @@ services:
       - TORCH_NUM_THREADS=${ANALYSIS_NATIVE_THREADS:-1}
       - NUMBA_NUM_THREADS=${ANALYSIS_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${ANALYSIS_FFMPEG_THREADS:-1}
+      # Resident MB above which a process recycles itself after its task.
+      - CRATE_WORKER_MAX_RSS_MB=${ANALYSIS_WORKER_MAX_RSS_MB:-1500}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
       - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
       - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
@@ -949,9 +996,14 @@ services:
       - CRATE_LEGACY_POOL_MAXCONN=${ANALYSIS_LEGACY_POOL_MAXCONN:-2}
       - CRATE_SQLALCHEMY_POOL_SIZE=${ANALYSIS_SQLALCHEMY_POOL_SIZE:-1}
       - CRATE_SQLALCHEMY_MAX_OVERFLOW=${ANALYSIS_SQLALCHEMY_MAX_OVERFLOW:-1}
+      # Smart Mix Stems: separation scratch and stem files, on the music volume
+      # (docs/technical/smart-mix-operations.md, "Server separation").
+      - CRATE_STEMS_DIR=/stems
+      - CRATE_STEMS_THREADS=${CRATE_STEMS_THREADS:-4}
     volumes:
       - ./app/config.yaml:/app/config.yaml:ro
       - ${MEDIA_DIR}/music:/music:ro
+      - ${STEMS_DIR:-${MEDIA_DIR}/smart-mix-stems}:/stems
       - ${DATA_DIR}/crate:/data
     networks:
       - crate
@@ -1175,4 +1227,8 @@ volumes:
   crate_redis_durable:
     driver: local
   crate_postgres:
+    driver: local
+  crate_postgres_backups:
+    driver: local
+  crate_backup_offsite:
     driver: local

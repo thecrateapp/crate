@@ -585,6 +585,7 @@ export const GOVERNOR = {
 
 export const GOVERNED_TASKS = [
   "agent_maintenance",
+  "analyze_playlist_stems",
   "backfill_artwork_variants",
   "backfill_smart_mix_profiles",
   "backfill_track_audio_fingerprints",

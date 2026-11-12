@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
 
 const {
   apiMock,
@@ -48,6 +56,7 @@ import {
   toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import { getPlaybackSession } from "@/lib/playback-provenance";
+import { setNativeBeatmatchPreference } from "@/lib/player-playback-prefs";
 import { setSmartMixCapabilities } from "@/lib/smart-mix";
 
 describe("player engine adapter", () => {
@@ -682,6 +691,73 @@ describe("player engine adapter", () => {
         allowBeatmatch: false,
         allowBassHandoff: false,
         descriptor: null,
+      });
+    });
+
+    it("hands the resolved planner to the native continuation", async () => {
+      setSmartMixCapabilities({
+        available: true,
+        androidNativeCrossfade: true,
+        androidBeatmatch: false,
+        androidBassHandoff: false,
+        androidLongBeatmatch: false,
+        plannerVersion: "smart-mix-v2",
+        plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+        listenPlannerVersion: "smart-mix-v3",
+      });
+      apiMock.mockResolvedValue(null);
+
+      const snapshot = await toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("continuation-planner-v3"),
+      );
+
+      expect(snapshot.continuation?.plannerVersion).toBe("smart-mix-v3");
+    });
+
+    it("hands smart-mix-v2 to the native continuation without a Listen recommendation", async () => {
+      apiMock.mockResolvedValue(null);
+
+      const snapshot = await toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("continuation-planner-v2"),
+      );
+
+      expect(snapshot.continuation?.plannerVersion).toBe("smart-mix-v2");
+    });
+
+    it("never asks the native continuation for long blends with smart-mix-v3", async () => {
+      // LV-D10. Long beatmatch on: v2 keeps it, v3 never asks for it.
+      setNativeBeatmatchPreference(true);
+      onTestFinished(() => setNativeBeatmatchPreference(false));
+      const long = {
+        available: true,
+        androidNativeCrossfade: true,
+        androidBeatmatch: true,
+        androidBassHandoff: false,
+        androidLongBeatmatch: true,
+        plannerVersion: "smart-mix-v2",
+      };
+      apiMock.mockResolvedValue(null);
+      setSmartMixCapabilities(long);
+      const v2 = await toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("continuation-long-v2"),
+      );
+      setSmartMixCapabilities({
+        ...long,
+        plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+        listenPlannerVersion: "smart-mix-v3",
+      });
+      const v3 = await toStartupEngineQueueSnapshot(
+        nativeSnapshotOptions("continuation-long-v3"),
+      );
+
+      expect(v2.continuation).toMatchObject({
+        plannerVersion: "smart-mix-v2",
+        allowLongBeatmatch: true,
+      });
+      expect(v3.continuation).toMatchObject({
+        plannerVersion: "smart-mix-v3",
+        allowBeatmatch: true,
+        allowLongBeatmatch: false,
       });
     });
 

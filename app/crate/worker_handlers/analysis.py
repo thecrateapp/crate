@@ -34,6 +34,7 @@ from crate.db.jobs.smart_mix_backfill import (
     count_smart_mix_in_flight,
     get_smart_mix_campaign,
     queue_next_smart_mix_batch,
+    record_smart_mix_model_availability,
     refresh_live_smart_mix_coverage,
     refresh_smart_mix_coverage,
     refresh_smart_mix_coverage_after_pass,
@@ -85,9 +86,11 @@ _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
 # The night-window limit keeps only a few analyses in flight, so a slot freed by
 # a finished analysis should be refilled within seconds rather than a poll later.
 # The coordinator waits as a pending task, not in a worker process, and checks
-# less often the longer its slots stay as they are.
+# less often the longer its slots stay as they are, but at least every 10 s: an
+# analysis takes about 25 s, so a longer wait would leave a freed slot idle for a
+# good part of one.
 _SMART_MIX_BACKFILL_POLL_SECONDS = 3
-_SMART_MIX_BACKFILL_MAX_POLL_SECONDS = 30
+_SMART_MIX_BACKFILL_MAX_POLL_SECONDS = 10
 
 
 def _now() -> datetime:
@@ -1418,9 +1421,10 @@ def _smart_mix_beats(
     analysis keeps its own beat tracker, so a model failure never fails the profile.
 
     Beats stored for this file by the current tracker are reused without running the
-    model (SM3-D16); the model's beats are stored, stamped with ``read_at``, while the
-    file is still the captured one, and a failure to store them only logs. A track
-    the model gives no beats stores nothing.
+    model (SM3-D16), except bars of three madmom never checked: they predate the meter
+    arbiter and run again. The model's beats are stored, stamped with ``read_at``,
+    while the file is still the captured one, and a failure to store them only logs. A
+    track the model gives no beats stores nothing.
     """
     from crate.smart_mix.beat_model import (
         BeatTrack,
@@ -1429,12 +1433,19 @@ def _smart_mix_beats(
     )
 
     tracker = beat_tracker_name()
-    if signals is not None and signals.beat_tracker == tracker and signals.beats_ms:
+    if (
+        signals is not None
+        and signals.beat_tracker == tracker
+        and signals.beats_ms
+        and not (signals.beats_per_bar == 3 and signals.meter_arbiter is None)
+    ):
         return BeatTrack(
             tracker=tracker,
             beats_ms=signals.beats_ms,
             downbeats_ms=signals.downbeats_ms or (),
             beats_per_bar=signals.beats_per_bar,
+            meter_margin=signals.meter_margin,
+            meter_arbiter=signals.meter_arbiter,
         )
     try:
         beats = track_file_beats(path)
@@ -1457,6 +1468,8 @@ def _smart_mix_beats(
             beats_ms=beats.beats_ms,
             downbeats_ms=beats.downbeats_ms,
             beats_per_bar=beats.beats_per_bar,
+            meter_margin=beats.meter_margin,
+            meter_arbiter=beats.meter_arbiter,
             updated_at=read_at,
         )
     except Exception:
@@ -1466,6 +1479,12 @@ def _smart_mix_beats(
             exc_info=True,
         )
     return beats
+
+
+def _beat_model_available() -> bool:
+    from crate.smart_mix import beat_model
+
+    return beat_model.beat_model_available()
 
 
 def _stored_voice(signals: TrackMixSignals | None):
@@ -1496,7 +1515,6 @@ def _refresh_live_coverage() -> None:
 def _handle_backfill_smart_mix_profiles(
     task_id: str, params: dict, config: dict
 ) -> dict:
-    del config
     from crate.resource_governor import record_decision, should_defer_task
 
     campaign = get_smart_mix_campaign()
@@ -1515,6 +1533,18 @@ def _handle_backfill_smart_mix_profiles(
                 _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
             ),
             progress=f"Deferred by resource governor: {decision.reason}",
+        )
+
+    # Smart Mix playlists go first (STEM-D2): while one has a track to separate, the
+    # coordinator claims nothing and makes sure the separation runs. Analyses already
+    # accepted finish; the backfill resumes once the playlists' work is done.
+    from crate.worker_handlers import smart_mix_stems
+
+    if smart_mix_stems.playlist_stem_work_pending(config.get("library_path")):
+        smart_mix_stems.wake_stem_task()
+        return run_again_later(
+            smart_mix_stems.BACKFILL_WAIT_SECONDS,
+            progress="Waiting for the stems of Smart Mix playlists",
         )
 
     # Only the claims of this backfill count as in flight; imports and manual
@@ -1544,6 +1574,10 @@ def _handle_backfill_smart_mix_profiles(
     ]
     from crate.crate_cli import has_subcommands, is_available
 
+    model_available = _beat_model_available()
+    # The service loop's wake-up reads it: a setup without the model never reopens
+    # its campaign by itself.
+    record_smart_mix_model_availability(model_available)
     claimed = claim_smart_mix_backfill_batch(
         limit=min(batch_size, window.limit - in_flight),
         max_in_flight=window.limit,
@@ -1551,6 +1585,9 @@ def _handle_backfill_smart_mix_profiles(
         max_attempts=max_attempts,
         claimed_by=f"task:{task_id}",
         promote_python_profiles=is_available() and has_subcommands(),
+        # Profiles at the target on the analyzer's own beats (new imports, library
+        # reanalyses) get Beat This!'s when this worker can run it.
+        upgrade_own_tracker=model_available,
     )
     queued = 0
     released: list[int] = []
@@ -1623,7 +1660,7 @@ def _smart_mix_backfill_poll_seconds() -> int:
 
     As long as the slots have stayed as they are: 3 s right after a claim or a
     finished analysis, then about double each time while nothing changes, up to
-    30 s. Each check is a whole actor cycle, so a long analysis or a child the
+    10 s. Each check is a whole actor cycle, so a long analysis or a child the
     governor defers no longer costs one every 3 s.
     """
     since_change = seconds_since_smart_mix_change()

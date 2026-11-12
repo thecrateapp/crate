@@ -28,10 +28,13 @@ import {
 } from "@/lib/playback-continuation";
 import {
   getSmartMixCapabilities,
+  continuationLongBeatmatch,
+  continuationPlanner,
   keepServerPlans,
   setSmartMixCapabilities,
   subscribeSmartMixCapabilities,
   type SmartMixCapabilities,
+  type SmartMixPlannerIdentifier,
 } from "@/lib/smart-mix";
 import {
   getCrossfadeDurationPreference,
@@ -93,6 +96,7 @@ type CrateNativePlaybackPlugin = {
           allowLongBeatmatch: boolean;
           delivery: string;
           refill: boolean;
+          plannerVersion: SmartMixPlannerIdentifier;
           sessionId?: string;
           batchIndex?: number;
           authoritativeCursor?: boolean;
@@ -188,11 +192,14 @@ export function continuationWithModes(
   context: EngineContinuationContext | undefined,
   capabilities: SmartMixCapabilities,
 ): EngineContinuationContext | null {
+  const plannerVersion = continuationPlanner(capabilities);
+  const allowLongBeatmatch = continuationLongBeatmatch(capabilities);
   if (
     !context ||
     (context.allowBeatmatch === capabilities.androidBeatmatch &&
       context.allowBassHandoff === capabilities.androidBassHandoff &&
-      context.allowLongBeatmatch === capabilities.androidLongBeatmatch)
+      context.allowLongBeatmatch === allowLongBeatmatch &&
+      context.plannerVersion === plannerVersion)
   ) {
     return null;
   }
@@ -200,7 +207,8 @@ export function continuationWithModes(
     ...context,
     allowBeatmatch: capabilities.androidBeatmatch,
     allowBassHandoff: capabilities.androidBassHandoff,
-    allowLongBeatmatch: capabilities.androidLongBeatmatch,
+    allowLongBeatmatch,
+    plannerVersion,
   };
 }
 
@@ -622,6 +630,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
         allowLongBeatmatch: context.allowLongBeatmatch,
         delivery: context.delivery,
         refill: context.descriptor !== null && this.repeatMode === "off",
+        plannerVersion: context.plannerVersion,
         ...(authoritativeCursor ? { authoritativeCursor: true } : {}),
         ...(descriptor?.sessionId
           ? {

@@ -8,7 +8,6 @@ from sqlalchemy import text
 
 from crate.db.tx import read_scope
 
-
 _ENTITY_ORDER = ("album", "artist", "track")
 
 _ENTITY_SELECTS = {
@@ -154,6 +153,14 @@ def _entity_page_sql(entity_type: str) -> str:
                {uid_column} > CAST(NULLIF(:after_entity_uid, '') AS uuid))
           AND :share_allowed
           AND (
+            cardinality(CAST(:grant_allowed_entity_types AS text[])) = 0
+            OR '{entity_type}' = ANY(CAST(:grant_allowed_entity_types AS text[]))
+          )
+          AND (
+            cardinality(CAST(:grant_allowed_entity_uids AS text[])) = 0
+            OR {uid_column}::text = ANY(CAST(:grant_allowed_entity_uids AS text[]))
+          )
+          AND (
             (
               cardinality(CAST(:allowed_entity_uids AS text[])) = 0
               AND cardinality(CAST(:{allowed_key} AS text[])) = 0
@@ -195,6 +202,8 @@ def list_federation_manifest_rows(
                             after_entity_uid if entity_type == after_entity_type else ""
                         ),
                         "limit": remaining,
+                        "grant_allowed_entity_types": [],
+                        "grant_allowed_entity_uids": [],
                         **policy_params,
                     },
                 )
@@ -242,6 +251,14 @@ def get_federation_manifest_revision_row(
                     ) AS catalog
                     WHERE :share_allowed
                       AND (
+                        cardinality(CAST(:grant_allowed_entity_types AS text[])) = 0
+                        OR catalog.entity_type = ANY(CAST(:grant_allowed_entity_types AS text[]))
+                      )
+                      AND (
+                        cardinality(CAST(:grant_allowed_entity_uids AS text[])) = 0
+                        OR catalog.remote_entity_uid = ANY(CAST(:grant_allowed_entity_uids AS text[]))
+                      )
+                      AND (
                         (
                           cardinality(CAST(:allowed_entity_uids AS text[])) = 0
                           AND CASE catalog.entity_type
@@ -280,7 +297,11 @@ def get_federation_manifest_revision_row(
                       )
                     """
                 ),
-                policy_params,
+                {
+                    "grant_allowed_entity_types": [],
+                    "grant_allowed_entity_uids": [],
+                    **policy_params,
+                },
             )
             .mappings()
             .one()

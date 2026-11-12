@@ -711,12 +711,14 @@ def _round_score(value: float) -> float:
 
 @dataclass(frozen=True, slots=True)
 class PlannedTransition:
-    """A v3 plan: the first candidate of the menu, the menu itself (for SM4) and
-    whether the menu came from the stored phrases (``structureUsed`` in the API)."""
+    """A v3 plan: the first candidate of the menu, the menu itself (for SM4),
+    whether the menu came from the stored phrases (``structureUsed`` in the API) and
+    whether the stems layer of both tracks scored it (``stemsUsed``, STEM-D5)."""
 
     plan: TransitionPlan
     candidates: tuple[TransitionCandidate, ...]
     structure_used: bool
+    stems_used: bool = False
 
 
 def plan_transition_v3(
@@ -727,8 +729,13 @@ def plan_transition_v3(
     outgoing_track_entity_uid: str | None = None,
     incoming_track_entity_uid: str | None = None,
     policy: PlannerPolicy = PLANNER_POLICY_V3,
+    outgoing_genre_prior: float | None = None,
+    incoming_genre_prior: float | None = None,
 ) -> PlannedTransition:
-    """Plan an edge with ``smart-mix-v3`` (SM3-D3). ``plan_transition`` is v2."""
+    """Plan an edge with ``smart-mix-v3`` (SM3-D3). ``plan_transition`` is v2.
+
+    The genre priors (``genre_beatmatch_prior`` of each track) gate the stems layer
+    to the beatmatch family (STEM-G1); unknown keeps it off."""
     # The candidate generator builds on this module's v2 helpers.
     from crate.smart_mix.candidates import plan_transition_candidates
 
@@ -739,6 +746,8 @@ def plan_transition_v3(
         policy,
         outgoing_track_entity_uid=outgoing_track_entity_uid,
         incoming_track_entity_uid=incoming_track_entity_uid,
+        outgoing_genre_prior=outgoing_genre_prior,
+        incoming_genre_prior=incoming_genre_prior,
     )
     return PlannedTransition(
         plan=candidates[0].to_plan(),
@@ -746,6 +755,7 @@ def plan_transition_v3(
         # The menu was placed and ranked on the stored phrases, even when v2's own
         # window (also on the menu) wins on them.
         structure_used=any(candidate.structure_used for candidate in candidates),
+        stems_used=any(candidate.stems_used for candidate in candidates),
     )
 
 

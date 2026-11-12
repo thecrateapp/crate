@@ -34,6 +34,7 @@ DEFAULT_SCHEDULES = {
     "sync_error_issues": 300,  # 5min — Sentry issues into the error inbox
     "track_error_fixes": 300,  # 5min — fix runs and their pull requests
     "cleanup_smart_mix_refinements": 86400,  # 24h — AI refinements unread for 180 days
+    "analyze_playlist_stems": 1800,  # 30min — Smart Mix playlist stems: retries, file changes
 }
 
 SCHEDULED_TASKS = [

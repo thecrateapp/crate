@@ -41,6 +41,22 @@ sources:
   - app/crate/db/queries/smart_mix_compatible.py
   - app/crate/db/repositories/smart_mix.py
   - app/crate/db/repositories/smart_mix_signals.py
+  - app/crate/smart_mix/stems.py
+  - app/crate/db/repositories/smart_mix_stems.py
+  - app/crate/db/schema_sections/smart_mix_stems_v156.py
+  - app/crate/db/repositories/smart_mix_playlists.py
+  - app/crate/smart_mix/separation.py
+  - app/crate/smart_mix/stem_storage.py
+  - app/crate/smart_mix/stem_files.py
+  - app/crate/worker_handlers/smart_mix_stems.py
+  - app/crate/db/jobs/smart_mix_stems.py
+  - app/crate/db/repositories/smart_mix_stem_files.py
+  - app/crate/db/schema_sections/smart_mix_stem_files_v158.py
+  - app/Dockerfile
+  - app/crate/db/schema_sections/smart_mix_playlists_v157.py
+  - app/crate/api/smart_mix_playlists.py
+  - app/crate/api/decks_stems.py
+  - app/crate/api/settings.py
   - app/crate/worker_handlers/analysis.py
   - app/crate/actors.py
   - app/crate/ai/queues.py
@@ -110,18 +126,18 @@ Backfill campaign -> batch claims -> heavy tasks per track
 These values come from the reviewed code; they were not discovered from a live instance.
 `test_smart_mix_versions.py` checks that this table follows the implemented identifiers.
 
-| Identifier                         | Value                | Meaning                                               |
-| ---------------------------------- | -------------------- | ----------------------------------------------------- |
-| `API_CONTRACT_VERSION`             | `2026-08`            | Advertised integration and capabilities contract      |
-| `PROFILE_SCHEMA_VERSION`           | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`                 | `smart-mix-audio-v8` | Target generation of profile analysis                 |
-| `MEASUREMENT_VERSION`              | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
-| `BEAT_GRID_FORMAT`                 | `delta-ms-v1`        | Beat grid format                                      |
-| `PLANNER_IDENTIFIER`               | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
-| `PLANNER_POLICY_VERSION`           | `2`                  | Numeric version of each individual plan               |
-| `PLANNER_POLICY.rules_revision`    | `7`                  | Internal rules revision included in the cache key     |
-| `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`       | Planner on the stored phrases (SM3-D3)                |
-| `PLANNER_POLICY_V3.rules_revision` | `1`                  | Rules revision of v3, in its cache key                |
+| Identifier                         | Value                 | Meaning                                               |
+| ---------------------------------- | --------------------- | ----------------------------------------------------- |
+| `API_CONTRACT_VERSION`             | `2026-08`             | Advertised integration and capabilities contract      |
+| `PROFILE_SCHEMA_VERSION`           | `1`                   | Schema of the persisted and serialized profile        |
+| `ANALYZER_VERSION`                 | `smart-mix-audio-v10` | Target generation of profile analysis                 |
+| `MEASUREMENT_VERSION`              | `bs1770-v1`           | Loudness and true peak provenance used by the planner |
+| `BEAT_GRID_FORMAT`                 | `delta-ms-v1`         | Beat grid format                                      |
+| `PLANNER_IDENTIFIER`               | `smart-mix-v2`        | Identifier for plan batches and capabilities          |
+| `PLANNER_POLICY_VERSION`           | `2`                   | Numeric version of each individual plan               |
+| `PLANNER_POLICY.rules_revision`    | `7`                   | Internal rules revision included in the cache key     |
+| `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`        | Planner on the stored phrases (SM3-D3)                |
+| `PLANNER_POLICY_V3.rules_revision` | `6`                   | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
 includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
@@ -148,6 +164,78 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
 | `activeEndMs`              | Musical end, by the same rule (for long tracks, over the last 120 s). A fade or reverb tail continues after it, so it falls 1-6 s before a -60 dB end of sound such as Mixxx's. It is not a silence threshold                                                                                                                           |
 | `introCueMs`, `outroCueMs` | Suggested mix points: the first beat at or after `activeStartMs` and the last beat 4 s before `activeEndMs`                                                                                                                                                                                                                             |
 | `beatPhaseOffsetMs`        | Plan field, beatmatch only. In output time and below one outgoing beat: the incoming track starts this much after `incomingCueMs` when the outgoing reaches `outgoingCueMs`. In incoming track time, start at `incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio` (`NativeTransitionPlan.startIncomingCueMs()`); never subtract it |
+
+### Analyzer v10
+
+`smart-mix-audio-v10` asks a second model before giving a track bars of three (see
+**Meter** under [Beats and downbeats](#beats-and-downbeats)). Beat This!'s DBN hears fast
+4/4 punk and metal in three, and since SM3-D16 such tracks get no downbeat and no phrases.
+On the 399 tracks of the stems evaluation sets, the DBN picks three on 10:
+
+| Tracks                                                                    | v9                      | v10                                             |
+| ------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------- |
+| The DBN picks three (Sepultura, Cannibal Corpse, Tragedy, THRICE, Swans…) | 10, all without phrases | 8 take four and gain 5-19 phrases; 2 keep three |
+| Without phrases (all sets)                                                | 30                      | 22                                              |
+| Four-beat sample (30 tracks): beats and downbeats as stored               | -                       | 30 of 30 identical                              |
+
+The two that keep three (Azu Tiwaline "Izen Zaren", Movements "Submerge") are the ones
+both models hear in three, likely in 6/8. Swans "Coward", a live-drums control, takes four
+and 19 phrases, which may be less reliable on irregular drums. Nobody has listened to these
+tracks. With one native thread, as the analysis worker runs it, the arbiter takes 10-30 s of
+CPU on a three-beat track of two to six minutes and about 50 s on one of 600 s, after Beat
+This!'s 5-35 s; a four-beat track costs what it did under v9.
+
+Readers accept v10, v9, v8, v7, v6 and v5 profiles (`READABLE_ANALYZER_VERSIONS`); writers,
+the backfill and Admin coverage target v10. Stored four-beat signals stay valid (see
+[Running the v10 backfill](#running-the-v10-backfill)).
+
+### Analyzer v9
+
+`smart-mix-audio-v9` fixes two defects found while building the stems evaluation sets
+(399 tracks: electronic, phrase, industrial, metal and punk) on the v8 profiles production
+writes:
+
+- **m4a at twice its length.** symphonia's MP4 demuxer sets the channel count only for PCM
+  sample entries, so an AAC track in an `.m4a` has none in its codec parameters. `crate-cli`
+  read its interleaved stereo frames as mono: the audio came out twice as long, at half speed
+  and an octave down, and the profile had twice the real duration, a grid, cues and phrases
+  on that timeline and no loudness. 2,207 of the 2,226 `.m4a` of the development copy of the
+  library (every AAC one; the ALAC ones were right) had a profile of twice their duration,
+  in every analyzer version. The library analysis (`analyze`: BPM, key, loudness, energy)
+  and PANNs read the same slowed audio. Both decoders now mix to mono by the channel count
+  of each decoded buffer. Beat This! never ran on them either: libsndfile cannot open AAC
+  in MP4, and librosa reads files only through it; ffmpeg now decodes them (see
+  [Beats and downbeats](#beats-and-downbeats)).
+- **Tracks without bars.** The bar anchor required one grid phase to hold 60 % of every model
+  downbeat inside the grid, the ones more than 70 ms from every beat included. Beat This!
+  slides half a beat off the grid in some sections, so tracks whose on-grid downbeats all
+  agreed lost their downbeat and every phrase. The winning phase now needs 60 % of the
+  downbeats that land on the grid, and at least half the downbeats inside the grid must land
+  on it.
+
+| 399 tracks of the stems evaluation sets            | v8                 | v9                 |
+| -------------------------------------------------- | ------------------ | ------------------ |
+| Without phrases (electronic, phrase, ind., m/p)    | 45 (11, 5, 17, 12) | 30 (6, 2, 9, 13)   |
+| Tracks with phrases whose profile changes          | -                  | 0 of 350 (non-m4a) |
+| `.m4a` duration, Ministry "Fear (Is Big Business)" | 583,656 ms         | 291,828 ms         |
+
+Every anchor of the old rule is the same anchor under the new one, so the 350 tracks that
+had phrases and are not `.m4a` keep their profile byte for byte; the 16 tracks that gain a
+bar change only `downbeatAnchorMs`, `timeSignature`, `phrases`, `energyCurve` and
+`structureConfidence`. The 30 left without phrases are tracks the DBN hears in 3/4 (10,
+SM3-D16) and tracks whose bar phase moves during the track (20): odd bars in the music, which
+madmom confirms on two of the four it was checked on, or model slips. A fixed `.m4a` profile
+matches the profile of a FLAC copy of the same file in grid, downbeat and phrases. Two
+offsets remain between symphonia, which `crate-cli` decodes with, and players: it keeps the
+encoder delay an MP4 edit list trims (about 46 ms on gapless AAC) and decodes HE-AAC without
+its SBR band (about 22 ms). The grid comes from Beat This!'s beats, decoded by ffmpeg as
+players decode, so only `crate-cli`'s own readings move: `bpmConfidence` was 0.78 on one
+gapless AAC file against 0.90 on its FLAC copy.
+
+Readers accept v9, v8, v7, v6 and v5 profiles (`READABLE_ANALYZER_VERSIONS`); writers, the
+backfill and Admin coverage target v9. v9 keeps `beat-this-small0-dbn` and `yamnet-2`, so a
+track analysed by v8 or v7 is recomputed from its stored signals, except the `.m4a` ones,
+which have no stored beats (see [Running the v9 backfill](#running-the-v9-backfill)).
 
 ### Analyzer v8
 
@@ -269,6 +357,14 @@ signals" below).
 | YAMNet, Google's weights in a PyTorch port (SM3-D13)      | Apache-2.0                                         | Voice per 0.48 s patch and per phrase; `vocal_detector` = `yamnet-2`        | About 0.7 s per minute of audio                                            |
 | None: harmony and timbre novelty of the phrases (SM3-D17) | —                                                  | Phrase boundaries, since `analyzerVersion` `smart-mix-audio-v7`             | About 6 ms (Python) and 4 ms (Rust)                                        |
 
+Smart Mix playlists add a third model, run only on their tracks (see "Server separation"
+below): `htdemucs-onnx-1`, Demucs v4 `htdemucs` exported to ONNX, on ONNX Runtime CPU.
+Demucs' code is MIT; the weights state no licence of their own and were trained partly on
+research-only data (MUSDB18-HQ), which Diego accepted at STEM-G0 for a free,
+non-commercial project. The image ships them with `htdemucs-onnx-1.NOTICE`, the
+attribution. A five-minute track takes about two to three minutes with four threads on a
+development laptop, plus the drum beats.
+
 Two more models serve only the offline measurement and never run in the worker: All-In-One
 (MIT), the reference for sections and downbeats, and madmom's downbeat networks (CC
 BY-NC-SA 4.0), the arbiter. madmom's package in the analysis image ships those network
@@ -299,8 +395,11 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   build reaches that stage through the `madmom-wheel` alias only when the image installs
   torch; without torch the alias points at the empty `madmom-skip` stage and the image
   gets neither madmom nor its licence. madmom's code is BSD (`/app/models/madmom.LICENSE`);
-  its package also ships model files under CC BY-NC-SA 4.0 that Crate does not use (the
-  DBN needs none), which is acceptable for Crate as free and open-source software.
+  its package also ships model files under CC BY-NC-SA 4.0 (Sebastian Böck and the
+  CPJKU, Johannes Kepler University Linz). Since `smart-mix-audio-v10` the meter arbiter
+  runs its downbeat networks (`DOWNBEATS_BLSTM`) in production, which Diego approved on
+  2026-11-09 (gate MG1): Crate is free and open-source software, so the non-commercial
+  licence does not block it. The DBN needs no model file.
 - **Where it runs.** `compute_smart_mix_profile` runs it before the analysis
   (`crate/smart_mix/beat_model.py`), unless the beats of this file are stored (see "Stored
   model signals" below), and passes the beats to the Rust analyzer
@@ -309,17 +408,47 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   fallback. Both use
   them instead of their own tracker, still fit the constant grid, and anchor the bar on the
   grid phase (beat index mod 4) that collects the most model downbeats within 70 ms, if
-  that phase holds at least 60 % of the model downbeats inside the grid. Otherwise the
+  that phase holds at least 60 % of those votes and at least half the model downbeats
+  inside the grid voted. A downbeat more than 70 ms from every grid beat (where Beat
+  This! slides half a beat off the grid in a section) votes for no phase; before
+  2026-11-09 it counted against the winning phase, and tracks whose downbeats all
+  agreed on the grid lost their bars and phrases. Otherwise the
   track has no downbeat and no phrases. The Rust cue downbeats (`introDownbeatMs`,
-  `outroDownbeatMs`) take the same rule over the 32 beats around each cue. A `crate-cli`
+  `outroDownbeatMs`) take the former rule over the 32 beats around each cue: 60 % of every
+  model downbeat in the window, the ones off the grid included, since eight bars are too
+  few to let those abstain. A `crate-cli`
   whose `analyze --help` does not list `--beats` would track its own beats after the model
   ran, so the worker logs a warning and the Python analyzer takes the beats instead. When
   that probe fails (a timeout on a loaded worker, for example), it logs a warning once and
   is not run again for 60 s (`PROBE_RETRY_SECONDS`); meanwhile each track logs at info that
   the probe is backing off and goes to the Python analyzer as well.
+- **Decoding.** The model reads the file with libsndfile. What libsndfile cannot open,
+  AAC in MP4 (the library's `.m4a`), ffmpeg decodes to mono at 22,050 Hz, as players
+  decode it: it trims the encoder delay an MP4 edit list marks and decodes HE-AAC with
+  its SBR band. Before, every `.m4a` lost the model and kept the analyzer's own tracker.
 - **Meter.** The DBN keeps one bar length per track, 3 or 4 beats, and `beats_per_bar` is
   read from its downbeats: the beats from each downbeat to the next, when every bar has as
-  many (otherwise null). Phrases, the planner and Crate Decks count bars of four, so with
+  many (otherwise null). Since `smart-mix-audio-v10` the worker decodes the DBN itself, one
+  path per bar length over the same Beat This! frames (`beat_model.decode_bar_paths`,
+  identical to madmom's processor for the winner), and when bars of three win it asks
+  madmom's own downbeat network, decoded by a DBN at 100 fps
+  (`crate/smart_mix/meter_arbiter.py`). Bars of three stay only when madmom also prefers
+  three; otherwise the track takes the DBN's four-beat path. Beat This!'s DBN hears fast
+  4/4 punk and metal (d-beat, thrash, death) in three, and since SM3-D16 such tracks lost
+  their bars and phrases. The arbiter runs only on those tracks (2.5 % of the evaluation
+  sets, 4.4 % of production's v9 signals) and reads the whole file: about 0.08 s of CPU per
+  second of audio on one thread, so 10-30 s on a track of two to six minutes and about 50 s
+  at 600 s. If it fails, the DBN's choice stands and the worker logs a warning.
+- **Arbiter memory.** madmom's own pipeline peaked at 5.6 GB on a 600 s track (3.6 GB at
+  348 s): it keeps each frame size's STFT of the whole file until the features are stacked,
+  and its Viterbi keeps a back-pointer per frame and state (about 15,000 states for bars of
+  four at 100 fps). The arbiter computes the spectrograms 30 s at a time with madmom's own
+  processors and runs the Viterbi forward pass keeping only scores, since it needs the log
+  probabilities and not the paths. Its input features and verdicts are madmom's (tests
+  compare both), and it no longer raises the process peak: the analysis of a 600 s
+  three-beat track peaks at 0.8-1.0 GB, which is Beat This!'s own peak. `track_mix_signals` keeps `meter_margin` (log p(3) - log p(4) per 1,000 frames)
+  and `meter_arbiter` (`madmom-dbn-3`, `madmom-dbn-4`, or null when it was not asked);
+  stored bars of three without a verdict are recomputed. Phrases, the planner and Crate Decks count bars of four, so with
   any other length (SM3-D16) both analyzers give the profile that `time_signature` and no
   downbeat, cue downbeats or phrases, and the track goes to crossfade. With 4, or without a
   constant bar, the bar is anchored as above and `time_signature` is 4 when the track has a
@@ -339,7 +468,14 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   `smart-mix-audio-v7`): a draft that brings a
   tracker the stored profile lacks, or another one (`beat-this-small0-dbn` over the
   `beat-this-small0` of the first, peak-picking builds), replaces it at the same quality,
-  and a run without the model never replaces a profile whose beats came from it.
+  and a run without the model never replaces a profile of the same file whose beats came
+  from it, whatever its quality or analyzer version. The library analysis embeds such
+  runs. Across versions the track keeps its older profile, which the backfill still
+  claims (its version is not the target) and recomputes with the model; a changed file
+  (another source revision) takes any draft. Before 2026-11-10 a reanalysis of a track's
+  BPM, key and loudness replaced its model beats whenever the analyzer's own tracker
+  rated the track higher, and before `smart-mix-audio-v10` a reanalysis during a backfill
+  left a current own-tracker profile the backfill never claimed again.
 - **Cost.** With one thread (`TORCH_NUM_THREADS`) on the development machine, `small0`
   takes 12.8 s of CPU on a 237 s track and 21.1 s on a 367 s one, and the DBN 0.8-1.0 s;
   with decoding and resampling, the whole step takes 14.7 s and 25.4 s.
@@ -450,6 +586,342 @@ with its beats stored, a backfill of the library takes about 3 days instead of 1
   only means not keeping their output: the worker logs a warning and the profile goes on.
 - **Size.** 3.4 KB for a 4:21 track and 4.8 KB for a 6:02 one (`pg_column_size` of the
   row; integer arrays are stored uncompressed), so about 0.5 GB for 140,000 tracks.
+
+### Stem analyses
+
+Smart Mix Stems separates a track into drums, bass, other and vocals and keeps what the
+planner needs from the stems, never the audio. Two producers write the same format: the
+server, for the tracks of Smart Mix playlists, and Crate Decks, which separates on the DJ's
+machine and may upload its analysis. The design is
+`docs/plans/2026-11-08-smart-mix-stems-design.md` in the Crate Decks repository (STEM-D1,
+D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
+
+- **Format `stem-analysis/1`.** A JSON document (`StemAnalysis`, unknown fields rejected
+  at every level):
+
+  | Field            | Content                                                                                                                                                              |
+  | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `schema`         | `stem-analysis/1`                                                                                                                                                    |
+  | `producer`       | `crate-server/<version>` or `crate-decks/<version>`; the prefix is the producer kind                                                                                 |
+  | `separator`      | `model` (`htdemucs` or `htdemucs_ft`), `version` (the separator identifier, such as `htdemucs-onnx-1`) and `sources`, exactly `["drums", "bass", "other", "vocals"]` |
+  | `sourceRevision` | The profile's `sourceRevision` (64 hex characters) of the file the producer analysed                                                                                 |
+  | `hopMs`          | 250                                                                                                                                                                  |
+  | `levels`         | One base64 string per stem, one byte per 250 ms window: RMS in dBFS, linear from -60 dB (0) to 0 dB (255)                                                            |
+  | `drumBeatsMs`    | Optional beats tracked on the drum stem, strictly increasing and within the analysed audio. Stored and measured; they change no grid                                 |
+  | `durationMs`     | Duration of the analysed audio                                                                                                                                       |
+
+  Every stem has the same number of windows, and they cover `durationMs` to within one
+  window either way. Producers encode a level with `encode_levels`:
+  `floor((dB + 60) × 255 / 60 + 0.5)` after clipping to [-60, 0], so -30 dB is 128,
+  silence is 0 and the server and Decks write the same bytes.
+
+- **Storage.** Migration 156 adds `track_stem_signals`, written by
+  `crate/db/repositories/smart_mix_stems.py`: one row per track and `producer_kind`
+  (`server` or `decks`), deleted with the track. It keeps the producer, the separator
+  model and version, the source revision, `hop_ms`, one `bytea` per stem, `drum_beats_ms`,
+  `duration_ms`, `created_at`, `updated_at` and, for Decks uploads only, `contributed_by`
+  (the user, set to null if the user is deleted). Checks keep a Decks row from naming a
+  `crate-server/` producer and keep the four curves the same length. A five-minute track
+  is about 4.8 KB of levels.
+- **Which rows replace which.** A store replaces the producer's row when the source revision
+  changed, whatever the separator, or when the new separator is at least as strong. A weaker
+  separator never overwrites a stronger analysis of the same file. A Decks upload is not
+  kept when the server already has an analysis of the same file from an equal or stronger
+  separator. The store says which happened: `stored`, `replaced` or `kept_stronger`.
+- **Which analysis applies (`choose_analysis`).** Only analyses of the track's current source
+  revision count: when a file changes, its old analyses stop applying at once, before
+  anything is recomputed. Of those, the stronger separator wins (`htdemucs_ft` over
+  `htdemucs`); on a tie, the server's.
+- **Stems layer (`stem_phrase_layer`).** Derived on read, never stored. For each phrase of the
+  profile, the mean level byte of each stem over the phrase, rounded half up. A window
+  belongs to the phrase that holds its centre; the last phrase ends where the beat grid puts
+  its last bar, capped at the profile's duration. There is no layer when the analysis is of
+  another source revision, when its duration differs from the profile's by more than 2 %,
+  when the profile has no phrases, or when a phrase gets no window.
+- **Presence per phrase** (`vocalPresent`, `bassPresent`, `drumsPresent`). A phrase has a
+  stem when its mean byte is at least the stem's floor and within the stem's drop of the
+  track's loudest phrase of that stem (`STEM_PRESENCE_CUTS` in `crate/smart_mix/stems.py`,
+  4.25 bytes per dB). The floor rejects separation leakage in tracks without the stem; the
+  drop follows the level each track mixes the stem at, which the absolute -35 dB cut of the
+  ST0 spike could not. ST3 calibrated them (`tools/smart-mix-eval/calibrate_stems.py`): vocals
+  -45 dBFS and 18 dB against the SG1b lyrics labels (balanced accuracy 0.82 on folds by
+  track, YAMNet's byte 0.74 on the same phrases); bass -40 dBFS and 17 dB, drums -40 dBFS and
+  14 dB, from the valley of each phrase's level below its track's loudest phrase, which has no
+  labels to check it against (the evaluation report in the Crate Decks repository,
+  `docs/plans/2026-11-09-smart-mix-stems-evaluation.md`, has the figures). The vocal
+  presence is detector `stem-vocals-1` (`vocalDetector`). The layer's `vocalPresent` is the
+  stem's alone; the v3 planner joins it with YAMNet's byte, a phrase being voiced when either
+  says so (STEM-G1, rules revision 3), because the stem misses voice YAMNet hears about half the
+  time they disagree. Changing a cut changes plans: it bumps `PLANNER_POLICY_V3.rules_revision`.
+- **API.** `GET /api/tracks/by-entity/{uid}/mix-profile?detail=full` carries the layer as
+  an optional `stems` object (`producer`, `separatorModel`, `separatorVersion`,
+  `vocalDetector` and `phrases` with `startMs`, `endMs`, `drums`, `bass`, `other`, `vocals`,
+  `vocalPresent`, `bassPresent` and `drumsPresent`); the summary never does. Crate Decks reads and uploads analyses through
+  `GET` and `PUT /api/decks/tracks/{uid}/stem-analysis`
+  (`docs/technical/crate-decks.md`, section "Stem analyses"). An upload needs
+  `smart_mix.stems.contribute` (owner and admin roles by default), at most 64 KiB, a
+  `crate-decks/` producer, the track's current source revision (409 otherwise) and its
+  duration within 2 %.
+- **Turning uploads off.** `PUT /api/settings/smart-mix` with
+  `{"stem_uploads_enabled": false}` (setting `smart_mix_stem_uploads_enabled`, on by
+  default) makes uploads answer 403 and drops `stem_upload` from `decks.features`.
+  Stored analyses and reads stay as they are. There is no Admin switch yet.
+- **Capability.** `smart_mix.stems` is `{available, playlists, storage}`. `available`
+  and `playlists` (Smart Mix playlists, next section) follow `smart_mix.available`;
+  `storage` says the server keeps stem files for Decks: on with `smart_mix.available`,
+  a stems directory in the API (`CRATE_STEMS_DIR`) and a stem quota above 0 (see
+  "Separation task and stem files").
+- **What does not change.** The v8 grid, downbeats, phrases and the YAMNet voice bytes stay
+  as they are. `smart-mix-v3` scores with the layer (see "Planner smart-mix-v3"); v2 never
+  reads it.
+
+### Smart Mix playlists
+
+A Smart Mix playlist is a playlist its owner marks for Smart Mix (STEM-D2). While it is
+on, the server separates its local tracks into stems, and Crate Decks keeps it as an
+offline set; every client lists all playlists and marks the Smart Mix ones. The routes
+and the Decks sync are in `docs/technical/crate-decks.md` (section "Smart Mix
+playlists"); the code is in `crate/db/repositories/smart_mix_playlists.py`.
+
+- **Storage.** Migration 157 adds three tables:
+  - `smart_mix_playlists`: one row per playlist ever turned on, deleted with the
+    playlist, with the owner, `enabled`, `enabled_at` (last turned on), `disabled_at`
+    (set only while off), `last_used_at`, `revision` and `updated_at`. Turning it off
+    keeps the row, so clients and the stem-file LRU see the change.
+  - `smart_mix_playlist_revisions`: one counter per user. Every change of one of the
+    user's Smart Mix playlists takes its next value: turned on or off, or tracks added,
+    removed or replaced while on. Decks lists "changes since revision N". The counter
+    row is locked until the change commits, so a user's changes are serial and the
+    per-user limit holds under concurrent requests.
+  - `track_stem_jobs`: one row per track (`pending`, `analyzing`, `ready` or `failed`,
+    `attempts`, `last_error`, `requested_at`, `started_at`, `finished_at` and the
+    `source_revision` it was asked for), deleted with the track. A track in two Smart
+    Mix playlists has one job.
+- **Who.** Only the owner turns a playlist on or off; system playlists have no owner.
+  Admins read any playlist's status but cannot toggle it.
+- **Limits.** Admin settings of each instance, in `PUT /api/settings/smart-mix`:
+
+  | Key                            | Setting                                  | Default  |
+  | ------------------------------ | ---------------------------------------- | -------- |
+  | `stem_max_tracks_per_playlist` | `smart_mix_stem_max_tracks_per_playlist` | 300      |
+  | `stem_max_tracks_per_user`     | `smart_mix_stem_max_tracks_per_user`     | no limit |
+
+  Both count distinct local tracks: a track twice in a playlist, or in two of a user's
+  playlists, counts once, and tracks from other instances do not count. Turning a
+  playlist on, and adding tracks to it while on (Listen, the web app, smart playlist
+  generation, OpenSubsonic), is refused with 409 when the playlist or the user's Smart
+  Mix playlists together would go over; nothing is stored. `null` turns the per-user
+  limit off; the per-playlist limit is always on (at least 1). Lowering a limit leaves
+  playlists that are on as they are, but they cannot grow.
+
+- **Queueing.** A track gets a pending job when one of its Smart Mix playlists turns on
+  or receives it and it has no server analysis of its current file (the profile's
+  source revision). A Decks upload does not count, because the server's separation
+  also produces the stem files (STEM-D6). An existing job:
+
+  - `pending` keeps its place unless the file changed;
+  - `ready` whose analysis no longer applies goes back to `pending`;
+  - `failed` goes back to `pending` only when the file changed since;
+  - `analyzing` is left to the worker.
+
+  Turning a playlist off and removing tracks leave jobs and analyses alone, so the
+  separation task (ST2.PR3) claims a job only while one of the track's Smart Mix
+  playlists is on. `queue_smart_mix_stem_jobs()` queues for every Smart Mix playlist
+  that is on, for that task to run before it claims and catch tracks whose file
+  changed.
+
+- **Status.** A track is `ready` when it has a server analysis of its current file;
+  otherwise it has its job's state, and `pending` with no job. The estimate is the
+  playlist's pending and analysing tracks times the mean time of the latest 20
+  separations (four minutes per track until there is one, from the ST2.PR2
+  measurements below), without other queued work.
+- **Playlist responses.** `GET /api/playlists`, its detail (owner and collaborators)
+  and `playlists` in `GET /api/me/playlists-page` carry `smartMix`, which is
+  `{enabled, ready, total}`, computed for all of them in one query; `ready` and `total`
+  are 0 while off. The toggle invalidates the `playlists` and `playlist:{id}` client
+  caches.
+- **Work.** The task `analyze_playlist_stems` separates the queued tracks; the
+  separation is in "Server separation" and the task in "Separation task and stem
+  files". `last_used_at` is set when a playlist is turned on and when its owner
+  downloads one of its stem files.
+
+### Server separation
+
+The analysis worker separates the tracks of Smart Mix playlists with `htdemucs-onnx-1`:
+Demucs v4 `htdemucs` exported to ONNX by Crate Decks, the network only, run on ONNX
+Runtime CPU (STEM-D3). There is no PyTorch in the separation. The code is
+`crate/smart_mix/separation.py`; where its audio goes is `crate/smart_mix/stem_storage.py`.
+
+- **One separator for both producers.** The DSP around the graph is numpy, ported from
+  Crate Decks' reference (`tools/crate-stems/stems_dsp.py`) with the parameters of the
+  ST0 spike report (section 5): normalisation of the whole track by its mono mix,
+  segments of 343,980 samples every 257,985, STFT and iSTFT with n_fft 4096 and hop 1024
+  (periodic Hann, normalised, reflect padding, centred), triangular overlap-add,
+  `shifts=0`. `tests/test_smart_mix_separation_dsp.py` checks it against Crate Decks'
+  fixtures within 1e-5, and `tests/test_smart_mix_separation_onnx.py` checks the whole
+  separation against the golden stems PyTorch computed (at least 60 dB SDR per stem).
+  The server's analyses say `producer` `crate-server/stems-1` and `separator`
+  `{model: htdemucs, version: htdemucs-onnx-1}`, the identifier Decks uses for the same
+  graph.
+- **The graph in the image.** The analysis image downloads `htdemucs-onnx-1.onnx`
+  (174 MB) at build time from the Crate Decks release asset
+  `models-htdemucs-onnx-1/htdemucs-onnx-1.onnx` and checks its SHA-256
+  (`808790c0…6a08`), like the Beat This! checkpoint; the worker never downloads it. It
+  lands in `/app/models` with `htdemucs-onnx-1.NOTICE`, the attribution and the note on
+  the training data (design section 7). The release asset is published in
+  `thecrateapp/crate-decks` (release `models-htdemucs-onnx-1`); an image cannot build from
+  the default without it. Local and dev builds can take the file from a named build
+  context instead, with the same check:
+
+  ```bash
+  docker build --target worker-analysis --build-arg PANNS=on \
+    --build-arg HTDEMUCS_ONNX_SOURCE=context \
+    --build-context htdemucs-onnx=<directory holding htdemucs-onnx-1.onnx> app
+  ```
+
+  `HTDEMUCS_ONNX_URL` points the download elsewhere, and `CRATE_HTDEMUCS_ONNX` the
+  worker at another file. Images built with `PANNS=off` separate too; they only lack
+  the drum beats.
+
+- **Disk.** Separation writes only to `CRATE_STEMS_DIR` (`/stems` in the Compose files,
+  `STEMS_DIR` on the host, `${MEDIA_DIR}/smart-mix-stems` by default), and only after
+  checking that it is on the library's filesystem: the music volume, never `/tmp`, a
+  `tmpfs` or the container's disk. When the music lives on another filesystem than
+  `MEDIA_DIR`, as on the project server (`media/music` links to `/mnt/music`), set
+  `STEMS_DIR` to a hidden directory below the music mount, like `CACHE_DIR`
+  (`/mnt/music/.smart-mix-stems`): the library scanner and watcher ignore hidden path
+  components, and slskd does not share hidden directories. Create the host directory,
+  owned by `PUID:PGID`, before deploying: Docker would create a missing one owned by
+  root. Scratch goes to `.scratch` inside it: ffmpeg decodes the track to float32 (about
+  106 MB for five minutes), the overlap-add writes one float32 file per stem (four times
+  that), and the directory is removed when the stems are no longer needed, on success and
+  on failure.
+- **Memory.** Nothing holds a whole track: the normalisation reads the decoded file in
+  blocks, and the overlap-add streams, writing each segment's final samples as soon as no
+  later segment can touch them. What stays in memory is ONNX Runtime with the graph and a
+  few segments of arrays, whatever the track's length. ONNX Runtime's default
+  (sequential) executor reuses buffers across the encoder and the decoder and held
+  3.8-3.9 GB, above the 1.5 GB at which the worker recycles a process and the 2 GB of the
+  default analysis container. The worker runs it without that reuse
+  (`SESSION_CONFIG` in `separation.py`, `enable_mem_reuse=False`). Measured in the
+  analysis image with 4 threads on a development laptop (Core Ultra 9 185H, shared with
+  other work):
+
+  | Session                           | Peak RSS   | Graph per segment | CPU per segment |
+  | --------------------------------- | ---------- | ----------------- | --------------- |
+  | Sequential (ONNX Runtime default) | 3.8-3.9 GB | 3.0-3.4 s         | 9.7-11.2 s      |
+  | Parallel, 2 inter-op threads      | 0.8 GB     | 3.3-4.0 s         | 13.6-16.6 s     |
+  | No memory reuse (used)            | 1.0 GB     | 2.4-3.0 s         | 8.0-10.0 s      |
+
+  The three give the same stems: 87.7-101.3 dB SDR against PyTorch on the golden track.
+  The parallel executor peaks lowest but spends 40-60 % more CPU per segment, the
+  scarcer resource on the server. Once the stems are written the session is dropped and
+  the freed heap goes back to the system (`malloc_trim`), so Beat This! afterwards adds
+  nothing to the peak: 1.0 GB for the whole separation of three tracks of 300-314 s, each
+  in a container limited to 2 GB (its cgroup, page cache included, peaked at 1.4-2.0 GB).
+
+- **Threads.** `CRATE_STEMS_THREADS` (4 by default, 1-64) sets ONNX Runtime's intra-op
+  threads and ffmpeg's. Idle threads sleep instead of spinning, so a waiting separation
+  does not raise the load the resource governor reads. On the same laptop, with 4
+  threads and a one-minute load of 3.6-9, a five-minute track took 122-173 s to separate
+  (54 segments, nine tenths of it in the graph), 15-20 s for the drum beats and 2 s for
+  the levels: 380-560 s of CPU. One segment of the graph by threads, at a load of about 3:
+
+  | Threads                 | 1   | 2   | 4   | 8   |
+  | ----------------------- | --- | --- | --- | --- |
+  | Seconds per segment     | 4.4 | 2.7 | 2.2 | 1.7 |
+  | CPU seconds per segment | 4.4 | 5.1 | 7.4 | 9.7 |
+
+  Threads past two buy less and less. On the default analysis container
+  (`cpus: "0.75"`) set `CRATE_STEMS_THREADS=1`. The project server (`cpus: "7.0"`) sets
+  `CRATE_STEMS_THREADS=2` in its `.env` while the backfill runs four to eight analyses on
+  its eight logical CPUs: by the table, 31 % less CPU per segment than 4 threads for 23 %
+  more time. The i7-7700 is slower per thread
+  than this laptop: **timing a 50-track Smart Mix playlist on the server is still to do
+  after the deploy** (ST2.PR2), and its result belongs here.
+
+- **Levels.** The level of a stem is the RMS of its mono mix (the mean of both channels)
+  over windows of 11,025 samples (250 ms at 44.1 kHz) from the start of the track; the
+  last window may be short and covers the samples it has. `durationMs` is the decoded
+  length, rounded to the millisecond. Crate Decks must compute them the same way (ST5).
+- **Drum beats.** Beat This! with its DBN, the profiles' beat tracker, runs on the drum
+  stem's mono mix at 22,050 Hz and fills `drumBeatsMs`. They are stored and measured,
+  never used for the grid (STEM-D4). Tracks over ten minutes, images without torch and
+  a model failure leave them out.
+
+### Separation task and stem files
+
+`analyze_playlist_stems` (`crate/worker_handlers/smart_mix_stems.py`) separates the
+tracks of Smart Mix playlists in `crate-analysis-worker`. Its queries are in
+`crate/db/jobs/smart_mix_stems.py`; the stem files in `crate/smart_mix/stem_files.py`.
+
+- **Queue and order.** `heavy`, priority 2: above the backfill coordinator (3), below
+  interactive work. One runs at a time: turning a Smart Mix playlist on, adding tracks
+  that need stems and the backfill all queue it with the scheduler's dedup key
+  (`schedule:analyze_playlist_stems`), and the scheduler queues it every 30 minutes, which
+  picks up retries and changed files. The resource governor applies; the night window
+  does not. Its time limit is two hours, for one track.
+- **A run.** It fails jobs a dead separation left `analyzing` for over two hours (the
+  attempt counts), queues the tracks whose file changed (`queue_smart_mix_stem_jobs()`),
+  asks for the profiles of up to ten waiting tracks that have none (the analysis is
+  stored under the profile's source revision, so a track waits for its profile), then
+  claims one job and separates its track. It runs again a second later while there is
+  more to claim, two minutes later while tracks wait for profiles, and otherwise ends
+  (`{"status": "idle"}`) after sweeping the stems directory. Without onnxruntime, the
+  graph or a stems directory on the music volume it ends as `skipped` with the reason,
+  and jobs stay `pending`.
+- **Claims.** A job is claimed while one of its track's Smart Mix playlists is on and its
+  track has a current profile of the job's revision: `pending` jobs, oldest request
+  first, then `failed` ones with attempts left once 15 minutes times their attempts have
+  passed. `FOR UPDATE SKIP LOCKED`, like the other claims.
+- **Outcome.** The task checks the file's revision when separation starts and again
+  before storing: a file that changed in between stores nothing. The `stem-analysis/1`
+  (`crate-server/stems-1`), the stem file's row and `ready` are written in one
+  transaction. Any failure ends `failed` with one more attempt and `last_error`; a track
+  gets three attempts, and one over 20 minutes fails for good at once.
+- **The backfill waits.** While a job can be claimed, the backfill coordinator claims
+  nothing, queues the task and comes back a minute later with the progress `Waiting for
+the stems of Smart Mix playlists`; analyses it already queued finish. Once the
+  playlists' work is done (nothing claimable, which includes failed tracks waiting to
+  retry), it resumes where it was. A playlist of 300 tracks therefore holds the backfill
+  for as long as it takes to separate them, about 20 hours at four minutes per track.
+- **Stem files** (STEM-D6). One MP4 per track with three AAC streams at 256 kbps:
+  drums, bass and vocals, in that order, each named in its handler (`handler_name`).
+  `other` is not stored: Decks rebuilds it as the residual against its own decode. A
+  five-minute track is about 29 MB. They live in `CRATE_STEMS_DIR` at
+  `<track id mod 256, hex>/<track id>-<revision prefix>.mp4`; ffmpeg writes each one in
+  the separation's scratch and it is renamed into place, and the writer refuses any
+  path outside that directory or inside its scratch. Migration 158 adds
+  `track_stem_files`: one row per track (deleted with it) with the relative `path`,
+  `bytes`, the separator, the `source_revision` and `last_used_at`. A new separation of
+  the track replaces its file.
+- **Quota.** `PUT /api/settings/smart-mix` with `stem_quota_gib` (setting
+  `smart_mix_stem_quota_gib`, 50 by default, 0 to 100,000): the total size of the stem
+  files, in GiB. After each separation the task evicts until the files fit: first the
+  files of tracks in no Smart Mix playlist that is on, then the rest, each least recently
+  used first. A file's last use is the later of its last download and the last use of the
+  Smart Mix playlists that hold it. 0 keeps no stem files; separation and analyses go
+  on. Evicting a file does not queue the track again: its analysis stays, and Decks
+  separates the track itself.
+- **Sweep.** When it has nothing to claim, the task deletes files of the directory no row
+  refers to and scratch left by a separation that died, once they are over two hours
+  old.
+- **Download.** `GET /api/decks/tracks/{uid}/stems` serves the file with Range support
+  (`audio/mp4`), only while it was separated from the track's current file; 404
+  otherwise, and when the API has no stems directory. The API mounts it read-only. A
+  download marks the file, and the downloader's Smart Mix playlists that are on and hold
+  the track, as used now (at most once an hour each): that is the use the LRU reads.
+  Details for clients are in `docs/technical/crate-decks.md` ("Stem files").
+- **Cost per track.** On the laptop of "Server separation", with 4 threads at a load of
+  3.7, the whole task for a 312 s track took 163 s: 131 s to separate, 15 s for the drum
+  beats, 1 s for the levels and 16 s for the stem file (30 MB). The status estimate uses
+  four minutes per track until real separations exist, since the i7-7700 is slower per
+  thread.
+- **After the deploy.** Before integration, the Crate Decks release asset
+  `models-htdemucs-onnx-1/htdemucs-onnx-1.onnx` must exist (the analysis image downloads
+  it), and the stems directory (`STEMS_DIR`, `${MEDIA_DIR}/smart-mix-stems` by default) must
+  exist on the music volume, owned by `PUID:PGID`.
+  Then time a 50-track Smart Mix playlist on the server and record it here.
 
 ### Measurement of the structure
 
@@ -583,13 +1055,19 @@ profile. A task that finishes without publishing does not account for a new prof
 `quality` accepts `full`, `partial`, `legacy` and `unavailable`. The Admin track table also
 exposes this profile status, in the implemented order of precedence:
 
-| Profile status   | Meaning                                                             |
-| ---------------- | ------------------------------------------------------------------- |
-| `missing`        | The track has no profile row                                        |
-| `unavailable`    | A profile exists and its quality is `unavailable`                   |
-| `source_changed` | Profile flagged by a source change                                  |
-| `outdated`       | Analyzer or schema version differs from the target                  |
-| `current`        | Profile not flagged stale, with current versions and usable quality |
+| Profile status   | Meaning                                                                                                                                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `missing`        | The track has no profile row                                                                                                                                                                       |
+| `unavailable`    | A profile exists and its quality is `unavailable`                                                                                                                                                  |
+| `source_changed` | Profile flagged by a source change                                                                                                                                                                 |
+| `outdated`       | Analyzer or schema version differs from the target, or the profile is at the target but on the analyzer's own beats (no `beat_tracker`) on a track Beat This! runs on (up to 600 s), where it runs |
+| `current`        | Profile not flagged stale, with current versions and usable quality, on Beat This!'s beats, on a track over 600 s, or where Beat This! cannot run                                                  |
+
+Where Beat This! cannot run (ARM images, `PANNS=off`, missing weights), nothing would ever give
+an own-tracker profile the model's beats, so coverage and the track list count it `current`.
+The coordinator records whether its worker can run the model in the campaign
+(`beat_model_available`, kept across campaigns); until a pass has recorded it, both assume the
+model, as production has it.
 
 `failed` is a filter on `processingState`, not a sixth profile status. A track can keep a
 usable profile and still record a failed processing attempt. Read `processingAttempts`,
@@ -610,6 +1088,7 @@ structure; check `refreshedAt` before reading zeros as a library with nothing pe
 | `backfill_smart_mix_profiles` | `heavy`       | Coordinates batches and enqueues children |
 | `compute_smart_mix_profile`   | `heavy`       | Analysis and publication per track        |
 | `refresh_smart_mix_coverage`  | `maintenance` | Aggregates coverage outside the request   |
+| `analyze_playlist_stems`      | `heavy`       | Stems of Smart Mix playlists, one at once |
 
 The backfill applies resource pressure and limits the work in flight to the limit of the
 [night window](#night-window): 8 at night and 4 by day by default. Its Admin settings accept
@@ -639,6 +1118,24 @@ completes has exhausted the claimable work in that pass; it can still leave exha
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
 
+A `completed` campaign of the deployed target reopens by itself (since `smart-mix-audio-v10`).
+Every 10 minutes (`SMART_MIX_WAKE_SECONDS`) the service loop of `crate-worker` looks for one
+claimable profile written since the campaign completed: a new import or a library reanalysis
+on the analyzer's own beats, a profile that became `unavailable`, a source change. If it finds
+one, it sets the campaign back to `running` and queues the coordinator, which claims under the
+same night window, resource governor and `maxAttempts`, and completes it again when nothing is
+left. Admin then shows the campaign `running`, with its counters going on from where they
+were. It reads the profiles written since `completed_at` through the `updated_at` index, one
+row at most, and does nothing for any other campaign: a paused or cancelled campaign stays
+stopped, a campaign of another target waits for an operator to start the new one, and a setup
+whose analysis worker cannot run Beat This! (the coordinator records it in the campaign as
+`beat_model_available`) never reopens by itself. To stop the reopening, pause or cancel the
+completed campaign: Admin shows **Pause reopening** next to **Start backfill** while the
+campaign of the deployed target is `completed`, and `POST /api/admin/smart-mix/backfill/pause`
+or `/cancel` accept a `completed` campaign. A paused campaign shows **Resume backfill**, which
+runs a pass and turns the reopening back on; after a cancel, **Start backfill** opens a new
+campaign.
+
 ### How a pass claims
 
 Ranking the whole library is expensive, and since the night window a pass only claims its free
@@ -662,8 +1159,16 @@ and whether it is a Python promotion:
   and schema, quality, `target_generation`, attempts, claims in flight, quarantined albums),
   under `FOR UPDATE SKIP LOCKED`, and leaves the ranking once claimed. A row that is no longer
   claimable, for example because a manual reanalysis wrote a current profile, is skipped.
+- **Own-tracker profiles at the target.** Since `smart-mix-audio-v10`, when the coordinator's
+  worker can run Beat This! (torch, `beat_this`, madmom and the weights installed), a profile at
+  the target analyzer and schema without a `beat_tracker` is claimable too, on tracks of 600 s or
+  less. The analysis daemon writes such profiles for new imports and library reanalyses
+  (`crate-cli analyze` runs without the model); the claim gives them Beat This!'s beats. They
+  take the same tiers and order as every other claimable track, and the same retry budget: a
+  file Beat This! fails on is claimed once per pass, up to `maxAttempts`, then counted as
+  `exhausted`. A model draft replaces the own-tracker profile whatever its quality.
 - **Refresh.** The ranking is rebuilt when its inputs change (analyzer version, schema,
-  `maxAttempts` or Python promotion), when it is older than 10 minutes and when it cannot fill a
+  `maxAttempts`, Python promotion or own-tracker upgrades), when it is older than 10 minutes and when it cannot fill a
   pass. Because of the last rule, a pass that claims nothing, which completes the campaign if
   nothing is in flight, always comes from a fresh ranking.
 - **What waits for the next ranking.** A track that becomes claimable between rankings (a failed
@@ -716,8 +1221,15 @@ attempts, and the start and resume calls take it in the same body:
   once nothing is in flight.
 - The wait follows how long the slots have stayed as they are, measured from the last change to
   a `smart_mix` processing row (a claim, a finished or failed analysis): 3 s right after one,
-  then about double each time while nothing changes, up to 30 s. A freed slot is therefore
-  refilled within 30 s at worst and within a few seconds while analyses finish often.
+  then about double each time while nothing changes, up to 10 s. A freed slot is therefore
+  refilled within 10 s at worst and within a few seconds while analyses finish often. With
+  30 s, the cap until 2026-11-11, a freed slot waited about 10 s on average for analyses of
+  about 25 s.
+- The analysis worker's pools take a message only when their single thread is free
+  (`dramatiq_queue_prefetch=1`, set by `run_worker()` for every pool that consumes `heavy`).
+  With Dramatiq's default prefetch of two, a busy process held the next child behind the
+  analysis it was running while other processes sat idle: the median child started at once, but
+  one in ten waited 30 s or more.
 - If the resource governor denies the coordinator after the actor admitted it, the coordinator
   goes back to the queue the same way, for the governor's delay and at most five minutes, with
   the progress `Deferred by resource governor: <reason>`. It never sleeps in a worker process.
@@ -753,7 +1265,9 @@ On the project server (i7-7700, 4 cores and 8 threads) set `ANALYSIS_WORKER_PROC
 `.env` and recreate the service with `docker compose up -d crate-analysis-worker`.
 `docker-compose.project.yaml` gives it `cpus: "7.0"`, which leaves a logical CPU for Postgres and
 the API at night, and `mem_limit: 14g`, which covers the 1.5 GB at which each process recycles
-itself plus the parent with the import analysis daemons. Watch its memory during the first night
+itself plus the parent with the import analysis daemons. The limit is the process's current
+resident set after a task, and `ANALYSIS_WORKER_MAX_RSS_MB` in `.env` changes it (default 1500); a
+process over it finishes its task and exits, and only that process starts again. Watch its memory during the first night
 with `docker stats crate-analysis-worker`. Eight analyses on four cores share them through
 Hyper-Threading, so the night gains less than double the day's throughput.
 
@@ -766,9 +1280,145 @@ therefore often below the night limit, and by day listeners can hold it below th
 as long as they listen. To run all eight at night, raise `max_load_ratio` in the runtime policy;
 the same threshold also applies by day.
 
+### Running the v10 backfill
+
+v10 changes only tracks whose DBN chose bars of three, but the publisher keeps a profile
+of the same version and quality, so a new version is the way to reach them. Production
+runs the v9 campaign (started 2026-11-09 at 19:00 UTC). v10 supersedes it whatever its
+state: after the release with v10 is deployed through the normal process, a new v10
+campaign recomputes the library, and a v9 coordinator still queued exits as `superseded`
+without claiming.
+
+1. **Check the starting point** as for v9: `analyzerVersion` `smart-mix-audio-v10`,
+   `controlState` `idle`, `campaign.target` `smart-mix-audio-v9` (running or paused) and
+   `activeTask` null or a v9 coordinator about to exit. Migration 161 adds
+   `meter_margin` and `meter_arbiter` to `track_mix_signals`; existing rows read null.
+2. **Start the campaign** with **Start backfill** (batch size 25, 3 attempts) or
+   `POST /api/admin/smart-mix/backfill`. It opens a v10 campaign whose `sequence`
+   continues the v9 one; the night window settings carry over.
+3. **What the campaign claims.** Every profile not at v10 (the v9, v8, v7, v6 and v5
+   ones, `unavailable` and source-changed ones, tracks without a profile) and, with
+   Beat This! available in the analysis worker, every v10 profile on the analyzer's own
+   beats of a track up to 600 s: new imports and library reanalyses during the campaign.
+   On 2026-11-09 production held no v9 profile without model beats under 600 s (74 over
+   it), so that class starts empty and grows only with imports and reanalyses.
+4. **What each row costs.**
+   - **Rewritten by v9, four beats to the bar:** about 95.6 % of them in production
+     (11,732 of the 12,278 stored signals on 2026-11-09). The stored beats stay valid,
+     so only decoding, `crate-cli` (about 2 s of CPU) and the phrase voice from the
+     stored bytes run, as for the v8 rows under v9 (about 31-41 tracks a minute by day
+     with four in flight).
+   - **Rewritten by v9, three beats to the bar:** about 4.4 % (537). Their stored beats
+     predate the arbiter, so Beat This! runs again (5-35 s) and madmom's network after
+     it (10-30 s, about 50 s at 600 s).
+   - **Not yet reached by v9** (v5 and v6 profiles): a whole profile, as under v9, plus
+     the arbiter on the 4.4 % that the DBN hears in three.
+   - **Own-tracker v10 profiles:** a whole profile each, which the campaign would have
+     paid for the same track anyway if the reanalysis had not come first.
+   - In all, v10 adds about 3-4 s of CPU per row v9 has already rewritten, and about
+     1 s per row it has not, over what v9 would have cost.
+   - **Memory.** Each process peaks at about 1 GB on a 600 s track, three-beat or not
+     (Beat This!'s peak), so eight night analyses stay near 8 GB of the 14 GB limit
+     whatever share of them are in three.
+5. **Library reanalyses during the campaign are safe.** A reanalysis of BPM, key and
+   loudness (Admin, or the `.m4a` one of the v9 runbook) never replaces a profile with
+   Beat This!'s beats by its own-tracker draft, of any version: the track keeps its v9
+   profile, and the campaign claims and recomputes it. A track whose profile has no
+   model beats (v5, v6, or v8 `.m4a`) takes the reanalysis' own-tracker v10 profile, and
+   the campaign then upgrades it with Beat This!.
+6. **Watch, pause, resume, cancel and close it** as for v9 below. Once it has finished,
+   a later release can drop v9 and older versions from `READABLE_ANALYZER_VERSIONS`.
+7. **After it completes,** the campaign reopens by itself when new imports or library
+   reanalyses leave claimable profiles (see [Campaign, queues and backfill](#campaign-queues-and-backfill)):
+   new tracks get Beat This!'s beats within about ten minutes plus their analysis, under
+   the night window. **Pause reopening** in Admin (or pausing or cancelling the
+   completed campaign through the API) stops that.
+
+#### Known issues of v10 (backlog, not in this release)
+
+- `crate-cli` decodes AAC in MP4 with symphonia, which keeps the encoder delay an MP4 edit
+  list trims (about 46 ms on gapless AAC) and decodes HE-AAC without its SBR band (about
+  22 ms): its own readings (cues, `bpmConfidence`) shift on such files; the grid, from Beat
+  This!, does not.
+- About 20 of the 399 evaluation tracks change bar phase during the track (odd bars, or
+  model slips): a single downbeat anchor cannot hold them, so they keep no phrases.
+- The meter arbiter was measured on the evaluation sets only; the labelled three-beat
+  reference set of its plan (All-In-One) is not built, and nobody has listened to the
+  tracks it changes. Swans "Coward", with irregular live drums, takes bars of four.
+- The analysis worker finds no PANNs model, so the library's mood comes from Essentia.
+- The wake-up only sees profiles written since the campaign completed: a track the
+  analysis daemon never profiled waits for an operator to start a campaign.
+
+### Running the v9 backfill
+
+Production holds a `paused` campaign with `target` `smart-mix-audio-v8`, paused on
+2026-11-09 after 4,779 batches and 12,505 claims, with 12,717 v8 profiles; the rest of the
+library still holds v7, v6 and v5 profiles. v9 replaces that target, so after the release
+with v9 is deployed through the normal process, a new v9 campaign recomputes the library.
+The queues do not change: the coordinator and each analysis run on `heavy`.
+
+1. **Check the starting point.** Open Admin, Analysis, Smart Mix, or call
+   `GET /api/admin/smart-mix/status` with an account that has `library.analysis.manage`.
+   Expect `analyzerVersion` `smart-mix-audio-v9`, `profileVersion` `1`, `controlState`
+   `idle` (a campaign of another target claims nothing), `campaign.target`
+   `smart-mix-audio-v8` with `campaign.status` `paused`, and `activeTask` null. If
+   `refreshedAt` is null or older than ten minutes, the call queues a coverage refresh: read
+   it again a minute later. Coverage starts at 0 %, and `versions` lists the v8, v7, v6 and
+   v5 profiles still being served. If `activeTask` is not null, wait for it to finish (a
+   coordinator of the v8 campaign exits as `superseded` without claiming) or cancel it from
+   Tasks.
+2. **Keep the night limit.** `ANALYSIS_WORKER_PROCESSES=8` in `.env` since the v7 backfill
+   (see [Night window](#night-window)); the governor's `max_load_ratio` is 1.5 in the runtime
+   policy since 2026-11-07.
+3. **Start the campaign.** Press **Start backfill** (batch size 25, 3 attempts), or call
+   `POST /api/admin/smart-mix/backfill` with `{"batchSize": 25, "maxAttempts": 3}`. The answer
+   is `{"status": "queued", "taskId": "…"}`. The paused v8 campaign is not resumed:
+   starting, or resuming, opens a campaign with `target` `smart-mix-audio-v9`,
+   `profile_version` `1`, `status` `running` and `batches` and `claimed` `0`, whose `sequence`
+   continues the v8 campaign's so no batch reuses a v8 dedup key.
+4. **Watch it.** `controlState` `running`; `campaign.batches` and `campaign.claimed` grow;
+   `currentProfiles` and `coveragePercent` rise; `processing.active`, `failed` and `exhausted`
+   show the work and its errors; `GET /api/admin/smart-mix/activity` gives
+   `tracksPerMinute`. The campaign claims every profile that is not v9, in the same order as
+   the v8 one, so the 12,717 v8 profiles come first. v9 is another generation, so a track the
+   v8 campaign finished or gave up on starts a new retry budget. Each rewritten track is
+   claimed once.
+5. **The v8 and v7 rows are cheap; the `.m4a` ones are not.** v9 keeps
+   `beat-this-small0-dbn` and `yamnet-2`, so a track whose file has not changed since its v8
+   or v7 analysis finds its beats and voice in `track_mix_signals` (see
+   [Stored model signals](#stored-model-signals)): neither Beat This! nor YAMNet runs, only
+   decoding, `crate-cli` (about 2 s of CPU) and the phrase voice from the stored bytes. The
+   12,717 v8 rows take about seven hours of CPU in all. Beat This! never ran on an `.m4a`
+   (libsndfile cannot open it), so those tracks have voice but no stored beats: about 2,280
+   in production (1.6 % of the library) run Beat This! now, 14.7-25.4 s each, about 13 hours
+   of CPU in all. v6 and v5 profiles predate the stored signals and cost a whole profile, as
+   they would have under v8.
+6. **Pause, resume or cancel.** **Pause backfill** or `POST /api/admin/smart-mix/backfill/pause`
+   (only from `running`, 409 otherwise); **Resume backfill** or
+   `POST /api/admin/smart-mix/backfill/resume` with the same body as the start, which keeps
+   the counters; **Cancel backfill** or `POST /api/admin/smart-mix/backfill/cancel` (from
+   `running` or `paused`). None of them interrupts analyses already handed to the heavy queue.
+   Starting again after a cancel opens a new v9 campaign that only claims what is still not
+   v9.
+7. **Close it.** The campaign turns `completed` when a pass claims nothing and nothing is in
+   flight. Then check `processing.exhausted` and the track list filters `outdated` and
+   `failed`, and use **Reanalyze track** for the ones worth retrying. Once the backfill has
+   finished, a later release can drop v8, v7, v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
+8. **The library analysis of the `.m4a`.** The v9 profiles fix the Smart Mix side only. The
+   BPM, key, loudness and mood the library analysis stored for the AAC `.m4a` came from the
+   same slowed audio; their reanalysis runs apart, on the library analysis tasks. Under
+   v9 it had to wait until the track's profile carried Beat This!'s beats: the library
+   analysis would otherwise publish its own current profile first, and the backfill would
+   never claim the track. From v10 on it can run first on every `.m4a`: a profile with
+   the model's beats keeps them, and a profile without them takes the own-tracker v10
+   draft, which the running campaign upgrades with Beat This!.
+
 ### Running the v8 backfill
 
-Production holds a `paused` campaign with `target` `smart-mix-audio-v7`, which had written
+Superseded by [Running the v9 backfill](#running-the-v9-backfill) on 2026-11-09; kept for
+reference.
+
+Production held a `paused` campaign with `target` `smart-mix-audio-v7`, which had written
 about 2,710 v7 profiles; the rest of the library still holds v6 and v5 profiles. v8 replaces
 that target, so after the release with v8 is deployed through the normal process, a new v8
 campaign recomputes the library. The queues do not change: the coordinator and each analysis
@@ -958,12 +1608,72 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 - **Without phrases on both tracks** (v5 and v6 profiles, unsegmented tracks, 3/4) the menu is
   v2's bar heuristic with v2's plan first, so v3 plans exactly as v2. Album, manual and missing
   profile transitions keep v2's single plan.
+- **Listen** asks for the planner in `/api/capabilities` `smart_mix.listen_planner_version`:
+  `smart-mix-v3` when `CRATE_LISTEN_SMART_MIX_V3_ENABLED` is on, `smart-mix-v2` otherwise, and
+  v2 when the field is absent (older servers). `planner_version` and VirtualDJ's
+  `vdj.planner_version` stay on v2 whatever the switch says, so older APKs never change planner.
+- **Listen's caps** (rules revision 6, LV-D9, decided at LV-G1 on 2026-11-10). For every source
+  but Crate Decks (`listen_cap_exempt_sources`), the menu is reordered so that the served plan
+  skips at most 10 s of the incoming intro (`listen_max_skipped_intro_ms`) and cuts at most 20 s
+  of the outgoing outro (`listen_max_unplayed_outro_ms`), measured as
+  `evaluation.music_left_out` measures them: the candidates within both caps first, in their
+  rank order, then v2's own plan (the fallback, even beyond the caps), then the rest. Crate
+  Decks keeps v3's own order, and v2 has no caps. The LV0 report
+  (`2026-11-09-listen-smart-mix-v3-evaluation.md` in the Crate Decks repository) measured these
+  values against 5/10 s and 20/40 s.
 - **Safety**: every candidate goes through `TransitionPlan` and the planner policy
   (`evaluation.policy_violations`); v3 copies v2's limits on tempo, gain, true peak and
   durations.
-- **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases. The
-  batch reads profiles without structure to build the cache keys and reads the structure only
-  for the edges it has to plan.
+- **Stems layer** (Smart Mix Stems ST3, rules revision 5, STEM-D5 and STEM-G1). When the
+  request comes from Crate Decks (`context.source = "decks"`, `stems_layer_sources`), both
+  tracks have a stem analysis of their current file (Smart Mix playlists, or a Crate Decks
+  upload), the policy's `stems_layer` is on and the edge belongs to the beatmatch family, the
+  phrase menu is scored with the stems layer. Listen, Android, VirtualDJ and every other source
+  get revision 1's menu, within Listen's caps since revision 6 (Diego, revision 5: Listen's short blends measured worse with the layer
+  on the industrial set):
+
+  - a phrase has voice when the vocal stem or YAMNet's stored byte (`VOCAL_THRESHOLD`) says so;
+    the vocal penalty counts those phrases, and so do the two bonuses below;
+  - the bass component is one minus the share of the mix with both basses at full level
+    (crossfade and handoff shelf) while both phrases have a bassline, so a mix where one side
+    has none scores like a handoff;
+  - two bonuses are added, 0.05 × the share of the mix before the handoff with the incoming on
+    drums without bass or vocals, and 0.05 × the share of the mix with the outgoing on a phrase
+    without vocals.
+
+  The terms are in the breakdown's `stems`. **The beatmatch family** (`stems_layer_applies`):
+  both tracks' gate priors are known and at least `stems_layer_min_genre_prior` (0.5). A
+  track's gate prior (`candidates.stems_gate_prior`) is 1.0 when its top artist genre or top
+  album genre (ties included) is of the machine-drum industrial family (`MACHINE_DRUM_GENRES`:
+  industrial, industrial metal and rock, EBM, electro-industrial, aggrotech, dark electro, Neue
+  Deutsche Härte), and otherwise the beatmatch prior of its album genres
+  (`transition_fit.genre_beatmatch_prior`, weighted). 0.5 is where the prior table turns from
+  rock, punk, metal, indie, pop and soul to dub, hip-hop, synthwave and dance. The industrial
+  family (rules revision 4) is a list of the gate's own: the shared prior table does not change,
+  so compatible tracks and radio keep their priors. Its drums are programmed or played to a grid:
+  on the development library 75 % of its tracks have a steady tempo, like electronic dance music
+  (80 %), against 32 % for extreme metal and 56-57 % for punk and rock; the rule lets in all of
+  Godflesh, Ministry, Fear Factory and Author & Punisher, 0.5 % of extreme metal, 1.0 % of punk
+  and hardcore and 1.1 % of rock (albums tagged industrial), and no other metal. Tracks without
+  genres keep the layer off. For another client, outside the family or without stems on both
+  tracks, every candidate and score is revision 1's (golden test
+  `app/tests/fixtures/smart_mix/candidates_v3_rules1.json`); Crate Decks' menus with stems have
+  their own (`candidates_v3_rules5.json`).
+  Revision 2 (stem vocals instead of YAMNet's, on every edge) was never released; the ST3
+  evaluation in the Crate Decks repository (`docs/plans/2026-11-09-smart-mix-stems-evaluation.md`)
+  has the measurements behind STEM-G1.
+
+- **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases, and
+  `stemsUsed: true` when the stems layer scored it (absent otherwise). The batch reads
+  profiles without structure and the stem analyses of its tracks (one bounded `ANY` query),
+  then, only when some Crate Decks edge has an analysis on both tracks, those tracks' album and artist genres
+  (one more bounded query, `get_track_genres`), to build the cache keys: an edge the layer scores
+  keys on both analyses too, so a genre that moves an edge into or out of the family changes
+  its key. It reads the structure only for the edges it has to plan, with the beat grid when a
+  layer applies (the grid places the end of the outro for the layer; the planner does not read
+  it).
+- **Crate Decks** (`context.source = "decks"` with `localRefinement`) also gets the menu and
+  the policy limits; see `docs/technical/crate-decks.md`, "Local refinement".
 - **Capability**: `smart_mix.structure` is true when at least half the library's tracks have a
   current profile with phrases, read from the coverage snapshot (`structure_percent`, counted by
   `refresh_smart_mix_coverage`). It is never computed in the request.
@@ -1045,18 +1755,20 @@ deterministic plan.
 These routes describe the application. They are not tools automatically available to
 Crate Agent; an MCP Bearer token is not an Admin session or a VirtualDJ PAT.
 
-| Route                                                                        | Use and relevant effect                                                                                                 |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/capabilities`                                                      | Effective flags and client contract; does not prove their implementation or physical readiness                          |
-| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Profile by UID; `full` includes the beat grid; a 404 can mean missing or invalidated                                    |
-| `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Local ranking of candidates; does not trigger analysis                                                                  |
-| `POST /api/playback/transition-plans`                                        | Batch planning; uses the cache                                                                                          |
-| `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                    |
-| `GET /api/admin/smart-mix/status`                                            | Coverage, campaign and coordinating task; can enqueue `refresh_smart_mix_coverage` if it is missing or older than 600 s |
-| `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                    |
-| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control and settings                                                                                    |
-| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                     |
-| `GET /api/admin/smart-mix/tracks/{id}/structure`                             | Stored phrases (with end and voice byte), energy curve and bar starts of one profile, for review in Admin               |
+| Route                                                                        | Use and relevant effect                                                                                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/capabilities`                                                      | Effective flags and client contract; does not prove their implementation or physical readiness                                        |
+| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Profile by UID; `full` includes the beat grid and, when an analysis applies, the `stems` layer; a 404 can mean missing or invalidated |
+| `GET` and `PUT /api/decks/tracks/{uid}/stem-analysis`                        | Crate Decks reads the stem analysis that applies and uploads its own; `PUT` needs `smart_mix.stems.contribute`                        |
+| `GET /api/smart-mix/playlists` and `GET`, `PUT /{id}`                        | Smart Mix playlists: changes since a revision, stem progress of one, turn on or off (owner only, within the limits)                   |
+| `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Local ranking of candidates; does not trigger analysis                                                                                |
+| `POST /api/playback/transition-plans`                                        | Batch planning; uses the cache                                                                                                        |
+| `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                                  |
+| `GET /api/admin/smart-mix/status`                                            | Coverage, campaign and coordinating task; can enqueue `refresh_smart_mix_coverage` if it is missing or older than 600 s               |
+| `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                                  |
+| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control and settings                                                                                                  |
+| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                                   |
+| `GET /api/admin/smart-mix/tracks/{id}/structure`                             | Stored phrases (with end and voice byte), energy curve and bar starts of one profile, for review in Admin                             |
 
 Admin requires `library.analysis.manage`, even for its reads. The public profile and compatible
 endpoints use session authorization or the PAT scope `vdj.smart_mix.read`, depending on the
@@ -1078,7 +1790,12 @@ authentication.
 `CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED`; beatmatch depends on both and on
 `CRATE_ANDROID_BEATMATCH_ENABLED`; bass handoff adds `CRATE_ANDROID_BASS_HANDOFF_ENABLED`.
 The configuration helpers default to false. VirtualDJ also uses `CRATE_VDJ_ENABLED` and, for
-automation, `CRATE_VDJ_AUTOMATION_ENABLED`. The client applies the user's preferences.
+automation, `CRATE_VDJ_AUTOMATION_ENABLED`.
+`CRATE_LISTEN_SMART_MIX_V3_ENABLED` (default false) moves only Listen to `smart-mix-v3`: with it
+on, `/api/capabilities` gives `smart_mix.listen_planner_version: "smart-mix-v3"`, and Listen
+uses it for its plan batches and its native continuation from its next app start. Rollback:
+turn it off and restart `crate-api`; clients go back to v2 at their next app start, with no app
+release. The client applies the user's preferences.
 Do not infer deployed values from defaults or from the existence of the code.
 
 The plan keeps an R1 physical gate that was deferred on 18 October: an external capture of the
@@ -1142,6 +1859,13 @@ the blind listening test.
   (the development library's spike tracks) with itself.
 - `music_left_out` reports the outgoing music after the mix and the incoming music before it,
   without a target: v3 often ends the mix at a phrase boundary before the outgoing music ends.
+- Stems (ST3): `separate_pool.py` separates a pool of local files with the server's own
+  separation code (CPU, or the same graph on ONNX Runtime CUDA) and writes one
+  `stem-analysis/1` per track; `run_eval.py --stems` attaches their layer to the profiles and
+  reports the stem vocal and bass clashes, `--planner smart-mix-v3-nostems` plans the same
+  profiles without the layer; `calibrate_stems.py` calibrates the presence cuts; and
+  `listen_metrics.py` adds `bassOnBassMs`, low end on both decks at full level in the rendered
+  audio.
 
 The analyzer's structure is measured apart, on audio files rather than plans:
 `tools/smart-mix-eval/structure/` scores beats, downbeats and phrases against All-In-One

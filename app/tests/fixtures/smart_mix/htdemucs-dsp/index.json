@@ -1,0 +1,157 @@
+{
+  "description": "Small DSP fixtures for the htdemucs pipeline (stems_dsp.py)",
+  "format": "raw little-endian float32, C order; complex spectra as channels [L.re, L.im, R.re, R.im]",
+  "generator": "tools/crate-stems/make_fixtures.py",
+  "dsp": {
+    "sample_rate": 44100,
+    "n_fft": 4096,
+    "hop": 1024,
+    "bins": 2048,
+    "pre_pad": 1536,
+    "edge_frames": 2,
+    "window": "hann, periodic",
+    "normalized": true,
+    "center": true,
+    "pad_mode": "reflect",
+    "segment": 343980,
+    "stride": 257985,
+    "sources": [
+      "drums",
+      "bass",
+      "other",
+      "vocals"
+    ]
+  },
+  "files": {
+    "stft_input": {
+      "file": "stft_input.bin",
+      "shape": [
+        2,
+        10000
+      ],
+      "layout": "[channel, sample]",
+      "bytes": 80000,
+      "sha256": "018387f9e24a0cd9d450a2af906946e06bf2b8b6cd561a13e5549df4a10689f5"
+    },
+    "stft_cac": {
+      "file": "stft_cac.bin",
+      "shape": [
+        1,
+        4,
+        2048,
+        10
+      ],
+      "layout": "[1, 2*channel (re, im), bin, frame]: the graph input `spec`",
+      "bytes": 327680,
+      "sha256": "89854e04a24ab9eaf708ac6f8f50cccb46ea17790b5dfd8da5a9c7232e3b395e"
+    },
+    "istft_roundtrip": {
+      "file": "istft_roundtrip.bin",
+      "shape": [
+        2,
+        10000
+      ],
+      "layout": "[channel, sample]: iSTFT of stft_cac, length 10000 (differs from the input near the edges by design)",
+      "bytes": 80000,
+      "sha256": "35e1ad1e651beddaaf2da0a88dd6024632c4638d3ecaee5eb3ad5b6c58462a01"
+    },
+    "istft_random_cac": {
+      "file": "istft_random_cac.bin",
+      "shape": [
+        1,
+        1,
+        4,
+        2048,
+        4
+      ],
+      "layout": "[1, stem, 2*channel (re, im), bin, frame]: a random spectrum in the layout of `spec_out`",
+      "bytes": 131072,
+      "sha256": "1c56bd3f35e9e8d1acd24da3818da1d51ebebcc169544cc95ebdcb506b1ea559"
+    },
+    "istft_random_output": {
+      "file": "istft_random_output.bin",
+      "shape": [
+        1,
+        2,
+        4000
+      ],
+      "layout": "[stem, channel, sample]: iSTFT of istft_random_cac, length 4000",
+      "bytes": 32000,
+      "sha256": "fe68827cd91c7af181e1f81b68ec5f4b5aa207b147916c23ee3c67406ff39079"
+    },
+    "ola_input": {
+      "file": "ola_input.bin",
+      "shape": [
+        2,
+        5300
+      ],
+      "layout": "[channel, sample]",
+      "bytes": 42400,
+      "sha256": "5179a437c92c4e72407589258e78b35bb44bc96ed54b083f7cc117cb008ad973"
+    },
+    "ola_weight": {
+      "file": "ola_weight.bin",
+      "shape": [
+        2000
+      ],
+      "layout": "[sample]: triangular weight for segment 2000",
+      "bytes": 8000,
+      "sha256": "4743ae494cb63da1f42cc2e23776b786ef50a75b49b69f55e0d3c79c70ac0b30"
+    },
+    "ola_sum_weight": {
+      "file": "ola_sum_weight.bin",
+      "shape": [
+        5300
+      ],
+      "layout": "[sample]: summed weights for length 5300, stride 1500",
+      "bytes": 21200,
+      "sha256": "89956bf9c88c2c5d05390d671b9543efbcf46257c9a5c9d730569a047ccf5ecd"
+    },
+    "ola_output": {
+      "file": "ola_output.bin",
+      "shape": [
+        2,
+        2,
+        5300
+      ],
+      "layout": "[stem, channel, sample]: overlap-add of the mock model; stem 0 = segment * ramp, stem 1 = segment * (1.5 - ramp), ramp[n] = 0.5 + n / 2000",
+      "bytes": 84800,
+      "sha256": "904a9964f314c49cf1679fb20b3d45ae00cc24cb14d25d07a4d9530f6d49bb47"
+    }
+  },
+  "overlap_add": {
+    "segment": 2000,
+    "stride": 1500,
+    "length": 5300,
+    "offsets": [
+      0,
+      1500,
+      3000,
+      4500
+    ],
+    "padding": "each segment is centred in `segment` samples with real neighbouring samples or zeros, then center-trimmed",
+    "real_weight": {
+      "segment": 343980,
+      "stride": 257985,
+      "values": {
+        "0": 5.814291528577243e-06,
+        "1": 1.1628583057154486e-05,
+        "171989": 1.0,
+        "171990": 1.0,
+        "343978": 1.1628583057154486e-05,
+        "343979": 5.814291528577243e-06
+      }
+    }
+  },
+  "normalisation": {
+    "input": "ola_input",
+    "mean": -0.007330087208579844,
+    "scale": 0.35292948227896803,
+    "rule": "mono = mean over channels; mean(mono); std(mono, ddof=1) + 1e-8"
+  },
+  "torch_check": {
+    "stft_max_abs": 3.073377695571952e-07,
+    "istft_max_abs": 7.786129685438681e-08
+  },
+  "total_bytes": 807152
+}

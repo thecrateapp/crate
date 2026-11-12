@@ -1,3 +1,155 @@
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _stub_incremental_task_authority(monkeypatch):
+    from crate.worker_handlers import global_catalog
+
+    monkeypatch.setattr(
+        global_catalog, "is_cancelled", lambda _task: False, raising=False
+    )
+    monkeypatch.setattr(global_catalog, "get_task", lambda _task: None, raising=False)
+
+
+def test_incremental_worker_continues_ready_backlog_without_waiting_for_scheduler(
+    monkeypatch,
+):
+    from crate.task_progress import TaskProgress
+    from crate.worker_handlers import RUN_AGAIN_AFTER_KEY, global_catalog
+
+    calls = []
+    progress = []
+    monkeypatch.setattr(
+        global_catalog,
+        "get_task",
+        lambda _task: {
+            "progress": TaskProgress(
+                phase="reconcile_dirty_sources", done=1000
+            ).to_json()
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_dirty_catalog_sources",
+        lambda limit: (
+            calls.append(limit)
+            or {
+                "claimed": 500,
+                "completed": 500,
+                "failed": 0,
+                "remaining": 2000,
+                "ready_remaining": 1500,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "refresh_global_catalog_genre_snapshots",
+        lambda: pytest.fail(
+            "Do not rebuild global snapshots for every bootstrap batch"
+        ),
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "emit_progress",
+        lambda _task, value, force=False: progress.append(value.to_dict()),
+    )
+
+    result = global_catalog._handle_reconcile_incremental("task-backlog", {}, {})
+
+    assert calls == [500]
+    assert 0 < result[RUN_AGAIN_AFTER_KEY] < 1
+    resumed = TaskProgress.from_json(result["progress"])
+    assert resumed.done == 1500
+    assert resumed.total == 3500
+    assert progress[-1]["done"] == 1500
+
+
+def test_incremental_worker_refreshes_once_when_a_resumed_drain_finishes(monkeypatch):
+    from crate.task_progress import TaskProgress
+    from crate.worker_handlers import RUN_AGAIN_AFTER_KEY, global_catalog
+
+    refreshes = []
+    invalidations = []
+    monkeypatch.setattr(
+        global_catalog,
+        "get_task",
+        lambda _task: {
+            "progress": TaskProgress(
+                phase="reconcile_dirty_sources", done=1500
+            ).to_json()
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_dirty_catalog_sources",
+        lambda limit: {
+            "claimed": 0,
+            "completed": 0,
+            "failed": 0,
+            "remaining": 0,
+            "ready_remaining": 0,
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "refresh_global_catalog_genre_snapshots",
+        lambda: refreshes.append(True),
+    )
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: invalidations.append(scopes),
+    )
+
+    result = global_catalog._handle_reconcile_incremental("task-drained", {}, {})
+
+    assert RUN_AGAIN_AFTER_KEY not in result
+    assert result["status"] == "completed"
+    assert refreshes == [True]
+    assert invalidations == [("global_catalog",)]
+
+
+def test_incremental_worker_does_not_spin_on_future_retry_rows(monkeypatch):
+    from crate.worker_handlers import RUN_AGAIN_AFTER_KEY, global_catalog
+
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_dirty_catalog_sources",
+        lambda limit: {
+            "claimed": 0,
+            "completed": 0,
+            "failed": 0,
+            "remaining": 20,
+            "ready_remaining": 0,
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog,
+        "refresh_global_catalog_genre_snapshots",
+        lambda: pytest.fail("No projected changes"),
+    )
+
+    result = global_catalog._handle_reconcile_incremental("task-delayed", {}, {})
+
+    assert RUN_AGAIN_AFTER_KEY not in result
+    assert result["remaining"] == 20
+
+
+def test_incremental_worker_honors_cancellation_before_claiming(monkeypatch):
+    from crate.worker_handlers import global_catalog
+
+    monkeypatch.setattr(global_catalog, "is_cancelled", lambda _task: True)
+    monkeypatch.setattr(
+        global_catalog,
+        "reconcile_dirty_catalog_sources",
+        lambda **_kwargs: pytest.fail("Cancelled task must not claim sources"),
+    )
+
+    result = global_catalog._handle_reconcile_incremental("cancelled-drain", {}, {})
+
+    assert result["status"] == "cancelled"
+
+
 def _stub_full_run_tracking(monkeypatch, global_catalog, *, run_id="run-1"):
     monkeypatch.setattr(
         global_catalog,

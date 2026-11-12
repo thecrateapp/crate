@@ -5,8 +5,9 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Iterator, MutableMapping, Sequence
+from collections.abc import Callable, Iterator, MutableMapping, Sequence
 from importlib import import_module
+from typing import Any
 
 from crate.ai.queues import AI_QUEUES, lane_threads
 from crate.db.cache_store import set_cache
@@ -43,10 +44,13 @@ POOL_STOP_GRACE_SECONDS = POOL_SHUTDOWN_TIMEOUT_SECONDS + 15
 
 
 def _dramatiq_commands(queues: Sequence[str], processes: int) -> list[list[str]]:
-    """One Dramatiq pool for the general queues and one per AI lane.
+    """One single-process Dramatiq pool per general process, and one per AI lane.
 
-    AI lanes wait on provider latency, so each gets a single process with its own
-    thread count instead of sharing the general single-threaded processes.
+    Dramatiq stops every process of a pool when one of them exits, so a process
+    that recycles itself (``crate.process_recycle``) must be alone in its pool for
+    the others to keep working. AI lanes wait on provider latency, so each gets a
+    single process with its own thread count instead of sharing the general
+    single-threaded processes.
     """
     base = [
         sys.executable,
@@ -59,17 +63,10 @@ def _dramatiq_commands(queues: Sequence[str], processes: int) -> list[list[str]]
     general = [queue for queue in queues if queue not in AI_QUEUES]
     commands = []
     if general:
-        commands.append(
-            [
-                *base,
-                "--processes",
-                str(processes),
-                "--threads",
-                "1",
-                "--queues",
-                *general,
-            ]
-        )
+        for _ in range(max(1, processes)):
+            commands.append(
+                [*base, "--processes", "1", "--threads", "1", "--queues", *general]
+            )
     for lane in AI_QUEUES:
         if lane in queues:
             commands.append(
@@ -87,12 +84,19 @@ def _dramatiq_commands(queues: Sequence[str], processes: int) -> list[list[str]]
 
 
 def _pool_environment(command: Sequence[str]) -> dict[str, str] | None:
-    """Environment for an AI pool process; None keeps the inherited one.
+    """Environment for an AI or heavy pool process; None keeps the inherited one.
 
     Every running task holds a handler session and a heartbeat session, so an
     AI pool with T threads needs at least 2T pooled connections.
+
+    Dramatiq prefetches twice the thread count. A heavy pool has one thread and
+    runs analyses of tens of seconds, so a prefetched message waits behind the
+    running one while other processes sit idle; a heavy pool takes a message
+    only when its thread is free.
     """
     queues = list(command[command.index("--queues") + 1 :])
+    if "heavy" in queues:
+        return {**os.environ, "dramatiq_queue_prefetch": "1"}
     if not queues or any(queue not in AI_QUEUES for queue in queues):
         return None
     threads = int(command[command.index("--threads") + 1])
@@ -114,33 +118,64 @@ def _request_pool_stop(
     stopping.set()
     for process in processes:
         if process.poll() is None:
-            process.send_signal(signum)
+            _send_stop(process, signum)
+
+
+def _send_stop(process, signum: int) -> None:
+    process.crate_stop_signal = signum
+    process.send_signal(signum)
 
 
 def _supervise_pools(
-    processes: Sequence,
+    processes: list,
     *,
     stopping: threading.Event | None = None,
     grace_seconds: float = POOL_STOP_GRACE_SECONDS,
     poll_seconds: float = 1.0,
+    respawn: Callable[[int], Any] | None = None,
 ) -> int:
     """Run until the pools stop; return the exit code the container should use.
 
     On a requested stop every pool already has its one SIGTERM, so the
-    supervisor only waits for all of them to drain. When a pool exits on its own
-    (OOM, memory recycling, crash) its siblings get one SIGTERM and
-    ``grace_seconds`` to drain before they are killed, so the restart policy
-    brings every lane back together instead of leaving a queue unconsumed.
+    supervisor only waits for all of them to drain. A pool that exits with 0 on
+    its own has recycled its process after a task (``crate.process_recycle``):
+    ``respawn(index)`` starts a new one in its place in ``processes`` and the
+    others carry on. When a pool exits otherwise (OOM, crash) its siblings get
+    one SIGTERM and ``grace_seconds`` to drain before they are killed, so the
+    restart policy brings every lane back together instead of leaving a queue
+    unconsumed.
     """
     stopping = stopping if stopping is not None else threading.Event()
     while not stopping.is_set():
-        exited = next((p for p in processes if p.poll() is not None), None)
+        index, exited = next(
+            ((i, p) for i, p in enumerate(processes) if p.poll() is not None),
+            (-1, None),
+        )
         if exited is not None and not stopping.is_set():
+            if exited.returncode == 0 and respawn is not None:
+                log.info("A Dramatiq pool recycled its process; starting a new one")
+                processes[index] = respawn(index)
+                continue
             return _stop_siblings(processes, exited, grace_seconds, poll_seconds)
         time.sleep(poll_seconds)
+    _stop_unsignalled(processes)
     while any(process.poll() is None for process in processes):
         time.sleep(poll_seconds)
     return next((p.returncode for p in processes if p.returncode), 0)
+
+
+def _stop_unsignalled(processes: Sequence) -> None:
+    """Pass a requested stop on to a pool started while it was being handled.
+
+    The stop handler runs on the supervisor's thread, so it has finished by now;
+    a pool it already signalled is skipped, since a second SIGTERM makes Dramatiq
+    kill its processes instead of letting them drain.
+    """
+    sent = [getattr(p, "crate_stop_signal", None) for p in processes]
+    signum = next((s for s in sent if s is not None), signal.SIGTERM)
+    for process, already in zip(processes, sent):
+        if already is None and process.poll() is None:
+            _send_stop(process, signum)
 
 
 def _stop_siblings(
@@ -177,6 +212,20 @@ def _recover_stale_work() -> None:
     released = release_dead_smart_mix_claims()
     if released:
         log.warning("Released %d dead Smart Mix backfill claim(s)", released)
+
+
+# How often the service loop looks for tracks that became claimable after the Smart
+# Mix campaign completed (new imports, library reanalyses).
+SMART_MIX_WAKE_SECONDS = 600
+
+
+def _wake_smart_mix_backfill() -> None:
+    """Reopen a completed Smart Mix campaign when tracks became claimable since."""
+    from crate.db.jobs.smart_mix_backfill import wake_smart_mix_backfill
+
+    task_id = wake_smart_mix_backfill()
+    if task_id:
+        log.info("Reopened the completed Smart Mix campaign: coordinator %s", task_id)
 
 
 def _env_int(name: str, default: int = 0) -> int:
@@ -295,14 +344,14 @@ def run_worker(config: dict):
         log.info("Projector daemon disabled for queues: %s", ",".join(queues))
 
     # Start Dramatiq workers via CLI (each command manages its own process pool)
-    procs = []
-    for dramatiq_cmd in _dramatiq_commands(
-        queues, int(config.get("worker_processes", 6))
-    ):
+    commands = _dramatiq_commands(queues, int(config.get("worker_processes", 6)))
+
+    def start_pool(index: int) -> subprocess.Popen:
+        dramatiq_cmd = commands[index]
         log.info("Starting Dramatiq: %s", " ".join(dramatiq_cmd))
-        procs.append(
-            subprocess.Popen(dramatiq_cmd, env=_pool_environment(dramatiq_cmd))
-        )
+        return subprocess.Popen(dramatiq_cmd, env=_pool_environment(dramatiq_cmd))
+
+    procs = [start_pool(index) for index in range(len(commands))]
 
     stopping = threading.Event()
 
@@ -314,7 +363,7 @@ def run_worker(config: dict):
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
 
-    exit_code = _supervise_pools(procs, stopping=stopping)
+    exit_code = _supervise_pools(procs, stopping=stopping, respawn=start_pool)
     service_stop.set()
     log.info("Dramatiq exited with code %d", exit_code)
     sys.exit(exit_code)
@@ -445,6 +494,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
     last_media_worker_bridge = 0
     last_jam_auto_dj = 0
     last_governor_sample = 0
+    last_smart_mix_wake = 0
 
     while not stop_event.is_set():
         now = _time.time()
@@ -486,6 +536,14 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
                 set_cache("imports_pending", {"count": count})
             except Exception:
                 pass
+
+        # A completed Smart Mix campaign reopens when tracks became claimable since
+        if now - last_smart_mix_wake > SMART_MIX_WAKE_SECONDS:
+            last_smart_mix_wake = now
+            try:
+                _wake_smart_mix_backfill()
+            except Exception:
+                log.debug("Smart Mix backfill wake-up failed", exc_info=True)
 
         # Zombie task cleanup and AI slot reclamation every 30s
         if now - last_zombie_check > 30:
@@ -757,6 +815,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "crate.worker_handlers.smart_mix_refinement",
         "SMART_MIX_REFINEMENT_TASK_HANDLERS",
         ("smart_mix_refine_transition", "cleanup_smart_mix_refinements"),
+    ),
+    (
+        "crate.worker_handlers.smart_mix_stems",
+        "SMART_MIX_STEMS_TASK_HANDLERS",
+        ("analyze_playlist_stems",),
     ),
     (
         "crate.worker_handlers.ai_proposals",

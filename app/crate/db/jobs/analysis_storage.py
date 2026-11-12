@@ -666,6 +666,29 @@ def _replaces_current_profile(
         and draft.analyzer_version != ANALYZER_VERSION
     ):
         return False
+    # A draft from the analyzer's own tracker never replaces a profile of the same file
+    # whose beats came from Beat This! (SM3-D14), whatever its quality or version: its
+    # own constant grid can rate steadier than the model's beats while being the weaker
+    # grid. The library analysis embeds such drafts. Kept, an older profile is still
+    # claimed by the backfill, whose target it misses, and recomputed with the model;
+    # replaced, the track would hold a current own-tracker profile the backfill never
+    # claims again.
+    if (
+        current.source_revision == source_revision
+        and current.beat_tracker is not None
+        and draft.beat_tracker is None
+    ):
+        return False
+    # The other way round, the model's beats replace the analyzer's own for the same
+    # file whatever the quality: the backfill's upgrade of a new import or a library
+    # reanalysis would otherwise fail on every track its own tracker rated higher.
+    if (
+        current.source_revision == source_revision
+        and current.beat_tracker is None
+        and draft.beat_tracker is not None
+        and draft.quality != MixProfileQuality.UNAVAILABLE
+    ):
+        return True
     if (
         current.profile_version != PROFILE_SCHEMA_VERSION
         or current.source_revision != source_revision
@@ -677,8 +700,7 @@ def _replaces_current_profile(
     if draft_rank != current_rank:
         return draft_rank > current_rank
     # Beat This! ships inside the analyzer version (SM3-D14): a draft that brings a
-    # tracker, or another one, replaces the profile; one from the analyzer's own
-    # tracker never replaces a profile whose beats came from the model.
+    # tracker, or another one, replaces the profile at the same quality.
     if draft.beat_tracker != current.beat_tracker:
         return draft.beat_tracker is not None
     # Voice ships inside the analyzer version (SM3-D13): a draft that brings it, or

@@ -229,6 +229,7 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
         "Smart Mix Profile Backfill", "analysis"
     ),
     "refresh_smart_mix_coverage": TaskTypeInfo("Smart Mix Coverage", "analysis"),
+    "analyze_playlist_stems": TaskTypeInfo("Smart Mix Playlist Stems", "analysis"),
     "cleanup_smart_mix_refinements": TaskTypeInfo(
         "Smart Mix Refinement Cleanup", "analysis"
     ),

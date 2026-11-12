@@ -20,6 +20,7 @@ from crate.db.jobs.smart_mix_backfill import (
     campaign_targets_current,
     queue_next_smart_mix_batch,
     set_smart_mix_campaign_status,
+    smart_mix_awaits_model_beats,
     smart_mix_profile_dedup_key,
     start_smart_mix_campaign,
 )
@@ -154,6 +155,7 @@ def smart_mix_tracks(
         search=q.strip() if q else None,
         before_track_id=before,
         limit=limit + 1,
+        awaits_model_beats=smart_mix_awaits_model_beats(),
     )
     page = rows[:limit]
     return SmartMixTrackListResponse.model_validate(
@@ -268,13 +270,15 @@ def resume_smart_mix_backfill(
 @router.post("/backfill/pause", response_model=SmartMixBackfillResponse)
 def pause_smart_mix_backfill(request: Request) -> SmartMixBackfillResponse:
     _require_manage(request)
-    return _stop_backfill("paused", allowed_from={"running"})
+    # A completed campaign reopens by itself when tracks become claimable; pausing or
+    # cancelling it stops that (``wake_smart_mix_backfill``).
+    return _stop_backfill("paused", allowed_from={"running", "completed"})
 
 
 @router.post("/backfill/cancel", response_model=SmartMixBackfillResponse)
 def cancel_smart_mix_backfill(request: Request) -> SmartMixBackfillResponse:
     _require_manage(request)
-    return _stop_backfill("cancelled", allowed_from={"running", "paused"})
+    return _stop_backfill("cancelled", allowed_from={"running", "paused", "completed"})
 
 
 def _queue_backfill(

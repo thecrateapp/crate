@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+# The test session is an admin, who may upload stem analyses (Smart Mix Stems ST1).
 _DECKS_CAPABILITIES = {
     "available": True,
     "min_client_version": "0.1.0",
     "contract_version": 1,
-    "features": [],
+    "features": [
+        "library_cursor",
+        "profiles_batch",
+        "stems",
+        "stem_upload",
+        "local_refinement",
+    ],
 }
 
 
@@ -13,6 +20,7 @@ def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
     monkeypatch.delenv("CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED", raising=False)
     monkeypatch.delenv("CRATE_ANDROID_BEATMATCH_ENABLED", raising=False)
     monkeypatch.delenv("CRATE_ANDROID_BASS_HANDOFF_ENABLED", raising=False)
+    monkeypatch.setattr("crate.api.capabilities.stem_uploads_enabled", lambda: True)
 
     response = test_app.get("/api/capabilities")
 
@@ -23,6 +31,7 @@ def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
             "planner_version": None,
             "planner_versions": [],
             "structure": False,
+            "listen_planner_version": None,
             "android_native_crossfade": False,
             "android_beatmatch": False,
             "android_bass_handoff": False,
@@ -35,6 +44,7 @@ def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
                 "typical_latency_ms": None,
                 "reason": "smart_mix_unavailable",
             },
+            "stems": {"available": False, "playlists": False, "storage": False},
         },
         "vdj": {
             "available": False,
@@ -69,6 +79,8 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
     monkeypatch.setenv("CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED", "true")
     monkeypatch.setenv("CRATE_ANDROID_BEATMATCH_ENABLED", "true")
     monkeypatch.setenv("CRATE_ANDROID_BASS_HANDOFF_ENABLED", "true")
+    monkeypatch.delenv("CRATE_LISTEN_SMART_MIX_V3_ENABLED", raising=False)
+    monkeypatch.setattr("crate.api.capabilities.stem_uploads_enabled", lambda: True)
 
     response = test_app.get("/api/capabilities")
 
@@ -79,6 +91,7 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
             "planner_version": "smart-mix-v2",
             "planner_versions": ["smart-mix-v2", "smart-mix-v3"],
             "structure": False,
+            "listen_planner_version": "smart-mix-v2",
             "android_native_crossfade": True,
             "android_beatmatch": True,
             "android_bass_handoff": True,
@@ -91,6 +104,7 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
                 "typical_latency_ms": None,
                 "reason": "disabled",
             },
+            "stems": {"available": True, "playlists": True, "storage": False},
         },
         "vdj": {
             "available": False,

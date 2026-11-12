@@ -251,6 +251,14 @@
     "sourceHash": "sha256:9b28f8a31eb68243eeb5d9aac89ac99ed986d666c2be1ba796e66d5d3c157b81",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "actions.playlist.smartMixOff": {
+    "sourceHash": "sha256:211151da9c62e61506d82c8907895a771206b41dee72eb151b51c6913cd53b1f",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
+  "actions.playlist.smartMixOn": {
+    "sourceHash": "sha256:a9c79f8f52da528e6d038d644e6654f471dba647aefa067381d738f1b64abc5a",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
   "actions.playlist.toasts.addedToLibrary": {
     "sourceHash": "sha256:29c9ab42e40467dcc71fad47026e23d6064a0bf4414e4b185f4e55cc0170dc38",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -270,6 +278,30 @@
   "actions.playlist.toasts.removedFromLibrary": {
     "sourceHash": "sha256:408fd3ca135bc6edc14f7e06c260e21fa2915b10e801f5ffdc646376d68d03ae",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "actions.playlist.toasts.smartMixFailed": {
+    "sourceHash": "sha256:609188087ee389ccc7d79a5b902b6349c0bf61faaf12b052b0621dfa7ff3108d",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
+  "actions.playlist.toasts.smartMixLimitTitle": {
+    "sourceHash": "sha256:200782c95b98d8b2bbdba1f372eaabd66cad21a1929840f5b1418af14ed45498",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
+  "actions.playlist.toasts.smartMixOff": {
+    "sourceHash": "sha256:246ddd812f9703eae8086530c8024e15644b58281bd95ed841ef18b793fdc385",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
+  "actions.playlist.toasts.smartMixOn": {
+    "sourceHash": "sha256:7dd20405f952af7260f3e4621715787c9557c02425c93a852f16f2cebf7556e1",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
+  "actions.playlist.toasts.smartMixPlaylistLimit": {
+    "sourceHash": "sha256:0a41678d7ac6f6c19690155f943fed0bbaa2308b622c48d16615ccb36a411f17",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
+  "actions.playlist.toasts.smartMixUserLimit": {
+    "sourceHash": "sha256:d711e8d8d5dcaa9d760b516e38f277534770796b84cbeabec3dc68772b28c5e6",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
   },
   "actions.playlist.unfollow": {
     "sourceHash": "sha256:2d935866f68f219dad20c6d91da9134dd8288f5c07f7621e1469ce47909a81df",
@@ -3683,6 +3715,10 @@
     "sourceHash": "sha256:42793f51dc040f0a9b878d3161f6c38a0dbdd1ae626b0e1d514645123d02e798",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "paths.refinement.pending": {
+    "sourceHash": "sha256:98bcd10bd8530784d947d3c606810414ba1ab2cca03958cb2587860aeb10112d",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
   "paths.regenerate": {
     "sourceHash": "sha256:008b8e11776f9a9201cdbee71525750dc669d3327d9baf40a37363d25aa24957",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -4910,6 +4946,22 @@
   "playlist.offline.tracksAvailable": {
     "sourceHash": "sha256:84d889d9c9737631fb694de651f2f70c85eb007c8c783300d03ff973869865db",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "playlist.smartMix.label": {
+    "sourceHash": "sha256:c1e70db595a5a890bb3be653a602a054a662e835e0db5ec88f6d05af4165ca5c",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
+  "playlist.smartMix.menuStatus": {
+    "sourceHash": "sha256:8ba796dbde203f3d3c426c095f6e33db0244e9c76af4d1797c16f19cf9b6b3c4",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
+  "playlist.smartMix.titlePartial": {
+    "sourceHash": "sha256:58ad82ef873fbd549c958ddfdef98b7aa4c3a701d66059acfedbf6584934968d",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
+  },
+  "playlist.smartMix.titleReady": {
+    "sourceHash": "sha256:0fbe34d3111e135bcbc0739ee72671bb9396993439456e348bf15d8b51f3d3fb",
+    "reviewedAt": "2026-11-09T09:57:09.479Z"
   },
   "playlist.subtitle.crate": {
     "sourceHash": "sha256:2e8dc71f42b4757edd1470df6c6efdd6febe97f20395043f4c48120c8b92a806",
