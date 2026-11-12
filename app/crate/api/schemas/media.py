@@ -12,6 +12,7 @@ from crate.api.schemas.common import (
     OkResponse,
     TaskEnqueueResponse,
 )
+from crate.api.schemas.decks import DecksProfileQuality
 from crate.api.schemas.radio import RadioTrack
 
 
@@ -90,6 +91,25 @@ class SearchTrackResultResponse(TrackRefResponse):
             "library, so its stream endpoints can serve it; false when the "
             "row exists but the file is missing or unreadable. Checked on "
             "every request. Omitted by the other search scopes."
+        ),
+    )
+    source_revision: str | None = Field(
+        default=None,
+        description=(
+            "Only in DJ search results (fields=dj, or an access-token DJ "
+            "query), as on the Decks track pages: revision of the audio file "
+            "on disk (same value as a current profile's source revision). "
+            "Omitted when the track is not playable."
+        ),
+    )
+    profile_quality: DecksProfileQuality | None = Field(
+        default=None,
+        description=(
+            "Only in DJ search results (fields=dj, or an access-token DJ "
+            "query), as on the Decks track pages: quality of the Smart Mix "
+            "profile GET /api/tracks/by-entity/{uid}/mix-profile serves, "
+            "'unavailable' when its analysis failed. Omitted when there is "
+            "none."
         ),
     )
 

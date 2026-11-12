@@ -86,9 +86,11 @@ _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
 # The night-window limit keeps only a few analyses in flight, so a slot freed by
 # a finished analysis should be refilled within seconds rather than a poll later.
 # The coordinator waits as a pending task, not in a worker process, and checks
-# less often the longer its slots stay as they are.
+# less often the longer its slots stay as they are, but at least every 10 s: an
+# analysis takes about 25 s, so a longer wait would leave a freed slot idle for a
+# good part of one.
 _SMART_MIX_BACKFILL_POLL_SECONDS = 3
-_SMART_MIX_BACKFILL_MAX_POLL_SECONDS = 30
+_SMART_MIX_BACKFILL_MAX_POLL_SECONDS = 10
 
 
 def _now() -> datetime:
@@ -1617,22 +1619,40 @@ def _handle_backfill_smart_mix_profiles(
     if not claimed:
         in_flight = count_smart_mix_in_flight()
         if in_flight == 0:
-            refresh_smart_mix_coverage(max_attempts=max_attempts)
+            _refresh_pass_coverage(refresh_smart_mix_coverage, max_attempts)
             complete_smart_mix_campaign()
             return {"claimed": 0, "queued": 0, "completed": True}
         return run_again_later(
             _smart_mix_backfill_poll_seconds(),
             progress=f"Waiting for the {in_flight} analyses in flight to finish",
         )
-    refresh_smart_mix_coverage_after_pass(max_attempts=max_attempts)
+    # The coordinator has no retries, so the next pass is queued first: a pass
+    # that failed before queueing it would stop the backfill for good.
+    next_task_id = queue_next_smart_mix_batch(batches=1, claimed=len(claimed))
+    _refresh_pass_coverage(refresh_smart_mix_coverage_after_pass, max_attempts)
     return {
         "claimed": len(claimed),
         "queued": queued,
         "released": len(released),
         "window": window.window,
         "limit": window.limit,
-        "next_task_id": queue_next_smart_mix_batch(batches=1, claimed=len(claimed)),
+        "next_task_id": next_task_id,
     }
+
+
+def _refresh_pass_coverage(refresh: Callable[..., Any], max_attempts: int) -> None:
+    """Refresh the coverage read model without ever failing the pass.
+
+    The coverage only feeds Admin; the next pass, a finished analysis or the
+    refresh Admin can request brings it up to date again.
+    """
+    try:
+        refresh(max_attempts=max_attempts)
+    except Exception:
+        log.warning(
+            "Smart Mix coverage refresh failed; the backfill pass carries on",
+            exc_info=True,
+        )
 
 
 def _smart_mix_backfill_poll_seconds() -> int:
@@ -1640,7 +1660,7 @@ def _smart_mix_backfill_poll_seconds() -> int:
 
     As long as the slots have stayed as they are: 3 s right after a claim or a
     finished analysis, then about double each time while nothing changes, up to
-    30 s. Each check is a whole actor cycle, so a long analysis or a child the
+    10 s. Each check is a whole actor cycle, so a long analysis or a child the
     governor defers no longer costs one every 3 s.
     """
     since_change = seconds_since_smart_mix_change()

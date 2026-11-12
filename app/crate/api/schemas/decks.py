@@ -1,8 +1,12 @@
-"""Crate Decks library navigation contract (S3)."""
+"""Crate Decks library navigation (S3) and batch mix profile (S4) contracts."""
 
 from typing import Literal
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from crate.api.schemas.smart_mix import MixProfileResponse
+from crate.db.queries.decks_profiles import DECKS_PROFILES_BATCH_LIMIT
 
 DecksContainerKind = Literal["playlist", "crate", "genre", "mood", "recent", "likes"]
 DecksProfileQuality = Literal["full", "partial", "legacy", "unavailable"]
@@ -115,12 +119,44 @@ class DecksTracksPageResponse(BaseModel):
     )
 
 
+class DecksMixProfilesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    entity_uids: list[UUID] = Field(
+        min_length=1,
+        max_length=DECKS_PROFILES_BATCH_LIMIT,
+        description="Track entity UIDs, 1 to 200. Repeated UIDs are answered once.",
+    )
+    detail: Literal["full"] = Field(
+        default="full",
+        description="Only `full`: the profiles carry the beat grid and stems layer.",
+    )
+
+
+class DecksMixProfilesResponse(BaseModel):
+    profiles: dict[str, MixProfileResponse] = Field(
+        description=(
+            "By entity UID (lowercase, hyphenated), in request order: the same "
+            "profile GET /api/tracks/by-entity/{uid}/mix-profile?detail=full serves."
+        )
+    )
+    missing: list[UUID] = Field(
+        description=(
+            "Requested UIDs without a current profile, in request order: not in "
+            "the local library, never analysed, or the file changed since. The "
+            "single endpoint answers 404 for each."
+        )
+    )
+
+
 __all__ = [
     "DecksContainerKind",
     "DecksContainerNodeResponse",
     "DecksContainerRefResponse",
     "DecksContainersResponse",
     "DecksLibraryResponse",
+    "DecksMixProfilesRequest",
+    "DecksMixProfilesResponse",
     "DecksProfileQuality",
     "DecksTrackResponse",
     "DecksTracksPageResponse",

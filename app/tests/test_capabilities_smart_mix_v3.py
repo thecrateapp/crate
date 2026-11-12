@@ -101,3 +101,37 @@ def test_structure_percent_reads_the_current_snapshot(monkeypatch) -> None:
     assert smart_mix_admin.get_smart_mix_structure_percent() is None
     snapshots.clear()
     assert smart_mix_admin.get_smart_mix_structure_percent() is None
+
+
+def test_listen_planner_defaults_to_v2(test_app, monkeypatch, smart_mix_on) -> None:
+    _structure_snapshot(monkeypatch, None)
+    monkeypatch.delenv("CRATE_LISTEN_SMART_MIX_V3_ENABLED", raising=False)
+
+    smart_mix = test_app.get("/api/capabilities").json()["smart_mix"]
+
+    assert smart_mix["listen_planner_version"] == "smart-mix-v2"
+
+
+def test_listen_planner_v3_behind_the_switch(
+    test_app, monkeypatch, smart_mix_on
+) -> None:
+    _structure_snapshot(monkeypatch, None)
+    monkeypatch.setenv("CRATE_LISTEN_SMART_MIX_V3_ENABLED", "true")
+
+    body = test_app.get("/api/capabilities").json()
+
+    assert body["smart_mix"]["listen_planner_version"] == "smart-mix-v3"
+    assert "smart-mix-v3" in body["smart_mix"]["planner_versions"]
+    # Older APKs and VirtualDJ read these two: they never move (LV-D3).
+    assert body["smart_mix"]["planner_version"] == "smart-mix-v2"
+    assert body["vdj"]["planner_version"] == "smart-mix-v2"
+
+
+def test_no_listen_planner_while_smart_mix_is_off(test_app, monkeypatch) -> None:
+    _structure_snapshot(monkeypatch, None)
+    monkeypatch.delenv("CRATE_SMART_MIX_ENABLED", raising=False)
+    monkeypatch.setenv("CRATE_LISTEN_SMART_MIX_V3_ENABLED", "true")
+
+    smart_mix = test_app.get("/api/capabilities").json()["smart_mix"]
+
+    assert smart_mix["listen_planner_version"] is None

@@ -116,6 +116,39 @@ def test_dj_search_marks_whether_each_track_has_audio(test_app, library, auth):
     dj_search.assert_called_once_with("bpm:120-128", 20, include_path=True)
 
 
+def test_dj_search_reports_the_source_revision_of_playable_audio(test_app, library):
+    # Same value as the S3 track pages and a current profile's source
+    # revision, from the same stat as `playable`; null without audio.
+    from crate.smart_mix.source import smart_mix_source_revision
+
+    rows = [
+        {**row, "format": "flac", "bitrate": 1411, "sample_rate": 44100}
+        for row in _dj_tracks(library)
+    ]
+    rows[0]["profile_quality"] = "full"
+    with patch("crate.api.browse_media.search_dj_tracks", return_value=rows):
+        response = test_app.get(
+            "/api/search", params={"q": "bpm:120-128", "fields": "dj"}
+        )
+
+    assert response.status_code == 200
+    tracks = {track["title"]: track for track in response.json()["tracks"]}
+    present = library / "Artist" / "Album" / "present.flac"
+    assert tracks["present"]["source_revision"] == smart_mix_source_revision(present)
+    assert tracks["file-link-inside"]["source_revision"] == (
+        smart_mix_source_revision(present)
+    )
+    for title, playable in _EXPECTED_PLAYABLE.items():
+        if not playable:
+            assert tracks[title].get("source_revision") is None, title
+    assert tracks["present"]["profile_quality"] == "full"
+    assert (
+        tracks["present"]["format"],
+        tracks["present"]["bitrate"],
+        tracks["present"]["sample_rate"],
+    ) == ("flac", 1411, 44100)
+
+
 def test_access_token_text_query_also_reports_playable(test_app, library):
     with (
         patch("crate.api.auth.AuthMiddleware.resolve_user", _token_user),
@@ -267,3 +300,15 @@ def test_search_openapi_documents_playable(components):
     playable = components["SearchTrackResultResponse"]["properties"]["playable"]
     assert "fields=dj" in playable["description"]
     assert "stream" in playable["description"]
+
+
+def test_search_openapi_documents_the_decks_fields(components):
+    properties = components["SearchTrackResultResponse"]["properties"]
+    assert "fields=dj" in properties["source_revision"]["description"]
+    quality = properties["profile_quality"]
+    assert "fields=dj" in quality["description"]
+    assert {"type": "string", "enum": ["full", "partial", "legacy", "unavailable"]} in (
+        quality["anyOf"]
+    )
+    for field in ("format", "bitrate", "sample_rate"):
+        assert field in properties

@@ -31,6 +31,8 @@ import {
 import {
   getSmartMixCapabilities,
   type SmartMixCapabilities,
+  continuationLongBeatmatch,
+  continuationPlanner,
   hasTransientPlanFallback,
   type SmartMixPlanInput,
   SmartMixTransitionPlanner,
@@ -324,7 +326,8 @@ export async function toStartupEngineQueueSnapshot(
           preferredDurationMs: options.crossfadeMs,
           allowBeatmatch: planInput.capabilities.androidBeatmatch,
           allowBassHandoff: planInput.capabilities.androidBassHandoff,
-          allowLongBeatmatch: planInput.capabilities.androidLongBeatmatch,
+          allowLongBeatmatch: continuationLongBeatmatch(planInput.capabilities),
+          plannerVersion: continuationPlanner(planInput.capabilities),
           delivery: getEffectivePlaybackDeliveryPolicy(),
           descriptor: continuationDescriptor(options.playSource, {
             shuffle: options.shuffle,
@@ -345,7 +348,9 @@ function sameCapabilities(
     left.androidBeatmatch === right.androidBeatmatch &&
     left.androidBassHandoff === right.androidBassHandoff &&
     left.androidLongBeatmatch === right.androidLongBeatmatch &&
-    left.plannerVersion === right.plannerVersion
+    left.plannerVersion === right.plannerVersion &&
+    left.listenPlannerVersion === right.listenPlannerVersion &&
+    (left.plannerVersions ?? []).join() === (right.plannerVersions ?? []).join()
   );
 }
 

@@ -621,5 +621,114 @@
       "recovery",
       "rollout"
     ]
+  },
+  {
+    "sourcePath": "docs/decks/user-manual.md",
+    "route": "/decks/user-manual",
+    "section": "decks",
+    "title": "Crate Decks user manual",
+    "summary": "Start Crate Decks, connect it to your Crate server and find your way around the desktop DJ app.",
+    "keywords": [
+      "crate decks",
+      "manual",
+      "getting started",
+      "sign in",
+      "settings",
+      "command line"
+    ],
+    "order": 10
+  },
+  {
+    "sourcePath": "docs/decks/library.md",
+    "route": "/decks/library",
+    "section": "decks",
+    "title": "Library and search",
+    "summary": "Browse your Crate server and the music on this computer, search with filters and set the library preferences.",
+    "keywords": ["crate decks", "library", "search", "crates", "playlists"],
+    "order": 20
+  },
+  {
+    "sourcePath": "docs/decks/mixing.md",
+    "route": "/decks/mixing",
+    "section": "decks",
+    "title": "Decks and mixing",
+    "summary": "How the cue button, sync lock, the deck equalizers and Auto DJ behave, and where to change them.",
+    "keywords": ["crate decks", "cue", "sync", "equalizer", "auto dj"],
+    "order": 30
+  },
+  {
+    "sourcePath": "docs/decks/analysis.md",
+    "route": "/decks/analysis",
+    "section": "decks",
+    "title": "Track analysis",
+    "summary": "What Crate's analysis gives Crate Decks, and how the beat and key detectors analyze your local tracks.",
+    "keywords": ["crate decks", "bpm", "beatgrid", "key", "camelot"],
+    "order": 40
+  },
+  {
+    "sourcePath": "docs/decks/sound.md",
+    "route": "/decks/sound",
+    "section": "decks",
+    "title": "Sound hardware",
+    "summary": "Choose the sound API and devices, route the main mix, headphones and inputs, tune latency and fix sound problems.",
+    "keywords": [
+      "crate decks",
+      "sound card",
+      "latency",
+      "headphones",
+      "microphone"
+    ],
+    "order": 50
+  },
+  {
+    "sourcePath": "docs/decks/controllers.md",
+    "route": "/decks/controllers",
+    "section": "decks",
+    "title": "Controllers",
+    "summary": "Connect a MIDI or HID controller, load one of the shipped mappings, or write your own mapping and script.",
+    "keywords": ["crate decks", "midi", "hid", "mapping", "controller"],
+    "order": 60
+  },
+  {
+    "sourcePath": "docs/decks/keyboard-shortcuts.md",
+    "route": "/decks/keyboard-shortcuts",
+    "section": "decks",
+    "title": "Keyboard shortcuts",
+    "summary": "The default keyboard mapping of Crate Decks for the decks, the mixer, Auto DJ, the library and the menus.",
+    "keywords": ["crate decks", "keyboard", "shortcuts", "keys"],
+    "order": 70
+  },
+  {
+    "sourcePath": "docs/decks/recording-and-broadcasting.md",
+    "route": "/decks/recording-and-broadcasting",
+    "section": "decks",
+    "title": "Recording and broadcasting",
+    "summary": "Record your mix to a file and stream it live to an Icecast or Shoutcast server.",
+    "keywords": [
+      "crate decks",
+      "recording",
+      "broadcast",
+      "icecast",
+      "shoutcast"
+    ],
+    "order": 80
+  },
+  {
+    "sourcePath": "docs/decks/vinyl-control.md",
+    "route": "/decks/vinyl-control",
+    "section": "decks",
+    "title": "Vinyl control",
+    "summary": "Play the decks with timecode vinyl or CDs on your turntables or CD players, and fix a bad timecode signal.",
+    "keywords": ["crate decks", "vinyl", "timecode", "dvs", "turntable"],
+    "order": 90
+  },
+  {
+    "sourcePath": "docs/decks/community.md",
+    "route": "/decks/community",
+    "section": "decks",
+    "title": "Help and community",
+    "summary": "Where to ask questions about Crate Decks, how to report a bug, and how to help with translations and controller mappings.",
+    "keywords": ["crate decks", "help", "bugs", "translations", "mappings"],
+    "order": 100
   }
 ]

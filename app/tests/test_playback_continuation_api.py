@@ -115,6 +115,58 @@ def test_continuation_returns_native_tracks_and_chained_plans(test_app, monkeypa
     ]
 
 
+def _post_radio_continuation(test_app, monkeypatch, planner: str):
+    from crate.api import smart_mix
+
+    _no_planner_io(monkeypatch)
+    after = str(uuid.uuid4())
+    first = str(uuid.uuid4())
+    second = str(uuid.uuid4())
+    monkeypatch.setattr(
+        smart_mix,
+        "get_continuation_descriptor",
+        lambda token_id: {"kind": "shaped_radio", "sessionId": "radio-1"},
+    )
+    monkeypatch.setattr(
+        smart_mix,
+        "continuation_radio_tracks",
+        lambda descriptor, **_kwargs: ([_radio_row(first), _radio_row(second)], False),
+    )
+    with patch("crate.api.auth.AuthMiddleware.resolve_user", _continuation_user()):
+        return test_app.post(
+            "/api/playback/continuation",
+            json={
+                "plannerVersion": planner,
+                "afterTrackEntityUid": after,
+                "context": _CONTEXT,
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    ("planner", "structure_key"), [("smart-mix-v2", False), ("smart-mix-v3", True)]
+)
+def test_continuation_plans_with_the_requested_planner(
+    test_app, monkeypatch, planner, structure_key
+):
+    # With no profiles, a v3 plan carries structureUsed: false and a v2 plan does
+    # not carry the key, which tells the planners apart.
+    response = _post_radio_continuation(test_app, monkeypatch, planner)
+
+    assert response.status_code == 200
+    plans = response.json()["plans"]
+    assert len(plans) == 2
+    assert all(("structureUsed" in plan) is structure_key for plan in plans)
+    # The plan format does not change: the native engine runs v3 plans as they are.
+    assert all(plan["plannerVersion"] == 2 for plan in plans)
+
+
+def test_continuation_rejects_an_unknown_planner(test_app, monkeypatch):
+    response = _post_radio_continuation(test_app, monkeypatch, "smart-mix-v9")
+
+    assert response.status_code == 422
+
+
 def test_continuation_without_descriptor_is_exhausted(test_app, monkeypatch):
     from crate.api import smart_mix
 

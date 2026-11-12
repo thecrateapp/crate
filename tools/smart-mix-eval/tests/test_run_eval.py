@@ -274,7 +274,8 @@ def test_v3_plans_the_edge_set_as_the_api_does() -> None:
     assert records[1]["structureUsed"] is False
     assert records[1]["plan"] == v2[1]["plan"]
     assert summary["structureUsed"] == {"edges": 1, "rate": 0.5}
-    assert PLANNER_RULES["smart-mix-v3"] == 5
+    # Revision 6 (LV-G1) serves every source but Crate Decks within Listen's caps.
+    assert PLANNER_RULES["smart-mix-v3"] == 6
     json.dumps(records)
 
 

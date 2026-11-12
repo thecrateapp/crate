@@ -450,3 +450,25 @@ def test_structure_draft_clamps_confidence_and_normalizes_bytes() -> None:
     assert draft.phrases == (phrase(),)
     assert draft.energy_curve == b"\x01\x02"
     assert draft.structure_confidence == 1.0
+
+
+def test_beat_grid_keeps_plain_millisecond_positions() -> None:
+    assert profile(beat_grid_ms=[482, 951, 1_419]).beat_grid_ms == (482, 951, 1_419)
+    assert profile(beat_grid_ms=()).beat_grid_ms == ()
+
+
+@pytest.mark.parametrize(
+    ("grid", "error"),
+    [
+        ((482, True, 1_419), TypeError),
+        ((482, 951.0, 1_419), TypeError),
+        ((482, "951"), TypeError),
+        ((-1, 951), ValueError),
+        ((482, 951, -5), ValueError),
+        ((482, 482), ValueError),
+        ((951, 482), ValueError),
+    ],
+)
+def test_beat_grid_rejects_invalid_positions(grid: tuple, error: type) -> None:
+    with pytest.raises(error):
+        profile(beat_grid_ms=grid)

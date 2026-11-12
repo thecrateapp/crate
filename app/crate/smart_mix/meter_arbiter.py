@@ -60,16 +60,25 @@ class MadmomMeterArbiter:
         )
 
     def __call__(self, path: str | Path) -> int | None:
+        return meter_from_activations(self._dbn, self.activations(Path(path)))
+
+    def activations(self, path: Path) -> np.ndarray:
+        """madmom's downbeat activations of a file, as ``RNNDownBeatProcessor``
+        gives them.
+
+        The decoded audio (about 100 MB for 600 s at 44.1 kHz) is freed once the
+        features exist, and the features once the network has read them, so
+        neither adds to the process's peak while the network and the DBN run.
+        """
         from crate.smart_mix.beat_model import _load_signal
 
-        samples, rate = _load_signal(Path(path), ARBITER_SAMPLE_RATE)
-        return meter_from_activations(self._dbn, self.activations(samples, rate))
-
-    def activations(self, samples: np.ndarray, rate: int) -> np.ndarray:
-        """madmom's downbeat activations of mono audio, as ``RNNDownBeatProcessor``
-        gives them."""
         _, network, select = self._network.processors
-        return select(network(self.features(samples, rate)))
+        samples, rate = _load_signal(path, ARBITER_SAMPLE_RATE)
+        features = self.features(samples, rate)
+        del samples
+        output = network(features)
+        del features
+        return select(output)
 
     def features(self, samples: np.ndarray, rate: int) -> np.ndarray:
         """The network's input, as ``RNNDownBeatProcessor``'s pre-processing gives
