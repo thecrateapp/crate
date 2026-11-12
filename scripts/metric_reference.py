@@ -49,6 +49,11 @@ FAMILIES = (
         "Which serving mode answered a catalog search.",
     ),
     (
+        "catalog.search_stream.",
+        "Federated search stream",
+        "Searches that asked for local and network results as one stream (FED1).",
+    ),
+    (
         "federation.playback.",
         "Federated playback",
         "Preparation of tracks from federated peers, from the request to ready, rate limited, unavailable or a fallback to the original file.",

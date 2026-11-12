@@ -37,7 +37,7 @@ bytes and ratios. **Prometheus** is the exported family name, without the
 not exported is still in System Health or the PostgreSQL history. See
 [Observability](observability.md) for what each surface shows.
 
-The catalogue defines 842 metrics; 78 are exported to Prometheus.
+The catalogue defines 843 metrics; 78 are exported to Prometheus.
 
 ## Metrics by family
 
@@ -99,7 +99,6 @@ Which serving mode answered a catalog search.
 | Metric | Type | Unit | Labels | Prometheus | Shown in |
 | --- | --- | --- | --- | --- | --- |
 | `catalog.search.serving_mode` | counter | 1 | `mode` | `crate_catalog_search_serving_mode` | PostgreSQL history only |
-| `catalog.search_stream.requests` | counter | 1 | `mode` | `crate_catalog_search_stream_requests` | PostgreSQL history only |
 
 ### Crate MCP
 
@@ -153,6 +152,14 @@ Preparation of tracks from federated peers, from the request to ready, rate limi
 | `federation.playback.prepare.ready_before_play` | counter | 1 | `effective_policy`, `origin`, `requested_policy` | `crate_federation_playback_prepare_ready_before_play` | PostgreSQL history only |
 | `federation.playback.prepare.requested` | counter | 1 | `effective_policy`, `origin`, `requested_policy` | `crate_federation_playback_prepare_requested` | PostgreSQL history only |
 | `federation.playback.prepare.unavailable` | counter | 1 | `effective_policy`, `origin`, `requested_policy` | `crate_federation_playback_prepare_unavailable` | PostgreSQL history only |
+
+### Federated search stream
+
+Searches that asked for local and network results as one stream (FED1).
+
+| Metric | Type | Unit | Labels | Prometheus | Shown in |
+| --- | --- | --- | --- | --- | --- |
+| `catalog.search_stream.requests` | counter | 1 | `mode` | not exported | PostgreSQL history only |
 
 ### Federation risk
 
