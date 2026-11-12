@@ -755,6 +755,14 @@ fn desktop_control_reply(request: u64, items: serde_json::Value) -> Result<bool,
     Ok(desktop_control::reply(request, line))
 }
 
+/// Listen's outcome for a control-socket command it confirms (`queue_item`):
+/// `error` is a short user-facing reason, or absent when it worked.
+#[cfg(desktop)]
+#[tauri::command]
+fn desktop_control_done(request: u64, error: Option<String>) -> bool {
+    desktop_control::confirm(request, error.map_or(Ok(()), Err))
+}
+
 /// The Linux desktop profile (compositor, tiling, Ryoku) for the frontend, which
 /// drops its own titlebar on a tiling compositor. `None` off Linux.
 #[cfg(desktop)]
@@ -1514,6 +1522,7 @@ pub fn run() {
             linux_desktop_profile,
             update_desktop_control_state,
             desktop_control_reply,
+            desktop_control_done,
             register_deep_link_listener,
             offline_storage::register_offline_transfer,
             offline_storage::cancel_offline_transfer,
@@ -1619,6 +1628,15 @@ mod tests {
     };
     #[cfg(target_os = "linux")]
     use super::{linux_artwork_cache_root, LinuxWindowBoundsUpdateState};
+
+    #[test]
+    fn control_done_without_a_waiting_command_is_ignored() {
+        assert!(!super::desktop_control_done(u64::MAX, None));
+        assert!(!super::desktop_control_done(
+            u64::MAX,
+            Some("queue locked".into())
+        ));
+    }
 
     #[cfg(target_os = "linux")]
     #[test]

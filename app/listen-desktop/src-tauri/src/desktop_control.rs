@@ -6,12 +6,18 @@
 //! socket at `$XDG_RUNTIME_DIR/crate/control.sock` (directory 0700, socket
 //! 0600, so only this user can connect), one JSON object per line:
 //!
-//! - server -> client: `{"type":"hello",...}` on connect, then
+//! - server -> client: `{"type":"hello",...,"commands":[...]}` on connect
+//!   (`commands` lists every `cmd` accepted here), then
 //!   `{"type":"state","protocol":1,"player":{...},"eq":{...}}` whenever the
 //!   state changes, and `{"type":"ack"}` / `{"type":"error","error":"..."}` for
 //!   each command line;
 //! - client -> server: a command such as `{"cmd":"play_pause"}`,
 //!   `{"cmd":"eq_mode","mode":"genre"}` or `{"cmd":"set_volume","volume":0.6}`.
+//!
+//! `search` is acked with a request id and answered later by a `result` line
+//! whose items may carry `art` (a cached image path, `desktop_launcher_art.rs`)
+//! and, for tracks, `duration`. `queue_item` is acked (or refused) only once
+//! Listen has appended the item. `show` with an `item` opens that item's page.
 //!
 //! Commands are validated here, then routed: transport through the same path
 //! as the tray and `--crate-command`, `show` to the window, and everything else
@@ -53,7 +59,11 @@ pub enum ControlCommand {
     PlayPause,
     Next,
     Previous,
-    Show,
+    /// Raise the window; with an `item` (a search result's `ref`), open its page.
+    Show {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        item: Option<serde_json::Value>,
+    },
     Seek {
         position: f64,
     },
@@ -86,7 +96,33 @@ pub enum ControlCommand {
     PlayItem {
         item: serde_json::Value,
     },
+    /// Append a search result (its `ref`) to the end of the play queue.
+    QueueItem {
+        item: serde_json::Value,
+    },
 }
+
+/// Every `cmd` the socket accepts, in the order `hello` lists them. A test
+/// keeps it in step with `ControlCommand`.
+pub const COMMANDS: &[&str] = &[
+    "play",
+    "pause",
+    "play_pause",
+    "next",
+    "previous",
+    "show",
+    "seek",
+    "set_volume",
+    "set_shuffle",
+    "set_repeat",
+    "eq_enabled",
+    "eq_mode",
+    "eq_preset",
+    "eq_gains",
+    "search",
+    "play_item",
+    "queue_item",
+];
 
 pub const MAX_QUERY_CHARS: usize = 200;
 const PLAY_KINDS: &[&str] = &["track", "album", "artist"];
@@ -97,6 +133,8 @@ pub enum Route {
     /// A tray/menu id handled by `handle_playback_menu_event`.
     Transport(&'static str),
     ShowWindow,
+    /// Raise the window, then hand the command to the webview to open a page.
+    ShowItem(serde_json::Value),
     /// The command, as JSON, for the webview.
     Webview(serde_json::Value),
 }
@@ -158,15 +196,15 @@ impl ControlCommand {
                 }
                 ControlCommand::Search { query }
             }
-            ControlCommand::PlayItem { item } => {
-                let kind = item.get("kind").and_then(|k| k.as_str()).unwrap_or("");
-                if !item.is_object() || !PLAY_KINDS.contains(&kind) {
-                    return Err(
-                        "item must be a search result ref (kind track, album or artist)".into(),
-                    );
-                }
-                ControlCommand::PlayItem { item }
-            }
+            ControlCommand::PlayItem { item } => ControlCommand::PlayItem {
+                item: validated_ref(item)?,
+            },
+            ControlCommand::QueueItem { item } => ControlCommand::QueueItem {
+                item: validated_ref(item)?,
+            },
+            ControlCommand::Show { item: Some(item) } => ControlCommand::Show {
+                item: Some(validated_ref(item)?),
+            },
             other => other,
         })
     }
@@ -178,10 +216,22 @@ impl ControlCommand {
             ControlCommand::PlayPause => Route::Transport("play_pause"),
             ControlCommand::Next => Route::Transport("next"),
             ControlCommand::Previous => Route::Transport("previous"),
-            ControlCommand::Show => Route::ShowWindow,
+            ControlCommand::Show { item: None } => Route::ShowWindow,
+            ControlCommand::Show { item: Some(_) } => {
+                Route::ShowItem(serde_json::to_value(self).unwrap_or_default())
+            }
             other => Route::Webview(serde_json::to_value(other).unwrap_or_default()),
         }
     }
+}
+
+/// A search result's `ref`: an object of kind track, album or artist.
+fn validated_ref(item: serde_json::Value) -> Result<serde_json::Value, String> {
+    let kind = item.get("kind").and_then(|k| k.as_str()).unwrap_or("");
+    if !item.is_object() || !PLAY_KINDS.contains(&kind) {
+        return Err("item must be a search result ref (kind track, album or artist)".into());
+    }
+    Ok(item)
 }
 
 /// Validate a state object from Listen and wrap it for the wire.
@@ -212,8 +262,33 @@ pub fn hello_line(version: &str) -> String {
         "app": "crate",
         "version": version,
         "protocol": CONTROL_PROTOCOL,
+        "commands": COMMANDS,
     })
     .to_string()
+}
+
+pub const MAX_COMMAND_ERROR_CHARS: usize = 200;
+
+/// The ack for a command Listen confirmed (`queue_item`): Listen's error, one
+/// line and bounded, or a timeout.
+pub fn confirmation_line(outcome: Option<Result<(), String>>) -> String {
+    match outcome {
+        Some(Ok(())) => serde_json::json!({"type": "ack"}).to_string(),
+        Some(Err(error)) => {
+            let error: String = error
+                .chars()
+                .map(|c| if c.is_control() { ' ' } else { c })
+                .take(MAX_COMMAND_ERROR_CHARS)
+                .collect();
+            let error = match error.trim() {
+                "" => "Crate could not do that",
+                trimmed => trimmed,
+            };
+            serde_json::json!({"type": "error", "error": error}).to_string()
+        }
+        None => serde_json::json!({"type": "error", "error": "Crate did not answer in time"})
+            .to_string(),
+    }
 }
 
 /// The answer to one `search`, for the client that asked.
@@ -229,6 +304,23 @@ pub fn result_line(request: u64, items: &serde_json::Value) -> Result<String, St
     Ok(line)
 }
 
+/// Keep `duration` only on tracks, as whole seconds.
+pub fn normalize_result_items(items: &mut serde_json::Value) {
+    for item in items.as_array_mut().into_iter().flatten() {
+        let Some(object) = item.as_object_mut() else {
+            continue;
+        };
+        let is_track = object.get("kind").and_then(|k| k.as_str()) == Some("track");
+        let seconds = object
+            .remove("duration")
+            .and_then(|d| d.as_f64())
+            .filter(|d| is_track && d.is_finite() && *d >= 0.0);
+        if let Some(seconds) = seconds {
+            object.insert("duration".into(), (seconds.round() as u64).into());
+        }
+    }
+}
+
 pub fn ack_line(result: &Result<ControlCommand, String>) -> String {
     match result {
         Ok(_) => serde_json::json!({"type": "ack"}).to_string(),
@@ -242,6 +334,10 @@ pub fn dispatch<R: tauri::Runtime>(app: &tauri::AppHandle<R>, command: &ControlC
     match command.route() {
         Route::Transport(id) => crate::handle_playback_menu_event(app, id),
         Route::ShowWindow => crate::show_main_window(app),
+        Route::ShowItem(payload) => {
+            crate::show_main_window(app);
+            let _ = app.emit(CONTROL_EVENT, payload);
+        }
         Route::Webview(payload) => {
             let _ = app.emit(CONTROL_EVENT, payload);
         }
@@ -266,13 +362,18 @@ pub fn player_extras(state: &serde_json::Value) -> Option<PlayerExtras> {
 }
 
 #[cfg(target_os = "linux")]
-pub use socket::{install, publish_state, reply};
+pub use socket::{confirm, install, publish_state, reply};
 
 #[cfg(not(target_os = "linux"))]
 pub fn publish_state(_line: String) {}
 
 #[cfg(not(target_os = "linux"))]
 pub fn reply(_request: u64, _line: String) -> bool {
+    false
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn confirm(_request: u64, _outcome: Result<(), String>) -> bool {
     false
 }
 
@@ -285,12 +386,12 @@ mod socket {
             net::{UnixListener, UnixStream},
         },
         path::PathBuf,
-        sync::{Mutex, OnceLock},
+        sync::{mpsc, Mutex, OnceLock},
         thread,
         time::Duration,
     };
 
-    use super::{ack_line, hello_line, ControlCommand, MAX_COMMAND_BYTES};
+    use super::{ack_line, confirmation_line, hello_line, ControlCommand, MAX_COMMAND_BYTES};
 
     #[derive(Default)]
     struct Hub {
@@ -298,10 +399,55 @@ mod socket {
         clients: Vec<UnixStream>,
         /// open `search` requests: id -> the asking client (and when it asked)
         pending: std::collections::HashMap<u64, (UnixStream, std::time::Instant)>,
+        /// commands waiting for Listen to confirm them (`queue_item`)
+        confirmations: std::collections::HashMap<u64, mpsc::Sender<Result<(), String>>>,
         next_request: u64,
     }
 
     const REQUEST_TTL: Duration = Duration::from_secs(15);
+    /// How long a `queue_item` waits for Listen (fetching an album's tracks)
+    /// before the client gets an error; below the 3 s clients usually wait.
+    const CONFIRM_TIMEOUT: Duration = Duration::from_millis(2500);
+
+    fn next_request(hub: &mut Hub) -> u64 {
+        hub.next_request += 1;
+        hub.next_request
+    }
+
+    /// Listen's outcome for a confirmed command; false if nobody waits for it.
+    pub fn confirm(request: u64, outcome: Result<(), String>) -> bool {
+        let sender = {
+            let mut hub = hub().lock().unwrap_or_else(|p| p.into_inner());
+            hub.confirmations.remove(&request)
+        };
+        sender.is_some_and(|sender| sender.send(outcome).is_ok())
+    }
+
+    /// Hand `queue_item` to Listen and wait for its outcome.
+    fn queue_and_wait(app: &tauri::AppHandle, item: &serde_json::Value) -> String {
+        let (sender, receiver) = mpsc::channel();
+        let request = {
+            let mut hub = hub().lock().unwrap_or_else(|p| p.into_inner());
+            let request = next_request(&mut hub);
+            hub.confirmations.insert(request, sender);
+            request
+        };
+        use tauri::Emitter;
+        let emitted = app.emit(
+            super::CONTROL_EVENT,
+            serde_json::json!({"cmd": "queue_item", "item": item, "request": request}),
+        );
+        let outcome = match emitted {
+            Ok(()) => receiver.recv_timeout(CONFIRM_TIMEOUT).ok(),
+            Err(_) => None,
+        };
+        hub()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .confirmations
+            .remove(&request);
+        confirmation_line(outcome)
+    }
 
     /// Send a search result to the client that asked; false if it is gone.
     pub fn reply(request: u64, line: String) -> bool {
@@ -431,8 +577,7 @@ mod socket {
                             // answered later by Listen through `desktop_control_reply`
                             let request = {
                                 let mut hub = hub().lock().unwrap_or_else(|p| p.into_inner());
-                                hub.next_request += 1;
-                                let request = hub.next_request;
+                                let request = next_request(&mut hub);
                                 if let Ok(client) = writer.try_clone() {
                                     hub.pending
                                         .insert(request, (client, std::time::Instant::now()));
@@ -446,6 +591,7 @@ mod socket {
                             );
                             serde_json::json!({"type": "ack", "request": request}).to_string()
                         }
+                        Ok(ControlCommand::QueueItem { item }) => queue_and_wait(&app, item),
                         Ok(command) => {
                             super::dispatch(&app, command);
                             ack_line(&result)
@@ -474,6 +620,7 @@ mod tests {
             (r#"{"cmd":"next"}"#, Route::Transport("next")),
             (r#"{"cmd":"previous"}"#, Route::Transport("previous")),
             (r#"{"cmd":"show"}"#, Route::ShowWindow),
+            (r#"{"cmd":"show","item":null}"#, Route::ShowWindow),
         ];
         for (line, route) in cases {
             assert_eq!(
@@ -638,6 +785,127 @@ mod tests {
             player_extras(&serde_json::json!({"player": {"volume": 1}})),
             None
         );
+    }
+
+    /// One valid line per command; `COMMANDS` must list exactly these.
+    const SAMPLES: &[&str] = &[
+        r#"{"cmd":"play"}"#,
+        r#"{"cmd":"pause"}"#,
+        r#"{"cmd":"play_pause"}"#,
+        r#"{"cmd":"next"}"#,
+        r#"{"cmd":"previous"}"#,
+        r#"{"cmd":"show"}"#,
+        r#"{"cmd":"seek","position":1}"#,
+        r#"{"cmd":"set_volume","volume":0.5}"#,
+        r#"{"cmd":"set_shuffle","on":true}"#,
+        r#"{"cmd":"set_repeat","mode":"all"}"#,
+        r#"{"cmd":"eq_enabled","on":true}"#,
+        r#"{"cmd":"eq_mode","mode":"smart"}"#,
+        r#"{"cmd":"eq_preset","preset":"rock"}"#,
+        r#"{"cmd":"eq_gains","gains":[0,0,0,0,0,0,0,0,0,0]}"#,
+        r#"{"cmd":"search","query":"x"}"#,
+        r#"{"cmd":"play_item","item":{"kind":"track"}}"#,
+        r#"{"cmd":"queue_item","item":{"kind":"album"}}"#,
+    ];
+
+    #[test]
+    fn hello_lists_every_accepted_command() {
+        let hello: serde_json::Value = serde_json::from_str(&hello_line("3.4.0")).unwrap();
+        let listed: Vec<&str> = hello["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c.as_str().unwrap())
+            .collect();
+        assert_eq!(listed, COMMANDS);
+        assert!(listed.contains(&"queue_item"));
+        let mut sampled = Vec::new();
+        for line in SAMPLES {
+            let command = ControlCommand::parse(line).unwrap_or_else(|e| panic!("{line}: {e}"));
+            let value = serde_json::to_value(&command).unwrap();
+            sampled.push(value["cmd"].as_str().unwrap().to_string());
+        }
+        assert_eq!(sampled, COMMANDS);
+    }
+
+    #[test]
+    fn queue_item_takes_a_search_ref() {
+        let line =
+            r#"{"cmd":"queue_item","item":{"kind":"track","track":{"title":"x","artist":"y"}}}"#;
+        let command = ControlCommand::parse(line).unwrap();
+        assert_eq!(
+            command.route(),
+            Route::Webview(serde_json::json!({
+                "cmd": "queue_item",
+                "item": {"kind": "track", "track": {"title": "x", "artist": "y"}}
+            }))
+        );
+        for bad in [
+            r#"{"cmd":"queue_item"}"#,
+            r#"{"cmd":"queue_item","item":"album"}"#,
+            r#"{"cmd":"queue_item","item":{"kind":"playlist"}}"#,
+        ] {
+            assert!(ControlCommand::parse(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn show_with_an_item_opens_its_page() {
+        assert_eq!(
+            ControlCommand::parse(r#"{"cmd":"show"}"#).unwrap(),
+            ControlCommand::Show { item: None }
+        );
+        let command = ControlCommand::parse(
+            r#"{"cmd":"show","item":{"kind":"artist","artist":{"name":"R"}}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            command.route(),
+            Route::ShowItem(serde_json::json!({
+                "cmd": "show",
+                "item": {"kind": "artist", "artist": {"name": "R"}}
+            }))
+        );
+        assert!(ControlCommand::parse(r#"{"cmd":"show","item":{"kind":"genre"}}"#).is_err());
+        assert!(ControlCommand::parse(r#"{"cmd":"show","item":7}"#).is_err());
+    }
+
+    #[test]
+    fn confirmation_lines() {
+        assert_eq!(confirmation_line(Some(Ok(()))), r#"{"type":"ack"}"#);
+        let error: serde_json::Value =
+            serde_json::from_str(&confirmation_line(Some(Err("queue\nlocked".into())))).unwrap();
+        assert_eq!(error["type"], "error");
+        assert!(!error["error"].as_str().unwrap().contains('\n'));
+        let long: serde_json::Value =
+            serde_json::from_str(&confirmation_line(Some(Err("x".repeat(500))))).unwrap();
+        assert_eq!(
+            long["error"].as_str().unwrap().len(),
+            MAX_COMMAND_ERROR_CHARS
+        );
+        let blank: serde_json::Value =
+            serde_json::from_str(&confirmation_line(Some(Err("  ".into())))).unwrap();
+        assert_eq!(blank["error"], "Crate could not do that");
+        let timeout: serde_json::Value = serde_json::from_str(&confirmation_line(None)).unwrap();
+        assert_eq!(timeout["type"], "error");
+    }
+
+    #[test]
+    fn result_items_keep_whole_second_durations_on_tracks_only() {
+        let mut items = serde_json::json!([
+            {"kind": "track", "duration": 201.6},
+            {"kind": "track", "duration": -1},
+            {"kind": "track", "duration": "3:20"},
+            {"kind": "album", "duration": 3000},
+            {"kind": "track"},
+            "x"
+        ]);
+        normalize_result_items(&mut items);
+        assert_eq!(items[0]["duration"], 202);
+        assert!(items[1].get("duration").is_none());
+        assert!(items[2].get("duration").is_none());
+        assert!(items[3].get("duration").is_none());
+        assert!(items[4].get("duration").is_none());
     }
 
     #[test]
