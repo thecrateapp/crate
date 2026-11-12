@@ -3,6 +3,7 @@ from sqlalchemy import inspect
 
 EXPECTED_ACTIVE_TABLES = {
     "auth_invites",
+    "backup_runs",
     "library_albums",
     "library_artists",
     "library_tracks",

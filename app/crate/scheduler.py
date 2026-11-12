@@ -35,6 +35,7 @@ DEFAULT_SCHEDULES = {
     "track_error_fixes": 300,  # 5min — fix runs and their pull requests
     "cleanup_smart_mix_refinements": 86400,  # 24h — AI refinements unread for 180 days
     "analyze_playlist_stems": 1800,  # 30min — Smart Mix playlist stems: retries, file changes
+    "backup_dump": 86400,  # 24h — local database dump, then its retention (BK1)
 }
 
 SCHEDULED_TASKS = [
@@ -61,6 +62,12 @@ ERROR_TRACKING_SCHEDULED_TASKS = {"sync_error_issues"}
 # Only scheduled while Launch fix is configured and a fix run is open or has a
 # branch to delete: with Launch fix off, nothing polls GitHub.
 ERROR_FIX_SCHEDULED_TASKS = {"track_error_fixes"}
+
+# The default local backup policy (admin backups, BK1): a nightly dump inside the
+# maintenance window, then its retention. On unless CRATE_LOCAL_BACKUPS_ENABLED is
+# off, which production sets while the crate-postgres-backup sidecar runs (until
+# BK6).
+LOCAL_BACKUP_SCHEDULED_TASKS = {"backup_dump"}
 
 
 def get_schedules() -> dict[str, int]:
@@ -134,6 +141,11 @@ def _scheduled_task_enabled(task_type: str) -> bool:
 
     if task_type in ERROR_FIX_SCHEDULED_TASKS:
         return _has_trackable_error_fixes()
+
+    if task_type in LOCAL_BACKUP_SCHEDULED_TASKS:
+        from crate.backups.settings import local_backups_enabled
+
+        return local_backups_enabled()
 
     return True
 
