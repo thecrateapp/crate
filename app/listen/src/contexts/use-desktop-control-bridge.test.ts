@@ -6,6 +6,13 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   api,
 }));
+const { prefetchLauncherArt } = vi.hoisted(() => ({
+  prefetchLauncherArt: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("@/lib/desktop-launcher-art", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/desktop-launcher-art")>()),
+  prefetchLauncherArt,
+}));
 vi.mock("@/lib/remote-track-playback", () => ({
   resolveRemotePlayableTrack: (track: unknown) => Promise.resolve(track),
 }));
@@ -24,6 +31,8 @@ import { useDesktopControlBridge } from "./use-desktop-control-bridge";
 
 function input() {
   return {
+    addToQueue: vi.fn(),
+    jamQueueLocked: false,
     play: vi.fn(),
     playAll: vi.fn(),
     repeat: "off" as const,
@@ -142,6 +151,89 @@ describe("useDesktopControlBridge", () => {
     expect(value.play).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Barrio Somavilla" }),
       { type: "queue", name: "Search" },
+    );
+  });
+
+  it("fetches the art the shell reports missing after answering", async () => {
+    api.mockResolvedValue({
+      artists: [],
+      albums: [{ name: "Pronto", artist: "Repion", id: 11 }],
+      tracks: [],
+    });
+    window.__crateTauriInvoke = vi.fn((name: string) =>
+      Promise.resolve(
+        name === "desktop_control_reply"
+          ? { delivered: true, missingArt: ["album:11"] }
+          : undefined,
+      ),
+    ) as typeof window.__crateTauriInvoke;
+    renderHook(() => useDesktopControlBridge(input()));
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(DESKTOP_CONTROL_COMMAND_EVENT, {
+          detail: { cmd: "search", query: "pronto", request: 6 },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const reply = (
+      window.__crateTauriInvoke as ReturnType<typeof vi.fn>
+    ).mock.calls.find(([name]) => name === "desktop_control_reply");
+    expect(reply?.[1].items[0].art_key).toBe("album:11");
+    expect(prefetchLauncherArt).toHaveBeenCalledWith(
+      ["album:11"],
+      expect.objectContaining({ store: expect.any(Function) }),
+    );
+  });
+
+  it("queues a picked item and confirms it to the shell", async () => {
+    const value = input();
+    renderHook(() => useDesktopControlBridge(value));
+    const item = {
+      kind: "track",
+      track: {
+        id: 9,
+        title: "Barrio Somavilla",
+        artist: "Repion",
+        album: "Pronto",
+      },
+    };
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(DESKTOP_CONTROL_COMMAND_EVENT, {
+          detail: { cmd: "queue_item", item, request: 8 },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(value.addToQueue).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Barrio Somavilla" }),
+    );
+    expect(window.__crateTauriInvoke).toHaveBeenCalledWith(
+      "desktop_control_done",
+      { request: 8, error: null },
+    );
+  });
+
+  it("reports why an item could not be queued", async () => {
+    const value = { ...input(), jamQueueLocked: true };
+    renderHook(() => useDesktopControlBridge(value));
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(DESKTOP_CONTROL_COMMAND_EVENT, {
+          detail: {
+            cmd: "queue_item",
+            item: { kind: "track", track: { title: "x", artist: "y" } },
+            request: 9,
+          },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(value.addToQueue).not.toHaveBeenCalled();
+    expect(window.__crateTauriInvoke).toHaveBeenCalledWith(
+      "desktop_control_done",
+      { request: 9, error: "The queue is locked by a Jam session" },
     );
   });
 });

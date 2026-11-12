@@ -24,8 +24,20 @@ import {
   fetchAlbumTracks,
   fetchArtistTopTracks,
 } from "@/components/actions/shared";
-import { api } from "@/lib/api";
-import { playDesktopRef, searchForDesktop } from "@/lib/desktop-control-search";
+import { api, ensureMediaAccessUrl } from "@/lib/api";
+import {
+  DesktopControlError,
+  playDesktopRef,
+  queueDesktopRef,
+  searchForDesktop,
+  type DesktopPlayDeps,
+} from "@/lib/desktop-control-search";
+import {
+  prefetchLauncherArt,
+  rememberLauncherArtSource,
+  squareJpeg,
+  type LauncherArtDeps,
+} from "@/lib/desktop-launcher-art";
 import { isTauriRuntime } from "@/lib/platform";
 import { resolveRemotePlayableTrack } from "@/lib/remote-track-playback";
 
@@ -39,7 +51,30 @@ type BridgeInput = Pick<
   | "setRepeatMode"
   | "play"
   | "playAll"
+  | "addToQueue"
+  | "jamQueueLocked"
 > & { volume: number };
+
+// built per command, so modules that mock these imports still load
+const playDeps = (): DesktopPlayDeps => ({
+  resolveTrack: resolveRemotePlayableTrack,
+  fetchAlbumTracks,
+  fetchArtistTopTracks,
+});
+
+const ART_DEPS: LauncherArtDeps = {
+  authorize: (url) => ensureMediaAccessUrl(url, "artwork"),
+  fetch: (url) => fetch(url),
+  toSquare: squareJpeg,
+  store: (key, bytes) =>
+    window.__crateTauriInvoke?.("store_launcher_art", { key, bytes }) ??
+    Promise.resolve(false),
+};
+
+interface DesktopControlReplyResult {
+  delivered?: boolean;
+  missingArt?: unknown;
+}
 
 const EQ_ACTIONS: DesktopControlActions["eq"] = {
   setEnabled: setEqualizerEnabled,
@@ -83,15 +118,25 @@ export function useDesktopControlBridge(input: BridgeInput) {
       if (!command) return;
       const current = actionsRef.current;
       if (command.cmd === "search") {
-        // answer the asking widget, even with nothing found or on error
-        void searchForDesktop(command.query, (url) => api(url))
+        // answer the asking widget, even with nothing found or on error;
+        // then fetch, in the background, the art the shell has not cached
+        void searchForDesktop(
+          command.query,
+          (url) => api(url),
+          rememberLauncherArtSource,
+        )
           .catch(() => [])
           .then((items) =>
-            window.__crateTauriInvoke?.("desktop_control_reply", {
-              request: command.request,
-              items,
-            }),
+            window.__crateTauriInvoke?.<DesktopControlReplyResult | boolean>(
+              "desktop_control_reply",
+              { request: command.request, items },
+            ),
           )
+          .then((result) => {
+            if (result && typeof result === "object") {
+              return prefetchLauncherArt(result.missingArt, ART_DEPS);
+            }
+          })
           .catch(() => {});
         return;
       }
@@ -99,12 +144,34 @@ export function useDesktopControlBridge(input: BridgeInput) {
         void playDesktopRef(
           command.item,
           { play: current.play, playAll: current.playAll },
-          {
-            resolveTrack: resolveRemotePlayableTrack,
-            fetchAlbumTracks,
-            fetchArtistTopTracks,
-          },
+          playDeps(),
         ).catch(() => {});
+        return;
+      }
+      if (command.cmd === "queue_item") {
+        // the shell acks the socket client only once this answers
+        void queueDesktopRef(
+          command.item,
+          {
+            addToQueue: current.addToQueue,
+            jamQueueLocked: current.jamQueueLocked,
+          },
+          playDeps(),
+        )
+          .then(
+            () => null,
+            (error: unknown) =>
+              error instanceof DesktopControlError
+                ? error.message
+                : "Crate could not queue that item",
+          )
+          .then((error) =>
+            window.__crateTauriInvoke?.("desktop_control_done", {
+              request: command.request,
+              error,
+            }),
+          )
+          .catch(() => {});
         return;
       }
       applyDesktopControlCommand(command, {

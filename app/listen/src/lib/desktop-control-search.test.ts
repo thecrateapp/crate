@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  DesktopControlError,
+  desktopRefPagePath,
   parseDesktopPlayRef,
   playDesktopRef,
+  queueDesktopRef,
   searchForDesktop,
   toDesktopSearchItems,
 } from "./desktop-control-search";
@@ -137,5 +140,118 @@ describe("desktop search", () => {
     await expect(
       playDesktopRef(album!.ref, { play, playAll }, deps),
     ).resolves.toBe(false);
+  });
+
+  it("tags items with art keys and tracks with whole-second durations", () => {
+    const sink = vi.fn();
+    const items = toDesktopSearchItems(
+      {
+        ...data,
+        tracks: [{ ...data.tracks[0]!, album_id: 11, duration: 201.6 }],
+      },
+      4,
+      sink,
+    );
+    expect(items.map((i) => [i.kind, i.art_key, i.duration])).toEqual([
+      ["artist", "artist:3", undefined],
+      ["album", "album:11", undefined],
+      ["track", "album:11", 202],
+    ]);
+    expect(sink).toHaveBeenCalledWith("artist:3", {
+      kind: "artist",
+      input: expect.objectContaining({ artistId: 3, artistName: "Repion" }),
+    });
+    expect(sink).toHaveBeenCalledWith("album:11", {
+      kind: "album",
+      input: expect.objectContaining({ albumId: 11, albumName: "Pronto" }),
+    });
+    // keys are ids, never URLs
+    expect(JSON.stringify(items)).not.toMatch(/https?:|\/api\//);
+  });
+
+  it("skips art the server says does not exist", () => {
+    const items = toDesktopSearchItems({
+      artists: [{ name: "No Photo", id: 4, has_photo: false }],
+      albums: [{ name: "No Cover", artist: "X", id: 5, has_cover: false }],
+      tracks: [{ title: "Loose", artist: "X", album: "" }],
+    });
+    expect(items.map((i) => i.art_key)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it("names the page a ref opens", () => {
+    const [artist, album, track] = toDesktopSearchItems({
+      ...data,
+      tracks: [
+        {
+          ...data.tracks[0]!,
+          album_id: 11,
+          album_slug: "pronto",
+          artist_slug: "repion",
+          entity_uid: "t 9",
+        },
+      ],
+    });
+    expect(desktopRefPagePath(artist!.ref)).toBe("/artists/repion");
+    expect(desktopRefPagePath(album!.ref)).toBe("/artists/repion/pronto");
+    expect(desktopRefPagePath(track!.ref)).toBe(
+      "/artists/repion/pronto?track=t%209",
+    );
+    expect(
+      desktopRefPagePath({ kind: "artist", artist: { name: "" } }),
+    ).toBeNull();
+    expect(
+      desktopRefPagePath({
+        kind: "track",
+        track: { title: "x", artist: "y", album: "" },
+      }),
+    ).toBeNull();
+  });
+
+  it("queues a track, an album or an artist at the end", async () => {
+    const addToQueue = vi.fn();
+    const tracks = [
+      { id: "t1", title: "One", artist: "Repion" },
+      { id: "t2", title: "Two", artist: "Repion" },
+    ];
+    const deps = {
+      resolveTrack: vi.fn((t) => Promise.resolve(t)),
+      fetchAlbumTracks: vi.fn().mockResolvedValue(tracks),
+      fetchArtistTopTracks: vi.fn().mockResolvedValue(tracks.slice(0, 1)),
+    };
+    const [artist, album, track] = toDesktopSearchItems(data);
+    const actions = { addToQueue, jamQueueLocked: false };
+
+    await expect(queueDesktopRef(album!.ref, actions, deps)).resolves.toBe(2);
+    expect(addToQueue.mock.calls.map(([t]) => t.id)).toEqual(["t1", "t2"]);
+    await expect(queueDesktopRef(artist!.ref, actions, deps)).resolves.toBe(1);
+    await expect(queueDesktopRef(track!.ref, actions, deps)).resolves.toBe(1);
+    expect(addToQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: "Barrio Somavilla" }),
+    );
+  });
+
+  it("refuses to queue what it cannot", async () => {
+    const addToQueue = vi.fn();
+    const deps = {
+      resolveTrack: vi.fn((t) => Promise.resolve(t)),
+      fetchAlbumTracks: vi.fn().mockResolvedValue([]),
+      fetchArtistTopTracks: vi.fn().mockRejectedValue(new Error("offline")),
+    };
+    const [artist, album] = toDesktopSearchItems(data);
+
+    await expect(
+      queueDesktopRef(album!.ref, { addToQueue, jamQueueLocked: true }, deps),
+    ).rejects.toThrow("locked by a Jam session");
+    await expect(
+      queueDesktopRef(album!.ref, { addToQueue, jamQueueLocked: false }, deps),
+    ).rejects.toThrow("Nothing to queue");
+    await expect(
+      queueDesktopRef(artist!.ref, { addToQueue, jamQueueLocked: false }, deps),
+    ).rejects.toBeInstanceOf(DesktopControlError);
+    expect(addToQueue).not.toHaveBeenCalled();
   });
 });

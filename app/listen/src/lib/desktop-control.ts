@@ -40,7 +40,9 @@ export type DesktopControlCommand =
   | { cmd: "eq_preset"; preset: string }
   | { cmd: "eq_gains"; gains: number[] }
   | { cmd: "search"; query: string; request: number }
-  | { cmd: "play_item"; item: DesktopPlayRef };
+  | { cmd: "play_item"; item: DesktopPlayRef }
+  | { cmd: "queue_item"; item: DesktopPlayRef; request: number }
+  | { cmd: "show"; item: DesktopPlayRef };
 
 export interface DesktopControlState {
   player: { volume: number; shuffle: boolean; repeat: RepeatMode };
@@ -121,6 +123,18 @@ export function parseDesktopControlCommand(
     case "play_item": {
       const item = parseDesktopPlayRef(v.item);
       return item ? { cmd: "play_item", item } : null;
+    }
+    case "queue_item": {
+      // the shell waits for desktop_control_done with this request id
+      const item = parseDesktopPlayRef(v.item);
+      return item && Number.isInteger(v.request) && (v.request as number) > 0
+        ? { cmd: "queue_item", item, request: v.request as number }
+        : null;
+    }
+    case "show": {
+      // a plain `show` only raises the window and never reaches the webview
+      const item = parseDesktopPlayRef(v.item);
+      return item ? { cmd: "show", item } : null;
     }
     default:
       return null;
@@ -204,7 +218,12 @@ export function applyDesktopControlCommand(
       return;
     case "search":
     case "play_item":
+    case "queue_item":
       // asynchronous: handled by the bridge (use-desktop-control-bridge.ts)
+      return;
+    case "show":
+      // navigation: handled by the desktop shell's router
+      // (app/listen-desktop/src/components/DesktopControlNavigator.tsx)
       return;
   }
 }

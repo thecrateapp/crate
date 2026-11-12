@@ -25,6 +25,8 @@ type PlayerPlatformActions = Pick<
   | "setRepeatMode"
   | "play"
   | "playAll"
+  | "addToQueue"
+  | "jamQueueLocked"
 >;
 
 interface PlayerPlatformIntegrationsInput extends PlayerPlatformActions {
@@ -38,11 +40,13 @@ interface PlayerPlatformIntegrationsInput extends PlayerPlatformActions {
 }
 
 export function usePlayerPlatformIntegrations({
+  addToQueue,
   currentTime,
   currentTrack,
   duration,
   isPlaying,
   isPlayingRef,
+  jamQueueLocked,
   lastNonZeroVolume,
   next,
   pause,
@@ -82,6 +86,8 @@ export function usePlayerPlatformIntegrations({
   });
   useDesktopTrayNowPlaying({ currentTrack, isPlaying });
   useDesktopControlBridge({
+    addToQueue,
+    jamQueueLocked,
     play,
     playAll,
     repeat,

@@ -50,6 +50,11 @@ function actions(shuffle = false) {
 
 afterEach(() => resetDesktopControlStateForTests());
 
+const ALBUM_REF = {
+  kind: "album",
+  album: { album: "Pronto", artist: "Repion", albumId: 11 },
+} as const;
+
 describe("parseDesktopControlCommand", () => {
   it("accepts every command with valid arguments", () => {
     expect(parseDesktopControlCommand({ cmd: "seek", position: 42 })).toEqual({
@@ -74,6 +79,19 @@ describe("parseDesktopControlCommand", () => {
       cmd: "eq_preset",
       preset: "shoegaze",
     });
+  });
+
+  it("accepts queue_item with a request id and show with an item", () => {
+    expect(
+      parseDesktopControlCommand({
+        cmd: "queue_item",
+        item: ALBUM_REF,
+        request: 4,
+      }),
+    ).toEqual({ cmd: "queue_item", item: ALBUM_REF, request: 4 });
+    expect(
+      parseDesktopControlCommand({ cmd: "show", item: ALBUM_REF }),
+    ).toEqual({ cmd: "show", item: ALBUM_REF });
   });
 
   it("clamps volume and gains into range", () => {
@@ -104,6 +122,11 @@ describe("parseDesktopControlCommand", () => {
       { cmd: "eq_preset", preset: "not-a-preset" },
       { cmd: "eq_gains", gains: [1, 2, 3] },
       { cmd: "eq_gains", gains: new Array(10).fill("1") },
+      { cmd: "queue_item", item: ALBUM_REF },
+      { cmd: "queue_item", item: ALBUM_REF, request: 0 },
+      { cmd: "queue_item", item: { kind: "playlist" }, request: 1 },
+      { cmd: "show" },
+      { cmd: "show", item: { kind: "genre" } },
     ]) {
       expect(
         parseDesktopControlCommand(value),

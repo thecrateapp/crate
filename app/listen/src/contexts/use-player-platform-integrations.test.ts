@@ -56,6 +56,7 @@ describe("usePlayerPlatformIntegrations", () => {
       setRepeatMode: vi.fn(),
       play: vi.fn(),
       playAll: vi.fn(),
+      addToQueue: vi.fn(),
     };
     const isPlayingRef = { current: true };
     const currentTrack = createTrack();
@@ -68,6 +69,7 @@ describe("usePlayerPlatformIntegrations", () => {
         duration: 180,
         isPlaying: true,
         isPlayingRef,
+        jamQueueLocked: false,
         lastNonZeroVolume: 0.8,
         repeat: "all",
         shuffle: true,
@@ -101,6 +103,8 @@ describe("usePlayerPlatformIntegrations", () => {
       isPlaying: true,
     });
     expect(useDesktopControlBridge).toHaveBeenCalledWith({
+      addToQueue: actions.addToQueue,
+      jamQueueLocked: false,
       play: actions.play,
       playAll: actions.playAll,
       repeat: "all",
