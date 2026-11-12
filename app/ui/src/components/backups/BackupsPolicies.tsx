@@ -540,6 +540,10 @@ export function BackupsPolicies({
       .filter((d) => usable(d) && (draft.destinations[d.id] ?? []).length)
       .map((d) => ({ value: d.id, label: d.name })),
   ];
+  // A source that left the policy or became unusable falls back to rotation.
+  const drillSource = drillOptions.some((o) => o.value === draft.drill_source)
+    ? draft.drill_source
+    : "rotate";
   const set = <K extends keyof PolicyDraft>(field: K, value: PolicyDraft[K]) =>
     setDraft((previous) => ({ ...previous, [field]: value }));
 
@@ -868,11 +872,7 @@ export function BackupsPolicies({
                 <Unit>days, from</Unit>
                 <AdminSelect
                   ariaLabel="Restore drill source"
-                  value={
-                    drillOptions.some((o) => o.value === draft.drill_source)
-                      ? draft.drill_source
-                      : "rotate"
-                  }
+                  value={drillSource}
                   onChange={(value) => set("drill_source", value)}
                   placeholder="Source"
                   allowClear={false}

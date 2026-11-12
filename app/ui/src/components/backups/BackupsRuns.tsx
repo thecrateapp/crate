@@ -335,14 +335,12 @@ export function BackupsRuns({
         </div>
         <div className="crate-form-field">
           <MonoLabel as="span">Date</MonoLabel>
-          <AdminSelect
-            ariaLabel="Date"
+          <SegmentedControl
+            as="radio"
+            label="Date"
             value={filters.date}
-            onChange={(date) => setFilters({ ...filters, date })}
-            placeholder="Any date"
-            allowClear={false}
-            triggerClassName="w-44"
-            options={DATES.map(({ value, label }) => ({ value, label }))}
+            onValueChange={(date) => setFilters({ ...filters, date })}
+            items={DATES.map(({ value, label }) => ({ value, label }))}
           />
         </div>
       </div>

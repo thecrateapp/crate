@@ -110,6 +110,35 @@ describe("Backups runs", () => {
     await waitFor(() => expect(lastRunsCall().get("kind")).toBe("verify"));
   });
 
+  it("filters by date with chips", async () => {
+    const user = await openRuns();
+    const dates = screen.getByRole("radiogroup", { name: "Date" });
+    expect(
+      within(dates)
+        .getAllByRole("radio")
+        .map((radio) => radio.textContent),
+    ).toEqual([
+      "Last 24 hours",
+      "Last 7 days",
+      "Last 14 days",
+      "Last 30 days",
+      "Any date",
+    ]);
+    expect(
+      within(dates).getByRole("radio", { name: "Last 14 days" }),
+    ).toBeChecked();
+    await user.click(
+      within(dates).getByRole("radio", { name: "Last 30 days" }),
+    );
+    await waitFor(() =>
+      expect(lastRunsCall().get("since")).toBe(
+        new Date(BACKUPS_NOW - 30 * 86_400_000).toISOString(),
+      ),
+    );
+    await user.click(within(dates).getByRole("radio", { name: "Any date" }));
+    await waitFor(() => expect(lastRunsCall().has("since")).toBe(false));
+  });
+
   it("pages with Load more", async () => {
     const user = await openRuns();
     expect(
