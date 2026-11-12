@@ -32,14 +32,24 @@ use tauri_plugin_deep_link::DeepLinkExt;
 #[cfg(desktop)]
 use tauri_plugin_window_state::StateFlags;
 
+#[cfg(desktop)]
+mod desktop_control;
+#[cfg(target_os = "linux")]
+mod desktop_mcp;
 #[cfg(all(desktop, any(target_os = "linux", test)))]
 mod desktop_window_bounds;
 #[cfg(target_os = "linux")]
 mod linux_desktop_integration;
 #[cfg(target_os = "linux")]
+mod linux_desktop_profile;
+#[cfg(target_os = "linux")]
 mod linux_desktop_theme;
 #[cfg(target_os = "linux")]
 mod linux_media_controls;
+#[cfg(target_os = "linux")]
+mod linux_sleep_inhibitor;
+#[cfg(target_os = "linux")]
+mod linux_track_notifications;
 #[cfg(target_os = "macos")]
 mod macos_delegate;
 #[cfg(target_os = "macos")]
@@ -308,11 +318,20 @@ fn update_now_playing(
 
 #[cfg(desktop)]
 #[tauri::command]
-fn update_desktop_media_session(payload: DesktopMediaSessionPayload) -> Result<(), String> {
+fn update_desktop_media_session(
+    app: tauri::AppHandle,
+    payload: DesktopMediaSessionPayload,
+) -> Result<(), String> {
+    #[cfg(not(target_os = "linux"))]
+    let _ = &app;
     #[cfg(target_os = "macos")]
     macos_media_controls::update_now_playing(&payload);
     #[cfg(target_os = "linux")]
-    linux_media_controls::update_now_playing(&payload);
+    {
+        linux_media_controls::update_now_playing(&payload);
+        linux_sleep_inhibitor::set_playing(payload.is_playing);
+        linux_track_notifications::track_update(&app, &payload);
+    }
     #[cfg(target_os = "windows")]
     windows_media_controls::update_now_playing(&payload);
 
@@ -325,7 +344,10 @@ fn update_desktop_media_playback_state(payload: DesktopMediaPlaybackState) -> Re
     #[cfg(target_os = "macos")]
     macos_media_controls::update_playback_state(payload.is_playing);
     #[cfg(target_os = "linux")]
-    linux_media_controls::update_playback_state(payload.is_playing);
+    {
+        linux_media_controls::update_playback_state(payload.is_playing);
+        linux_sleep_inhibitor::set_playing(payload.is_playing);
+    }
     #[cfg(target_os = "windows")]
     windows_media_controls::update_playback_state(payload.is_playing);
 
@@ -711,6 +733,44 @@ async fn linux_desktop_theme_snapshot() -> Result<Option<serde_json::Value>, Str
     }
 }
 
+/// Volume, shuffle, repeat and equalizer from Listen, for desktop widgets
+/// (served on the Linux control socket) and for MPRIS.
+#[cfg(desktop)]
+#[tauri::command]
+fn update_desktop_control_state(state: serde_json::Value) -> Result<(), String> {
+    let line = desktop_control::state_line(&state)?;
+    #[cfg(target_os = "linux")]
+    if let Some(extras) = desktop_control::player_extras(&state) {
+        linux_media_controls::update_extras(extras);
+    }
+    desktop_control::publish_state(line);
+    Ok(())
+}
+
+/// Listen's answer to a control-socket `search`, for the client that asked.
+#[cfg(desktop)]
+#[tauri::command]
+fn desktop_control_reply(request: u64, items: serde_json::Value) -> Result<bool, String> {
+    let line = desktop_control::result_line(request, &items)?;
+    Ok(desktop_control::reply(request, line))
+}
+
+/// The Linux desktop profile (compositor, tiling, Ryoku) for the frontend, which
+/// drops its own titlebar on a tiling compositor. `None` off Linux.
+#[cfg(desktop)]
+#[tauri::command]
+fn linux_desktop_profile() -> Option<serde_json::Value> {
+    #[cfg(target_os = "linux")]
+    {
+        serde_json::to_value(linux_desktop_profile::current()).ok()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 fn register_deep_link_listener(
@@ -856,6 +916,16 @@ fn enforce_linux_desktop_window_bounds<R: tauri::Runtime>(window: &Window<R>) {
     use desktop_window_bounds::{
         clamp_to_work_area, physical_minimum, select_work_area, WindowBounds, WorkArea,
     };
+
+    // A tiling compositor owns the window's size and position: only lower the
+    // minimum so the window fits a tile, and never resize or move it.
+    if linux_desktop_profile::current().tiling {
+        let _ = window.set_min_size(Some(Size::Logical(tauri::LogicalSize::new(
+            linux_desktop_profile::TILING_MIN_WIDTH,
+            linux_desktop_profile::TILING_MIN_HEIGHT,
+        ))));
+        return;
+    }
 
     let (Ok(inner_size), Ok(outer_size), Ok(outer_position), Ok(monitors)) = (
         window.inner_size(),
@@ -1310,8 +1380,27 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<DesktopMenuState> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // `crate-desktop --mcp`: an MCP server on stdio that drives the running app
+    // through its control socket. It must not reach the single-instance plugin,
+    // which would hand the arguments to the running app and exit.
     #[cfg(target_os = "linux")]
-    prefer_wayland_gdk_backend();
+    if std::env::args().skip(1).any(|arg| arg == "--mcp") {
+        desktop_mcp::serve_stdio();
+        return;
+    }
+    // `crate-desktop --launcher`: a rofi-script provider (Ryoku's launcher)
+    #[cfg(target_os = "linux")]
+    if std::env::args().skip(1).any(|arg| arg == "--launcher") {
+        desktop_mcp::launcher();
+        return;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Before GTK starts: the program name becomes the Wayland app_id.
+        linux_desktop_profile::set_program_name();
+        prefer_wayland_gdk_backend();
+    }
 
     let _sentry_guard = observability::init_sentry("listen-tauri-native");
 
@@ -1370,6 +1459,10 @@ pub fn run() {
                 macos_media_controls::install(app);
                 #[cfg(target_os = "linux")]
                 linux_media_controls::install(app);
+                #[cfg(target_os = "linux")]
+                desktop_control::install(app.handle());
+                #[cfg(target_os = "linux")]
+                linux_track_notifications::install(app.handle());
                 #[cfg(target_os = "windows")]
                 windows_media_controls::install(app);
 
@@ -1418,6 +1511,9 @@ pub fn run() {
             ensure_desktop_window_size,
             open_bandcamp_cookie_interceptor,
             linux_desktop_theme_snapshot,
+            linux_desktop_profile,
+            update_desktop_control_state,
+            desktop_control_reply,
             register_deep_link_listener,
             offline_storage::register_offline_transfer,
             offline_storage::cancel_offline_transfer,

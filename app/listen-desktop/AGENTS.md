@@ -12,7 +12,9 @@ packaging. Platform-wide rules live in the root `AGENTS.md`.
 - `src/lib/tauri-init.ts`, `tauri-filesystem.ts`, `linux-*` — desktop-only runtime glue.
 - `src-tauri/src/` — Rust shell. `lib.rs` registers all commands
   (`generate_handler!`); `secure_session.rs` (OS keyring), `offline_storage.rs`,
-  `{macos,linux,windows}_media_controls.rs`, `desktop_window_bounds.rs`.
+  `{macos,linux,windows}_media_controls.rs`, `desktop_window_bounds.rs`,
+  `desktop_control.rs` (local control channel), `linux_desktop_profile.rs`
+  (compositor/tiling detection, Wayland app_id), `linux_sleep_inhibitor.rs`.
 - `src-tauri/tauri.conf.json` — base config; `tauri.linux.conf.json` — Linux overlay
   (frameless, transparent, 1280x820 minimum).
 - `src-tauri/capabilities/default.json` — permission allowlist (fs scope, http URLs).
@@ -77,6 +79,57 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   any new capability in `capabilities/default.json`, and a Rust test.
 - Listen code that branches on desktop must use `isTauriRuntime` from
   `app/listen/src/lib/platform.ts`; desktop-only React stays in this package.
+
+## Linux desktop integration
+
+- **Profile.** `linux_desktop_profile::current()` decides once per launch:
+  compositor (`HYPRLAND_INSTANCE_SIGNATURE`, `NIRI_SOCKET`, `SWAYSOCK`, `I3SOCK`, then
+  `XDG_CURRENT_DESKTOP`), `tiling`, and `ryoku`. The `linux_desktop_profile` command
+  hands it to the frontend (`src/lib/linux-desktop-profile.ts`).
+- **Tiling compositors** (Hyprland, niri, Sway, i3, river) own window geometry. There
+  the bounds clamp only lowers the minimum to `TILING_MIN_*` (600x480) and never calls
+  `set_size`/`set_position`, and `main.tsx` drops the custom titlebar
+  (`data-crate-linux-wm="tiling"` zeroes the chrome height and corner radius).
+  GNOME/KDE keep the titlebar and the clamp.
+- **App id.** `run()` sets the GLib program name to the bundle identifier before GTK
+  starts, because GTK 3 takes the Wayland app_id from it. The window then reports
+  `app.cratemusic.crate.desktop`, which matches the desktop entries' `StartupWMClass`
+  (it used to report `crate-desktop`).
+- **Control socket** (`desktop_control.rs`): `$XDG_RUNTIME_DIR/crate/control.sock`
+  (dir 0700, socket 0600), JSON lines, protocol 1. Server sends `hello`, then `state`
+  on every change, and `ack`/`error` per command. Commands: `play`, `pause`,
+  `play_pause`, `next`, `previous`, `show`, `seek`, `set_volume`, `set_shuffle`,
+  `set_repeat`, `eq_enabled`, `eq_mode` (`smart|genre|adaptive|manual`), `eq_preset`,
+  `eq_gains`, `search` (acked with a `request` id, answered later with a `result`
+  line to that client only, through `desktop_control_reply`) and `play_item` (a
+  search result's `ref`). Refs never carry media URLs: Crate signs those with a
+  `media_ticket` (`lib/desktop-control-search.ts` strips them). Transport goes through `handle_playback_menu_event` (same path as the
+  tray and `--crate-command`); the rest is the `crate:control-command` event, which
+  `tauri-init.ts` validates again and hands to Listen
+  (`app/listen/src/lib/desktop-control.ts`, `use-desktop-control-bridge.ts`). Listen
+  publishes the state with `update_desktop_control_state`. Keep `ControlCommand` and
+  `DesktopControlCommand` in step. Consumers: the Ryoku bar's Crate plugin, scripts.
+- **MPRIS** now seeks (`Seek`, `SetPosition`, `CanSeek` when a track has a length) and
+  reports/sets `Volume`, `Shuffle` and `LoopStatus` from the control state.
+- **Sleep.** `linux_sleep_inhibitor` holds a logind `sleep`/`block` inhibitor only while
+  playing: idle suspend waits, screen lock and blanking do not, the lid still suspends.
+- **Track notifications** (`linux_track_notifications.rs`): one transient card per new
+  track, only while playing and with the window unfocused; it replaces the previous
+  card (`replaces_id`), carries the cached cover (`image-path`), `desktop-entry`, and
+  the actions "Show Crate" (default) and "Next" (handled from `ActionInvoked`).
+- **MCP** (`desktop_mcp.rs`): `crate-desktop --mcp` is an MCP server on stdio (JSON-RPC,
+  tools: now_playing, play_pause, next_track, previous_track, seek, set_shuffle,
+  set_repeat, set_equalizer, show_crate). It is a client of the control socket plus
+  MPRIS, never starts the app, and returns before the single-instance plugin runs.
+  Register with e.g. `claude mcp add crate -- crate-desktop --mcp`. Tools also include
+  `search_library` and `play_result`.
+- **Launcher** (`crate-desktop --launcher`): a rofi-script provider (Ryoku's launcher
+  Script provider, or rofi): pass 1 prints search rows with the ref as `info`, pass 2
+  (`ROFI_RETV=1`) plays the pick. Also returns before the single-instance plugin.
+- **Arch package:** `packaging/aur/crate-desktop-bin/` (PKGBUILD + .SRCINFO from the
+  release `.deb`; bump the sha256 from the GitHub asset digest, not crate-checksums.txt).
+- **Volume caveat:** Listen's player volume is the webview's own gain, not the system
+  volume, so desktop widgets do not offer it (the Ryoku bar plugin dropped its slider).
 
 ## Vendored crates
 

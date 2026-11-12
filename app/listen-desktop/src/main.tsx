@@ -21,6 +21,10 @@ import { renderSecureSessionError } from "@/lib/secure-session-error";
 
 import { initTauriRuntime, startTauriOAuthRuntime } from "./lib/tauri-init";
 import { LinuxWindowTitlebar } from "./components/LinuxWindowTitlebar";
+import {
+  applyLinuxDesktopProfile,
+  loadLinuxDesktopProfile,
+} from "./lib/linux-desktop-profile";
 
 const disposeFocusRingMotion = installFocusRingMotion();
 import.meta.hot?.dispose(disposeFocusRingMotion);
@@ -53,12 +57,20 @@ async function bootstrapDesktopApp(): Promise<void> {
     return;
   }
 
+  // A tiling compositor (Hyprland, niri, Sway...) draws the frame itself.
+  const showTitlebar =
+    hasLinuxWindowTitlebar &&
+    applyLinuxDesktopProfile(
+      await loadLinuxDesktopProfile(window.__crateTauriInvoke),
+      document.documentElement,
+    ).showTitlebar;
+
   void primeOfflineRuntimeProfile();
   startTauriOAuthRuntime();
   createRoot(root).render(
     <I18nProvider>
-      {hasLinuxWindowTitlebar && <LinuxWindowTitlebar />}
-      {hasLinuxWindowTitlebar && <div aria-hidden="true" className="h-9" />}
+      {showTitlebar && <LinuxWindowTitlebar />}
+      {showTitlebar && <div aria-hidden="true" className="h-9" />}
       <HashRouter useTransitions={hasLinuxWindowTitlebar ? false : undefined}>
         <App />
         <Toaster {...toasterConfig} theme="dark" position="bottom-center" />
