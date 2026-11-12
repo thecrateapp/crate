@@ -13,6 +13,12 @@ from typing import Any
 
 from crate.db.queries.browse_media_search import search_all_hybrid
 from crate.db.repositories import federation as repo
+from crate.federation.results_envelope import (
+    RESULTS_CONTRACT,
+    envelope_to_search_contract,
+    is_results_envelope,
+    parse_results_envelope,
+)
 from crate.federation.client import (
     SEARCH_TIMEOUT,
     federated_post,
@@ -67,22 +73,28 @@ def _search_one_peer(
             node_id=local_node["node_uid"],
             key_id=local_node["active_key_id"],
             private_key_ref=local_node["private_key_ref"],
-            json_body={"q": query, "limit": limit},
+            json_body={"q": query, "limit": limit, "contracts": [RESULTS_CONTRACT]},
             timeout=SEARCH_TIMEOUT,
             user_assertion=user_assertion,
         )
         if resp.status_code == 200:
-            data = resp.json()
-            return _tag_remote_results(
-                data=data,
-                peer=peer,
-            )
+            return _adapt_peer_answer(resp.json(), peer=peer)
         else:
             log.debug("Peer %s returned %d", peer["node_uid"], resp.status_code)
             return None
     except Exception as e:
         log.debug("Peer %s search failed: %s", peer["node_uid"], e)
         return None
+
+
+def _adapt_peer_answer(data: Any, *, peer: dict) -> dict:
+    """Read a peer's answer: the v1 envelope, or the legacy shape of older owners."""
+    if is_results_envelope(data):
+        envelope = parse_results_envelope(data)
+        if envelope is None:
+            raise ValueError("Unreadable results envelope")
+        return envelope_to_search_contract(envelope, peer=peer)
+    return _tag_remote_results(data=data, peer=peer)
 
 
 def _tag_remote_results(data: dict, peer: dict) -> dict:
