@@ -99,6 +99,7 @@ Which serving mode answered a catalog search.
 | Metric | Type | Unit | Labels | Prometheus | Shown in |
 | --- | --- | --- | --- | --- | --- |
 | `catalog.search.serving_mode` | counter | 1 | `mode` | `crate_catalog_search_serving_mode` | PostgreSQL history only |
+| `catalog.search_stream.requests` | counter | 1 | `mode` | `crate_catalog_search_stream_requests` | PostgreSQL history only |
 
 ### Crate MCP
 
