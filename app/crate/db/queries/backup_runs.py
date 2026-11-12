@@ -149,8 +149,47 @@ def latest_destination_runs(
         return _impl(current)
 
 
+def latest_tier_copies(
+    *, session: Session | None = None
+) -> dict[str, dict[str, datetime]]:
+    """Per destination, when the last good off-site copy of each tier started.
+
+    The tiers are the copy's tags (``details.tags``), so a copy that stood for the
+    daily and the weekly tier counts for both.
+    """
+
+    def _impl(current: Session) -> dict[str, dict[str, datetime]]:
+        rows = current.execute(
+            text(
+                """
+                SELECT destination_id::text AS destination_id, tier,
+                       max(started_at) AS started_at
+                FROM backup_runs,
+                     jsonb_array_elements_text(
+                         CASE WHEN jsonb_typeof(details -> 'tags') = 'array'
+                              THEN details -> 'tags' ELSE '[]'::jsonb END
+                     ) AS tier
+                WHERE kind = 'offsite' AND status = 'succeeded'
+                  AND destination_id IS NOT NULL
+                  AND tier IN ('daily', 'weekly', 'monthly')
+                GROUP BY destination_id, tier
+                """
+            )
+        ).mappings()
+        out: dict[str, dict[str, datetime]] = {}
+        for row in rows:
+            out.setdefault(row["destination_id"], {})[row["tier"]] = row["started_at"]
+        return out
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 __all__ = [
     "get_backup_run",
+    "latest_tier_copies",
     "latest_destination_runs",
     "latest_successful_dump",
     "list_backup_runs",
