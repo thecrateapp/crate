@@ -113,8 +113,11 @@ def test_restic_targets_per_kind(tmp_path):
             "rclone:cratebk:crate-backups",
         ),
         "dropbox": (
-            {"path": "crate"},
-            {"token": '{"access_token":"a","refresh_token":"r"}'},
+            {"path": "crate", "client_id": "appkey"},
+            {
+                "client_secret": "appsecret",
+                "token": '{"access_token":"a","refresh_token":"r"}',
+            },
             "rclone:cratebk:crate",
         ),
     }
@@ -239,3 +242,36 @@ def test_the_sftp_probe_asks_for_the_pinned_host_key_type(tmp_path):
     )
     assert remote.env["RCLONE_CONFIG_CRATEBK_PORT"] == "23"
     assert private not in " ".join(remote.env.values())
+
+
+@pytest.mark.parametrize("kind", ["gdrive", "dropbox"])
+def test_oauth_kinds_never_fall_back_to_the_shared_rclone_client(
+    kind, tmp_path, monkeypatch
+):
+    """D4: Drive and Dropbox use the install's own OAuth client, never rclone's."""
+    for name in ("CLIENT_ID", "CLIENT_SECRET"):
+        monkeypatch.delenv(f"CRATE_BACKUP_{kind.upper()}_{name}", raising=False)
+    token = '{"access_token":"a","refresh_token":"r"}'
+    for build in (providers.restic_target, providers.rclone_remote):
+        with pytest.raises(DestinationError, match="OAuth client"):
+            build(
+                kind,
+                {"path": "crate"},
+                {"token": token},
+                backup_dir=tmp_path,
+                work_dir=tmp_path,
+            )
+
+    # The install-wide client from the environment is the install's own too.
+    monkeypatch.setenv(f"CRATE_BACKUP_{kind.upper()}_CLIENT_ID", "env-id")
+    monkeypatch.setenv(f"CRATE_BACKUP_{kind.upper()}_CLIENT_SECRET", "env-secret")
+    target = providers.restic_target(
+        kind,
+        {"path": "crate"},
+        {"token": token},
+        backup_dir=tmp_path,
+        work_dir=tmp_path,
+    )
+    assert target.env["RCLONE_CONFIG_CRATEBK_CLIENT_ID"] == "env-id"
+    assert target.env["RCLONE_CONFIG_CRATEBK_CLIENT_SECRET"] == "env-secret"
+    assert "env-secret" in target.secret_values

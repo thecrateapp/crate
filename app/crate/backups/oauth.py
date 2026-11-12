@@ -40,6 +40,7 @@ from crate.backups.destinations import (
     load_destination_secrets,
     update_destination,
 )
+from crate.backups.providers import DestinationError, install_oauth_client
 from crate.db.queries.backup_destinations import get_backup_destination
 
 STATE_TTL_SECONDS = 10 * 60
@@ -159,20 +160,10 @@ def oauth_client(
     kind: str, config: Mapping[str, Any], credentials: Mapping[str, Any]
 ) -> tuple[str, str]:
     """The OAuth client of a destination, else the install-wide one."""
-    env_prefix = f"CRATE_BACKUP_{kind.upper()}_"
-    client_id = str(config.get("client_id") or "").strip()
-    client_secret = str(credentials.get("client_secret") or "").strip()
-    if not client_id:
-        client_id = os.environ.get(f"{env_prefix}CLIENT_ID", "").strip()
-        client_secret = (
-            client_secret or os.environ.get(f"{env_prefix}CLIENT_SECRET", "").strip()
-        )
-    if not client_id or not client_secret:
-        raise OAuthError(
-            f"Add your own {OAUTH_PROVIDERS[kind].label} OAuth client ID and secret "
-            "to this destination first"
-        )
-    return client_id, client_secret
+    try:
+        return install_oauth_client(kind, config, credentials)
+    except DestinationError as exc:
+        raise OAuthError(str(exc)) from exc
 
 
 def _oauth_destination(destination_id: str) -> dict[str, Any]:

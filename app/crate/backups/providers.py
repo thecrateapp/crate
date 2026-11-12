@@ -480,6 +480,31 @@ def _sftp_files(
     return key_file, known_hosts, pinned
 
 
+def install_oauth_client(
+    kind: str, config: Mapping[str, Any], secrets: Mapping[str, Any]
+) -> tuple[str, str]:
+    """The install's own OAuth client: the destination's, else the install-wide one.
+
+    Drive and Dropbox never fall back to rclone's shared client (decision D4): its
+    quota is shared with every rclone user, and a token minted for another client
+    cannot be refreshed with it.
+    """
+    env_prefix = f"CRATE_BACKUP_{kind.upper()}_"
+    client_id = str(config.get("client_id") or "").strip()
+    client_secret = str(secrets.get("client_secret") or "").strip()
+    if not client_id:
+        client_id = os.environ.get(f"{env_prefix}CLIENT_ID", "").strip()
+        client_secret = (
+            client_secret or os.environ.get(f"{env_prefix}CLIENT_SECRET", "").strip()
+        )
+    if not client_id or not client_secret:
+        label = PROVIDERS[kind].label
+        raise DestinationError(
+            f"Add your own {label} OAuth client ID and secret to this destination first"
+        )
+    return client_id, client_secret
+
+
 def _rclone_oauth_env(
     kind: str, config: Mapping[str, Any], secrets: Mapping[str, Any]
 ) -> tuple[dict[str, str], list[str]]:
@@ -489,11 +514,10 @@ def _rclone_oauth_env(
         env[f"{_RCLONE_ENV}SCOPE"] = DRIVE_SCOPE
         if config.get("root_folder_id"):
             env[f"{_RCLONE_ENV}ROOT_FOLDER_ID"] = str(config["root_folder_id"])
-    if config.get("client_id"):
-        env[f"{_RCLONE_ENV}CLIENT_ID"] = str(config["client_id"])
-    if secrets.get("client_secret"):
-        env[f"{_RCLONE_ENV}CLIENT_SECRET"] = str(secrets["client_secret"])
-        secret_values.append(str(secrets["client_secret"]))
+    client_id, client_secret = install_oauth_client(kind, config, secrets)
+    env[f"{_RCLONE_ENV}CLIENT_ID"] = client_id
+    env[f"{_RCLONE_ENV}CLIENT_SECRET"] = client_secret
+    secret_values.append(client_secret)
     if secrets.get("token"):
         token = str(secrets["token"])
         env[f"{_RCLONE_ENV}TOKEN"] = token
