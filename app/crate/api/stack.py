@@ -16,7 +16,12 @@ from crate.api.openapi_responses import (
     merge_responses,
 )
 from crate.api.permissions import require_permission
-from crate.api.redis_sse import close_pubsub, get_async_redis, open_pubsub
+from crate.api.redis_sse import (
+    close_pubsub,
+    get_async_redis,
+    log_redis_failure,
+    open_pubsub,
+)
 from crate.api.schemas.utility import (
     AdminStackSnapshotResponse,
     StackActionResponse,
@@ -67,7 +72,12 @@ async def _mark_live_watched() -> None:
             live_activity.WATCH_KEY, "1", ex=live_activity.WATCH_TTL_SECONDS
         )
     except Exception:
-        log.debug("Could not mark live stack activity as watched", exc_info=True)
+        # Without the watch flag the projector publishes no live frames and the
+        # Stack page shows no CPU or memory, so this must be visible.
+        log_redis_failure(
+            "stack_live_watched",
+            "Could not mark live stack activity as watched; the Stack page gets no CPU or memory",
+        )
 
 
 async def _last_live_frame() -> str | None:
