@@ -1,0 +1,40 @@
+# Maintainer: thecrateapp (set a real name and address before publishing to the AUR)
+#
+# The Crate desktop app (Tauri 2 / WebKitGTK) from the GitHub release .deb.
+# Release assets: https://github.com/thecrateapp/crate/releases
+# Bump: set pkgver, then the sha256 from
+#   gh api repos/thecrateapp/crate/releases/tags/v$pkgver \
+#     -q '.assets[] | select(.name=="crate-linux-'$pkgver'.deb") | .digest'
+# (crate-checksums.txt lists the CLI binaries only), then
+#   makepkg --printsrcinfo > .SRCINFO
+pkgname=crate-desktop-bin
+pkgver=3.3.1
+pkgrel=1
+pkgdesc="Crate: self-hosted music player (desktop app)"
+arch=('x86_64')
+url="https://cratemusic.app"
+license=('AGPL-3.0-only')
+depends=(
+  'webkit2gtk-4.1'
+  'gtk3'
+  'libayatana-appindicator'
+  'gst-plugins-base'
+  'gst-plugins-good'
+)
+optdepends=(
+  'gst-libav: AAC/ALAC (m4a) playback'
+  'gst-plugins-bad: extra codecs'
+)
+provides=('crate-desktop')
+conflicts=('crate-desktop')
+source=("crate-linux-${pkgver}.deb::https://github.com/thecrateapp/crate/releases/download/v${pkgver}/crate-linux-${pkgver}.deb")
+sha256sums=('b9f428ccae269ba006a260049245324e6b9bc0f7204eb509fe11818af2501e72')
+noextract=("crate-linux-${pkgver}.deb")
+
+package() {
+  bsdtar -xOf "crate-linux-${pkgver}.deb" 'data.tar.*' | bsdtar -xf - -C "$pkgdir"
+  # the .deb ships /usr/bin, /usr/share/applications/Crate.desktop and hicolor icons
+  chmod 0755 "$pkgdir/usr/bin/crate-desktop"
+  find "$pkgdir/usr/share" -type d -exec chmod 0755 {} +
+  find "$pkgdir/usr/share" -type f -exec chmod 0644 {} +
+}
