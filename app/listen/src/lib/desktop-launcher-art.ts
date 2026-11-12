@@ -15,7 +15,6 @@ import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 
 export const LAUNCHER_ART_SIZE = 256;
 const MAX_REMEMBERED_SOURCES = 256;
-const MAX_CONCURRENT_FETCHES = 3;
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 const KEY_PATTERN = /^(album|artist):[A-Za-z0-9._:-]{1,150}$/;
 
@@ -93,60 +92,232 @@ export function launcherArtUrl(source: LauncherArtSource): string {
 export interface LauncherArtDeps {
   /** Adds the media ticket the image route needs. */
   authorize: (url: string) => Promise<string>;
-  fetch: (url: string) => Promise<Response>;
+  fetch: (url: string, init: RequestInit) => Promise<Response>;
   /** A square `size` px JPEG, PNG or WebP, or null if it cannot decode. */
   toSquare: (image: Blob, size: number) => Promise<Blob | null>;
   store: (key: string, bytes: number[]) => Promise<unknown>;
+  /**
+   * A URL of the same image the webview already loaded at 256 px or more
+   * (its ticket included), so the HTTP cache can answer without a refetch.
+   */
+  loadedImage?: (url: string) => string | null;
 }
 
-async function fetchOne(key: string, deps: LauncherArtDeps): Promise<void> {
-  const source = sources.get(key);
-  if (!source) return;
-  const url = launcherArtUrl(source);
-  if (!url) return;
-  const response = await deps.fetch(await deps.authorize(url));
-  if (!response.ok) return;
-  const image = await response.blob();
-  if (!image.size || image.size > MAX_SOURCE_BYTES) return;
-  const square = await deps.toSquare(image, LAUNCHER_ART_SIZE);
-  if (!square?.size) return;
-  const bytes = Array.from(new Uint8Array(await square.arrayBuffer()));
-  await deps.store(key, bytes);
+/** How a batch of keys is fetched. */
+export interface LauncherArtPlan {
+  concurrency: number;
+  priority: "high" | "low";
+  /** Awaited before each image of a background run (idle time). */
+  pause?: () => Promise<void>;
+}
+
+/** A search's misses: all tickets in one request, four images at a time. */
+export const ON_DEMAND_PLAN: LauncherArtPlan = {
+  concurrency: 4,
+  priority: "high",
+};
+
+/** What the user plays: two at a time, low priority, in idle time. */
+export const PREWARM_PLAN: LauncherArtPlan = {
+  concurrency: 2,
+  priority: "low",
+  pause: idle,
+};
+
+/** Tickets for a prewarm are requested this many at a time. */
+const AUTHORIZE_BATCH = 32;
+const MAX_STORED_KEYS = 4096;
+const stored = new Set<string>();
+
+function idle(): Promise<void> {
+  return new Promise((resolve) => {
+    const idleWindow = globalThis as typeof globalThis & {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+    };
+    if (typeof idleWindow.requestIdleCallback === "function") {
+      idleWindow.requestIdleCallback(() => resolve(), { timeout: 2_000 });
+    } else {
+      setTimeout(resolve, 50);
+    }
+  });
+}
+
+function markStored(key: string): void {
+  stored.delete(key);
+  stored.add(key);
+  if (stored.size > MAX_STORED_KEYS) {
+    const oldest = stored.values().next().value;
+    if (oldest !== undefined) stored.delete(oldest);
+  }
+}
+
+function sizeOf(url: URL): number | null {
+  const size = Number(url.searchParams.get("size"));
+  return Number.isFinite(size) && size > 0 ? size : null;
 }
 
 /**
- * Fetch and store the images the shell reported missing, a few at a time,
- * in the background. Failures are dropped: the launcher keeps its icon.
+ * The smallest copy of `url`'s image (same path and version) the webview has
+ * loaded at `LAUNCHER_ART_SIZE` or more, from its resource timing entries.
+ * Thumbnails smaller than that are not reused: the crop would be upscaled.
+ */
+export function findLoadedImage(
+  url: string,
+  entries: ReadonlyArray<{ name: string }> = loadedResources(),
+): string | null {
+  let wanted: URL;
+  try {
+    wanted = new URL(url, "https://crate.local");
+  } catch {
+    return null;
+  }
+  const version = wanted.searchParams.get("v");
+  let best: { name: string; size: number } | null = null;
+  for (const entry of entries) {
+    let loaded: URL;
+    try {
+      loaded = new URL(entry.name);
+    } catch {
+      continue;
+    }
+    if (loaded.pathname !== wanted.pathname) continue;
+    if (/^https?:/i.test(url) && loaded.origin !== wanted.origin) continue;
+    if (version !== loaded.searchParams.get("v")) continue;
+    const size = sizeOf(loaded);
+    if (size == null || size < LAUNCHER_ART_SIZE) continue;
+    if (!best || size < best.size) best = { name: entry.name, size };
+  }
+  return best?.name ?? null;
+}
+
+function loadedResources(): ReadonlyArray<{ name: string }> {
+  try {
+    return typeof performance?.getEntriesByType === "function"
+      ? performance.getEntriesByType("resource")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+interface ArtJob {
+  key: string;
+  url: string;
+  reuse: string | null;
+  authorized: Promise<string | null> | null;
+}
+
+async function imageFor(
+  job: ArtJob,
+  deps: LauncherArtDeps,
+  plan: LauncherArtPlan,
+): Promise<Blob | null> {
+  const init: RequestInit = { priority: plan.priority } as RequestInit;
+  if (job.reuse) {
+    try {
+      const cached = await deps.fetch(job.reuse, {
+        ...init,
+        cache: "force-cache",
+      });
+      if (cached.ok) return await cached.blob();
+    } catch {
+      // fall back to a fresh fetch
+    }
+  }
+  const authorized = await (job.authorized ??
+    deps.authorize(job.url).catch(() => null));
+  if (!authorized) return null;
+  const response = await deps.fetch(authorized, init);
+  return response.ok ? response.blob() : null;
+}
+
+async function fetchOne(
+  job: ArtJob,
+  deps: LauncherArtDeps,
+  plan: LauncherArtPlan,
+): Promise<void> {
+  const image = await imageFor(job, deps, plan);
+  if (!image?.size || image.size > MAX_SOURCE_BYTES) return;
+  const square = await deps.toSquare(image, LAUNCHER_ART_SIZE);
+  if (!square?.size) return;
+  const bytes = Array.from(new Uint8Array(await square.arrayBuffer()));
+  await deps.store(job.key, bytes);
+  markStored(job.key);
+}
+
+function plannedJobs(keys: string[]): ArtJob[] {
+  const jobs: ArtJob[] = [];
+  for (const key of keys) {
+    const source = sources.get(key);
+    const url = source ? launcherArtUrl(source) : "";
+    if (url) jobs.push({ key, url, reuse: null, authorized: null });
+  }
+  return jobs;
+}
+
+/** Ask for every ticket of a batch in the same tick: one batched request. */
+function authorizeBatch(jobs: ArtJob[], deps: LauncherArtDeps): void {
+  for (const job of jobs) {
+    job.reuse = deps.loadedImage?.(job.url) ?? null;
+    if (!job.reuse) job.authorized = deps.authorize(job.url).catch(() => null);
+  }
+}
+
+/**
+ * Fetch and store the images the shell reported missing. A search's misses
+ * go out together (`ON_DEMAND_PLAN`); the prewarm trickles in idle time
+ * (`PREWARM_PLAN`). A key is skipped while another run fetches it or once
+ * this session stored it. Failures are dropped: the launcher keeps its icon.
  */
 export async function prefetchLauncherArt(
   keys: unknown,
   deps: LauncherArtDeps,
+  plan: LauncherArtPlan = ON_DEMAND_PLAN,
+  signal?: AbortSignal,
 ): Promise<void> {
   if (!Array.isArray(keys)) return;
-  const queue = keys.filter(
-    (key): key is string =>
-      typeof key === "string" &&
-      KEY_PATTERN.test(key) &&
-      sources.has(key) &&
-      !inFlight.has(key),
+  const wanted = Array.from(
+    new Set(
+      keys.filter(
+        (key): key is string =>
+          typeof key === "string" &&
+          KEY_PATTERN.test(key) &&
+          sources.has(key) &&
+          !inFlight.has(key) &&
+          !stored.has(key),
+      ),
+    ),
   );
-  queue.forEach((key) => inFlight.add(key));
+  const jobs = plannedJobs(wanted);
+  const batch = plan.pause ? AUTHORIZE_BATCH : jobs.length;
+  let next = 0;
+  let authorizedUpTo = 0;
+  // workers start in the same tick, so each batch's tickets share a request
+  const take = (): ArtJob | undefined => {
+    if (next >= authorizedUpTo && next < jobs.length) {
+      authorizeBatch(jobs.slice(next, next + batch), deps);
+      authorizedUpTo = next + batch;
+    }
+    return jobs[next++];
+  };
   const worker = async () => {
-    for (let key = queue.shift(); key; key = queue.shift()) {
+    for (let job = take(); job; job = take()) {
+      if (signal?.aborted) return;
+      await plan.pause?.();
+      if (signal?.aborted) return;
+      if (inFlight.has(job.key) || stored.has(job.key)) continue;
+      inFlight.add(job.key);
       try {
-        await fetchOne(key, deps);
+        await fetchOne(job, deps, plan);
       } catch {
         // offline, expired session, undecodable image: no art this time
       } finally {
-        inFlight.delete(key);
+        inFlight.delete(job.key);
       }
     }
   };
   await Promise.all(
-    Array.from(
-      { length: Math.min(MAX_CONCURRENT_FETCHES, queue.length) },
-      worker,
-    ),
+    Array.from({ length: Math.min(plan.concurrency, jobs.length) }, worker),
   );
 }
 
@@ -188,4 +359,5 @@ export async function squareJpeg(
 export function resetLauncherArtForTests(): void {
   sources.clear();
   inFlight.clear();
+  stored.clear();
 }

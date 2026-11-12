@@ -182,7 +182,10 @@ describe("useDesktopControlBridge", () => {
     expect(reply?.[1].items[0].art_key).toBe("album:11");
     expect(prefetchLauncherArt).toHaveBeenCalledWith(
       ["album:11"],
-      expect.objectContaining({ store: expect.any(Function) }),
+      expect.objectContaining({
+        store: expect.any(Function),
+        loadedImage: expect.any(Function),
+      }),
     );
   });
 

@@ -33,6 +33,7 @@ import {
   type DesktopPlayDeps,
 } from "@/lib/desktop-control-search";
 import {
+  findLoadedImage,
   prefetchLauncherArt,
   rememberLauncherArtSource,
   squareJpeg,
@@ -62,9 +63,10 @@ const playDeps = (): DesktopPlayDeps => ({
   fetchArtistTopTracks,
 });
 
-const ART_DEPS: LauncherArtDeps = {
+export const LAUNCHER_ART_DEPS: LauncherArtDeps = {
   authorize: (url) => ensureMediaAccessUrl(url, "artwork"),
-  fetch: (url) => fetch(url),
+  fetch: (url, init) => fetch(url, init),
+  loadedImage: (url) => findLoadedImage(url),
   toSquare: squareJpeg,
   store: (key, bytes) =>
     window.__crateTauriInvoke?.("store_launcher_art", { key, bytes }) ??
@@ -134,7 +136,7 @@ export function useDesktopControlBridge(input: BridgeInput) {
           )
           .then((result) => {
             if (result && typeof result === "object") {
-              return prefetchLauncherArt(result.missingArt, ART_DEPS);
+              return prefetchLauncherArt(result.missingArt, LAUNCHER_ART_DEPS);
             }
           })
           .catch(() => {});
