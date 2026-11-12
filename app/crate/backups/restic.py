@@ -285,10 +285,12 @@ def backup_file(
     tags: Sequence[str],
     taken_at: str,
     host: str = SNAPSHOT_HOST,
+    extra_args: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Back up one file as ``/<filename>``; return restic's summary."""
     args = [
         "backup",
+        *extra_args,
         "--json",
         "--quiet",
         "--stdin",
