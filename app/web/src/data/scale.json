@@ -1,12 +1,12 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 8738,
-  "vitest": 7296,
+  "pytest": 9045,
+  "vitest": 7327,
   "goTests": 435,
   "rustTests": 371,
-  "taskTypes": 162,
-  "migrations": 158,
+  "taskTypes": 164,
+  "migrations": 162,
   "taskQueues": {
     "ai": [
       "ai_catalog_refresh",
@@ -143,6 +143,8 @@
       "compute_popularity",
       "refresh_smart_mix_coverage",
       "cleanup_smart_mix_refinements",
+      "backup_dump",
+      "backup_local_retention",
       "index_genres",
       "enrich_genre_descriptions",
       "sync_musicbrainz_genre_graph",
