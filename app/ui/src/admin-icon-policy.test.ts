@@ -114,6 +114,7 @@ const supportingScope = [
   "app/ui/src/components/backups/DestinationFields.tsx",
   "app/ui/src/components/backups/SnapshotsTab.tsx",
   "app/ui/src/components/backups/BackupsPolicies.tsx",
+  "app/ui/src/components/backups/BackupsRuns.tsx",
 ];
 const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
   .map((name) => `app/ui/src/components/layout/${name}.tsx`)
@@ -422,6 +423,15 @@ const approvedLibraryControls = new Map<string, number>([
     "app/ui/src/components/backups/BackupsPolicies.tsx:@crate/ui/primitives/Checkbox:Checkbox",
     1,
   ],
+  ["app/ui/src/components/backups/BackupsRuns.tsx:./backup-ui:CopyAction", 1],
+  [
+    "app/ui/src/components/backups/BackupsRuns.tsx:@/components/ui/AdminSelect:AdminSelect",
+    2,
+  ],
+  [
+    "app/ui/src/components/backups/BackupsRuns.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
   [
     "app/ui/src/components/backups/DestinationDrawer.tsx:./DestinationFields:B2Credentials",
     1,
@@ -504,6 +514,10 @@ const approvedLibraryControls = new Map<string, number>([
   ],
   [
     "app/ui/src/pages/Backups.tsx:@/components/backups/BackupsPolicies:BackupsPolicies",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/BackupsRuns:BackupsRuns",
     1,
   ],
   [
@@ -1325,6 +1339,8 @@ const approvedLibraryControls = new Map<string, number>([
 const approvedUx = new Map([
   // Backups (BK5): Solar kind marks (BG1-2), Copy, Edit and disclosure chevrons.
   ["BackupsDestinations:backups-edit", ["@crate/ui/icons", "Pencil"]],
+  ["BackupsRuns:backups-run-collapse", ["@crate/ui/icons", "ChevronDown"]],
+  ["BackupsRuns:backups-run-expand", ["@crate/ui/icons", "ChevronRight"]],
   [
     "DestinationFields:backups-paste-token-collapse",
     ["@crate/ui/icons", "ChevronDown"],

@@ -10,6 +10,7 @@ import { Button } from "@crate/ui/shadcn/button";
 
 import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import { BackupsDestinations } from "@/components/backups/BackupsDestinations";
+import { BackupsRuns } from "@/components/backups/BackupsRuns";
 import {
   BackupsPolicies,
   NEW_POLICY,
@@ -37,6 +38,7 @@ import {
   type BackupDestination,
   type BackupOverview,
   type BackupPolicy,
+  type BackupRun,
   type TaskEnqueue,
 } from "@/lib/backups";
 
@@ -146,6 +148,15 @@ export function Backups() {
   function openDestination(id: string) {
     setView("destinations");
     setDrawer({ mode: "edit", id });
+  }
+
+  function retryRun(run: BackupRun) {
+    if (
+      (run.kind === "verify" || run.kind === "restore_drill") &&
+      run.destination_id
+    )
+      runCheck(run.kind, run.destination_id);
+    else runPolicy(run.policy_id ?? null);
   }
 
   function setTestingFor(id: string, on: boolean) {
@@ -270,6 +281,14 @@ export function Backups() {
         onEdit={(id) => setDrawer({ mode: "edit", id })}
         onTest={(id) => void testDestination(id)}
         onToggle={(id, enabled) => void toggleDestination(id, enabled)}
+      />
+    );
+  else if (view === "runs")
+    content = (
+      <BackupsRuns
+        destinations={data.destinations}
+        onOpenDestination={openDestination}
+        onRetry={retryRun}
       />
     );
   else if (view === "policies")
