@@ -190,7 +190,7 @@ describe("Backups page", () => {
         ),
       )
       .mockResolvedValueOnce(
-        new Response(new Blob(["age-encryption.org/v1"]), {
+        new Response(new TextEncoder().encode("age-encryption.org/v1"), {
           status: 200,
           headers: {
             "Content-Type": "application/octet-stream",
