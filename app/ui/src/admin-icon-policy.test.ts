@@ -113,6 +113,7 @@ const supportingScope = [
   "app/ui/src/components/backups/DestinationDrawer.tsx",
   "app/ui/src/components/backups/DestinationFields.tsx",
   "app/ui/src/components/backups/SnapshotsTab.tsx",
+  "app/ui/src/components/backups/BackupsPolicies.tsx",
 ];
 const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
   .map((name) => `app/ui/src/components/layout/${name}.tsx`)
@@ -405,6 +406,23 @@ const approvedLibraryControls = new Map<string, number>([
   ],
   ["app/ui/src/components/backups/BackupsOverview.tsx:./backup-ui:KindMark", 1],
   [
+    "app/ui/src/components/backups/BackupsPolicies.tsx:./RetentionStrip:RetentionStrip",
+    1,
+  ],
+  ["app/ui/src/components/backups/BackupsPolicies.tsx:./backup-ui:KindMark", 1],
+  [
+    "app/ui/src/components/backups/BackupsPolicies.tsx:@/components/ui/AdminSelect:AdminSelect",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/BackupsPolicies.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/BackupsPolicies.tsx:@crate/ui/primitives/Checkbox:Checkbox",
+    1,
+  ],
+  [
     "app/ui/src/components/backups/DestinationDrawer.tsx:./DestinationFields:B2Credentials",
     1,
   ],
@@ -485,6 +503,10 @@ const approvedLibraryControls = new Map<string, number>([
     1,
   ],
   [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/BackupsPolicies:BackupsPolicies",
+    1,
+  ],
+  [
     "app/ui/src/pages/Backups.tsx:@/components/backups/DestinationDrawer:DestinationDrawer",
     1,
   ],
@@ -502,7 +524,7 @@ const approvedLibraryControls = new Map<string, number>([
   ],
   [
     "app/ui/src/pages/Backups.tsx:@crate/ui/primitives/ErrorState:ErrorState",
-    1,
+    2,
   ],
   // End of Backups (BK5) compositions.
   // Smart Mix 3 plan, SM1.PR4: the track profile's phrase strip for gate SG1. A

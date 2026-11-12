@@ -11,6 +11,10 @@ import { Button } from "@crate/ui/shadcn/button";
 import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import { BackupsDestinations } from "@/components/backups/BackupsDestinations";
 import {
+  BackupsPolicies,
+  NEW_POLICY,
+} from "@/components/backups/BackupsPolicies";
+import {
   BackupsOverview,
   type CheckKind,
 } from "@/components/backups/BackupsOverview";
@@ -60,6 +64,7 @@ export function Backups() {
   const [drawer, setDrawer] = useState<DrawerTarget | null>(null);
   const [created, setCreated] = useState<BackupDestination | null>(null);
   const [testing, setTesting] = useState<ReadonlySet<string>>(new Set());
+  const [policyId, setPolicyId] = useState<string | null>(null);
 
   function refresh() {
     overview.refetch();
@@ -236,6 +241,17 @@ export function Backups() {
       </Button>
     );
 
+  if (view === "policies")
+    actions = (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setPolicyId(NEW_POLICY)}
+      >
+        New policy
+      </Button>
+    );
+
   let content: ReactNode;
   if (overview.loading && !data) content = <LoadingState variant="section" />;
   else if (!data)
@@ -254,6 +270,24 @@ export function Backups() {
         onEdit={(id) => setDrawer({ mode: "edit", id })}
         onTest={(id) => void testDestination(id)}
         onToggle={(id, enabled) => void toggleDestination(id, enabled)}
+      />
+    );
+  else if (view === "policies")
+    content = policies.data ? (
+      <BackupsPolicies
+        policies={policies.data}
+        overview={data}
+        selected={policyId}
+        onSelect={setPolicyId}
+        onChanged={refresh}
+      />
+    ) : policies.loading ? (
+      <LoadingState variant="section" />
+    ) : (
+      <ErrorState
+        title="Policies unavailable"
+        message={policies.error ?? "The policies could not be loaded."}
+        onRetry={policies.refetch}
       />
     );
   else

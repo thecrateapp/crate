@@ -180,6 +180,8 @@ export interface BackupPolicy {
   last_scheduled_at?: string | null;
   next_run?: string | null;
   destinations: Record<string, BackupTier[]>;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export type BackupRunKind =
@@ -542,21 +544,6 @@ export function policyLine(
 
 // ── retention estimate ──────────────────────────────────────────────
 
-/** Copies kept by a destination with these tiers under these counts. */
-export function copiesKept(
-  counts: Pick<
-    BackupLocalRetention,
-    "keep_daily" | "keep_weekly" | "keep_monthly"
-  >,
-  tiers: readonly BackupTier[] = TIERS,
-): number {
-  return (
-    (tiers.includes("daily") ? counts.keep_daily : 0) +
-    (tiers.includes("weekly") ? counts.keep_weekly : 0) +
-    (tiers.includes("monthly") ? counts.keep_monthly : 0)
-  );
-}
-
 /** How far back the oldest kept copy reaches, as words. */
 export function reachText(
   counts: Pick<
@@ -607,6 +594,33 @@ export function keptDays(
     }
   }
   return kept;
+}
+
+/**
+ * Distinct copies a destination keeps with these tiers: a copy that is both
+ * the day's and the week's counts once, as restic's --keep-* buckets do.
+ */
+export function keptCopies(
+  counts: Pick<
+    BackupLocalRetention,
+    "keep_daily" | "keep_weekly" | "keep_monthly"
+  >,
+  tiers: readonly BackupTier[],
+  today: Date,
+): number {
+  return keptDays(
+    {
+      keep_daily: tiers.includes("daily") ? counts.keep_daily : 0,
+      keep_weekly: tiers.includes("weekly") ? counts.keep_weekly : 0,
+      keep_monthly: tiers.includes("monthly") ? counts.keep_monthly : 0,
+    },
+    today,
+    Math.max(
+      counts.keep_daily,
+      counts.keep_weekly * 7,
+      counts.keep_monthly * 31,
+    ) + 31,
+  ).size;
 }
 
 // ── recovery kit ────────────────────────────────────────────────────

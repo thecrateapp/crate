@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  copiesKept,
   formatAgo,
   formatBackupBytes,
   formatSeconds,
+  keptCopies,
   keptDays,
   kindBadge,
   policyLine,
@@ -68,13 +68,21 @@ describe("backups helpers", () => {
 
   it("estimates retention", () => {
     const counts = { keep_daily: 7, keep_weekly: 4, keep_monthly: 3 };
-    expect(copiesKept(counts)).toBe(14);
-    expect(copiesKept(counts, ["weekly", "monthly"])).toBe(7);
     expect(reachText(counts)).toBe("about 3 months");
     const kept = keptDays(counts, new Date(2026, 10, 10));
     expect([...kept.values()].filter((t) => t === "daily")).toHaveLength(7);
     expect(kept.get(9)).toBe("weekly"); // Sunday 1 Nov
     expect(kept.get(10)).toBe("monthly"); // Saturday 31 Oct
+    expect(
+      keptCopies(
+        counts,
+        ["daily", "weekly", "monthly"],
+        new Date(2026, 10, 10),
+      ),
+    ).toBe(13);
+    expect(
+      keptCopies(counts, ["weekly", "monthly"], new Date(2026, 10, 10)),
+    ).toBe(7);
   });
 
   it("summarises a policy schedule", () => {
