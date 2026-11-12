@@ -13,9 +13,9 @@ export function networkSearchEligible(query: string): boolean {
 /**
  * The query to send to the network search, or null while there is none.
  *
- * The first query the page mounts with was submitted, so it goes at once.
- * Later changes reset to null and settle after the debounce, so quick changes
- * never open one network search each.
+ * The first eligible query since the page mounted was submitted, so it goes at
+ * once. Later changes reset to null and settle after the debounce, so quick
+ * changes never open one network search each.
  */
 export function useNetworkSearchQuery(
   query: string,
@@ -26,15 +26,19 @@ export function useNetworkSearchQuery(
   const [settled, setSettled] = useState<string | null>(() =>
     eligible ? trimmed : null,
   );
-  const firstRef = useRef(true);
+  const sentRef = useRef(false);
 
   useEffect(() => {
-    if (firstRef.current) {
-      firstRef.current = false;
-      if (eligible) return;
+    if (!eligible) {
+      setSettled(null);
+      return;
+    }
+    if (!sentRef.current) {
+      sentRef.current = true;
+      setSettled(trimmed);
+      return;
     }
     setSettled(null);
-    if (!eligible) return;
     const timer = setTimeout(
       () => setSettled(trimmed),
       NETWORK_SEARCH_DEBOUNCE_MS,

@@ -1,4 +1,5 @@
-import { apiSseUrl } from "@/lib/api";
+import { apiSseUrl, ensureMediaAccessUrl } from "@/lib/api";
+import { usesConfigurableServer } from "@/lib/platform";
 import type { SearchData } from "@/pages/search-results-model";
 
 export type NetworkSearchPeerStatus =
@@ -54,54 +55,69 @@ function parse<T>(event: Event): T | null {
 /**
  * Open one federated search (FED1.4). Returns a function that closes it.
  *
- * The server ends the stream with ``done``; the source is closed then, and on
- * any error, so EventSource never reconnects and repeats a search.
+ * Native shells authenticate SSE with a media ticket, so the URL waits for one
+ * before the source opens. The server ends the stream with ``done``; the
+ * source is closed then, and on any error, so EventSource never reconnects
+ * and repeats a search.
  */
 export function openNetworkSearchStream(
   query: string,
   handlers: NetworkSearchHandlers,
   limit = NETWORK_SEARCH_LIMIT,
 ): () => void {
-  const source = new EventSource(
-    apiSseUrl(networkSearchStreamPath(query, limit)),
-  );
+  const path = networkSearchStreamPath(query, limit);
+  let source: EventSource | null = null;
   let closed = false;
   let sawLocal = false;
   const close = () => {
     if (closed) return;
     closed = true;
-    source.close();
+    source?.close();
   };
-
-  source.addEventListener("local", (event) => {
-    const payload = parse<{ results: SearchData }>(event);
-    if (!payload || closed) return;
-    sawLocal = true;
-    handlers.onLocal(payload.results);
-  });
-  source.addEventListener("coverage", (event) => {
-    const payload = parse<NetworkSearchCoverage>(event);
-    if (payload && !closed) handlers.onCoverage(payload);
-  });
-  source.addEventListener("remote", (event) => {
-    const payload = parse<{
-      results: SearchData;
-      coverage: NetworkSearchCoverage;
-    }>(event);
-    if (payload && !closed)
-      handlers.onRemote(payload.results, payload.coverage);
-  });
-  source.addEventListener("done", (event) => {
-    const payload = parse<{ coverage: NetworkSearchCoverage }>(event);
-    if (closed) return;
-    close();
-    if (payload) handlers.onDone(payload.coverage);
-  });
-  source.onerror = () => {
+  const fail = () => {
     if (closed) return;
     close();
     handlers.onError(!sawLocal);
   };
+
+  const open = (url: string) => {
+    if (closed) return;
+    try {
+      source = new EventSource(url, {
+        withCredentials: !usesConfigurableServer,
+      });
+    } catch {
+      fail();
+      return;
+    }
+    source.addEventListener("local", (event) => {
+      const payload = parse<{ results: SearchData }>(event);
+      if (!payload || closed) return;
+      sawLocal = true;
+      handlers.onLocal(payload.results);
+    });
+    source.addEventListener("coverage", (event) => {
+      const payload = parse<NetworkSearchCoverage>(event);
+      if (payload && !closed) handlers.onCoverage(payload);
+    });
+    source.addEventListener("remote", (event) => {
+      const payload = parse<{
+        results: SearchData;
+        coverage: NetworkSearchCoverage;
+      }>(event);
+      if (payload && !closed)
+        handlers.onRemote(payload.results, payload.coverage);
+    });
+    source.addEventListener("done", (event) => {
+      const payload = parse<{ coverage: NetworkSearchCoverage }>(event);
+      if (closed) return;
+      close();
+      if (payload) handlers.onDone(payload.coverage);
+    });
+    source.onerror = fail;
+  };
+
+  ensureMediaAccessUrl(path, "sse").then(open, () => open(apiSseUrl(path)));
 
   return close;
 }

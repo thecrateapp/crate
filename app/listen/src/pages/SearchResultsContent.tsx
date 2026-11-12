@@ -37,6 +37,10 @@ export function SearchResultsContent({
   const { t } = useTranslation();
   const noLocalResults = searchDataIsEmpty(data);
   const withNetwork = networkSearchInvolved(network) ? network : null;
+  // Between the local results and the server's fan-out decision, an empty
+  // local result is not yet the final answer.
+  const networkDeciding =
+    network !== null && !network.unavailable && network.coverage === null;
   const networkEmptyAndDone =
     withNetwork !== null &&
     !networkStillSearching(withNetwork) &&
@@ -72,7 +76,9 @@ export function SearchResultsContent({
           onSearchAgain={searchAgain}
         />
       ) : null}
-      {noLocalResults && !withNetwork ? <SearchNoResultsState /> : null}
+      {noLocalResults && !withNetwork && !networkDeciding ? (
+        <SearchNoResultsState />
+      ) : null}
       {noLocalResults && networkEmptyAndDone ? (
         <SearchNoResultsState
           message={networkCoverageSummary(withNetwork, t)}

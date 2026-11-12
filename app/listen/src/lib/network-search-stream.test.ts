@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/api", () => ({
+  apiSseUrl: (path: string) => path,
+  ensureMediaAccessUrl: vi.fn(async (path: string) => path + "&media_ticket=t"),
+}));
+
 import {
   networkSearchStreamPath,
   openNetworkSearchStream,
@@ -9,12 +14,14 @@ import {
 class FakeEventSource {
   static last: FakeEventSource | null = null;
   url: string;
+  options: EventSourceInit | undefined;
   closed = false;
   onerror: (() => void) | null = null;
   listeners = new Map<string, (event: MessageEvent<string>) => void>();
 
-  constructor(url: string) {
+  constructor(url: string, options?: EventSourceInit) {
     this.url = url;
+    this.options = options;
     FakeEventSource.last = this;
   }
 
@@ -48,17 +55,25 @@ function handlers(): NetworkSearchHandlers {
 
 describe("openNetworkSearchStream", () => {
   beforeEach(() => {
+    FakeEventSource.last = null;
     vi.stubGlobal("EventSource", FakeEventSource);
   });
+
+  async function opened(): Promise<FakeEventSource> {
+    await vi.waitFor(() => expect(FakeEventSource.last).not.toBeNull());
+    return FakeEventSource.last!;
+  }
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("asks the streamed search endpoint", () => {
+  it("asks the streamed search endpoint with a media ticket", async () => {
     openNetworkSearchStream("joy division", handlers(), 20);
 
-    const url = new URL(FakeEventSource.last!.url, "https://listen.test");
+    const source = await opened();
+    const url = new URL(source.url, "https://listen.test");
+    expect(url.searchParams.get("media_ticket")).toBe("t");
     expect(url.pathname).toBe("/api/catalog/search-stream");
     expect(url.searchParams.get("q")).toBe("joy division");
     expect(url.searchParams.get("limit")).toBe("20");
@@ -67,10 +82,10 @@ describe("openNetworkSearchStream", () => {
     );
   });
 
-  it("delivers each event and closes on done", () => {
+  it("delivers each event and closes on done", async () => {
     const on = handlers();
     openNetworkSearchStream("joy", on);
-    const source = FakeEventSource.last!;
+    const source = await opened();
 
     source.emit("local", {
       query: "joy",
@@ -91,10 +106,10 @@ describe("openNetworkSearchStream", () => {
     expect(source.closed).toBe(true);
   });
 
-  it("closes on error so the browser never repeats the search", () => {
+  it("closes on error so the browser never repeats the search", async () => {
     const on = handlers();
     openNetworkSearchStream("joy", on);
-    const source = FakeEventSource.last!;
+    const source = await opened();
     source.emit("local", { results: { artists: [], albums: [], tracks: [] } });
 
     source.onerror!();
@@ -105,12 +120,21 @@ describe("openNetworkSearchStream", () => {
     expect(on.onError).toHaveBeenCalledWith(false);
   });
 
-  it("reports an error before local results so the page can fall back", () => {
+  it("reports an error before local results so the page can fall back", async () => {
     const on = handlers();
     openNetworkSearchStream("joy", on);
 
-    FakeEventSource.last!.onerror!();
+    (await opened()).onerror!();
 
     expect(on.onError).toHaveBeenCalledWith(true);
+  });
+
+  it("never opens a source once closed", async () => {
+    const close = openNetworkSearchStream("joy", handlers());
+    close();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(FakeEventSource.last).toBeNull();
   });
 });

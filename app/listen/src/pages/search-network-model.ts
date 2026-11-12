@@ -60,7 +60,7 @@ export function networkCoverageSummary(
     return t("search.network.searching", { count: coverage.peers_total });
   }
   const parts: string[] = [];
-  if (searchDataIsEmpty(network.results)) {
+  if (searchDataIsEmpty(network.results) && coverage.peers_answered > 0) {
     parts.push(
       t("search.network.noResults", {
         answered: coverage.peers_answered,

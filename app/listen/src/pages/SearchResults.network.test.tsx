@@ -221,6 +221,41 @@ describe("SearchResults with network search", () => {
     ).toBeInTheDocument();
   });
 
+  it("does not count results from peers that never answered", async () => {
+    renderSearch("rare bootleg");
+    await waitFor(() => expect(streams).toHaveLength(1));
+    act(() => {
+      streams[0]!.handlers.onLocal(EMPTY);
+      streams[0]!.handlers.onDone(
+        coverage({
+          state: "partial",
+          peers_total: 1,
+          peers_failed: 1,
+          peers_pending: 0,
+        }),
+      );
+    });
+
+    expect(
+      await screen.findByText("1 peer did not answer."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No results in 0/)).not.toBeInTheDocument();
+  });
+
+  it("does not flash an empty state before the server decides", async () => {
+    renderSearch("rare bootleg");
+    await waitFor(() => expect(streams).toHaveLength(1));
+
+    act(() => streams[0]!.handlers.onLocal(EMPTY));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: 'Results for "rare bootleg"',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No music found")).not.toBeInTheDocument();
+  });
+
   it("says nothing about the network when it was not asked", async () => {
     renderSearch("joy division");
     await waitFor(() => expect(streams).toHaveLength(1));

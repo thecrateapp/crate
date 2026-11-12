@@ -61,11 +61,13 @@ function canonicalSearch(query: string, signal: AbortSignal) {
 export function useSearchResults(
   query: string,
   retryKey: number,
-  networkEnabled: boolean,
+  /** Null while the capabilities load: neither path starts until it is known. */
+  networkEnabled: boolean | null,
 ): SearchResultsState {
   const trimmed = query.trim();
-  const viaNetwork = networkEnabled && networkSearchEligible(trimmed);
-  const networkQuery = useNetworkSearchQuery(trimmed, networkEnabled);
+  const capabilityKnown = networkEnabled !== null;
+  const viaNetwork = networkEnabled === true && networkSearchEligible(trimmed);
+  const networkQuery = useNetworkSearchQuery(trimmed, networkEnabled === true);
   const [result, setResult] = useState<SearchResultsState["result"]>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -81,6 +83,10 @@ export function useSearchResults(
       return;
     }
     if (viaNetwork) return;
+    if (!capabilityKnown) {
+      setSearching(true);
+      return;
+    }
     setNetwork(null);
     const controller = new AbortController();
     setError(null);
@@ -97,7 +103,7 @@ export function useSearchResults(
         if (!controller.signal.aborted) setSearching(false);
       });
     return () => controller.abort();
-  }, [trimmed, retryKey, viaNetwork]);
+  }, [trimmed, retryKey, viaNetwork, capabilityKnown]);
 
   useEffect(() => {
     if (!viaNetwork) return;
