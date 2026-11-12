@@ -354,6 +354,7 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     playAll,
     addToQueue,
     jamQueueLocked,
+    queue,
   });
 
   const { actionsValue, progressValue, stateValue } = usePlayerContextValues({

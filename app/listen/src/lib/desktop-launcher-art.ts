@@ -14,7 +14,8 @@ import type { AlbumRouteInput, ArtistRouteInput } from "@/lib/library-routes";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 
 export const LAUNCHER_ART_SIZE = 256;
-const MAX_REMEMBERED_SOURCES = 256;
+// a full prewarm (300) plus a few searches
+const MAX_REMEMBERED_SOURCES = 512;
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 const KEY_PATTERN = /^(album|artist):[A-Za-z0-9._:-]{1,150}$/;
 
@@ -117,9 +118,14 @@ export const ON_DEMAND_PLAN: LauncherArtPlan = {
   priority: "high",
 };
 
-/** What the user plays: two at a time, low priority, in idle time. */
+const PREWARM_PLAN_CONCURRENCY = 2;
+
+/**
+ * What the user plays: low priority, in idle time, two at a time across all
+ * background runs together.
+ */
 export const PREWARM_PLAN: LauncherArtPlan = {
-  concurrency: 2,
+  concurrency: PREWARM_PLAN_CONCURRENCY,
   priority: "low",
   pause: idle,
 };
@@ -128,6 +134,26 @@ export const PREWARM_PLAN: LauncherArtPlan = {
 const AUTHORIZE_BATCH = 32;
 const MAX_STORED_KEYS = 4096;
 const stored = new Set<string>();
+
+/** Background (low priority) fetches across all runs, at most this many. */
+const BACKGROUND_SLOTS = PREWARM_PLAN_CONCURRENCY;
+let backgroundRunning = 0;
+const backgroundWaiters: Array<() => void> = [];
+
+async function acquireBackgroundSlot(): Promise<void> {
+  if (backgroundRunning < BACKGROUND_SLOTS) {
+    backgroundRunning += 1;
+    return;
+  }
+  // the releasing run hands its slot over directly
+  await new Promise<void>((resolve) => backgroundWaiters.push(resolve));
+}
+
+function releaseBackgroundSlot(): void {
+  const next = backgroundWaiters.shift();
+  if (next) next();
+  else backgroundRunning -= 1;
+}
 
 function idle(): Promise<void> {
   return new Promise((resolve) => {
@@ -305,14 +331,21 @@ export async function prefetchLauncherArt(
       if (signal?.aborted) return;
       await plan.pause?.();
       if (signal?.aborted) return;
-      if (inFlight.has(job.key) || stored.has(job.key)) continue;
-      inFlight.add(job.key);
+      const background = plan.priority === "low";
+      if (background) await acquireBackgroundSlot();
       try {
-        await fetchOne(job, deps, plan);
-      } catch {
-        // offline, expired session, undecodable image: no art this time
+        if (signal?.aborted) return;
+        if (inFlight.has(job.key) || stored.has(job.key)) continue;
+        inFlight.add(job.key);
+        try {
+          await fetchOne(job, deps, plan);
+        } catch {
+          // offline, expired session, undecodable image: no art this time
+        } finally {
+          inFlight.delete(job.key);
+        }
       } finally {
-        inFlight.delete(job.key);
+        if (background) releaseBackgroundSlot();
       }
     }
   };
@@ -360,4 +393,6 @@ export function resetLauncherArtForTests(): void {
   sources.clear();
   inFlight.clear();
   stored.clear();
+  backgroundRunning = 0;
+  backgroundWaiters.length = 0;
 }

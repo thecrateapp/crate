@@ -24,7 +24,7 @@ import {
   fetchAlbumTracks,
   fetchArtistTopTracks,
 } from "@/components/actions/shared";
-import { api, ensureMediaAccessUrl } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   DesktopControlError,
   playDesktopRef,
@@ -33,12 +33,10 @@ import {
   type DesktopPlayDeps,
 } from "@/lib/desktop-control-search";
 import {
-  findLoadedImage,
   prefetchLauncherArt,
   rememberLauncherArtSource,
-  squareJpeg,
-  type LauncherArtDeps,
 } from "@/lib/desktop-launcher-art";
+import { LAUNCHER_ART_DEPS } from "@/lib/desktop-launcher-art-runtime";
 import { isTauriRuntime } from "@/lib/platform";
 import { resolveRemotePlayableTrack } from "@/lib/remote-track-playback";
 
@@ -62,16 +60,6 @@ const playDeps = (): DesktopPlayDeps => ({
   fetchAlbumTracks,
   fetchArtistTopTracks,
 });
-
-export const LAUNCHER_ART_DEPS: LauncherArtDeps = {
-  authorize: (url) => ensureMediaAccessUrl(url, "artwork"),
-  fetch: (url, init) => fetch(url, init),
-  loadedImage: (url) => findLoadedImage(url),
-  toSquare: squareJpeg,
-  store: (key, bytes) =>
-    window.__crateTauriInvoke?.("store_launcher_art", { key, bytes }) ??
-    Promise.resolve(false),
-};
 
 interface DesktopControlReplyResult {
   delivered?: boolean;

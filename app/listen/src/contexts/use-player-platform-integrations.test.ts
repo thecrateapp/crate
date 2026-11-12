@@ -6,12 +6,14 @@ import type { Track } from "@/contexts/player-types";
 import { usePlayerPlatformIntegrations } from "./use-player-platform-integrations";
 
 const {
+  useLauncherArtPrewarm,
   useDesktopControlBridge,
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
   useMediaSession,
   usePlayerShortcuts,
 } = vi.hoisted(() => ({
+  useLauncherArtPrewarm: vi.fn(),
   useDesktopControlBridge: vi.fn(),
   useDesktopTrayCommands: vi.fn(),
   useDesktopTrayNowPlaying: vi.fn(),
@@ -24,6 +26,7 @@ vi.mock("./use-desktop-tray-commands", () => ({
   useDesktopTrayNowPlaying,
 }));
 vi.mock("./use-desktop-control-bridge", () => ({ useDesktopControlBridge }));
+vi.mock("./use-launcher-art-prewarm", () => ({ useLauncherArtPrewarm }));
 vi.mock("./use-media-session", () => ({ useMediaSession }));
 vi.mock("./use-player-shortcuts", () => ({ usePlayerShortcuts }));
 
@@ -71,6 +74,7 @@ describe("usePlayerPlatformIntegrations", () => {
         isPlayingRef,
         jamQueueLocked: false,
         lastNonZeroVolume: 0.8,
+        queue: [currentTrack],
         repeat: "all",
         shuffle: true,
         volume: 0.5,
@@ -114,6 +118,10 @@ describe("usePlayerPlatformIntegrations", () => {
       shuffle: true,
       toggleShuffle: actions.toggleShuffle,
       volume: 0.5,
+    });
+    expect(useLauncherArtPrewarm).toHaveBeenCalledWith({
+      currentTrack,
+      queue: [currentTrack],
     });
     expect(useMediaSession).toHaveBeenCalledWith({
       currentTime: 12,

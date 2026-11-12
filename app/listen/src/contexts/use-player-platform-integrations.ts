@@ -4,6 +4,7 @@ import type { PlayerActionsValue } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
 
 import { useDesktopControlBridge } from "./use-desktop-control-bridge";
+import { useLauncherArtPrewarm } from "./use-launcher-art-prewarm";
 import {
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
@@ -36,6 +37,7 @@ interface PlayerPlatformIntegrationsInput extends PlayerPlatformActions {
   isPlaying: boolean;
   isPlayingRef: MutableRefObject<boolean>;
   lastNonZeroVolume: number;
+  queue: readonly Track[];
   volume: number;
 }
 
@@ -60,6 +62,7 @@ export function usePlayerPlatformIntegrations({
   setRepeatMode,
   play,
   playAll,
+  queue,
   volume,
 }: PlayerPlatformIntegrationsInput) {
   usePlayerShortcuts({
@@ -98,6 +101,8 @@ export function usePlayerPlatformIntegrations({
     toggleShuffle,
     volume,
   });
+
+  useLauncherArtPrewarm({ currentTrack, queue });
 
   useMediaSession({
     currentTime,

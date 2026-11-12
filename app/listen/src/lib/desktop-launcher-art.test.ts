@@ -293,4 +293,26 @@ describe("launcher art", () => {
     );
     expect(d.fetch).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps all background runs together at two fetches", async () => {
+    const keys = rememberAlbums(8);
+    let running = 0;
+    let peak = 0;
+    const d = deps({
+      fetch: vi.fn(async () => {
+        running += 1;
+        peak = Math.max(peak, running);
+        await new Promise((resolve) => setTimeout(resolve, 3));
+        running -= 1;
+        return okImage();
+      }),
+    });
+    const plan = { ...PREWARM_PLAN, pause: () => Promise.resolve() };
+    await Promise.all([
+      prefetchLauncherArt(keys.slice(0, 4), d, plan),
+      prefetchLauncherArt(keys.slice(4), d, plan),
+    ]);
+    expect(peak).toBe(2);
+    expect(d.store).toHaveBeenCalledTimes(8);
+  });
 });
