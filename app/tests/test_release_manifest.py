@@ -53,6 +53,162 @@ def test_listen_change_only_selects_listen_image() -> None:
     assert detect_changed_images(["app/listen/src/App.tsx"]) == {"listen"}
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "app/web/src/content/blog/a-post.md",
+        "app/web/src/components/blog-viz/BlogFigure.astro",
+        "docs/technical/engineering-blog-visual-plan.md",
+    ],
+)
+def test_blog_changes_do_not_rebuild_the_agent(path: str) -> None:
+    assert release_manifest.detect_changed_agent_images([path]) == set()
+
+
+def test_blog_edit_preserves_every_other_image_including_agent() -> None:
+    previous = assemble_manifest(
+        release_sha=PREVIOUS_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=_previous_manifest(),
+        changed_digests={"agent": "sha256:" + "e" * 64},
+    )
+    paths = ["app/web/src/content/blog/a-post.md"]
+    selected = detect_changed_images(
+        paths
+    ) | release_manifest.detect_changed_agent_images(paths)
+    assert selected == {"site"}
+    manifest = assemble_manifest(
+        release_sha=RELEASE_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=previous,
+        changed_digests={name: "sha256:" + "f" * 64 for name in selected},
+    )
+    assert manifest["agent_images"] == previous["agent_images"]
+    assert {
+        name
+        for name in IMAGE_SPECS
+        if manifest["images"][name] != previous["images"][name]
+    } == {"site"}
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "expected"),
+    [
+        (
+            "jobs:\n  build-site:\n    steps:\n      - run: build old\n",
+            "jobs:\n  build-site:\n    steps:\n      - run: build new\n",
+            {"site"},
+        ),
+        (
+            "jobs:\n  build-worker:\n    uses: old\n",
+            "jobs:\n  build-worker:\n    uses: new\n",
+            {"worker"},
+        ),
+        (
+            "env:\n  REGISTRY: old\njobs:\n  build-site:\n    steps: []\n",
+            "env:\n  REGISTRY: new\njobs:\n  build-site:\n    steps: []\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        (
+            "jobs:\n  changes:\n    steps: []\n",
+            "jobs:\n  changes:\n    steps: [new]\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        (
+            "jobs:\n  promote-release:\n    steps: []\n",
+            "jobs:\n  promote-release:\n    steps: [new]\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        (
+            "jobs:\n  unknown:\n    steps: []\n",
+            "jobs:\n  unknown:\n    steps: [new]\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        ("", "jobs: {}\n", set(release_manifest.ALL_IMAGE_SPECS)),
+    ],
+)
+def test_workflow_changes_rebuild_only_affected_jobs_or_fail_closed(
+    before, after, expected
+):
+    assert release_manifest.detect_workflow_images(before, after) == expected
+
+
+def test_scoped_site_workflow_change_does_not_rebuild_other_images():
+    paths = [".github/workflows/build-images.yml", "app/web/Dockerfile"]
+    assert detect_changed_images(paths, workflow_images={"site"}) == {"site"}
+    assert (
+        release_manifest.detect_changed_agent_images(paths, workflow_images={"site"})
+        == set()
+    )
+
+
+def test_shared_workflow_alias_rebuilds_all_its_consumers():
+    before = "jobs:\n  build-site:\n    steps: &shared\n      - run: old\n  build-docs:\n    steps: *shared\n"
+    assert release_manifest.detect_workflow_images(
+        before, before.replace("run: old", "run: new")
+    ) == {"site", "docs"}
+    assert release_manifest.detect_workflow_images(before, before) == set()
+
+
+def test_detect_cli_scopes_git_workflow_diff_and_blog_changes(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    workflow = tmp_path / ".github/workflows/build-images.yml"
+    workflow.parent.mkdir(parents=True)
+    before = "jobs:\n  changes:\n    steps: []\n  build-site:\n    steps:\n      - run: old\n"
+    workflow.write_text(before)
+
+    def commit():
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.test",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+            cwd=tmp_path,
+            check=True,
+        )
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True
+        ).strip()
+
+    base = commit()
+    workflow.write_text(before.replace("run: old", "run: new"))
+    post = tmp_path / "app/web/src/content/blog/post.md"
+    post.parent.mkdir(parents=True)
+    post.write_text("A new post")
+    head = commit()
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/release_manifest.py"),
+            "detect",
+            "--base",
+            base,
+            "--head",
+            head,
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    outputs = dict(line.split("=", 1) for line in result.stdout.splitlines())
+    assert {name for name, value in outputs.items() if value == "true"} == {
+        "site",
+        "any",
+    }
+
+
 def test_cast_receiver_change_only_selects_receiver_image() -> None:
     assert detect_changed_images(["app/cast-receiver/src/App.tsx"]) == {"cast-receiver"}
 
@@ -138,6 +294,7 @@ def test_backend_change_selects_backend_compatibility_group() -> None:
         ("app/listen/Dockerfile.dockerignore", {"listen"}),
         ("app/cast-receiver/Dockerfile.dockerignore", {"cast-receiver"}),
         (".github/workflows/build-images.yml", set(IMAGE_SPECS)),
+        (".github/workflows/build-image.yml", set(IMAGE_SPECS)),
     ],
 )
 def test_change_classifier_covers_independent_build_inputs(
@@ -299,7 +456,9 @@ def test_sentry_releases_command_prints_release_and_projects(tmp_path: Path) -> 
 AGENT_DIGEST = f"sha256:{777:064x}"
 
 
-def test_any_change_rebuilds_the_agent_image_without_touching_fleet_detection() -> None:
+def test_non_website_source_changes_rebuild_agent_without_touching_fleet_detection() -> (
+    None
+):
     detect_agent = release_manifest.detect_changed_agent_images
     assert detect_changed_images(["docs/technical/operations.md"]) == {"docs"}
     assert detect_agent(["docs/technical/operations.md"]) == {"agent"}

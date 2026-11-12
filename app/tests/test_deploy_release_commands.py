@@ -428,6 +428,140 @@ def _agent_tooling(deploy: str) -> list[str]:
     return block[len("AGENT_TOOLING=(") : block.index(")")].split()
 
 
+@pytest.mark.parametrize(
+    ("changed", "old_image", "refresh"),
+    [
+        ("crate-site\n", "official@sha256:same", False),
+        ("crate-site\ncrate-docs\n", "official@sha256:same", False),
+        ("crate-site\n", "official@sha256:old", True),
+        ("crate-api\n", "official@sha256:same", True),
+    ],
+)
+def test_website_release_skips_operator_refresh_only_with_unchanged_image(
+    tmp_path, changed, old_image, refresh
+):
+    (tmp_path / ".env").write_text(
+        "CRATE_AGENT_IMAGE=official@sha256:same\nCRATE_RELEASE_SHA=new\n"
+    )
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / ".env").write_text(
+        f"CRATE_AGENT_IMAGE={old_image}\nCRATE_RELEASE_SHA=old\n"
+    )
+    (backup / "changed_services").write_text(changed)
+    env, log = _fake_docker(tmp_path)
+    env.update(
+        FAKE_RUNNING="crate-operator crate-operator-supervisor crate-provenance",
+        BACKUP_DIR=str(backup),
+    )
+    script = "COMPOSE=(docker compose)\nOPERATOR_OVERLAY=deploy/operator/compose.operator.yaml\n"
+    script += "\n".join(
+        _shell_function(name)
+        for name in (
+            "log",
+            "dc",
+            "env_file_value",
+            "env_value",
+            "refresh_running_agent",
+        )
+    )
+    subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", script + "\nrefresh_running_agent\n"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert (" up " in log.read_text()) is refresh
+
+
+@pytest.mark.parametrize("changed", [("site",), ("site", "docs")])
+def test_incremental_website_deploy_starts_only_the_changed_web_services(
+    tmp_path, changed
+):
+    spec = importlib.util.spec_from_file_location(
+        "website_release_fixture", ROOT / "scripts/release_manifest.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    previous = {
+        "schema_version": 1,
+        "release_sha": "a" * 40,
+        "images": {
+            name: {
+                "repository": f"ghcr.io/thecrateapp/{entry.repository}",
+                "digest": f"sha256:{index:064x}",
+                "source_sha": "a" * 40,
+                "environment": entry.environment,
+                "services": list(entry.services),
+            }
+            for index, (name, entry) in enumerate(module.ALL_IMAGE_SPECS.items(), 1)
+            if name != "agent"
+        },
+    }
+    candidate = module.assemble_manifest(
+        release_sha="b" * 40,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=previous,
+        changed_digests={name: "sha256:" + "f" * 64 for name in changed},
+    )
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    staging = tmp_path / ".deploy"
+    staging.mkdir()
+    for path, content in [
+        (backup / ".env", module.render_release_env(previous)),
+        (tmp_path / ".env", module.render_release_env(previous)),
+        (staging / "release.env.candidate", module.render_release_env(candidate)),
+    ]:
+        path.write_text(content)
+    for name in ("docker-compose.yaml", "docker-compose.project.yaml"):
+        (tmp_path / name).write_text("services: {}\n")
+        (backup / name).write_text("services: {}\n")
+    env, log = _fake_docker(tmp_path)
+    env.update(
+        BACKUP_DIR=str(backup), FAKE_RUNNING="crate-api crate-worker crate-operator"
+    )
+    remote = (ROOT / "scripts/deploy-remote.sh").read_text()
+    arrays = remote[remote.index("PROJECT_SERVICES=(") : remote.index("\nlog() {")]
+    shell = "IMAGE_PREFIX=ghcr.io/thecrateapp\nCOMPOSE=(docker compose)\n" + arrays
+    shell += "\n".join(
+        _shell_function(name)
+        for name in (
+            "log",
+            "dc",
+            "env_file_value",
+            "env_value",
+            "record_changed_release_services",
+            "cmd_up",
+        )
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            shell + "\nrecord_changed_release_services\ncmd_up\n",
+        ],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert set((backup / "changed_services").read_text().splitlines()) == {
+        f"crate-{name}" for name in changed
+    }
+    up = next(line for line in log.read_text().splitlines() if " up " in line)
+    assert up.split()[up.split().index("--no-deps") + 1 :] == sorted(
+        f"crate-{name}" for name in changed
+    )
+
+
 def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
     deploy = (ROOT / "scripts/deploy.sh").read_text()
     tooling = _agent_tooling(deploy)

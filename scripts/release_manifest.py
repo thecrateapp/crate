@@ -18,8 +18,11 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 GLOBAL_BUILD_PATTERNS = (
     ".github/workflows/build-images.yml",
+    ".github/workflows/build-image.yml",
     ".github/actions/**",
 )
+BUILD_WORKFLOW = ".github/workflows/build-images.yml"
+BLOG_BUILD_PATTERNS = ("app/web/**", "docs/technical/engineering-blog*.md")
 
 
 @dataclass(frozen=True)
@@ -129,7 +132,8 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
 }
 
 # Agent images are optional manifest entries outside the provenance-bound fleet.
-# The Crate Agent image bakes the release context, so every change rebuilds it.
+# The Crate Agent image bakes source context. Website/editorial-only releases
+# reuse it; managed hosts activate the exact new context separately at deploy.
 AGENT_IMAGE_SPECS: dict[str, ImageSpec] = {
     "agent": ImageSpec(
         repository="crate-agent",
@@ -170,7 +174,10 @@ def _requested_images(requested: str) -> set[str]:
 
 
 def _detect(
-    specs: dict[str, ImageSpec], paths: Iterable[str], requested: str | None
+    specs: dict[str, ImageSpec],
+    paths: Iterable[str],
+    requested: str | None,
+    workflow_images: set[str] | None = None,
 ) -> set[str]:
     if requested:
         return _requested_images(requested) & set(specs)
@@ -179,27 +186,103 @@ def _detect(
         for path in paths
         if path.strip()
     ]
+    scoped_workflow = workflow_images is not None and BUILD_WORKFLOW in normalized_paths
+    if scoped_workflow:
+        normalized_paths.remove(BUILD_WORKFLOW)
     if any(_matches(path, GLOBAL_BUILD_PATTERNS) for path in normalized_paths):
         return set(specs)
-    return {
+    selected = {
         name
         for name, spec in specs.items()
         if any(_matches(path, spec.patterns) for path in normalized_paths)
     }
+    if scoped_workflow:
+        selected.update(workflow_images & set(specs))
+    return selected
 
 
 def detect_changed_images(
-    paths: Iterable[str], *, requested: str | None = None
+    paths: Iterable[str],
+    *,
+    requested: str | None = None,
+    workflow_images: set[str] | None = None,
 ) -> set[str]:
     if requested:
         _requested_images(requested)
-    return _detect(IMAGE_SPECS, paths, requested)
+    return _detect(IMAGE_SPECS, paths, requested, workflow_images)
 
 
 def detect_changed_agent_images(
-    paths: Iterable[str], *, requested: str | None = None
+    paths: Iterable[str],
+    *,
+    requested: str | None = None,
+    workflow_images: set[str] | None = None,
 ) -> set[str]:
-    return _detect(AGENT_IMAGE_SPECS, paths, requested)
+    paths = [
+        path
+        for path in paths
+        if not _matches(path.removeprefix("./"), BLOG_BUILD_PATTERNS)
+    ]
+    return _detect(AGENT_IMAGE_SPECS, paths, requested, workflow_images)
+
+
+def _workflow_sections(text: str) -> tuple[dict, dict]:
+    # Only workflow comparison needs YAML; manifest validation on production
+    # hosts remains stdlib-only. Safe loading also expands aliases so an edited
+    # shared step selects every build job that consumes it.
+    import yaml
+
+    try:
+        workflow = yaml.safe_load(text)
+    except yaml.YAMLError as error:
+        raise ValueError("Unreadable workflow") from error
+    if not isinstance(workflow, dict):
+        raise ValueError("No workflow mapping")
+    jobs = workflow.pop("jobs", None)
+    if not isinstance(jobs, dict) or not jobs:
+        raise ValueError("No jobs mapping")
+    if any(
+        not isinstance(name, str) or not isinstance(job, dict)
+        for name, job in jobs.items()
+    ):
+        raise ValueError("Unrecognized job")
+    return workflow, jobs
+
+
+def detect_workflow_images(before: str, after: str) -> set[str]:
+    """Scope build-job edits; shared/unknown changes still rebuild everything."""
+    all_images = set(ALL_IMAGE_SPECS)
+    try:
+        old_common, old_jobs = _workflow_sections(before)
+        new_common, new_jobs = _workflow_sections(after)
+    except (ImportError, ValueError):
+        return all_images
+    if old_common != new_common:
+        return all_images
+    selected = set()
+    for job in old_jobs.keys() | new_jobs.keys():
+        if old_jobs.get(job) == new_jobs.get(job):
+            continue
+        image = job.removeprefix("build-")
+        if not job.startswith("build-") or image not in ALL_IMAGE_SPECS:
+            return all_images
+        selected.add(image)
+    return selected
+
+
+def _git_workflow_images(base: str, head: str) -> set[str]:
+    try:
+        versions = [
+            subprocess.check_output(
+                ["git", "show", f"{revision}:{BUILD_WORKFLOW}"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+            for revision in (base, head)
+        ]
+    except subprocess.CalledProcessError:
+        return set(ALL_IMAGE_SPECS)
+    return detect_workflow_images(*versions)
 
 
 def _expected_repository(registry: str, owner: str, spec: ImageSpec) -> str:
@@ -512,7 +595,14 @@ def main() -> int:
             ) | detect_changed_agent_images([], requested=args.requested)
         elif args.base:
             paths = _git_changed_paths(args.base, args.head)
-            selected = detect_changed_images(paths) | detect_changed_agent_images(paths)
+            workflow_images = (
+                _git_workflow_images(args.base, args.head)
+                if BUILD_WORKFLOW in paths
+                else None
+            )
+            selected = detect_changed_images(
+                paths, workflow_images=workflow_images
+            ) | detect_changed_agent_images(paths, workflow_images=workflow_images)
         else:
             selected = set(ALL_IMAGE_SPECS)
         for name in ALL_IMAGE_SPECS:
