@@ -34,6 +34,8 @@ use tauri_plugin_window_state::StateFlags;
 
 #[cfg(desktop)]
 mod desktop_control;
+#[cfg(desktop)]
+mod desktop_launcher_art;
 #[cfg(target_os = "linux")]
 mod desktop_mcp;
 #[cfg(all(desktop, any(target_os = "linux", test)))]
@@ -748,11 +750,40 @@ fn update_desktop_control_state(state: serde_json::Value) -> Result<(), String> 
 }
 
 /// Listen's answer to a control-socket `search`, for the client that asked.
+///
+/// Items carry an internal `art_key`; it becomes `art` (a cached image path)
+/// when the image is on disk. `missingArt` lists the keys Listen should fetch
+/// and hand to `store_launcher_art`, so a later search shows them.
 #[cfg(desktop)]
 #[tauri::command]
-fn desktop_control_reply(request: u64, items: serde_json::Value) -> Result<bool, String> {
+fn desktop_control_reply(
+    request: u64,
+    items: serde_json::Value,
+) -> Result<DesktopControlReplyResult, String> {
+    let mut items = items;
+    let root = desktop_launcher_art::cache_root();
+    let (hits, missing_art) = desktop_launcher_art::resolve_items(root.as_deref(), &mut items);
+    desktop_control::normalize_result_items(&mut items);
     let line = desktop_control::result_line(request, &items)?;
-    Ok(desktop_control::reply(request, line))
+    let delivered = desktop_control::reply(request, line);
+    if !hits.is_empty() {
+        // LRU bookkeeping off the reply path
+        let _ = std::thread::Builder::new()
+            .name("crate-launcher-art-touch".into())
+            .spawn(move || desktop_launcher_art::touch(&hits));
+    }
+    Ok(DesktopControlReplyResult {
+        delivered,
+        missing_art,
+    })
+}
+
+#[cfg(desktop)]
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopControlReplyResult {
+    delivered: bool,
+    missing_art: Vec<String>,
 }
 
 /// Listen's outcome for a control-socket command it confirms (`queue_item`):
@@ -761,6 +792,24 @@ fn desktop_control_reply(request: u64, items: serde_json::Value) -> Result<bool,
 #[tauri::command]
 fn desktop_control_done(request: u64, error: Option<String>) -> bool {
     desktop_control::confirm(request, error.map_or(Ok(()), Err))
+}
+
+/// A launcher image (a square 256 px JPEG, PNG or WebP) that Listen fetched
+/// for an `art_key` reported as missing. Written atomically off the main
+/// thread; the cache is pruned afterwards.
+#[cfg(desktop)]
+#[tauri::command]
+async fn store_launcher_art(key: String, bytes: Vec<u8>) -> Result<bool, String> {
+    let Some(root) = desktop_launcher_art::cache_root() else {
+        return Ok(false);
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        desktop_launcher_art::store(&root, &key, &bytes)?;
+        desktop_launcher_art::prune_if_due(&root);
+        Ok(true)
+    })
+    .await
+    .map_err(|_| "art writer stopped".to_string())?
 }
 
 /// The Linux desktop profile (compositor, tiling, Ryoku) for the frontend, which
@@ -1523,6 +1572,7 @@ pub fn run() {
             update_desktop_control_state,
             desktop_control_reply,
             desktop_control_done,
+            store_launcher_art,
             register_deep_link_listener,
             offline_storage::register_offline_transfer,
             offline_storage::cancel_offline_transfer,
@@ -1628,6 +1678,28 @@ mod tests {
     };
     #[cfg(target_os = "linux")]
     use super::{linux_artwork_cache_root, LinuxWindowBoundsUpdateState};
+
+    #[test]
+    fn control_reply_strips_art_keys_and_reports_what_to_fetch() {
+        let items = serde_json::json!([
+            {"kind": "album", "title": "A", "art_key": "album:launcher-art-test-never-cached",
+             "art": "https://example.invalid/cover?media_ticket=secret"},
+            {"kind": "track", "title": "T", "art_key": "album:launcher-art-test-never-cached",
+             "duration": 61.4}
+        ]);
+        // no socket client asked for request 0, so nothing is delivered
+        let result = super::desktop_control_reply(0, items).unwrap();
+        assert!(!result.delivered);
+        if super::desktop_launcher_art::cache_root().is_some() {
+            assert_eq!(
+                result.missing_art,
+                vec!["album:launcher-art-test-never-cached"]
+            );
+        } else {
+            assert!(result.missing_art.is_empty());
+        }
+        assert!(super::desktop_control_reply(0, serde_json::json!({})).is_err());
+    }
 
     #[test]
     fn control_done_without_a_waiting_command_is_ignored() {

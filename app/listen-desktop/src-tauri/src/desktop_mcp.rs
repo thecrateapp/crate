@@ -330,7 +330,7 @@ fn handle(request: &Value) -> Option<Value> {
 //
 // Ryoku's launcher (and rofi) run it as `<keyword> <query>`: pass 1 gets the
 // query in ROFI_INFO (ROFI_RETV=0) and prints one row per result as
-// `text\0icon\x1f<name>\x1finfo\x1f<ref json>`; picking a row runs it again with
+// `text\0icon\x1f<name or image path>\x1finfo\x1f<ref json>`; picking a row runs it again with
 // ROFI_RETV=1 and that row's info, and the result plays.
 
 const START_INFO: &str = "__start__";
@@ -366,9 +366,13 @@ fn launcher_rows(items: &Value) -> String {
         } else {
             format!("{} · {}", row_text(title), row_text(subtitle))
         };
+        // a cached cover or photo when Crate has one, else a themed icon
+        let icon = item["art"]
+            .as_str()
+            .filter(|art| art.starts_with('/') && !art.contains(['\n', '\x1f']))
+            .unwrap_or_else(|| icon_for(kind));
         out.push_str(&format!(
-            "{text}\0icon\x1f{}\x1finfo\x1f{}\n",
-            icon_for(kind),
+            "{text}\0icon\x1f{icon}\x1finfo\x1f{}\n",
             item["ref"]
         ));
     }
@@ -450,6 +454,20 @@ mod tests {
             "Pronto · Repion · 2024\0icon\x1fmedia-optical-cd-audio\x1finfo\x1f{\"album\":{\"album\":\"Pronto\"},\"kind\":\"album\"}"
         );
         assert!(lines[1].starts_with("Bad Title\0icon\x1faudio-x-generic"));
+    }
+
+    #[test]
+    fn launcher_rows_use_cached_art_as_the_icon() {
+        let items = json!([
+            {"kind": "album", "title": "Pronto", "art": "/home/u/.cache/crate/launcher-art/ab-256.jpg", "ref": {"kind": "album"}},
+            {"kind": "artist", "title": "Repion", "art": "", "ref": {"kind": "artist"}},
+            {"kind": "track", "title": "T", "art": "relative.jpg", "ref": {"kind": "track"}}
+        ]);
+        let rows = launcher_rows(&items);
+        let lines: Vec<_> = rows.lines().collect();
+        assert!(lines[0].contains("\0icon\x1f/home/u/.cache/crate/launcher-art/ab-256.jpg\x1finfo"));
+        assert!(lines[1].contains("\0icon\x1favatar-default\x1f"));
+        assert!(lines[2].contains("\0icon\x1faudio-x-generic\x1f"));
     }
 
     #[test]
