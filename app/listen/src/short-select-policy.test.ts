@@ -38,6 +38,12 @@ const DYNAMIC_SELECTS: Record<string, string> = {
     "Path prefixes are those of the predefined origins (OPENAI_COMPATIBLE_PATH_PREFIXES), the closed list the API accepts; categorical form field.",
   "app/ui/src/components/ai-models/OpenAICompatibleFields.tsx:AdminSelect:draft.reasoning":
     "Reasoning controls depend on the chosen origin template's API.",
+  "app/ui/src/components/backups/BackupsPolicies.tsx:AdminSelect:drillSource":
+    "Restore drill sources are the policy's usable destinations from the backups overview API, plus rotation; categorical form field.",
+  "app/ui/src/components/backups/BackupsRuns.tsx:AdminSelect:filters.destination":
+    "Destinations are user-managed records returned by the backups overview API.",
+  "app/ui/src/components/backups/DestinationFields.tsx:AdminSelect:draft.preset":
+    "S3 presets come from the S3_PRESETS provider catalogue shared with the destination form; categorical form field.",
   "app/ui/src/pages/Browse.tsx:AdminSelect:genre":
     "The catalog supplies available genres; their cardinality is not a UI constant.",
   "app/ui/src/pages/Browse.tsx:AdminSelect:country":

@@ -101,6 +101,20 @@ const supportingScope = [
   "app/ui/src/components/errors/TriagePanel.tsx",
   "app/ui/src/components/errors/TriageSettingsForm.tsx",
   "app/ui/src/components/system-health/ErrorsTile.tsx",
+  // Backups (BK5): text actions; Solar kind glyphs (BG1-2), Copy, Edit and
+  // disclosure chevrons are the only glyph sites.
+  "app/ui/src/pages/Backups.tsx",
+  "app/ui/src/components/backups/backup-ui.tsx",
+  "app/ui/src/components/backups/BackupsOverview.tsx",
+  "app/ui/src/components/backups/RecoveryKit.tsx",
+  "app/ui/src/components/backups/RepositorySizeChart.tsx",
+  "app/ui/src/components/backups/RunMenus.tsx",
+  "app/ui/src/components/backups/BackupsDestinations.tsx",
+  "app/ui/src/components/backups/DestinationDrawer.tsx",
+  "app/ui/src/components/backups/DestinationFields.tsx",
+  "app/ui/src/components/backups/SnapshotsTab.tsx",
+  "app/ui/src/components/backups/BackupsPolicies.tsx",
+  "app/ui/src/components/backups/BackupsRuns.tsx",
 ];
 const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
   .map((name) => `app/ui/src/components/layout/${name}.tsx`)
@@ -374,6 +388,159 @@ const approvedControls = new Map([
 // direct children and icon props remain independently audited, opaque spreads fail,
 // and each exact path/source/export may appear only this many times in source.
 const approvedLibraryControls = new Map<string, number>([
+  // Backups (BK5): reviewed compositions; each child glyph is audited at its own site.
+  [
+    "app/ui/src/components/backups/BackupsDestinations.tsx:./backup-ui:KindMark",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/BackupsDestinations.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/BackupsOverview.tsx:./RecoveryKit:RecoveryKitWarning",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/BackupsOverview.tsx:./RepositorySizeChart:RepositorySizeChart",
+    1,
+  ],
+  ["app/ui/src/components/backups/BackupsOverview.tsx:./backup-ui:KindMark", 1],
+  [
+    "app/ui/src/components/backups/BackupsPolicies.tsx:./RetentionStrip:RetentionStrip",
+    1,
+  ],
+  ["app/ui/src/components/backups/BackupsPolicies.tsx:./backup-ui:KindMark", 1],
+  [
+    "app/ui/src/components/backups/BackupsPolicies.tsx:@/components/ui/AdminSelect:AdminSelect",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/BackupsPolicies.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/BackupsPolicies.tsx:@crate/ui/primitives/Checkbox:Checkbox",
+    1,
+  ],
+  ["app/ui/src/components/backups/BackupsRuns.tsx:./backup-ui:CopyAction", 1],
+  [
+    "app/ui/src/components/backups/BackupsRuns.tsx:@/components/ui/AdminSelect:AdminSelect",
+    2,
+  ],
+  [
+    "app/ui/src/components/backups/BackupsRuns.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:./DestinationFields:B2Credentials",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:./DestinationFields:ConnectBlock",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:./DestinationFields:OAuthClientFields",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:./DestinationFields:PasteToken",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:./DestinationFields:S3Credentials",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:./DestinationFields:S3Fields",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:./DestinationFields:SftpKey",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:./SnapshotsTab:SnapshotsTab",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:./backup-ui:KindMark",
+    2,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationDrawer.tsx:@crate/ui/shadcn/sheet:SheetContent",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationFields.tsx:./backup-ui:CopyAction",
+    2,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationFields.tsx:./backup-ui:SecretField",
+    5,
+  ],
+  [
+    "app/ui/src/components/backups/DestinationFields.tsx:@/components/ui/AdminSelect:AdminSelect",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/RecoveryKit.tsx:@crate/ui/primitives/AppModal:AppModal",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/RepositorySizeChart.tsx:@/components/charts/InstrumentChart:InstrumentChartLegend",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/SnapshotsTab.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  [
+    "app/ui/src/components/backups/backup-ui.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/BackupsDestinations:BackupsDestinations",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/BackupsOverview:BackupsOverview",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/BackupsPolicies:BackupsPolicies",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/BackupsRuns:BackupsRuns",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/DestinationDrawer:DestinationDrawer",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/RecoveryKit:RecoveryKitDialog",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/RunMenus:CheckMenuButton",
+    2,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@/components/backups/RunMenus:RunNowButton",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Backups.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    2,
+  ],
+  // End of Backups (BK5) compositions.
   // Smart Mix 3 plan, SM1.PR4: the track profile's phrase strip for gate SG1. A
   // hand-built SVG instrument (rules and an energy lane) with no glyph and no button.
   [
@@ -1170,6 +1337,24 @@ const approvedLibraryControls = new Map<string, number>([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  // Backups (BK5): Solar kind marks (BG1-2), Copy, Edit and disclosure chevrons.
+  ["BackupsDestinations:backups-edit", ["@crate/ui/icons", "Pencil"]],
+  ["BackupsRuns:backups-run-collapse", ["@crate/ui/icons", "ChevronDown"]],
+  ["BackupsRuns:backups-run-expand", ["@crate/ui/icons", "ChevronRight"]],
+  [
+    "DestinationFields:backups-paste-token-collapse",
+    ["@crate/ui/icons", "ChevronDown"],
+  ],
+  [
+    "DestinationFields:backups-paste-token-expand",
+    ["@crate/ui/icons", "ChevronRight"],
+  ],
+  ["backup-ui:backup-kind-cloud-drive", ["@crate/ui/icons", "FolderCloud"]],
+  ["backup-ui:backup-kind-object-storage", ["@crate/ui/icons", "CloudStorage"]],
+  ["backup-ui:backup-kind-sftp", ["@crate/ui/icons", "ServerPath"]],
+  ["backup-ui:backup-kind-volume", ["@crate/ui/icons", "SsdRound"]],
+  ["backup-ui:backups-copy", ["@crate/ui/icons", "Copy"]],
+  // End of Backups (BK5) glyph sites.
   ["Errors:header-refresh", ["@crate/ui/icons", "RefreshCw"]],
   ["ListPagination:pagination-previous", ["lucide-react", "ChevronLeft"]],
   ["ListPagination:pagination-next", ["lucide-react", "ChevronRight"]],
