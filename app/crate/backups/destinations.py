@@ -237,13 +237,17 @@ def update_destination(
     secrets_changed = clean_secrets != stored
     new_ref = _store_credentials(clean_secrets) if secrets_changed else None
     try:
-        updated = update_backup_destination(
-            destination_id,
-            name=None if name is None else _name(name),
-            config=clean_config if config is not None else None,
-            enabled=enabled,
-            **({"secret_ref": new_ref} if secrets_changed else {}),
-        )
+        changes: dict[str, Any] = {
+            "name": None if name is None else _name(name),
+            "config": clean_config if config is not None else None,
+            "enabled": enabled,
+        }
+        if secrets_changed:
+            updated = update_backup_destination(
+                destination_id, secret_ref=new_ref, **changes
+            )
+        else:
+            updated = update_backup_destination(destination_id, **changes)
     except Exception:
         _revoke(new_ref)
         raise
