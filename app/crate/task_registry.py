@@ -59,6 +59,7 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "backup_dump": TaskTypeInfo("Database Backup", "library"),
     "backup_local_retention": TaskTypeInfo("Backup Retention", "library"),
     "backup_test_destination": TaskTypeInfo("Backup Destination Test", "library"),
+    "backup_probe_destination": TaskTypeInfo("Backup Settings Test", "library"),
     "backup_offsite": TaskTypeInfo("Off-site Backup Copy", "library"),
     "backup_verify": TaskTypeInfo("Backup Verification", "library"),
     "backup_restore_drill": TaskTypeInfo("Backup Restore Drill", "library"),

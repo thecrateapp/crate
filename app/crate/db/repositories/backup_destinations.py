@@ -17,6 +17,7 @@ from crate.db.queries.backup_destinations import DESTINATION_COLUMNS, valid_uuid
 from crate.db.tx import optional_scope
 
 MAX_ERROR_LENGTH = 2000
+MAX_CACHED_SNAPSHOTS = 500
 CHECK_STATUSES = frozenset({"untested", "ok", "failing", "unavailable"})
 _UNSET: Any = object()
 
@@ -148,12 +149,16 @@ def record_destination_check(
     repository_bytes: int | None = None,
     initialized: bool = False,
     config_updates: dict[str, Any] | None = None,
+    snapshots: list[dict[str, Any]] | None = None,
     session: Session | None = None,
 ) -> bool:
     """Store what a connection test or a copy learnt about a destination.
 
     ``config_updates`` merges facts the engine discovered into the configuration
     (the SFTP host key seen on first contact) without resetting the status.
+    ``snapshots`` replaces the cached listing (newest first, capped). The first
+    passing test of a destination enables it (BG1-11); later ones leave the
+    operator's choice alone.
     """
     if status not in CHECK_STATUSES:
         raise ValueError(f"Unknown destination status: {status!r}")
@@ -171,11 +176,19 @@ def record_destination_check(
                     last_checked_at = now(),
                     snapshot_count = COALESCE(:snapshot_count, snapshot_count),
                     repository_bytes = COALESCE(:repository_bytes, repository_bytes),
+                    enabled = CASE
+                        WHEN :initialized AND :status = 'ok'
+                             AND repository_initialized_at IS NULL
+                        THEN TRUE ELSE enabled END,
                     repository_initialized_at = CASE
                         WHEN :initialized
                         THEN COALESCE(repository_initialized_at, now())
                         ELSE repository_initialized_at END,
-                    config_json = config_json || CAST(:config_updates AS jsonb)
+                    config_json = config_json || CAST(:config_updates AS jsonb),
+                    snapshots_json = COALESCE(CAST(:snapshots AS jsonb), snapshots_json),
+                    snapshots_listed_at = CASE
+                        WHEN CAST(:snapshots AS jsonb) IS NULL THEN snapshots_listed_at
+                        ELSE now() END
                 WHERE id = CAST(:id AS uuid)
                 RETURNING id
                 """
@@ -188,6 +201,11 @@ def record_destination_check(
                 "repository_bytes": repository_bytes,
                 "initialized": initialized,
                 "config_updates": json.dumps(config_updates or {}),
+                "snapshots": (
+                    None
+                    if snapshots is None
+                    else json.dumps(snapshots[:MAX_CACHED_SNAPSHOTS], default=str)
+                ),
             },
         )
         return result.first() is not None

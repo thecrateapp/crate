@@ -260,6 +260,27 @@ def _handle_backup_test_destination(task_id: str, params: dict, config: dict) ->
     return {"destination_id": destination_id, "connection": result.to_dict()}
 
 
+def _handle_backup_probe_destination(task_id: str, params: dict, config: dict) -> dict:
+    """Test unsaved settings (BG1-9); they come from the ephemeral store, once."""
+    del config
+    from crate.backups import ephemeral
+    from crate.backups.connection import ConnectionResult, probe_unsaved
+
+    payload = ephemeral.take(str(params.get("probe_id") or ""))
+    if payload is None:
+        result = ConnectionResult(
+            "failing", "The unsaved settings expired; test the connection again"
+        )
+    else:
+        result = probe_unsaved(
+            str(payload.get("kind") or ""),
+            dict(payload.get("config") or {}),
+            dict(payload.get("secrets") or {}),
+            should_cancel=lambda: is_cancelled(task_id),
+        )
+    return {"connection": result.to_dict()}
+
+
 # ── policies (BK3) ──────────────────────────────────────────────────
 
 
@@ -372,6 +393,7 @@ def _handle_backup_offsite(task_id: str, params: dict, config: dict) -> dict:
             snapshot_count=result.snapshot_count,
             repository_bytes=result.repository_bytes,
             initialized=True,
+            snapshots=result.snapshots,
         )
     return {"run_id": run_id, **result.to_dict()}
 
@@ -418,7 +440,14 @@ def _handle_backup_verify(task_id: str, params: dict, config: dict) -> dict:
             finish_backup_run(run_id, status="failed", error=message)
             record_destination_check(destination_id, status="failing", error=message)
             return {"status": "failed", "error": message, "run_id": run_id}
+        snapshots = result.pop("snapshots", None)
         finish_backup_run(run_id, status="succeeded", details=result)
+        record_destination_check(
+            destination_id,
+            status="ok",
+            snapshot_count=result.get("snapshot_count"),
+            snapshots=snapshots,
+        )
     return {"run_id": run_id, **result}
 
 
@@ -542,6 +571,7 @@ BACKUP_TASK_HANDLERS = {
     "backup_dump": _handle_backup_dump,
     "backup_local_retention": _handle_backup_local_retention,
     "backup_test_destination": _handle_backup_test_destination,
+    "backup_probe_destination": _handle_backup_probe_destination,
     "backup_offsite": _handle_backup_offsite,
     "backup_verify": _handle_backup_verify,
     "backup_restore_drill": _handle_backup_restore_drill,

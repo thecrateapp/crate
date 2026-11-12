@@ -252,6 +252,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Test connection of a backup destination (BK2): asked from Admin, so priority 0
     # on the default queue; restic init plus a probe stay well under 15 minutes.
     "backup_test_destination": TaskPoolConfig("default", 0, 900, 0),
+    # Test of unsaved settings (BK4): the rclone probe only.
+    "backup_probe_destination": TaskPoolConfig("default", 0, 300, 0),
     # Backup policies (BK3): copies, verification and drills hold one destination's
     # lock each; the tick only reads and queues.
     "backup_offsite": TaskPoolConfig("maintenance", 2, 21600, 0),

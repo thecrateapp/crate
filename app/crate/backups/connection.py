@@ -32,9 +32,11 @@ from crate.backups.local import BackupCancelled, BackupError
 from crate.backups.restic import (
     ResticError,
     Runner,
+    compact_snapshots,
     list_snapshots,
     open_or_init,
     probe_remote,
+    remote_has_repository,
     repository_size,
     scrub,
     tools_available,
@@ -54,6 +56,7 @@ class ConnectionResult:
     snapshot_count: int | None = None
     repository_bytes: int | None = None
     learned: dict[str, Any] = field(default_factory=dict)
+    snapshots: list[dict[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -149,7 +152,9 @@ def check_destination(
             probe_remote(remote, work_dir=work_dir, should_cancel=should_cancel)
             if result.repository is None:
                 result.repository = open_or_init(runner)
-            result.snapshot_count = len(list_snapshots(runner))
+            listed = list_snapshots(runner)
+            result.snapshot_count = len(listed)
+            result.snapshots = compact_snapshots(listed)
             result.repository_bytes = repository_size(runner)
     except BackupCancelled:
         raise
@@ -179,7 +184,69 @@ def test_destination(
         repository_bytes=result.repository_bytes,
         initialized=result.status == "ok",
         config_updates=result.learned if result.status == "ok" else None,
+        snapshots=result.snapshots if result.status == "ok" else None,
     )
+    return result
+
+
+def probe_unsaved(
+    kind: str,
+    config: dict[str, Any],
+    secrets: dict[str, Any],
+    *,
+    should_cancel: Callable[[], bool] | None = None,
+) -> ConnectionResult:
+    """Test settings that are not saved yet (BG1-9), without storing anything.
+
+    The rclone probe writes, reads and deletes a file where the repository would
+    live, then looks for an existing restic repository there (``repository`` is
+    ``existing`` or ``empty``). restic itself needs the repository password, which
+    Crate generates only when the destination is saved, so the full test runs
+    after saving; its first pass enables the destination.
+    """
+    if tools_available():
+        return ConnectionResult(
+            "unavailable", "This worker has no rclone; use the standard image"
+        )
+    try:
+        clean_config, clean_secrets = providers.validate(kind, config, secrets)
+    except providers.DestinationError as exc:
+        return ConnectionResult("failing", str(exc))
+    if kind == "sftp":
+        return ConnectionResult(
+            "failing",
+            "Save the destination first: Crate generates its SSH key, and the "
+            "server must accept the public key before a test can pass",
+        )
+    spec = providers.provider(kind)
+    missing = spec.missing_secrets(clean_secrets)
+    if missing:
+        return ConnectionResult("failing", f"Missing: {', '.join(missing)}")
+    secret_values = [str(v) for v in clean_secrets.values()]
+    result = ConnectionResult("ok")
+    with tempfile.TemporaryDirectory(prefix="crate-probe-") as raw_dir:
+        work_dir = Path(raw_dir)
+        try:
+            remote = providers.rclone_remote(
+                kind,
+                clean_config,
+                clean_secrets,
+                backup_dir=backup_dir(),
+                work_dir=work_dir,
+            )
+            probe_remote(remote, work_dir=work_dir, should_cancel=should_cancel)
+            result.repository = (
+                "existing"
+                if remote_has_repository(
+                    remote, work_dir=work_dir, should_cancel=should_cancel
+                )
+                else "empty"
+            )
+        except BackupCancelled:
+            raise
+        except (ResticError, BackupError, OSError, providers.DestinationError) as exc:
+            result.status = "failing"
+            result.error = scrub(str(exc), secret_values)
     return result
 
 
@@ -189,6 +256,7 @@ test_destination.__test__ = False  # type: ignore[attr-defined]
 __all__ = [
     "ConnectionResult",
     "check_destination",
+    "probe_unsaved",
     "learned_host_key",
     "open_destination",
     "test_destination",

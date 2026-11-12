@@ -98,6 +98,13 @@ class BackupDestination(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+    # Since migration 165 (BK4): the worker's last snapshot listing.
+    snapshots_json: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default="[]"
+    )
+    snapshots_listed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
 
 class BackupPolicy(Base):
