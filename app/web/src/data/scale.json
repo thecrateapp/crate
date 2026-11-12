@@ -1,12 +1,12 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 9045,
+  "pytest": 9088,
   "vitest": 7327,
   "goTests": 435,
   "rustTests": 371,
-  "taskTypes": 164,
-  "migrations": 162,
+  "taskTypes": 165,
+  "migrations": 163,
   "taskQueues": {
     "ai": [
       "ai_catalog_refresh",
@@ -61,6 +61,7 @@
       "wipe_library",
       "rebuild_library",
       "resolve_duplicates",
+      "backup_test_destination",
       "bandcamp_import_purchase",
       "bandcamp_withdraw_contribution",
       "bandcamp_cleanup_user_contributions",
