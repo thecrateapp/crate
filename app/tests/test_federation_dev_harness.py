@@ -31,6 +31,15 @@ def test_federation_dev_harness_admin_shares_node_a_api_alias():
     assert "fed-net" in services["node-a-admin"]["networks"]
 
 
+def test_federation_dev_harness_listen_reaches_node_a_readplane():
+    services = _compose()["services"]
+
+    aliases = services["node-a-readplane"]["networks"]["fed-net"]["aliases"]
+
+    assert "crate-readplane" in aliases
+    assert "fed-net" in services["node-a-listen"]["networks"]
+
+
 def test_federation_dev_makefile_operates_node_a_admin():
     makefile = (ROOT / "Makefile").read_text()
 
