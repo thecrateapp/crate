@@ -42,12 +42,15 @@ def test_fanout_deadline_returns_partial_results_without_waiting(monkeypatch):
     )
     monkeypatch.setattr(search_fanout, "_search_local_index", lambda *args: None)
 
-    def slow_search(**kwargs):
-        del kwargs
+    def slow_search(*args, **kwargs):
+        del args, kwargs
         time.sleep(0.2)
-        return {"artists": [{"name": "Too late"}], "albums": [], "tracks": []}
+        return search_fanout.PeerAnswer(
+            status="answered",
+            results={"artists": [{"name": "Too late"}], "albums": [], "tracks": []},
+        )
 
-    monkeypatch.setattr(search_fanout, "_search_one_peer", slow_search)
+    monkeypatch.setattr(search_fanout, "_query_peer", slow_search)
 
     started = time.monotonic()
     result = search_fanout.federated_search(

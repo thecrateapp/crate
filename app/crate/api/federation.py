@@ -64,7 +64,11 @@ from crate.federation.playback_prepare import (
 )
 from crate.federation.policy import apply_result_limit, entity_is_allowed
 from crate.federation.results_envelope import RESULTS_CONTRACT, build_results_envelope
-from crate.federation.search import handle_remote_search
+from crate.federation.search import (
+    INBOUND_SEARCH_RETRY_AFTER_SECONDS,
+    handle_remote_search,
+    inbound_search_allowed,
+)
 from crate.federation.signing import (
     SIGNATURE_VERSION,
     SIGNED_HEADERS,
@@ -582,6 +586,7 @@ async def federated_search(body: SearchBody, request: Request):
     decision = await asyncio.to_thread(
         _require_capability, peer, "catalog.search", assertion=assertion
     )
+    await asyncio.to_thread(_require_search_quota, request, peer, assertion)
     wants_envelope = RESULTS_CONTRACT in body.contracts
     policy = await asyncio.to_thread(_catalog_share_policy)
     if not _catalog_policy_allows_live_search(policy):
@@ -609,6 +614,20 @@ async def federated_search(body: SearchBody, request: Request):
         )
         return await asyncio.to_thread(_search_envelope, limited, truncated=truncated)
     return _strip_paths(limited)
+
+
+def _require_search_quota(request: Request, peer: dict, assertion: dict | None) -> None:
+    subject_hash = str((assertion or {}).get("sub") or "") or None
+    if not inbound_search_allowed(
+        _request_redis(request),
+        node_uid=str(peer["node_uid"]),
+        subject_hash=subject_hash,
+    ):
+        raise HTTPException(
+            status_code=429,
+            detail="Search quota exceeded",
+            headers={"Retry-After": str(INBOUND_SEARCH_RETRY_AFTER_SECONDS)},
+        )
 
 
 def _search_envelope(

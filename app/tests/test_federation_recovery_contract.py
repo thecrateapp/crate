@@ -23,7 +23,11 @@ def test_peer_outage_marks_federated_search_as_partial(monkeypatch):
     monkeypatch.setattr(search_fanout, "search_all_hybrid", lambda *args: local)
     monkeypatch.setattr(search_fanout, "_get_approved_peers_for_search", lambda: [peer])
     monkeypatch.setattr(search_fanout, "_search_local_index", lambda *args: None)
-    monkeypatch.setattr(search_fanout, "_search_one_peer", lambda **kwargs: None)
+    monkeypatch.setattr(
+        search_fanout,
+        "_query_peer",
+        lambda *args, **kwargs: search_fanout.PeerAnswer(status="failed"),
+    )
 
     result = search_fanout.federated_search(
         "query",

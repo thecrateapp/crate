@@ -6,6 +6,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from crate.federation.results_envelope import RESULTS_CONTRACT
 
@@ -142,3 +143,52 @@ def test_a_catalog_closed_to_live_search_answers_incomplete_not_empty(
 
     assert result["items"] == []
     assert result["coverage"]["complete"] is False
+
+
+class TestInboundQuota:
+    def test_a_peer_over_its_quota_gets_429(self, owner, monkeypatch):
+        from crate.federation import search as owner_search
+
+        monkeypatch.setattr(owner_search, "INBOUND_SEARCH_PER_PEER_PER_MINUTE", 2)
+        request = _request(_Redis())
+
+        _search(owner, request)
+        _search(owner, request)
+        with pytest.raises(HTTPException) as denied:
+            _search(owner, request)
+
+        assert denied.value.status_code == 429
+        assert denied.value.headers == {"Retry-After": "10"}
+
+    def test_one_remote_user_cannot_use_the_whole_peer_quota(self, owner, monkeypatch):
+        from crate.federation import search as owner_search
+
+        monkeypatch.setattr(owner_search, "INBOUND_SEARCH_PER_SUBJECT_PER_MINUTE", 1)
+        request = _request(_Redis())
+
+        _search(owner, request)
+        with pytest.raises(HTTPException) as denied:
+            _search(owner, request)
+        monkeypatch.setattr(
+            owner, "_require_user_assertion", lambda *args: {"sub": "someone-else"}
+        )
+        _search(owner, request)
+
+        assert denied.value.status_code == 429
+
+    def test_quotas_are_per_peer(self, owner, monkeypatch):
+        from crate.federation import search as owner_search
+
+        monkeypatch.setattr(owner_search, "INBOUND_SEARCH_PER_PEER_PER_MINUTE", 1)
+        redis = _Redis()
+        _search(owner, _request(redis))
+
+        other = {"node_uid": "00000000-0000-0000-0000-0000000000cc"}
+
+        async def signed_other(_request, body_bytes=None):
+            del body_bytes
+            return other
+
+        monkeypatch.setattr(owner, "_require_signed_node_request", signed_other)
+
+        assert _search(owner, _request(redis))["artists"]
