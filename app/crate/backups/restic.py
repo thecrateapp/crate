@@ -377,6 +377,51 @@ def probe_remote(
         raise failure
 
 
+def remote_has_repository(
+    remote: RcloneRemote,
+    *,
+    work_dir: Path,
+    should_cancel: Callable[[], bool] | None = None,
+    timeout_seconds: float = 120,
+) -> bool:
+    """Whether a restic repository (its ``config`` file) is already there."""
+    env = _base_env(work_dir)
+    env.update(remote.env)
+    output = run_command(
+        [
+            rclone_bin(),
+            "lsf",
+            *_RCLONE_FLAGS,
+            "--files-only",
+            "--max-depth",
+            "1",
+            remote.path.rstrip("/") + "/",
+        ],
+        env=env,
+        secrets=remote.secret_values,
+        should_cancel=should_cancel,
+        timeout_seconds=timeout_seconds,
+        poll_seconds=0.5,
+        label="rclone list",
+    )
+    return "config" in output.decode("utf-8", "replace").split()
+
+
+def compact_snapshots(snapshots: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Newest first, only what Admin's snapshots tab shows."""
+    compact = [
+        {
+            "id": str(s.get("short_id") or str(s.get("id") or "")[:8]),
+            "time": s.get("time"),
+            "host": s.get("hostname"),
+            "tags": list(s.get("tags") or []),
+            "paths": list(s.get("paths") or []),
+        }
+        for s in snapshots
+    ]
+    return sorted(compact, key=lambda s: str(s["time"] or ""), reverse=True)
+
+
 __all__ = [
     "RCLONE_BIN_ENV",
     "RESTIC_BIN_ENV",
@@ -384,10 +429,12 @@ __all__ = [
     "Runner",
     "SNAPSHOT_HOST",
     "backup_file",
+    "compact_snapshots",
     "list_snapshots",
     "open_or_init",
     "probe_remote",
     "rclone_bin",
+    "remote_has_repository",
     "repository_size",
     "restic_bin",
     "restore_file",

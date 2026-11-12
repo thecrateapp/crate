@@ -94,7 +94,9 @@ def _enqueue_retention() -> str | None:
     return _enqueue(RETENTION_TASK, {}, RETENTION_TASK)
 
 
-def _queue_policy_copies(policy: dict, dump_path: str, taken_at: datetime) -> list[str]:
+def _queue_policy_copies(
+    policy: dict, dump_path: str, taken_at: datetime, *, ignore_window: bool = False
+) -> list[str]:
     """One ``backup_offsite`` per usable destination whose tiers are due."""
     now = local_now()
     destinations = {row["id"]: row for row in list_backup_destinations()}
@@ -123,6 +125,7 @@ def _queue_policy_copies(policy: dict, dump_path: str, taken_at: datetime) -> li
                 "destination_tiers": list(tiers),
                 "taken_at": taken_at.isoformat(),
                 "ignore_maintenance_window": True,
+                **({"ignore_window": True} if ignore_window else {}),
             },
             f"backup_offsite:{policy['id']}:{destination_id}",
         )
@@ -180,7 +183,11 @@ def _handle_backup_dump(task_id: str, params: dict, config: dict) -> dict:
     retention_task_id = _enqueue_retention()
     offsite_task_ids = (
         _queue_policy_copies(
-            policy, relative, parse_dump_name(result.path.name) or datetime.now(UTC)
+            policy,
+            relative,
+            parse_dump_name(result.path.name) or datetime.now(UTC),
+            # Run now from Admin: the operator asked for it now, window or not.
+            ignore_window=bool(params.get("ignore_window")),
         )
         if policy
         else []
@@ -260,6 +267,27 @@ def _handle_backup_test_destination(task_id: str, params: dict, config: dict) ->
     return {"destination_id": destination_id, "connection": result.to_dict()}
 
 
+def _handle_backup_probe_destination(task_id: str, params: dict, config: dict) -> dict:
+    """Test unsaved settings (BG1-9); they come from the ephemeral store, once."""
+    del config
+    from crate.backups import ephemeral
+    from crate.backups.connection import ConnectionResult, probe_unsaved
+
+    payload = ephemeral.take(str(params.get("probe_id") or ""))
+    if payload is None:
+        result = ConnectionResult(
+            "failing", "The unsaved settings expired; test the connection again"
+        )
+    else:
+        result = probe_unsaved(
+            str(payload.get("kind") or ""),
+            dict(payload.get("config") or {}),
+            dict(payload.get("secrets") or {}),
+            should_cancel=lambda: is_cancelled(task_id),
+        )
+    return {"connection": result.to_dict()}
+
+
 # ── policies (BK3) ──────────────────────────────────────────────────
 
 
@@ -317,7 +345,7 @@ def _handle_backup_offsite(task_id: str, params: dict, config: dict) -> dict:
         return {"status": "failed", "error": "The destination no longer exists"}
     if not row["enabled"]:
         return {"status": "skipped", "reason": "The destination is disabled"}
-    waiting = _wait_for_window(policy)
+    waiting = None if params.get("ignore_window") else _wait_for_window(policy)
     if waiting:
         return waiting
     tags = [str(t) for t in params.get("tags") or []]
@@ -372,6 +400,7 @@ def _handle_backup_offsite(task_id: str, params: dict, config: dict) -> dict:
             snapshot_count=result.snapshot_count,
             repository_bytes=result.repository_bytes,
             initialized=True,
+            snapshots=result.snapshots,
         )
     return {"run_id": run_id, **result.to_dict()}
 
@@ -418,7 +447,14 @@ def _handle_backup_verify(task_id: str, params: dict, config: dict) -> dict:
             finish_backup_run(run_id, status="failed", error=message)
             record_destination_check(destination_id, status="failing", error=message)
             return {"status": "failed", "error": message, "run_id": run_id}
+        snapshots = result.pop("snapshots", None)
         finish_backup_run(run_id, status="succeeded", details=result)
+        record_destination_check(
+            destination_id,
+            status="ok",
+            snapshot_count=result.get("snapshot_count"),
+            snapshots=snapshots,
+        )
     return {"run_id": run_id, **result}
 
 
@@ -542,6 +578,7 @@ BACKUP_TASK_HANDLERS = {
     "backup_dump": _handle_backup_dump,
     "backup_local_retention": _handle_backup_local_retention,
     "backup_test_destination": _handle_backup_test_destination,
+    "backup_probe_destination": _handle_backup_probe_destination,
     "backup_offsite": _handle_backup_offsite,
     "backup_verify": _handle_backup_verify,
     "backup_restore_drill": _handle_backup_restore_drill,

@@ -108,6 +108,20 @@ jobs:
           install -m 0755 "rclone-v${rclone_version}-linux-amd64/rclone" "$RUNNER_TEMP/bin/rclone"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
+      - name: Install age (opens the recovery kit in the tests)
+        env:
+          AGE_VERSION: "1.2.1"
+          # age publishes no checksum file: this is the hash of the release
+          # archive as downloaded on 2026-11-12.
+          AGE_SHA256: "7df45a6cc87d4da11cc03a539a7470c15b1041ab2b396af088fe9990f7c79d50"
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 5 -o age.tar.gz \
+            "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz"
+          echo "${AGE_SHA256}  age.tar.gz" | sha256sum -c -
+          tar xzf age.tar.gz
+          install -m 0755 age/age "$RUNNER_TEMP/bin/age"
+
       - name: Run the backups engine tests
         env:
           CRATE_POSTGRES_USER: crate
@@ -120,6 +134,6 @@ jobs:
           POSTGRES_SUPERUSER_DB: crate_test
           CRATE_BACKUP_INTEGRATION_REQUIRED: "1"
         run: |
-          restic version && rclone version | head -n 1 && pg_restore --version
+          restic version && rclone version | head -n 1 && age --version && pg_restore --version
           python -m pytest tests/test_backup_*.py -q -rs --tb=short
         working-directory: app

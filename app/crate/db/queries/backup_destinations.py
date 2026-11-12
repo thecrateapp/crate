@@ -19,7 +19,8 @@ DESTINATION_COLUMNS = """
     id::text AS id, kind, name, config_json AS config, secret_ref,
     repo_password_ref, enabled, status, last_checked_at, last_error,
     repository_initialized_at, snapshot_count, repository_bytes,
-    recovery_kit_downloaded_at, recovery_kit_confirmed_at, created_at, updated_at
+    recovery_kit_downloaded_at, recovery_kit_confirmed_at, created_at, updated_at,
+    snapshots_json AS snapshots, snapshots_listed_at
 """
 
 

@@ -823,6 +823,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "backup_dump",
             "backup_local_retention",
             "backup_test_destination",
+            "backup_probe_destination",
             "backup_offsite",
             "backup_verify",
             "backup_restore_drill",

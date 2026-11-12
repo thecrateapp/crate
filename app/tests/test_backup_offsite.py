@@ -152,10 +152,9 @@ def test_verify_reads_a_subset_of_the_data(volume, dump):
         tags=["daily"],
         taken_at=datetime(2026, 11, 10, 3, 30, tzinfo=timezone.utc),
     )
-    assert offsite.verify_destination(volume, read_percent=100) == {
-        "read_percent": 100,
-        "snapshot_count": 1,
-    }
+    result = offsite.verify_destination(volume, read_percent=100)
+    assert (result["read_percent"], result["snapshot_count"]) == (100, 1)
+    assert [s["paths"] for s in result["snapshots"]] == [["/crate.dump"]]
 
 
 def test_the_drill_restores_into_a_throwaway_database_only(volume, dump):

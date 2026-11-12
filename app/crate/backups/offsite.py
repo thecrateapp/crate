@@ -35,6 +35,7 @@ from crate.backups.local import BackupError, Connection
 from crate.backups.restic import (
     Runner,
     backup_file,
+    compact_snapshots,
     list_snapshots,
     repository_size,
     restore_file,
@@ -68,9 +69,13 @@ class CopyResult:
     repository_bytes: int | None
     removed_snapshots: int
     tags: list[str] = field(default_factory=list)
+    # The repository's listing after the copy, for the destination's cache.
+    snapshots: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        out = asdict(self)
+        out.pop("snapshots")
+        return out
 
 
 @dataclass(slots=True)
@@ -144,6 +149,7 @@ def copy_dump(
         repository_bytes=size,
         removed_snapshots=removed,
         tags=snapshot_tags,
+        snapshots=compact_snapshots(snapshots),
     )
 
 
@@ -166,7 +172,11 @@ def verify_destination(
             unlock_stale(runner)
         runner.run("check", f"--read-data-subset={percent}%")
         snapshots = list_snapshots(runner)
-    return {"read_percent": percent, "snapshot_count": len(snapshots)}
+    return {
+        "read_percent": percent,
+        "snapshot_count": len(snapshots),
+        "snapshots": compact_snapshots(snapshots),
+    }
 
 
 # ── restore drill ───────────────────────────────────────────────────
