@@ -71,9 +71,14 @@ jobs:
         run: |
           set -eu
           if ! grep -rqs apt.postgresql.org /etc/apt/sources.list.d/; then
-            sudo install -d /usr/share/postgresql-common/pgdg
-            sudo curl -fsSL --retry 5 -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-              https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            key=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+            sudo install -d "$(dirname "$key")"
+            for url in https://apt.postgresql.org/pub/repos/apt/ACCC4CF8.asc \
+                       https://www.postgresql.org/media/keys/ACCC4CF8.asc; do
+              sudo curl -fsSL --retry 5 --retry-all-errors -o "$key" "$url" && break
+            done
+            # The same key the worker image checks (app/Dockerfile).
+            echo "$(sed -n 's/^ARG PGDG_ACCC4CF8_ASC_SHA256=//p' app/Dockerfile)  $key" | sha256sum -c -
             echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
               | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
           fi
