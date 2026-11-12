@@ -123,6 +123,17 @@ MANUAL_TRIGGER_VALUES = frozenset(
 DEFAULT_DEFER_SECONDS = 300
 DEFAULT_LOAD_RATIO = 0.85
 DEFAULT_IOWAIT_PERCENT = 25.0
+# The iowait gate samples /proc/stat for 50 ms, so it also catches short bursts
+# while the disks are idle. It defers only when the kernel's 10 s IO pressure
+# (PSI, "some avg10") is at least this high too; without PSI the sample decides.
+DEFAULT_MIN_IO_PRESSURE_PERCENT = 10.0
+IO_PRESSURE_PATH = "/proc/pressure/io"
+# A deferred task waits CRATE_RESOURCE_DEFER_SECONDS before it asks again. The
+# Smart Mix backfill coordinator only counts free slots and its analyses are
+# governed themselves, so it asks again sooner: a long wait leaves the slots
+# empty after a brief spike.
+QUICK_RECHECK_TASK_TYPES = frozenset({"backfill_smart_mix_profiles"})
+QUICK_RECHECK_DEFER_SECONDS = 30
 DEFAULT_SWAP_PERCENT = 30.0
 DEFAULT_SWAP_MIN_USED_MB = 512.0
 DEFAULT_MIN_MEMORY_AVAILABLE_PERCENT = 15.0
@@ -193,6 +204,7 @@ class ResourceSnapshot:
     load_1m: float | None = None
     load_ratio: float | None = None
     iowait_percent: float | None = None
+    io_pressure_percent: float | None = None
     swap_used_percent: float | None = None
     swap_used_mb: float | None = None
     memory_available_percent: float | None = None
@@ -247,10 +259,15 @@ def _should_defer_task(task_type: str, params: dict | None = None) -> ResourceDe
             return window_decision
     if _bypasses_resource_pressure(task_type, params):
         return ResourceDecision(allowed=True)
-    return evaluate_resources(
+    decision = evaluate_resources(
         label=task_type,
         listener_sensitive=task_type not in LISTENER_INSENSITIVE_GOVERNED_TASK_TYPES,
     )
+    if not decision.allowed and task_type in QUICK_RECHECK_TASK_TYPES:
+        decision.defer_seconds = min(
+            decision.defer_seconds, QUICK_RECHECK_DEFER_SECONDS
+        )
+    return decision
 
 
 def evaluate_maintenance_window(*, task_type: str = "background") -> ResourceDecision:
@@ -501,7 +518,17 @@ def _evaluate_resources(
 
     if snapshot.load_ratio is not None and snapshot.load_ratio > max_load_ratio:
         reasons.append(f"load {snapshot.load_ratio:.2f}>{max_load_ratio:.2f}")
-    if snapshot.iowait_percent is not None and snapshot.iowait_percent > max_iowait:
+    min_io_pressure = _float_setting(
+        "CRATE_RESOURCE_MIN_IO_PRESSURE_PERCENT", DEFAULT_MIN_IO_PRESSURE_PERCENT
+    )
+    if (
+        snapshot.iowait_percent is not None
+        and snapshot.iowait_percent > max_iowait
+        and (
+            snapshot.io_pressure_percent is None
+            or snapshot.io_pressure_percent >= min_io_pressure
+        )
+    ):
         reasons.append(f"iowait {snapshot.iowait_percent:.1f}%>{max_iowait:.1f}%")
     if (
         snapshot.swap_used_percent is not None
@@ -550,6 +577,7 @@ def build_snapshot(*, include_playback: bool = True) -> ResourceSnapshot:
         load_1m=load_1m,
         load_ratio=load_ratio,
         iowait_percent=_sample_iowait_percent(),
+        io_pressure_percent=_read_io_pressure_percent(),
         swap_used_percent=memory.get("swap_used_percent"),
         swap_used_mb=memory.get("swap_used_mb"),
         memory_available_percent=memory.get("memory_available_percent"),
@@ -918,6 +946,21 @@ def _read_cpu_totals() -> tuple[int, int] | None:
     total = sum(values)
     iowait = values[4] if len(values) > 4 else 0
     return total, iowait
+
+
+def _read_io_pressure_percent() -> float | None:
+    """The kernel's share of the last 10 s with a task stalled on IO, or None."""
+    try:
+        with open(IO_PRESSURE_PATH, encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith("some "):
+                    for field in line.split()[1:]:
+                        key, _, value = field.partition("=")
+                        if key == "avg10":
+                            return float(value)
+    except (OSError, ValueError):
+        return None
+    return None
 
 
 def _sample_iowait_percent(interval_seconds: float = 0.05) -> float | None:
