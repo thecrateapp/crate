@@ -98,6 +98,12 @@
       "class": "sse"
     },
     {
+      "name": "search-stream",
+      "path": "/api/catalog/search-stream",
+      "methods": ["GET"],
+      "class": "sse"
+    },
+    {
       "name": "home-stream",
       "path": "/api/me/home/discovery-stream",
       "methods": ["GET"],

@@ -552,6 +552,31 @@ def is_catalog_stale(node_uid: str) -> bool:
     return datetime.now(UTC) - last > timedelta(hours=STALE_THRESHOLD_HOURS)
 
 
+def stale_replica_node_uids(node_uids: list[str]) -> set[str]:
+    """Peers whose replica exists but has not synced within the freshness budget.
+
+    A peer that never completed a sync has no replica to be stale; remote search
+    reaches it under the k rule (FED-D14). One query for every peer.
+    """
+    if not node_uids:
+        return set()
+    with read_scope() as s:
+        rows = s.execute(
+            text(
+                """
+                SELECT node_uid::text
+                FROM federation_catalog_cursors
+                WHERE node_uid = ANY(CAST(:uids AS uuid[]))
+                  AND full_sync_completed_at IS NOT NULL
+                  AND GREATEST(last_delta_at, full_sync_completed_at)
+                      < NOW() - make_interval(hours => :hours)
+                """
+            ),
+            {"uids": list(node_uids), "hours": STALE_THRESHOLD_HOURS},
+        ).scalars()
+        return set(rows)
+
+
 # ── Search ────────────────────────────────────────────────────────────────
 
 

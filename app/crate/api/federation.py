@@ -63,7 +63,8 @@ from crate.federation.playback_prepare import (
     record_remote_playback_delivery,
 )
 from crate.federation.policy import apply_result_limit, entity_is_allowed
-from crate.federation.search import handle_remote_search
+from crate.federation.results_envelope import RESULTS_CONTRACT, build_results_envelope
+from crate.federation.search import handle_remote_search, inbound_search_wait
 from crate.federation.signing import (
     SIGNATURE_VERSION,
     SIGNED_HEADERS,
@@ -163,6 +164,9 @@ _LOCAL_ONLY_KEYS = {
 class SearchBody(BaseModel):
     q: str = ""
     limit: int = Field(default=20, ge=1, le=50)
+    # Result contracts the requester reads, in preference order (FED-D18). Old
+    # requesters send none and keep the legacy {artists, albums, tracks} shape.
+    contracts: list[str] = Field(default_factory=list, max_length=8)
 
 
 class StreamTicketBody(BaseModel):
@@ -578,18 +582,64 @@ async def federated_search(body: SearchBody, request: Request):
     decision = await asyncio.to_thread(
         _require_capability, peer, "catalog.search", assertion=assertion
     )
+    await asyncio.to_thread(_require_search_quota, request, peer, assertion)
+    wants_envelope = RESULTS_CONTRACT in body.contracts
     policy = await asyncio.to_thread(_catalog_share_policy)
     if not _catalog_policy_allows_live_search(policy):
+        if wants_envelope:
+            return await asyncio.to_thread(
+                _search_envelope,
+                _empty_search_response(),
+                truncated=False,
+                complete=False,
+            )
         return _empty_search_response()
     payload = await asyncio.to_thread(
         handle_remote_search, query=body.q, limit=body.limit
     )
-    return _strip_paths(
-        apply_result_limit(
-            payload,
-            requested_limit=body.limit,
-            constraints=decision.constraints,
+    limited = apply_result_limit(
+        payload,
+        requested_limit=body.limit,
+        constraints=decision.constraints,
+    )
+    if wants_envelope:
+        truncated = any(
+            len(payload.get(group) or []) >= body.limit
+            or len(limited.get(group) or []) < len(payload.get(group) or [])
+            for group in ("artists", "albums", "tracks")
         )
+        return await asyncio.to_thread(_search_envelope, limited, truncated=truncated)
+    return _strip_paths(limited)
+
+
+def _require_search_quota(request: Request, peer: dict, assertion: dict | None) -> None:
+    subject_hash = str((assertion or {}).get("sub") or "") or None
+    wait = inbound_search_wait(
+        _request_redis(request),
+        node_uid=str(peer["node_uid"]),
+        subject_hash=subject_hash,
+    )
+    if wait is not None:
+        raise HTTPException(
+            status_code=429,
+            detail="Search quota exceeded",
+            headers={"Retry-After": str(wait)},
+        )
+
+
+def _search_envelope(
+    payload: dict[str, list[dict]], *, truncated: bool, complete: bool = True
+) -> dict[str, Any]:
+    node = repo.get_local_node()
+    if not node:
+        raise HTTPException(status_code=503, detail="Local node not configured")
+    return build_results_envelope(
+        payload,
+        node_uid=str(node["node_uid"]),
+        node_name=node.get("display_name"),
+        lease_scope="catalog.search",
+        truncated=truncated,
+        complete=complete,
     )
 
 

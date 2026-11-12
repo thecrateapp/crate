@@ -56,6 +56,13 @@ Design: `2026-11-10-federation-hybrid-design.md` (decisions FED-D1…D18). Branc
 
 **Goal:** remote results in seconds, before any replica (FED-D2, D4, D5, D14, D16, D17, D18).
 
+**Decided (Diego, 2026-11-12):** the proposed open values (design §10).
+- *k* = 5: fan out when there are fewer than 5 local results.
+- Listen debounces 300 ms and needs at least 3 characters.
+- The remote window: 1.5 s per peer and a 2 s total deadline.
+- The metadata lease: 24 h (FED-D7).
+- The reference profiles as proposed in design §8.
+
 1. **FED1.1 · The result envelope.** Add the `crate.federation.results/1` schema on the owner side, together with A's adapter into Listen's search contract.
    - **Red:** contract tests, plus "unknown fields are ignored" and "a missing optional field is fine".
 2. **FED1.2 · Fan-out.** In `app/crate/federation/search_fanout.py`:
@@ -114,7 +121,7 @@ Design: `2026-11-10-federation-hybrid-design.md` (decisions FED-D1…D18). Branc
 1. **FED4.1 · Delta consumer** on the v159 feed. Idempotent per page with its checkpoint. A no-change poll writes nothing.
    - **Red:** A → B → A; delete → restore → delete; out-of-order commits; a second no-change poll.
 2. **FED4.2 · Recovery bootstrap** only for a cursor outside the history, a scope change or an explicit repair.
-3. **FED4.3 · Leases (FED-D7).** Metadata leases of 24 h (*to confirm*) renewed at half-life, plus revocations pushed through the feed. On expiry, cached results are hidden but kept. Playback always revalidates.
+3. **FED4.3 · Leases (FED-D7).** Metadata leases of 24 h (decided by Diego, 2026-11-12) renewed at half-life, plus revocations pushed through the feed. On expiry, cached results are hidden but kept. Playback always revalidates.
    - **Red:** a revocation applies immediately when online and at expiry when offline; playback fails closed.
 
 ## FED5 · Source identity in navigation and playback
@@ -148,4 +155,4 @@ Compare per-block digests with the owner and repair only the differing blocks; n
 - **The Codex snapshot is unverified,** and Codex may still be editing the old worktree. Stop that worktree before FED0.1.
 - **v3.3.1 also deploys stems (v3.3.0).** Both sets of checks are needed.
 - **The migration renumbering with v10.**
-- **The ≤600 s target depends on the reference profile;** confirm it before FG2.
+- **The ≤600 s target depends on the reference profile.** Diego accepted the proposed profiles on 2026-11-12 (design §8).

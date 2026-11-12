@@ -415,6 +415,11 @@ METRIC_SPECS = {
         "1",
         {"mode": "catalog_serving_mode"},
     ),
+    "catalog.search_stream.requests": (
+        "counter_delta",
+        "1",
+        {"mode": "catalog_serving_mode"},
+    ),
     "federation.playback.prepare.fallback_original": (
         "counter_delta",
         "1",

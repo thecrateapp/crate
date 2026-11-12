@@ -5539,6 +5539,34 @@
     "sourceHash": "sha256:1fe6b91a28f3eeac10cf6ddb02e2b533e08f2a9c8d07aaafe2f89e4678b96ad4",
     "reviewedAt": "2026-10-20T21:22:28.506017Z"
   },
+  "search.network.again": {
+    "sourceHash": "sha256:31514cb65d19fc4c9eb8ebae4f2075f4ad0b84caf530a9dd94596506e71ea1e7",
+    "reviewedAt": "2026-11-12T18:26:45.673Z"
+  },
+  "search.network.coverage": {
+    "sourceHash": "sha256:ecfeee7a8960b8cd46f526c45179afcffe9da6301cb5f7d9ebf53e04df024cf6",
+    "reviewedAt": "2026-11-12T18:26:45.673Z"
+  },
+  "search.network.noAnswer": {
+    "sourceHash": "sha256:0f56fce73cb7e7cb355492266d29b56152e85dd53919e9a4c81b2c7a9ed93b89",
+    "reviewedAt": "2026-11-12T18:26:45.673Z"
+  },
+  "search.network.noResults": {
+    "sourceHash": "sha256:e5cd6cb1a5a81578839ad703cedf532f04b9118c6fa4f8830d93879582cab60a",
+    "reviewedAt": "2026-11-12T18:26:45.673Z"
+  },
+  "search.network.searching": {
+    "sourceHash": "sha256:8162a4ce5867e1bfa6f7153899936be56d6867dee2ce217da5d1d40c3c53e229",
+    "reviewedAt": "2026-11-12T18:26:45.673Z"
+  },
+  "search.network.title": {
+    "sourceHash": "sha256:e9cbce2008455ac450b62657a086b9c9a9d258c57f05be550fe4f20a7e884f89",
+    "reviewedAt": "2026-11-12T18:26:45.673Z"
+  },
+  "search.network.unavailable": {
+    "sourceHash": "sha256:f2d0b0ce196457b83d6f9738354c312b97f6b351482448744563d65e9d7b4d93",
+    "reviewedAt": "2026-11-12T18:26:45.673Z"
+  },
   "search.noMusicFound": {
     "sourceHash": "sha256:3e1caa796391036435ef7310d15acd22966134251869705470316c6b1a008652",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
