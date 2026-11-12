@@ -21,7 +21,7 @@ import hashlib
 import logging
 import threading
 import time
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal, Protocol
@@ -74,6 +74,65 @@ class FanoutSettings:
 DEFAULT_SETTINGS = FanoutSettings()
 
 PeerStatus = Literal["answered", "cached", "failed", "timed_out", "rate_limited"]
+
+
+FanoutReason = Literal[
+    "query_too_short",
+    "no_peers",
+    "few_local_results",
+    "stale_replica",
+    "enough_local_results",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class FanoutDecision:
+    reason: FanoutReason
+    peers: list[dict]
+
+    @property
+    def fans_out(self) -> bool:
+        return bool(self.peers)
+
+
+def query_is_long_enough(query: str, settings: FanoutSettings | None = None) -> bool:
+    active = settings or DEFAULT_SETTINGS
+    return (
+        len(normalize_fanout_query(query).replace(" ", "")) >= active.min_query_length
+    )
+
+
+def decide_fanout(
+    query: str,
+    *,
+    local_total: int,
+    peers: list[dict],
+    stale_node_uids: Callable[[list[str]], set[str]] | None = None,
+    settings: FanoutSettings | None = None,
+) -> FanoutDecision:
+    """FED-D14 on the server: fewer than k local results, or a stale replica.
+
+    Summary routing ("the peer has more of this artist") comes with FED2.
+    """
+    active = settings or DEFAULT_SETTINGS
+    if not query_is_long_enough(query, active):
+        return FanoutDecision("query_too_short", [])
+    if not peers:
+        return FanoutDecision("no_peers", [])
+    if local_total < active.min_local_results:
+        return FanoutDecision("few_local_results", list(peers))
+    lookup = stale_node_uids or _stale_replica_node_uids
+    stale = lookup([str(peer["node_uid"]) for peer in peers])
+    stale_peers = [peer for peer in peers if str(peer["node_uid"]) in stale]
+    if stale_peers:
+        return FanoutDecision("stale_replica", stale_peers)
+    return FanoutDecision("enough_local_results", [])
+
+
+def _stale_replica_node_uids(node_uids: list[str]) -> set[str]:
+    from crate.db.repositories.federation_catalog import stale_replica_node_uids
+
+    return stale_replica_node_uids(node_uids)
 
 
 def _empty_results() -> dict[str, list[dict]]:
