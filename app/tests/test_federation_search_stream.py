@@ -185,7 +185,7 @@ def test_the_endpoint_streams_server_sent_events(monkeypatch, peers):
     monkeypatch.setattr(catalog, "search_global_catalog", lambda q, **kw: EMPTY)
     monkeypatch.setattr(search_stream, "_load_context", lambda: (LOCAL_NODE, PEERS[:1]))
     monkeypatch.setattr(search_stream, "_stale_replica_node_uids", lambda _uids: set())
-    monkeypatch.setattr(search_stream, "StoreFanoutCache", MemoryFanoutCache)
+    monkeypatch.setattr(search_fanout, "DEFAULT_CACHE", MemoryFanoutCache())
 
     response = catalog.catalog_search_stream(object(), q="joy division", limit=20)
 
@@ -204,3 +204,45 @@ def test_the_endpoint_streams_server_sent_events(monkeypatch, peers):
     assert names[0] == "local"
     assert names[-1] == "done"
     assert "remote" in names
+
+
+def test_a_failure_before_the_fan_out_still_ends_with_done(peers):
+    def broken_context():
+        raise RuntimeError("database down")
+
+    async def run():
+        return [
+            (name, payload)
+            async for name, payload in federated_search_events(
+                "joy division",
+                limit=20,
+                user={"id": 7},
+                local_search=lambda: EMPTY,
+                load_context=broken_context,
+                settings=QUICK,
+                cache=MemoryFanoutCache(),
+            )
+        ]
+
+    events = asyncio.run(run())
+
+    assert [name for name, _ in events] == ["local", "done"]
+    assert events[-1][1]["coverage"]["reason"] == "federation_unavailable"
+
+
+def test_a_failure_during_the_fan_out_ends_with_the_coverage_so_far(monkeypatch, peers):
+    async def broken_stream(*args, **kwargs):
+        yield search_fanout.PeerOutcome(
+            node_uid="fast", node_name="Fast", status="answered"
+        )
+        raise RuntimeError("peer pool broke")
+
+    monkeypatch.setattr(search_stream, "stream_peer_outcomes", broken_stream)
+
+    events = _events()
+
+    assert events[-1][1] == "done"
+    coverage = events[-1][2]["coverage"]
+    assert coverage["state"] == "partial"
+    assert coverage["peers_answered"] == 1
+    assert coverage["peers_timed_out"] == 2

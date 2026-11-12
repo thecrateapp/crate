@@ -36,6 +36,7 @@ from crate.federation.client import (
 )
 from crate.federation.results_envelope import (
     RESULTS_CONTRACT,
+    build_results_envelope,
     envelope_to_search_contract,
     is_results_envelope,
     parse_results_envelope,
@@ -64,7 +65,7 @@ class FanoutSettings:
     deadline_s: float = 2.0
     max_concurrency: int = 4
     # The HTTP call may outlive the window so a late answer reaches the cache.
-    answer_timeout_s: float = 4.0
+    answer_timeout_s: float = 3.0
     # FED-D17: short TTLs for the per (query, peer) cache.
     answer_ttl_s: int = 300
     empty_ttl_s: int = 60
@@ -189,6 +190,9 @@ class StoreFanoutCache:
             log.debug("Federated search cache write failed", exc_info=True)
 
 
+DEFAULT_CACHE = StoreFanoutCache()
+
+
 class MemoryFanoutCache:
     """In-process cache for tests and for callers without a shared store."""
 
@@ -222,14 +226,26 @@ class NullFanoutCache:
 
 
 # Peer queries run on their own small pool so a slow peer never holds a request
-# worker, and so an answer that comes after the window can still be cached.
+# worker, and so an answer that comes after the window can still be cached. The
+# pool never queues: when every thread is busy (a silent peer under load), a
+# peer is reported as timed out at once instead of waiting behind it, and one
+# (query, peer, viewer) is never asked twice at the same time.
+PEER_POOL_SIZE = 16
 _PEER_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
-    max_workers=8, thread_name_prefix="federated-search"
+    max_workers=PEER_POOL_SIZE, thread_name_prefix="federated-search"
 )
+_PEER_SLOTS = threading.BoundedSemaphore(PEER_POOL_SIZE)
+_IN_FLIGHT: dict[tuple[int, str], concurrent.futures.Future] = {}
+_IN_FLIGHT_LOCK = threading.Lock()
 
 
 def normalize_fanout_query(query: str) -> str:
     return " ".join(query.casefold().split())
+
+
+def peer_backoff_key(node_uid: str) -> str:
+    """Set when a peer answers 429: no query of any kind goes to it until it expires."""
+    return f"{CACHE_PREFIX}:{node_uid}:rate-limited"
 
 
 def peer_cache_key(node_uid: str, query: str, *, limit: int, user: dict | None) -> str:
@@ -329,13 +345,25 @@ def _search_one_peer(
 
 
 def _adapt_peer_answer(data: Any, *, peer: dict) -> dict:
-    """Read a peer's answer: the v1 envelope, or the legacy shape of older owners."""
-    if is_results_envelope(data):
-        envelope = parse_results_envelope(data)
-        if envelope is None:
-            raise ValueError("Unreadable results envelope")
-        return envelope_to_search_contract(envelope, peer=peer)
-    return _tag_remote_results(data=data, peer=peer)
+    """Read a peer's answer: the v1 envelope, or the legacy shape of older owners.
+
+    Legacy rows go through the same whitelist as the envelope, so an older
+    owner's local ids and slugs never reach Listen as if they were A's.
+    """
+    if not is_results_envelope(data):
+        if not isinstance(data, dict):
+            raise ValueError("Unreadable peer answer")
+        data = build_results_envelope(
+            data,
+            node_uid=str(peer["node_uid"]),
+            node_name=peer.get("display_name"),
+            lease_scope="catalog.search",
+            truncated=False,
+        )
+    envelope = parse_results_envelope(data)
+    if envelope is None:
+        raise ValueError("Unreadable results envelope")
+    return envelope_to_search_contract(envelope, peer=peer)
 
 
 def _tag_remote_results(data: dict, peer: dict) -> dict:
@@ -445,7 +473,7 @@ def _artist_match_key(artist: dict) -> str:
 def _album_match_key(album: dict) -> str:
     artist = (album.get("artist") or "").strip().lower()
     name = (album.get("name") or "").strip().lower()
-    year = str(album.get("year", "")).strip()
+    year = str(album.get("year") or "").strip()[:4]
     return f"album:{artist}|{name}|{year}"
 
 
@@ -516,8 +544,14 @@ class RemoteResultGroups:
         }
 
 
-def _cache_entry(answer: PeerAnswer) -> dict[str, Any]:
-    return {"status": answer.status, "results": answer.results}
+def _cache_entry(answer: PeerAnswer, ttl_s: int) -> dict[str, Any]:
+    # The expiry travels with the entry: a store that loses the TTL (the
+    # PostgreSQL fallback of the cache) must not serve it forever.
+    return {
+        "status": answer.status,
+        "results": answer.results,
+        "expires_at": time.time() + ttl_s,
+    }
 
 
 def _query_and_remember(
@@ -541,14 +575,55 @@ def _query_and_remember(
     if answer.status == "answered":
         has_results = any(answer.results.get(group) for group in SEARCH_GROUPS)
         ttl = settings.answer_ttl_s if has_results else settings.empty_ttl_s
-        cache.set(cache_key, _cache_entry(answer), ttl)
+        cache.set(cache_key, _cache_entry(answer, ttl), ttl)
     elif answer.status == "rate_limited":
         ttl = min(
             answer.retry_after_s or settings.max_rate_limited_ttl_s,
             settings.max_rate_limited_ttl_s,
         )
-        cache.set(cache_key, _cache_entry(answer), ttl)
+        cache.set(
+            peer_backoff_key(str(peer["node_uid"])), _cache_entry(answer, ttl), ttl
+        )
     return answer
+
+
+def _submit_peer_query(
+    peer: dict,
+    query: str,
+    limit: int,
+    local_node: dict,
+    user: dict | None,
+    settings: FanoutSettings,
+    cache: FanoutCache,
+    cache_key: str,
+) -> concurrent.futures.Future | None:
+    """Start (or join) the query for this key; None when the pool is full."""
+    flight_key = (id(cache), cache_key)
+    with _IN_FLIGHT_LOCK:
+        running = _IN_FLIGHT.get(flight_key)
+        if running is not None and not running.done():
+            return running
+        if not _PEER_SLOTS.acquire(blocking=False):
+            return None
+
+        def job() -> PeerAnswer:
+            try:
+                return _query_and_remember(
+                    peer, query, limit, local_node, user, settings, cache, cache_key
+                )
+            finally:
+                _PEER_SLOTS.release()
+                with _IN_FLIGHT_LOCK:
+                    if _IN_FLIGHT.get(flight_key) is future:
+                        del _IN_FLIGHT[flight_key]
+
+        try:
+            future = _PEER_EXECUTOR.submit(job)
+        except RuntimeError:
+            _PEER_SLOTS.release()
+            return None
+        _IN_FLIGHT[flight_key] = future
+        return future
 
 
 def _outcome(
@@ -564,6 +639,9 @@ def _outcome(
 
 def _cached_outcome(peer: dict, entry: Any) -> PeerOutcome | None:
     if not isinstance(entry, dict):
+        return None
+    expires_at = entry.get("expires_at")
+    if not isinstance(expires_at, (int, float)) or expires_at <= time.time():
         return None
     if entry.get("status") == "rate_limited":
         return _outcome(peer, "rate_limited")
@@ -592,7 +670,7 @@ async def stream_peer_outcomes(
     fan-out ``deadline_s``. A peer still pending at the deadline is reported as
     ``timed_out``; its thread keeps going and caches what it gets.
     """
-    store: FanoutCache = cache if cache is not None else StoreFanoutCache()
+    store: FanoutCache = cache if cache is not None else DEFAULT_CACHE
     loop = asyncio.get_running_loop()
     deadline = loop.time() + settings.deadline_s
     keys = {
@@ -601,11 +679,19 @@ async def stream_peer_outcomes(
         )
         for peer in peers
     }
-    cached = await asyncio.to_thread(store.get_many, list(keys.values()))
+    backoff_keys = {
+        str(peer["node_uid"]): peer_backoff_key(str(peer["node_uid"])) for peer in peers
+    }
+    cached = await asyncio.to_thread(
+        store.get_many, [*keys.values(), *backoff_keys.values()]
+    )
 
     live: list[dict] = []
     for peer in peers:
-        outcome = _cached_outcome(peer, cached.get(keys[str(peer["node_uid"])]))
+        node_uid = str(peer["node_uid"])
+        outcome = _cached_outcome(peer, cached.get(backoff_keys[node_uid]))
+        if outcome is None:
+            outcome = _cached_outcome(peer, cached.get(keys[node_uid]))
         if outcome is None:
             live.append(peer)
         else:
@@ -620,9 +706,7 @@ async def stream_peer_outcomes(
             remaining = deadline - loop.time()
             if remaining <= 0:
                 return _outcome(peer, "timed_out")
-            job = loop.run_in_executor(
-                _PEER_EXECUTOR,
-                _query_and_remember,
+            submitted = _submit_peer_query(
                 peer,
                 query,
                 limit,
@@ -632,6 +716,10 @@ async def stream_peer_outcomes(
                 store,
                 keys[str(peer["node_uid"])],
             )
+            if submitted is None:
+                log.info("Federated search pool is full; peer reported as timed out")
+                return _outcome(peer, "timed_out")
+            job = asyncio.wrap_future(submitted)
             try:
                 answer = await asyncio.wait_for(
                     asyncio.shield(job),

@@ -64,11 +64,7 @@ from crate.federation.playback_prepare import (
 )
 from crate.federation.policy import apply_result_limit, entity_is_allowed
 from crate.federation.results_envelope import RESULTS_CONTRACT, build_results_envelope
-from crate.federation.search import (
-    INBOUND_SEARCH_RETRY_AFTER_SECONDS,
-    handle_remote_search,
-    inbound_search_allowed,
-)
+from crate.federation.search import handle_remote_search, inbound_search_wait
 from crate.federation.signing import (
     SIGNATURE_VERSION,
     SIGNED_HEADERS,
@@ -618,15 +614,16 @@ async def federated_search(body: SearchBody, request: Request):
 
 def _require_search_quota(request: Request, peer: dict, assertion: dict | None) -> None:
     subject_hash = str((assertion or {}).get("sub") or "") or None
-    if not inbound_search_allowed(
+    wait = inbound_search_wait(
         _request_redis(request),
         node_uid=str(peer["node_uid"]),
         subject_hash=subject_hash,
-    ):
+    )
+    if wait is not None:
         raise HTTPException(
             status_code=429,
             detail="Search quota exceeded",
-            headers={"Retry-After": str(INBOUND_SEARCH_RETRY_AFTER_SECONDS)},
+            headers={"Retry-After": str(wait)},
         )
 
 

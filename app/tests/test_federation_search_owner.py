@@ -51,6 +51,11 @@ class _Redis:
     def zadd(self, key, mapping):
         self.sets.setdefault(key, {}).update(mapping)
 
+    def zrange(self, key, start, end, withscores=False):
+        members = sorted(self.sets.get(key, {}).items(), key=lambda item: item[1])
+        selected = members[start : end + 1]
+        return selected if withscores else [member for member, _ in selected]
+
     def expire(self, key, seconds):
         return True
 
@@ -158,7 +163,23 @@ class TestInboundQuota:
             _search(owner, request)
 
         assert denied.value.status_code == 429
-        assert denied.value.headers == {"Retry-After": "10"}
+        retry_after = int(denied.value.headers["Retry-After"])
+        assert 1 <= retry_after <= 60
+
+    def test_rejected_searches_do_not_extend_the_block(self, owner, monkeypatch):
+        from crate.federation import search as owner_search
+
+        monkeypatch.setattr(owner_search, "INBOUND_SEARCH_PER_PEER_PER_MINUTE", 1)
+        redis = _Redis()
+        request = _request(redis)
+
+        _search(owner, request)
+        for _ in range(3):
+            with pytest.raises(HTTPException):
+                _search(owner, request)
+
+        [peer_key] = [key for key in redis.sets if ":peer:" in key]
+        assert len(redis.sets[peer_key]) == 1
 
     def test_one_remote_user_cannot_use_the_whole_peer_quota(self, owner, monkeypatch):
         from crate.federation import search as owner_search

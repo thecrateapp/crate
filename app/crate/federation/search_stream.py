@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -27,11 +28,12 @@ from crate.federation.search_fanout import (
     FanoutSettings,
     PeerOutcome,
     RemoteResultGroups,
-    StoreFanoutCache,
     _stale_replica_node_uids,
     decide_fanout,
     stream_peer_outcomes,
 )
+
+log = logging.getLogger(__name__)
 
 CoverageState = Literal["searching", "complete", "partial", "skipped"]
 SkipReason = Literal["local_only", "federation_unavailable"]
@@ -117,56 +119,67 @@ async def federated_search_events(
     if user.get("auth_type") == "access_token":
         yield skipped("local_only")
         return
-    local_node, peers = await asyncio.to_thread(load_context or _load_context)
-    if not local_node:
-        yield skipped("federation_unavailable")
-        return
-    decision = await asyncio.to_thread(
-        decide_fanout,
-        query,
-        local_total=_local_total(local),
-        peers=peers,
-        stale_node_uids=stale_node_uids or _stale_replica_node_uids,
-        settings=settings,
-    )
-    if not decision.fans_out:
-        yield skipped(decision.reason)
-        return
+    # The local results are out; whatever fails from here on ends the stream
+    # with a coverage, never a broken connection.
+    coverage: SearchCoverage | None = None
+    try:
+        local_node, peers = await asyncio.to_thread(load_context or _load_context)
+        if not local_node:
+            yield skipped("federation_unavailable")
+            return
+        decision = await asyncio.to_thread(
+            decide_fanout,
+            query,
+            local_total=_local_total(local),
+            peers=peers,
+            stale_node_uids=stale_node_uids or _stale_replica_node_uids,
+            settings=settings,
+        )
+        if not decision.fans_out:
+            yield skipped(decision.reason)
+            return
 
-    coverage = SearchCoverage(
-        state="searching",
-        reason=decision.reason,
-        window_ms=window_ms,
-        peers=[
-            {
-                "node_uid": str(peer["node_uid"]),
-                "node_name": str(peer.get("display_name") or ""),
-                "status": "pending",
-            }
-            for peer in decision.peers
-        ],
-    )
-    yield "coverage", coverage.payload()
+        coverage = SearchCoverage(
+            state="searching",
+            reason=decision.reason,
+            window_ms=window_ms,
+            peers=[
+                {
+                    "node_uid": str(peer["node_uid"]),
+                    "node_name": str(peer.get("display_name") or ""),
+                    "status": "pending",
+                }
+                for peer in decision.peers
+            ],
+        )
+        yield "coverage", coverage.payload()
 
-    groups = RemoteResultGroups(local=local)
-    async for outcome in stream_peer_outcomes(
-        query,
-        decision.peers,
-        local_node=local_node,
-        user=user,
-        limit=limit,
-        settings=settings,
-        cache=cache if cache is not None else StoreFanoutCache(),
-    ):
-        coverage.record(outcome)
-        if outcome.answered and _local_total(outcome.results):
-            groups.add(outcome.results)
-            yield (
-                "remote",
-                {"results": groups.snapshot(), "coverage": coverage.payload()},
-            )
-        else:
-            yield "coverage", coverage.payload()
+        groups = RemoteResultGroups(local=local)
+        async for outcome in stream_peer_outcomes(
+            query,
+            decision.peers,
+            local_node=local_node,
+            user=user,
+            limit=limit,
+            settings=settings,
+            cache=cache,
+        ):
+            coverage.record(outcome)
+            if outcome.answered and _local_total(outcome.results):
+                groups.add(outcome.results)
+                yield (
+                    "remote",
+                    {"results": groups.snapshot(), "coverage": coverage.payload()},
+                )
+            else:
+                yield "coverage", coverage.payload()
+    except Exception:
+        log.warning("Federated search stopped after the local results", exc_info=True)
+        if coverage is None:
+            yield skipped("federation_unavailable")
+            return
+    if coverage is None:
+        return
     coverage.finish()
     yield "done", {"coverage": coverage.payload()}
 
@@ -174,7 +187,6 @@ async def federated_search_events(
 __all__ = [
     "SearchCoverage",
     "SkipReason",
-    "StoreFanoutCache",
     "federated_search_events",
     "sse_frame",
 ]

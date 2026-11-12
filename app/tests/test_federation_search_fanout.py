@@ -315,3 +315,114 @@ class TestPeerSelection:
         selected = eligible_search_peers(peers)
 
         assert [peer["node_uid"] for peer in selected] == ["ok", "list-caps"]
+
+
+class TestReviewRegressions:
+    def test_a_429_backs_off_the_peer_for_every_query(self, monkeypatch):
+        calls: list[str] = []
+
+        def limited(peer, query, limit, local_node, user, timeout_s):
+            calls.append(query)
+            return PeerAnswer(status="rate_limited", retry_after_s=10)
+
+        monkeypatch.setattr(search_fanout, "_query_peer", limited)
+        cache = MemoryFanoutCache()
+
+        _collect([FAST], cache=cache, query="joy division")
+        [(_, other)] = _collect([FAST], cache=cache, query="new order")
+
+        assert other.status == "rate_limited"
+        assert calls == ["joy division"]
+
+    def test_a_full_pool_reports_timed_out_without_queueing(
+        self, monkeypatch, peers_answer
+    ):
+        calls, _, _ = peers_answer
+        monkeypatch.setattr(search_fanout, "_PEER_SLOTS", threading.BoundedSemaphore(1))
+        assert search_fanout._PEER_SLOTS.acquire(blocking=False)
+
+        started = time.monotonic()
+        [(_, outcome)] = _collect([FAST])
+
+        assert outcome.status == "timed_out"
+        assert time.monotonic() - started < 0.1
+        assert calls == []
+
+    def test_one_query_per_peer_is_in_flight_at_a_time(self, peers_answer):
+        calls, state, _ = peers_answer
+        state["slow_delay"] = 0.3
+        cache = MemoryFanoutCache()
+
+        async def both():
+            async def one():
+                return [
+                    outcome
+                    async for outcome in stream_peer_outcomes(
+                        "joy division",
+                        [SLOW],
+                        local_node=LOCAL_NODE,
+                        user=None,
+                        limit=20,
+                        settings=FanoutSettings(per_peer_timeout_s=1.0, deadline_s=1.0),
+                        cache=cache,
+                    )
+                ]
+
+            return await asyncio.gather(one(), one())
+
+        first, second = asyncio.run(both())
+
+        assert [o.status for o in first] == [o.status for o in second] == ["answered"]
+        assert calls == ["slow"]
+
+    def test_an_expired_cache_entry_is_ignored(self, peers_answer):
+        calls, _, _ = peers_answer
+        cache = MemoryFanoutCache()
+        key = search_fanout.peer_cache_key("fast", "joy division", limit=20, user=None)
+        cache.set(
+            key,
+            {"status": "answered", "results": {}, "expires_at": time.time() - 1},
+            300,
+        )
+
+        [(_, outcome)] = _collect([FAST], cache=cache)
+
+        assert outcome.status == "answered"
+        assert calls == ["fast"]
+
+    def test_an_old_owner_answer_loses_its_local_ids(self):
+        legacy = {
+            "artists": [{"id": 9, "entity_uid": "a", "slug": "x", "name": "IDLES"}],
+            "albums": [],
+            "tracks": [
+                {
+                    "id": 12,
+                    "entity_uid": "t",
+                    "album_id": 3,
+                    "artist_id": 9,
+                    "album_slug": "brutalism",
+                    "title": "Mother",
+                    "artist": "IDLES",
+                    "album": "Brutalism",
+                }
+            ],
+        }
+
+        results = search_fanout._adapt_peer_answer(
+            legacy, peer={**FAST, "default_grant_preset": "listen"}
+        )
+
+        [track] = results["tracks"]
+        assert track["remote_entity_uid"] == "t"
+        for leaked in ("id", "entity_uid", "album_id", "artist_id", "album_slug"):
+            assert leaked not in track
+        assert "id" not in results["artists"][0]
+
+    def test_album_years_match_across_formats(self):
+        from crate.federation.search_fanout import _album_match_key
+
+        local = {"artist": "IDLES", "name": "Brutalism", "year": "2017-03-10"}
+        assert _album_match_key(local) == _album_match_key({**local, "year": "2017"})
+        assert _album_match_key({**local, "year": None}) == _album_match_key(
+            {"artist": "IDLES", "name": "Brutalism"}
+        )
