@@ -20,6 +20,7 @@ import { bootstrapNativeSessionStore } from "@/lib/server-store";
 import { renderSecureSessionError } from "@/lib/secure-session-error";
 
 import { initTauriRuntime, startTauriOAuthRuntime } from "./lib/tauri-init";
+import { DesktopControlNavigator } from "./components/DesktopControlNavigator";
 import { LinuxWindowTitlebar } from "./components/LinuxWindowTitlebar";
 import {
   applyLinuxDesktopProfile,
@@ -73,6 +74,7 @@ async function bootstrapDesktopApp(): Promise<void> {
       {showTitlebar && <div aria-hidden="true" className="h-9" />}
       <HashRouter useTransitions={hasLinuxWindowTitlebar ? false : undefined}>
         <App />
+        <DesktopControlNavigator />
         <Toaster {...toasterConfig} theme="dark" position="bottom-center" />
       </HashRouter>
     </I18nProvider>,
