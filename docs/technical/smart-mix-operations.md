@@ -137,7 +137,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | `PLANNER_POLICY_VERSION`           | `2`                   | Numeric version of each individual plan               |
 | `PLANNER_POLICY.rules_revision`    | `7`                   | Internal rules revision included in the cache key     |
 | `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`        | Planner on the stored phrases (SM3-D3)                |
-| `PLANNER_POLICY_V3.rules_revision` | `5`                   | Rules revision of v3, in its cache key                |
+| `PLANNER_POLICY_V3.rules_revision` | `6`                   | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
 includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
@@ -1221,8 +1221,15 @@ attempts, and the start and resume calls take it in the same body:
   once nothing is in flight.
 - The wait follows how long the slots have stayed as they are, measured from the last change to
   a `smart_mix` processing row (a claim, a finished or failed analysis): 3 s right after one,
-  then about double each time while nothing changes, up to 30 s. A freed slot is therefore
-  refilled within 30 s at worst and within a few seconds while analyses finish often.
+  then about double each time while nothing changes, up to 10 s. A freed slot is therefore
+  refilled within 10 s at worst and within a few seconds while analyses finish often. With
+  30 s, the cap until 2026-11-11, a freed slot waited about 10 s on average for analyses of
+  about 25 s.
+- The analysis worker's pools take a message only when their single thread is free
+  (`dramatiq_queue_prefetch=1`, set by `run_worker()` for every pool that consumes `heavy`).
+  With Dramatiq's default prefetch of two, a busy process held the next child behind the
+  analysis it was running while other processes sat idle: the median child started at once, but
+  one in ten waited 30 s or more.
 - If the resource governor denies the coordinator after the actor admitted it, the coordinator
   goes back to the queue the same way, for the governor's delay and at most five minutes, with
   the progress `Deferred by resource governor: <reason>`. It never sleeps in a worker process.
@@ -1258,7 +1265,9 @@ On the project server (i7-7700, 4 cores and 8 threads) set `ANALYSIS_WORKER_PROC
 `.env` and recreate the service with `docker compose up -d crate-analysis-worker`.
 `docker-compose.project.yaml` gives it `cpus: "7.0"`, which leaves a logical CPU for Postgres and
 the API at night, and `mem_limit: 14g`, which covers the 1.5 GB at which each process recycles
-itself plus the parent with the import analysis daemons. Watch its memory during the first night
+itself plus the parent with the import analysis daemons. The limit is the process's current
+resident set after a task, and `ANALYSIS_WORKER_MAX_RSS_MB` in `.env` changes it (default 1500); a
+process over it finishes its task and exits, and only that process starts again. Watch its memory during the first night
 with `docker stats crate-analysis-worker`. Eight analyses on four cores share them through
 Hyper-Threading, so the night gains less than double the day's throughput.
 
@@ -1599,6 +1608,19 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 - **Without phrases on both tracks** (v5 and v6 profiles, unsegmented tracks, 3/4) the menu is
   v2's bar heuristic with v2's plan first, so v3 plans exactly as v2. Album, manual and missing
   profile transitions keep v2's single plan.
+- **Listen** asks for the planner in `/api/capabilities` `smart_mix.listen_planner_version`:
+  `smart-mix-v3` when `CRATE_LISTEN_SMART_MIX_V3_ENABLED` is on, `smart-mix-v2` otherwise, and
+  v2 when the field is absent (older servers). `planner_version` and VirtualDJ's
+  `vdj.planner_version` stay on v2 whatever the switch says, so older APKs never change planner.
+- **Listen's caps** (rules revision 6, LV-D9, decided at LV-G1 on 2026-11-10). For every source
+  but Crate Decks (`listen_cap_exempt_sources`), the menu is reordered so that the served plan
+  skips at most 10 s of the incoming intro (`listen_max_skipped_intro_ms`) and cuts at most 20 s
+  of the outgoing outro (`listen_max_unplayed_outro_ms`), measured as
+  `evaluation.music_left_out` measures them: the candidates within both caps first, in their
+  rank order, then v2's own plan (the fallback, even beyond the caps), then the rest. Crate
+  Decks keeps v3's own order, and v2 has no caps. The LV0 report
+  (`2026-11-09-listen-smart-mix-v3-evaluation.md` in the Crate Decks repository) measured these
+  values against 5/10 s and 20/40 s.
 - **Safety**: every candidate goes through `TransitionPlan` and the planner policy
   (`evaluation.policy_violations`); v3 copies v2's limits on tempo, gain, true peak and
   durations.
@@ -1607,7 +1629,7 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
   tracks have a stem analysis of their current file (Smart Mix playlists, or a Crate Decks
   upload), the policy's `stems_layer` is on and the edge belongs to the beatmatch family, the
   phrase menu is scored with the stems layer. Listen, Android, VirtualDJ and every other source
-  get revision 1's menu (Diego, revision 5: Listen's short blends measured worse with the layer
+  get revision 1's menu, within Listen's caps since revision 6 (Diego, revision 5: Listen's short blends measured worse with the layer
   on the industrial set):
 
   - a phrase has voice when the vocal stem or YAMNet's stored byte (`VOCAL_THRESHOLD`) says so;
@@ -1768,7 +1790,12 @@ authentication.
 `CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED`; beatmatch depends on both and on
 `CRATE_ANDROID_BEATMATCH_ENABLED`; bass handoff adds `CRATE_ANDROID_BASS_HANDOFF_ENABLED`.
 The configuration helpers default to false. VirtualDJ also uses `CRATE_VDJ_ENABLED` and, for
-automation, `CRATE_VDJ_AUTOMATION_ENABLED`. The client applies the user's preferences.
+automation, `CRATE_VDJ_AUTOMATION_ENABLED`.
+`CRATE_LISTEN_SMART_MIX_V3_ENABLED` (default false) moves only Listen to `smart-mix-v3`: with it
+on, `/api/capabilities` gives `smart_mix.listen_planner_version: "smart-mix-v3"`, and Listen
+uses it for its plan batches and its native continuation from its next app start. Rollback:
+turn it off and restart `crate-api`; clients go back to v2 at their next app start, with no app
+release. The client applies the user's preferences.
 Do not infer deployed values from defaults or from the existence of the code.
 
 The plan keeps an R1 physical gate that was deferred on 18 October: an external capture of the

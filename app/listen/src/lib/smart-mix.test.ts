@@ -14,6 +14,7 @@ import {
   SMART_TRANSITION_LONG_SECONDS,
   SMART_TRANSITION_SHORT_SECONDS,
   keepServerPlans,
+  resolvePlannerVersion,
   SmartMixTransitionPlanner,
   type SmartMixCapabilities,
   type SmartMixRequest,
@@ -35,6 +36,12 @@ const ENABLED_CAPABILITIES: SmartMixCapabilities = {
   androidBassHandoff: false,
   androidLongBeatmatch: false,
   plannerVersion: "smart-mix-v2",
+};
+
+const V3_CAPABILITIES: SmartMixCapabilities = {
+  ...ENABLED_CAPABILITIES,
+  plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+  listenPlannerVersion: "smart-mix-v3",
 };
 
 const PLAYLIST_SOURCE: PlaySource = {
@@ -879,4 +886,219 @@ describe("effective Smart Mix capabilities", () => {
 
     expect(getSmartMixCapabilities().androidNativeCrossfade).toBe(true);
   });
+});
+
+describe("resolvePlannerVersion", () => {
+  it("uses the planner the server recommends for Listen", () => {
+    expect(resolvePlannerVersion(V3_CAPABILITIES)).toBe("smart-mix-v3");
+  });
+
+  it("stays on smart-mix-v2 on a server without a Listen recommendation", () => {
+    expect(
+      resolvePlannerVersion({
+        ...ENABLED_CAPABILITIES,
+        plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+      }),
+    ).toBe("smart-mix-v2");
+  });
+
+  it("ignores a recommendation the server does not list or the client does not know", () => {
+    expect(
+      resolvePlannerVersion({
+        ...V3_CAPABILITIES,
+        plannerVersions: ["smart-mix-v2"],
+      }),
+    ).toBe("smart-mix-v2");
+    expect(
+      resolvePlannerVersion({
+        ...V3_CAPABILITIES,
+        plannerVersions: ["smart-mix-v2", "smart-mix-v9"],
+        listenPlannerVersion: "smart-mix-v9",
+      }),
+    ).toBe("smart-mix-v2");
+  });
+
+  it("has no planner while Smart Mix is off", () => {
+    expect(
+      resolvePlannerVersion({ ...ENABLED_CAPABILITIES, plannerVersion: null }),
+    ).toBeNull();
+  });
+
+  it("normalises a server without the new fields", () => {
+    setSmartMixCapabilities(ENABLED_CAPABILITIES);
+    expect(getServerSmartMixCapabilities()).toMatchObject({
+      plannerVersions: [],
+      listenPlannerVersion: null,
+    });
+    setSmartMixCapabilities(V3_CAPABILITIES);
+    expect(getServerSmartMixCapabilities()).toMatchObject({
+      plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+      listenPlannerVersion: "smart-mix-v3",
+    });
+  });
+});
+
+describe("SmartMixTransitionPlanner with the recommended planner", () => {
+  function planInput(capabilities: SmartMixCapabilities) {
+    return {
+      revision: "queue-revision-planner",
+      tracks: TRACKS,
+      currentIndex: 0,
+      playSource: PLAYLIST_SOURCE,
+      shuffle: false,
+      offline: false,
+      preferredDurationMs: 4000,
+      capabilities,
+    };
+  }
+
+  it("requests smart-mix-v3 when the server recommends it and installs its plans", async () => {
+    const request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v3",
+      plans: [{ ...serverPlan(TRACKS[0]!, TRACKS[1]!), structureUsed: true }],
+    });
+
+    const plans = await new SmartMixTransitionPlanner(request).plan(
+      planInput(V3_CAPABILITIES),
+    );
+
+    expect(request.mock.calls[0]![2]).toMatchObject({
+      plannerVersion: "smart-mix-v3",
+    });
+    expect(plans[0]).toMatchObject({
+      plannerVersion: 2,
+      durationMs: 4000,
+      outgoingCueMs: 176000,
+    });
+    expect(plans[0]).not.toHaveProperty("structureUsed");
+    expect(plans[0]!.fallbackReason).toBeUndefined();
+  });
+
+  it("drops a response from another planner than the one it asked for", async () => {
+    // Asked smart-mix-v3, answered smart-mix-v2.
+    const request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v2",
+      plans: [
+        serverPlan(TRACKS[0]!, TRACKS[1]!),
+        serverPlan(TRACKS[1]!, TRACKS[2]!),
+      ],
+    });
+
+    const plans = await new SmartMixTransitionPlanner(request).plan(
+      planInput(V3_CAPABILITIES),
+    );
+
+    expect(plans.length).toBeGreaterThan(0);
+    for (const plan of plans) {
+      expect(plan).toMatchObject({
+        fallbackReason: "missing_profile",
+        confidence: 0,
+      });
+    }
+  });
+
+  it("never asks for long blends with smart-mix-v3", async () => {
+    // LV-D10: the user's "Transición máxima" always wins with v3.
+    const longCapabilities = {
+      ...V3_CAPABILITIES,
+      androidLongBeatmatch: true,
+    };
+    const v3Request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v3",
+      plans: [],
+    });
+    await new SmartMixTransitionPlanner(v3Request).plan(
+      planInput(longCapabilities),
+    );
+    const [, , v3Body] = v3Request.mock.calls[0]!;
+    expect(v3Body.plannerVersion).toBe("smart-mix-v3");
+    expect(v3Body.edges[0].context).toMatchObject({ allowBeatmatch: true });
+    expect(v3Body.edges[0].context).not.toHaveProperty("allowLongBeatmatch");
+
+    // With v2 it keeps today's request.
+    const v2Request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v2",
+      plans: [],
+    });
+    await new SmartMixTransitionPlanner(v2Request).plan(
+      planInput({ ...ENABLED_CAPABILITIES, androidLongBeatmatch: true }),
+    );
+    const [, , v2Body] = v2Request.mock.calls[0]!;
+    expect(v2Body.edges[0].context).toMatchObject({
+      allowLongBeatmatch: true,
+    });
+  });
+
+  it("a planner change starts a new planning generation", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ plannerVersion: "smart-mix-v2", plans: [] })
+      .mockResolvedValueOnce({ plannerVersion: "smart-mix-v3", plans: [] });
+    const planner = new SmartMixTransitionPlanner(request);
+
+    await planner.plan(planInput(ENABLED_CAPABILITIES));
+    await planner.plan(planInput(V3_CAPABILITIES));
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]![2]).toMatchObject({
+      plannerVersion: "smart-mix-v3",
+    });
+  });
+
+  it("keeps known album sequences gapless with smart-mix-v3", async () => {
+    const request = vi.fn();
+    const albumTracks = TRACKS.slice(0, 3).map((track) => ({
+      ...track,
+      artist: "Dredg",
+      album: "El Cielo",
+    }));
+
+    const plans = await new SmartMixTransitionPlanner(request).plan({
+      ...planInput(V3_CAPABILITIES),
+      tracks: albumTracks,
+      playSource: { type: "album", name: "El Cielo", id: 1 },
+    });
+
+    expect(request).not.toHaveBeenCalled();
+    expect(plans.length).toBeGreaterThan(0);
+    for (const plan of plans) {
+      expect(plan).toMatchObject({
+        mode: "gapless",
+        fallbackReason: "album_sequence",
+      });
+    }
+  });
+
+  it.each(["smart-mix-v2", "smart-mix-v3"] as const)(
+    "keeps a %s long beatmatch dj-blend intact",
+    async (planner) => {
+      const longPlan = {
+        ...serverPlan(TRACKS[0]!, TRACKS[1]!),
+        mode: "beatmatch" as const,
+        durationMs: 32_000,
+        curve: "dj-blend" as const,
+        incomingTempoRatio: 1.02,
+        beatPhaseOffsetMs: 120,
+      };
+      const request = vi.fn().mockResolvedValue({
+        plannerVersion: planner,
+        plans: [longPlan],
+      });
+      const capabilities =
+        planner === "smart-mix-v3" ? V3_CAPABILITIES : ENABLED_CAPABILITIES;
+
+      const plans = await new SmartMixTransitionPlanner(request).plan(
+        planInput(capabilities),
+      );
+
+      // Nothing clamps a server plan to 12 s.
+      expect(plans[0]).toMatchObject({
+        mode: "beatmatch",
+        durationMs: 32_000,
+        curve: "dj-blend",
+        incomingTempoRatio: 1.02,
+        beatPhaseOffsetMs: 120,
+      });
+    },
+  );
 });

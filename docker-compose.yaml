@@ -982,6 +982,8 @@ services:
       - TORCH_NUM_THREADS=${ANALYSIS_NATIVE_THREADS:-1}
       - NUMBA_NUM_THREADS=${ANALYSIS_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${ANALYSIS_FFMPEG_THREADS:-1}
+      # Resident MB above which a process recycles itself after its task.
+      - CRATE_WORKER_MAX_RSS_MB=${ANALYSIS_WORKER_MAX_RSS_MB:-1500}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
       - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
       - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}

@@ -70,6 +70,7 @@ def test_decks_reads_stems_and_a_contributor_may_upload(
 
     assert features == [
         "library_cursor",
+        "profiles_batch",
         "stems",
         "stem_upload",
         "local_refinement",
@@ -85,6 +86,7 @@ def test_no_stem_upload_without_the_contribute_permission(
 
     assert _capabilities(test_app)["decks"]["features"] == [
         "library_cursor",
+        "profiles_batch",
         "stems",
         "local_refinement",
     ]
@@ -97,6 +99,7 @@ def test_no_stem_upload_while_uploads_are_off(test_app, uploads) -> None:
 
     assert _capabilities(test_app)["decks"]["features"] == [
         "library_cursor",
+        "profiles_batch",
         "stems",
         "local_refinement",
     ]
@@ -107,6 +110,7 @@ def test_an_unreadable_setting_hides_stem_upload(test_app, uploads) -> None:
 
     assert _capabilities(test_app)["decks"]["features"] == [
         "library_cursor",
+        "profiles_batch",
         "stems",
         "local_refinement",
     ]

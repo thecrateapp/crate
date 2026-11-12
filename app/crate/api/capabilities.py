@@ -18,6 +18,7 @@ from crate.config import (
     android_bass_handoff_enabled,
     android_beatmatch_enabled,
     android_native_crossfade_enabled,
+    listen_smart_mix_v3_enabled,
     smart_mix_enabled,
     vdj_automation_enabled,
     vdj_enabled,
@@ -30,6 +31,7 @@ from crate.db.repositories.smart_mix_stems import stem_uploads_enabled
 from crate.llm.prompts.smart_mix_transition import PROMPT_VERSION
 from crate.smart_mix_ai import gate_reason, provider_kind, refinement_gate
 from crate.db.cache_settings import get_setting
+from crate.smart_mix.policy import PLANNER_POLICY_V3
 from crate.smart_mix.stem_storage import configured_stems_directory
 from crate.smart_mix.stems import (
     STEM_CONTRIBUTE_PERMISSION,
@@ -80,6 +82,7 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             planner_version=PLANNER_IDENTIFIER if available else None,
             planner_versions=list(PLANNER_IDENTIFIERS) if available else [],
             structure=available and _structure_available(),
+            listen_planner_version=_listen_planner(available),
             android_native_crossfade=native_crossfade,
             android_beatmatch=beatmatch,
             android_bass_handoff=bass_handoff,
@@ -114,6 +117,18 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
         ),
         access_token=_access_token_capabilities(request, vdj_automation),
     )
+
+
+def _listen_planner(available: bool) -> str | None:
+    """The planner Listen asks for: v3 behind its switch, v2 otherwise (LV-D3).
+
+    planner_version and the VirtualDJ contract never move; only this field does.
+    """
+    if not available:
+        return None
+    if listen_smart_mix_v3_enabled():
+        return PLANNER_POLICY_V3.identifier
+    return PLANNER_IDENTIFIER
 
 
 def _structure_available() -> bool:
@@ -162,9 +177,9 @@ def _decks_features(request: Request) -> list[DecksFeature]:
     # Each feature is added by the server change that serves its contract: S3
     # library_cursor (/api/decks), S4 profiles_batch, S5
     # beatmatch/bass_handoff/long_beatmatch, S7 cues, Smart Mix Stems ST1
-    # stems/stem_upload and ST3 local_refinement. S4, S5 and S7 are not served
-    # yet. Do not derive them from the Android Smart Mix flags.
-    features: list[DecksFeature] = ["library_cursor", "stems"]
+    # stems/stem_upload and ST3 local_refinement. S5 and S7 are not served yet.
+    # Do not derive them from the Android Smart Mix flags.
+    features: list[DecksFeature] = ["library_cursor", "profiles_batch", "stems"]
     if _may_upload_stems(request):
         features.append("stem_upload")
     # smart-mix-v3 serves the candidate menu and policy limits to the decks context.

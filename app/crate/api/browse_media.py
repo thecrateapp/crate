@@ -100,6 +100,7 @@ from crate.federation.global_playback import (
     resolve_global_track_playback,
 )
 from crate.federation.playback_prepare import prepare_remote_playback_variants
+from crate.smart_mix.source import smart_mix_source_revision_from_stat
 from crate.streaming.paths import resolve_data_file
 from crate.streaming.policy import normalize_policy
 from crate.streaming.service import (
@@ -172,15 +173,20 @@ def _queue_completeness_refresh() -> str:
 
 
 def _with_playable_audio(tracks: list[dict]) -> list[dict]:
-    """Replace each server path with `playable` (S9); never leak the path.
+    """Replace each server path with `playable` (S9) and `source_revision`.
 
     Same check as the stream endpoints: a regular file inside the library.
+    The one stat per track also gives the file's revision, as on the Decks
+    track pages (S3). Never leaks the path.
     """
     stats = stat_playable_sources([track.get("path") for track in tracks])
     return [
         {
             **{key: value for key, value in track.items() if key != "path"},
             "playable": file_stat is not None,
+            "source_revision": (
+                smart_mix_source_revision_from_stat(file_stat) if file_stat else None
+            ),
         }
         for track, file_stat in zip(tracks, stats, strict=True)
     ]

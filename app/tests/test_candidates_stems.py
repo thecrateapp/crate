@@ -53,6 +53,15 @@ from tests.smart_mix_candidate_cases import (
 FIXTURES = Path(__file__).resolve().parent / "fixtures/smart_mix"
 GOLDEN = json.loads((FIXTURES / "candidates_v3_rules1.json").read_text())
 GOLDEN_RULES5 = FIXTURES / "candidates_v3_rules5.json"
+# Rules revision 6 (LV-G1): every source but Crate Decks gets revision 1's menu
+# reordered within Listen's caps, recorded once from the tested code.
+GOLDEN_LISTEN_CAPS = FIXTURES / "candidates_v3_listen_caps.json"
+# Revision 1's ranking, before Listen's caps reorder it: what the stems tests compare.
+UNCAPPED = replace(
+    PLANNER_POLICY_V3,
+    listen_max_skipped_intro_ms=None,
+    listen_max_unplayed_outro_ms=None,
+)
 # Genre beatmatch priors (crate.smart_mix.transition_fit): house and techno are 0.95,
 # rock 0.15. The layer needs both tracks in the beatmatch family.
 IN_FAMILY = (0.95, 0.95)
@@ -224,8 +233,8 @@ def _picked(
 def test_rules_revision_5_gates_the_stems_layer_by_client_and_mix_type() -> None:
     # Revision 3 gated the layer by genre and took voice from either detector;
     # revision 4 let the machine-drum industrial family in; revision 5 serves it to
-    # Crate Decks only (STEM-G1).
-    assert PLANNER_POLICY_V3.rules_revision == 5
+    # Crate Decks only (STEM-G1); revision 6 adds Listen's caps for every other source.
+    assert PLANNER_POLICY_V3.rules_revision == 6
     assert PLANNER_POLICY_V3.stems_layer_sources == ("decks",)
     assert PLANNER_POLICY_V3.stems_layer is True
     assert PLANNER_POLICY_V3.stems_layer_min_genre_prior == 0.5
@@ -238,7 +247,7 @@ def test_rules_revision_5_gates_the_stems_layer_by_client_and_mix_type() -> None
 def test_identical_candidates_and_scores_without_stems(case) -> None:
     name, outgoing, incoming, ctx = case
 
-    menu = _menu(outgoing, incoming, ctx)
+    menu = _menu(outgoing, incoming, ctx, UNCAPPED)
 
     assert [candidate.to_dict() for candidate in menu] == GOLDEN["cases"][name]
     assert not any(candidate.stems_used for candidate in menu)
@@ -256,7 +265,7 @@ def test_one_stems_layer_alone_changes_nothing(case) -> None:
     every = set(range(len(outgoing.phrases)))
     with_outgoing_stems = _with_stems(outgoing, vocals=every, bass=every, drums=every)
 
-    menu = _menu(with_outgoing_stems, incoming, ctx)
+    menu = _menu(with_outgoing_stems, incoming, ctx, UNCAPPED)
 
     assert [candidate.to_dict() for candidate in menu] == GOLDEN["cases"][name]
 
@@ -307,7 +316,7 @@ def test_prefers_an_overlap_where_the_stem_vocals_do_not_collide() -> None:
         incoming_genre_prior=IN_FAMILY[1],
     )
     assert listen.stems_used is False
-    assert list(listen.candidates) == without
+    assert list(listen.candidates) == _menu(outgoing, incoming, context())
 
     assert _picked(without) == (OUTRO, INTRO, 8)
     assert _picked(with_stems) == (OUTRO, BUILD, 8)
@@ -414,12 +423,16 @@ def test_outside_the_family_the_menu_is_revision_1s(case, priors) -> None:
     "case", _phrased_golden_cases(), ids=[case[0] for case in _phrased_golden_cases()]
 )
 def test_other_clients_get_revision_1s_menu_in_the_family(case, source) -> None:
+    # Revision 1's menu, within Listen's caps since revision 6.
     name, outgoing, incoming, ctx = case
     other = replace(ctx, source=source) if ctx.source == "playlist" else ctx
+    golden = json.loads(GOLDEN_LISTEN_CAPS.read_text())
 
     menu = _menu(_patterned(outgoing), _patterned(incoming), other)
 
-    assert [candidate.to_dict() for candidate in menu] == GOLDEN["cases"][name]
+    assert [candidate.to_dict() for candidate in menu] == golden["cases"][name]
+    uncapped = _menu(_patterned(outgoing), _patterned(incoming), other, UNCAPPED)
+    assert [candidate.to_dict() for candidate in uncapped] == GOLDEN["cases"][name]
     assert not any(candidate.stems_used for candidate in menu)
 
 
@@ -438,7 +451,8 @@ def _rules5_menus() -> dict[str, list[dict]]:
 def test_rules_revision_5_menus_with_stems_match_their_golden() -> None:
     golden = json.loads(GOLDEN_RULES5.read_text())
 
-    assert golden["rulesRevision"] == PLANNER_POLICY_V3.rules_revision
+    # Revision 6 changed no Crate Decks menu: its golden is still revision 5's.
+    assert golden["rulesRevision"] == 5
     assert golden["priors"] == list(IN_FAMILY)
     assert golden["source"] == "decks"
     assert _rules5_menus() == golden["cases"]
@@ -741,3 +755,43 @@ def test_a_pair_needs_both_tracks_in_the_family() -> None:
     assert applies("Front 242", "Godflesh")
     assert not applies("Godflesh", "Darkthrone")
     assert not applies("Black Flag", "Ministry")
+
+
+def test_decks_menus_ignore_the_listen_caps() -> None:
+    # Rules revision 6 caps the music v3 leaves out for every source but Crate
+    # Decks (LV-D9); Decks' menus stay revision 5's, byte for byte.
+    golden = json.loads(GOLDEN_RULES5.read_text())
+
+    assert PLANNER_POLICY_V3.listen_max_skipped_intro_ms == 10_000
+    assert PLANNER_POLICY_V3.listen_max_unplayed_outro_ms == 20_000
+    assert "decks" in PLANNER_POLICY_V3.listen_cap_exempt_sources
+    assert golden["rulesRevision"] == 5
+    assert _rules5_menus() == golden["cases"]
+
+
+def _listen_caps_menus() -> dict[str, list[dict]]:
+    return {
+        name: [candidate.to_dict() for candidate in _menu(outgoing, incoming, ctx)]
+        for name, outgoing, incoming, ctx in _golden_cases()
+    }
+
+
+def test_listen_caps_golden() -> None:
+    # Generated once from the tested code (rules revision 6); never regenerated after
+    # a change.
+    golden = json.loads(GOLDEN_LISTEN_CAPS.read_text())
+
+    assert golden["rulesRevision"] == PLANNER_POLICY_V3.rules_revision
+    assert golden["caps"] == {
+        "maxSkippedIntroMs": PLANNER_POLICY_V3.listen_max_skipped_intro_ms,
+        "maxUnplayedOutroMs": PLANNER_POLICY_V3.listen_max_unplayed_outro_ms,
+    }
+    assert _listen_caps_menus() == golden["cases"]
+    # The caps changed some of revision 1's Listen menus; album and manual kept v2's.
+    changed = [
+        name
+        for name in golden["cases"]
+        if golden["cases"][name] != GOLDEN["cases"][name]
+    ]
+    assert changed
+    assert golden["cases"]["album_gapless"] == GOLDEN["cases"]["album_gapless"]
