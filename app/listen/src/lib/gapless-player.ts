@@ -379,27 +379,20 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
 export function destroyPlayer(): void {
   playerControls.cancelPendingRecovery();
+  audioRecovery.reset();
   stopFade();
   resetEqualizer();
   setEqualizerHost(null);
   lastPlaybackRate = 1.0;
   if (instance) {
-    // Gapless-5 shares a single AudioContext across every instance via
-    // `window.gapless5AudioContext` — if we don't clear it here, the next
-    // initPlayer() in this same page session (e.g. logout → login without
-    // a reload) reuses a context that belonged to the instance we just
-    // tore down instead of getting a fresh one.
-    const previousContext = getAudioContext();
     try {
-      instance.stop();
-      instance.removeAllTracks();
+      instance.dispose();
     } catch {
       /* ignore */
     }
     instance = null;
     currentAnalyser = null;
     currentTrackFullyBuffered = false;
-    audioRecovery.clearSharedGaplessAudioContext(previousContext);
   }
   setVolumeSink(null);
   tauriPlaybackWasActive = false;
@@ -499,7 +492,6 @@ const playerControls: GaplessPlayerControls = createGaplessPlayerControls({
 function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   if (!instance) return;
   const previous = instance;
-  const previousContext = getAudioContext();
   const tracks = previous.getTracks();
   const index = Math.max(0, Math.min(previous.getIndex(), tracks.length - 1));
   const previousTrackPath = previous.getTrack();
@@ -534,8 +526,7 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   resetEqualizer();
   setEqualizerHost(null);
   try {
-    previous.stop();
-    previous.removeAllTracks();
+    previous.dispose();
   } catch {
     /* ignore */
   }
@@ -543,7 +534,6 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   instance = null;
   currentAnalyser = null;
   currentTrackFullyBuffered = false;
-  audioRecovery.clearSharedGaplessAudioContext(previousContext);
 
   const nextPlayer = initPlayer(currentCallbacks);
   if (tracks.length > 0) {

@@ -52,8 +52,8 @@ function createControls(options: ControlsFixtureOptions = {}) {
   const prepare = vi.fn(options.prepare ?? (async () => undefined));
   const needsRecovery = vi.fn(() => options.recoveryRequired ?? false);
   const audioRecovery = {
-    clearSharedGaplessAudioContext: vi.fn(),
     install: vi.fn(),
+    reset: vi.fn(),
     needsRecovery,
     prepare,
   };

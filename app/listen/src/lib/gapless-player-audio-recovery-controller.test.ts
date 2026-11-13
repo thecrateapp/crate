@@ -49,6 +49,40 @@ describe("gapless player audio recovery controller", () => {
     ).toBe(true);
   });
 
+  it("does not wake a replacement context when an old resume settles after teardown", async () => {
+    let finishResume!: () => void;
+    const old = {
+      state: "suspended",
+      resume: () =>
+        new Promise<void>((resolve) => {
+          finishResume = resolve;
+        }),
+    } as unknown as AudioContext;
+    let current = old;
+    const next = {
+      state: "running",
+      createGain: vi.fn(),
+    } as unknown as AudioContext;
+    const controller = createAudioRecoveryController({
+      getAudioContext: () => current,
+      isTauriDesktopRuntime: () => true,
+      isPlaybackActive: () => false,
+      isOutputStale: () => false,
+      canReuseCurrentTrackBuffer: () => false,
+      restoreBufferedPlaybackPosition: () => null,
+      markOutputStale: vi.fn(),
+      rebuildPlayer: vi.fn(),
+      clearOutputStale: vi.fn(),
+    });
+    const wake = controller.prepare("first");
+    controller.reset();
+    current = next;
+    expect(controller.needsRecovery()).toBe(false);
+    finishResume();
+    await wake;
+    expect(next.createGain).not.toHaveBeenCalled();
+  });
+
   it("deduplicates concurrent context wake operations", async () => {
     let releaseResume: (() => void) | undefined;
     const resume = vi.fn(

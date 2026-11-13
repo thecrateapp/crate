@@ -84,6 +84,7 @@ type MockGapless5Instance = {
   play: MockFn;
   pause: MockFn;
   stop: MockFn;
+  dispose: MockFn;
   next: MockFn;
   prev: MockFn;
   gotoTrack: MockFn;
@@ -117,6 +118,7 @@ function mkMockInstance(
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
+    dispose: vi.fn(),
     next: vi.fn(),
     prev: vi.fn(),
     gotoTrack: vi.fn(),
@@ -477,8 +479,7 @@ describe("destroyPlayer", () => {
     initPlayer();
     destroyPlayer();
 
-    expect(mock.stop).toHaveBeenCalled();
-    expect(mock.removeAllTracks).toHaveBeenCalled();
+    expect(mock.dispose).toHaveBeenCalledOnce();
     expect(getPlayer()).toBeNull();
   });
 
@@ -514,7 +515,7 @@ describe("destroyPlayer", () => {
 
   it("gracefully handles errors during cleanup", () => {
     initPlayer();
-    mock.stop.mockImplementation(() => {
+    mock.dispose.mockImplementation(() => {
       throw new Error("context closed");
     });
 

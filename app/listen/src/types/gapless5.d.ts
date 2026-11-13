@@ -30,6 +30,7 @@ declare module "@/lib/gapless5/gapless5" {
     play(): void;
     pause(): void;
     stop(): void;
+    dispose(): void;
     playpause(): void;
     isPlaying(): boolean;
 

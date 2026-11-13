@@ -447,11 +447,11 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     if (audio) {
       audio.pause();
     }
+    if (endedCallback !== null) {
+      window.clearTimeout(endedCallback);
+      endedCallback = null;
+    }
     if (source) {
-      if (endedCallback) {
-        window.clearTimeout(endedCallback);
-        endedCallback = null;
-      }
       source.stop(0);
       source.disconnect();
     }
@@ -505,10 +505,12 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
       position = 0;
     }
     const looped = player.isSingleLoop();
+    const generation = loadGeneration;
 
     if (buffer !== null) {
       setState(Gapless5State.Starting);
-      player.context.resume().then(() => {
+      const playDecodedBuffer = () => {
+        if (generation !== loadGeneration) return;
         if (state === Gapless5State.Starting) {
           gainNode.gain.value = this.getVolume();
 
@@ -575,6 +577,10 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
           source.stop();
           source.disconnect();
         }
+      };
+      player.context.resume().then(playDecodedBuffer, (error) => {
+        if (generation === loadGeneration && state === Gapless5State.Starting)
+          onError(error);
       });
     } else if (audio !== null) {
       const offsetSec = position / 1000;
@@ -587,11 +593,15 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
       // Resume the AudioContext before HTML5 play — mobile browsers
       // require this to happen inside a user-gesture call stack.
       if (player.context && player.context.state === "suspended") {
-        player.context.resume();
+        void player.context.resume().catch((error) => {
+          if (generation === loadGeneration)
+            log.warn("Could not resume WebAudio", error);
+        });
       }
       audio
         .play()
         .then(() => {
+          if (generation !== loadGeneration) return;
           if (state === Gapless5State.Starting) {
             log.debug(
               `Playing HTML5 Audio${looped ? " (looped)" : ""}: ${
@@ -611,7 +621,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
           }
         })
         .catch((e) => {
-          if (e.name === "AbortError") return;
+          if (generation !== loadGeneration || e.name === "AbortError") return;
           log.warn(`Failed to play ${this.audioPath}: ${e.message}`);
           // Notify the player so the UI can react (e.g. show retry)
           if (e.name === "NotAllowedError") {
@@ -683,7 +693,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         }
       }
       if (gainNode !== null) {
-        const { currentTime } = window.gapless5AudioContext;
+        const { currentTime } = player.context;
         // Ramping to prevent clicks
         // Not ramping for the whole fade because user can pause, set master volume, etc.
         gainNode.gain.linearRampToValueAtTime(
@@ -732,18 +742,17 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
   };
 
   const fetchBlob = (audioPath, loader) => {
+    const generation = loadGeneration;
     fetch(audioPath)
-      .then((r) => {
-        if (r.ok) {
-          r.blob().then((blob) => {
-            loader(blob);
-          });
-        } else {
-          onError(r.statusUI);
-        }
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.blob();
       })
-      .catch((e) => {
-        onError(e);
+      .then((blob) => {
+        if (generation === loadGeneration) loader(blob);
+      })
+      .catch((error) => {
+        if (generation === loadGeneration) onError(error);
       });
   };
 
@@ -1413,6 +1422,9 @@ function Gapless5(options = {}, deprecated = {}) {
 
   // System
   let tickCallback = null;
+  let disposed = false;
+  const crossfadeTimers = new Set();
+  const controls = new AbortController();
   this.tickMS = 27; // fast enough for numbers to look real-time
   this.avgTickMS = this.tickMS;
   this.initialized = false;
@@ -1505,8 +1517,11 @@ function Gapless5(options = {}, deprecated = {}) {
   this.id = options.guiId || Math.floor((1 + Math.random()) * 0x10000);
   window.gapless5Players[this.id] = this;
 
-  // There can be only one AudioContext per window, so to have multiple players we must define this outside the player scope
-  if (window.gapless5AudioContext === undefined) {
+  // Players in the same window share a live output context.
+  if (
+    !window.gapless5AudioContext ||
+    window.gapless5AudioContext.state === "closed"
+  ) {
     const MaybeContext = window.AudioContext || window.webkitAudioContext;
     if (MaybeContext) {
       window.gapless5AudioContext = new MaybeContext();
@@ -1777,12 +1792,16 @@ function Gapless5(options = {}, deprecated = {}) {
         log.error(`Gapless5 mapKeys() error: no function named '${key}'`);
       }
     }
-    document.addEventListener("keydown", (e) => {
-      const keyCode = e.key.charCodeAt(0);
-      if (keyCode in this.keyMappings) {
-        this.keyMappings[keyCode](e);
-      }
-    });
+    document.addEventListener(
+      "keydown",
+      (e) => {
+        const keyCode = e.key.charCodeAt(0);
+        if (keyCode in this.keyMappings) {
+          this.keyMappings[keyCode](e);
+        }
+      },
+      { signal: controls.signal },
+    );
   };
 
   /**
@@ -1882,9 +1901,11 @@ function Gapless5(options = {}, deprecated = {}) {
             this.fadingTrack = null;
           };
           this.fadingTrack = this.getIndex();
-          window.setTimeout(() => {
+          const timer = window.setTimeout(() => {
+            crossfadeTimers.delete(timer);
             tryStopFadingTrack();
           }, this.crossfade);
+          crossfadeTimers.add(timer);
           this.next(null, true, true);
         }
       } else {
@@ -2374,7 +2395,49 @@ function Gapless5(options = {}, deprecated = {}) {
     if (tickCallback) {
       window.clearTimeout(tickCallback);
     }
-    tickCallback = window.setTimeout(tick, this.tickMS);
+    if (!disposed) tickCallback = window.setTimeout(tick, this.tickMS);
+  };
+
+  this.dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    window.clearTimeout(tickCallback);
+    for (const timer of crossfadeTimers) window.clearTimeout(timer);
+    crossfadeTimers.clear();
+    controls.abort();
+    try {
+      this.stop();
+    } catch (error) {
+      log.warn("Could not stop a retiring player", error);
+    }
+    try {
+      this.removeAllTracks();
+    } finally {
+      this.masterOut?.disconnect();
+      if (this._outputChainOutput) {
+        try {
+          this._outputChainOutput.disconnect(this.context.destination);
+        } catch {
+          // The effect owner may have disconnected it during teardown.
+        }
+      }
+      const players = window.gapless5Players;
+      if (players[this.id] === this) delete players[this.id];
+      const ctx = this.context;
+      if (
+        ctx &&
+        !Object.values(players).some((player) => player.context === ctx)
+      ) {
+        if (window.gapless5AudioContext === ctx)
+          window.gapless5AudioContext = undefined;
+        if (ctx.state !== "closed")
+          void ctx
+            .close()
+            .catch((error) =>
+              log.warn("Could not close the audio context", error),
+            );
+      }
+    }
   };
 
   const createGUI = (playerHandle) => {
@@ -2440,7 +2503,7 @@ function Gapless5(options = {}, deprecated = {}) {
     const onMouseDown = (elementId, cb) => {
       const elem = getElement(elementId);
       if (elem) {
-        elem.addEventListener("mousedown", cb);
+        elem.addEventListener("mousedown", cb, { signal: controls.signal });
       }
     };
 
