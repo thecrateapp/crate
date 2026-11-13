@@ -148,9 +148,7 @@ describe("warmLauncherArt", () => {
     return {
       authorize: vi.fn((url: string) => Promise.resolve(url)),
       fetch: vi.fn(() =>
-        Promise.resolve(
-          new Response(new Blob([new Uint8Array([1])]), { status: 200 }),
-        ),
+        Promise.resolve(new Response(new Uint8Array([1]), { status: 200 })),
       ),
       toSquare: vi.fn((blob: Blob) => Promise.resolve(blob)),
       store: vi.fn<LauncherArtDeps["store"]>(() => Promise.resolve(true)),

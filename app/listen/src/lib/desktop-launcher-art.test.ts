@@ -36,8 +36,9 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const okImage = () =>
-  new Response(new Blob([new Uint8Array([1, 2, 3])]), { status: 200 });
+// A byte body, not a Blob: Node 22's undici reads a Blob body through
+// `.stream()`, which jsdom's Blob lacks, so `new Response(blob)` threw.
+const okImage = () => new Response(new Uint8Array([1, 2, 3]), { status: 200 });
 
 function deps(overrides: Partial<LauncherArtDeps> = {}) {
   return {
@@ -45,9 +46,7 @@ function deps(overrides: Partial<LauncherArtDeps> = {}) {
       Promise.resolve(`${url}&media_ticket=SECRET`),
     ),
     fetch: vi.fn(() =>
-      Promise.resolve(
-        new Response(new Blob([new Uint8Array([1, 2, 3])]), { status: 200 }),
-      ),
+      Promise.resolve(new Response(new Uint8Array([1, 2, 3]), { status: 200 })),
     ),
     toSquare: vi.fn(() =>
       Promise.resolve(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])])),
@@ -122,7 +121,11 @@ describe("launcher art", () => {
       expect.stringContaining("media_ticket=SECRET"),
       expect.objectContaining({ priority: "high" }),
     );
-    expect(d.toSquare).toHaveBeenCalledWith(expect.any(Blob), 256);
+    // the fetched image (undici's Blob under Node 22, not jsdom's global)
+    expect(d.toSquare).toHaveBeenCalledWith(
+      expect.objectContaining({ size: 3 }),
+      256,
+    );
     expect(d.store).toHaveBeenCalledWith(
       `album:${S}:11`,
       [0xff, 0xd8, 0xff, 0xe0],
