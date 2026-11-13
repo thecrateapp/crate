@@ -143,7 +143,7 @@ still required. Generic low/drift rule support is not proof that those sources
 exist. See [MCP observations](./11-crate-mcp.md) for exact source coverage.
 
 The supervisor is the only push channel to the Crate Operator chat; the legacy built-in
-Telegram bot was removed. The example config ships three alert rules over
+Telegram bot was removed. The example config ships four alert rules over
 `get_observability_summary`:
 
 - `instance/health-score` (`low`): the health score persisted by the worker
@@ -157,6 +157,14 @@ Telegram bot was removed. The example config ships three alert rules over
   marked as a lower bound when a truncated sample contained only new rows.
 - `library/new-releases` (`digest`): releases detected for library artists in the
   last 7 days, one message per hour at most.
+- `backups/backup-alerts` (`digest`): the open backup alerts the `backup_alerts`
+  task stores every 5 minutes (a failing destination, a late copy, a failed
+  verification, restore drill, dump or local retention), grouped by kind with a
+  30-minute cooldown. The task keeps one open alert per condition until it clears
+  and gives it an occurrence `id`, so each one is announced once; one that clears
+  and comes back is a new occurrence. Rows carry `id`, `kind`, `level`, the
+  destination's name and `opened_at`, never error text. Evidence older than 900
+  seconds does not count. See [Managed backups](admin-backups.md#alerts).
 
 Per-task completion messages and playback notifications are intentionally not
 recreated.

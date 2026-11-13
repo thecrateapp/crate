@@ -119,6 +119,18 @@
         "status"
       ],
       "cooldown_seconds": 3600
+    },
+    {
+      "id": "backup-alerts",
+      "subsystem": "backups",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "sources", "backup_alerts"],
+      "kind": "digest",
+      "field": ["rows"],
+      "group_field": ["kind"],
+      "row_fields": ["id", "kind", "level", "destination", "opened_at"],
+      "fresh_seconds": 900,
+      "cooldown_seconds": 1800
     }
   ]
 }

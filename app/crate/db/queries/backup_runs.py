@@ -104,6 +104,48 @@ def latest_successful_dump(*, session: Session | None = None) -> dict[str, Any] 
     return runs[0] if runs else None
 
 
+LOCAL_RUN_KINDS = ("dump", "local_retention")
+
+
+def latest_local_runs(*, session: Session | None = None) -> dict[str, dict[str, Any]]:
+    """The latest run of each local kind (``dump``, ``local_retention``), and the
+    latest successful one: ``{"dump": run, "dump_succeeded": run, ...}``."""
+
+    def _impl(current: Session) -> dict[str, dict[str, Any]]:
+        rows = current.execute(
+            text(
+                f"""
+                SELECT * FROM (
+                    SELECT DISTINCT ON (kind) 'latest' AS slot, {_COLUMNS}
+                    FROM backup_runs
+                    WHERE kind = ANY(:kinds) AND destination_id IS NULL
+                    ORDER BY kind, started_at DESC, id DESC
+                ) latest
+                UNION ALL
+                SELECT * FROM (
+                    SELECT DISTINCT ON (kind) 'succeeded' AS slot, {_COLUMNS}
+                    FROM backup_runs
+                    WHERE kind = ANY(:kinds) AND destination_id IS NULL
+                      AND status = 'succeeded'
+                    ORDER BY kind, started_at DESC, id DESC
+                ) succeeded
+                """
+            ),
+            {"kinds": list(LOCAL_RUN_KINDS)},
+        ).mappings()
+        out: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            run = dict(row)
+            slot = run.pop("slot")
+            out[run["kind"] if slot == "latest" else f"{run['kind']}_succeeded"] = run
+        return out
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 def latest_destination_runs(
     *, session: Session | None = None
 ) -> dict[str, dict[str, dict[str, Any]]]:
@@ -272,11 +314,13 @@ def count_backup_runs(
 
 
 __all__ = [
+    "LOCAL_RUN_KINDS",
     "count_backup_runs",
     "repository_size_series",
     "get_backup_run",
     "latest_tier_copies",
     "latest_destination_runs",
+    "latest_local_runs",
     "latest_successful_dump",
     "list_backup_runs",
 ]

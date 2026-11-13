@@ -828,6 +828,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "backup_verify",
             "backup_restore_drill",
             "backup_policies_tick",
+            "backup_alerts",
         ),
     ),
     (

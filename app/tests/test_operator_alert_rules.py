@@ -683,3 +683,65 @@ def test_example_config_loads_with_errors_critical_enabled(tmp_path):
     assert "errors-critical" in [rule.id for rule in enabled]
     # Still within the eight distinct MCP observations a cycle may make.
     assert len({rule.request_key for rule in enabled}) <= 8
+
+
+def backup_alerts_summary(now, rows):
+    return {
+        "data": {
+            "sources": {
+                "backup_alerts": {
+                    "source": "backup_alerts",
+                    "availability": "available",
+                    "observed_at": iso(now),
+                    "coverage": "partial",
+                    "data": {"rows": rows, "open_count": len(rows)},
+                    "truncated": False,
+                }
+            }
+        }
+    }
+
+
+def test_example_configs_ship_the_backup_alerts_digest():
+    for name in ("config.operator.example.json", "config.example.json"):
+        rule = example_rules(name)["backup-alerts"]
+        assert (rule.subsystem, rule.kind, rule.enabled) == ("backups", "digest", True)
+        assert list(rule.source_path) == ["data", "sources", "backup_alerts"]
+        assert list(rule.group_field) == ["kind"] and "text" not in rule.row_fields
+    installer = (
+        ROOT / "app/installer/internal/assets/files/config.operator.example.json"
+    )
+    assert (
+        installer.read_text()
+        == (ROOT / "deploy/operator/config.operator.example.json").read_text()
+    )
+
+
+def test_each_backup_alert_occurrence_is_announced_once(state):
+    rule = example_rules()["backup-alerts"]
+    supervisor = Supervisor(state, "lab", [rule])
+
+    def see(now, rows):
+        supervisor.observe({rule.request_key: backup_alerts_summary(now, rows)}, now)
+
+    failing = {
+        "id": "4f1c0a9e2b3d5c6f",
+        "kind": "destination_failing",
+        "level": "danger",
+        "destination": "Cloudflare R2",
+        "opened_at": "2027-01-15T08:00:00+00:00",
+    }
+    see(BASE, [])
+    see(BASE + 300, [failing])
+    see(BASE + 600, [failing])
+    see(BASE + 3600, [failing])
+    sent = messages(state)
+    assert len(sent) == 1
+    payload = json.loads(sent[0].split("new; ", 1)[1])
+    assert payload["group"] == "destination_failing"
+    assert payload["latest"] == [failing]
+
+    # Cleared, then back: a new occurrence id is a new message.
+    see(BASE + 3900, [])
+    see(BASE + 4200, [{**failing, "id": "9a8b7c6d5e4f3a2b"}])
+    assert len(messages(state)) == 2

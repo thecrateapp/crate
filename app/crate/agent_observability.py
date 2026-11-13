@@ -349,6 +349,53 @@ def _health(records, failure):
     return result
 
 
+BACKUP_ALERT_FIELDS = ("id", "kind", "level", "destination", "opened_at")
+
+
+def _backup_alerts(records, failure):
+    """Open backup alerts as the ``backup_alerts`` task stored them (BK6)."""
+    record = records.get("backup_alerts")
+    payload = (record or {}).get("payload")
+    rows = payload.get("open") if isinstance(payload, dict) else None
+    valid = (
+        isinstance(rows, list)
+        and len(rows) <= 20
+        and all(
+            isinstance(row, dict)
+            and isinstance(row.get("id"), str)
+            and 1 <= len(row["id"]) <= 64
+            and isinstance(row.get("kind"), str)
+            for row in rows
+        )
+    )
+    if not record or not valid or not isinstance(rows, list):
+        result = _source("backup_alerts", record, None, failure, fresh=900)
+        if record and payload and not failure:
+            result["reason"] = (
+                "Stored backup alerts have invalid producer types or bounds"
+            )
+        return result
+    selected = [
+        {key: str(row.get(key) or "")[:120] for key in BACKUP_ALERT_FIELDS}
+        for row in rows
+    ]
+    result = _source(
+        "backup_alerts",
+        record,
+        {"rows": selected, "open_count": len(selected)},
+        failure,
+        fresh=900,
+    )
+    result.update(
+        returned_count=len(selected),
+        interpretation=(
+            "Open backup alerts, one per condition until it clears; an alert that "
+            "comes back gets a new id. Unavailable when backups are not in use."
+        ),
+    )
+    return result
+
+
 def _sample(name, evidence, key, failure, interpretation):
     rows = evidence.get(key) or []
     result = _source(
@@ -590,6 +637,7 @@ def get_observability_summary():
         failure,
         "Newest 20 releases detected for library artists within 7 days.",
     )
+    sources["backup_alerts"] = _backup_alerts(records, failure)
     result = _result(
         "observability_summary",
         sources,
