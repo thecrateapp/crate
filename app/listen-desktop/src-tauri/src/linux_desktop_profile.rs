@@ -171,7 +171,8 @@ mod tests {
 
     #[test]
     fn detects_compositors_and_tiling() {
-        let cases: &[(&[(&str, &str)], Compositor, bool)] = &[
+        type Case<'a> = (&'a [(&'a str, &'a str)], Compositor, bool);
+        let cases: &[Case] = &[
             (
                 &[
                     ("HYPRLAND_INSTANCE_SIGNATURE", "abc"),

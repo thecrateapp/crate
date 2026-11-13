@@ -406,8 +406,8 @@ pub fn launcher() {
                 print!("{}", launcher_rows(&items));
             }
         }
-        Err(_) => print!(
-            "Crate is not running: start it\0icon\x1f{}\x1finfo\x1f{START_INFO}\n",
+        Err(_) => println!(
+            "Crate is not running: start it\0icon\x1f{}\x1finfo\x1f{START_INFO}",
             crate::linux_desktop_profile::LINUX_APP_ID
         ),
     }

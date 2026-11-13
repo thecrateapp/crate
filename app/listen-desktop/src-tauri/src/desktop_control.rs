@@ -380,46 +380,141 @@ pub fn confirm(_request: u64, _outcome: Result<(), String>) -> bool {
 #[cfg(target_os = "linux")]
 mod socket {
     use std::{
+        collections::HashMap,
         io::{BufRead, BufReader, Read, Write},
+        net::Shutdown,
         os::unix::{
             fs::{DirBuilderExt, PermissionsExt},
             net::{UnixListener, UnixStream},
         },
         path::PathBuf,
-        sync::{mpsc, Mutex, OnceLock},
+        sync::{mpsc, Mutex, MutexGuard, OnceLock},
         thread,
-        time::Duration,
+        time::{Duration, Instant},
     };
 
     use super::{ack_line, confirmation_line, hello_line, ControlCommand, MAX_COMMAND_BYTES};
 
-    #[derive(Default)]
-    struct Hub {
-        state: Option<String>,
-        clients: Vec<UnixStream>,
-        /// open `search` requests: id -> the asking client (and when it asked)
-        pending: std::collections::HashMap<u64, (UnixStream, std::time::Instant)>,
-        /// commands waiting for Listen to confirm them (`queue_item`)
-        confirmations: std::collections::HashMap<u64, mpsc::Sender<Result<(), String>>>,
-        next_request: u64,
-    }
+    /// The lines queued for one client. Only that client's writer thread
+    /// writes to its socket, one whole line per write, so lines never
+    /// interleave, and queueing never waits on the client: the main thread
+    /// (state, search replies) only ever does a `try_send`.
+    type Outbox = mpsc::SyncSender<String>;
 
+    /// Lines a client may leave unread before it counts as stuck and is dropped.
+    const OUTBOX_LINES: usize = 64;
+    /// How long the writer waits on a client that stopped reading.
+    const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
     const REQUEST_TTL: Duration = Duration::from_secs(15);
     /// How long a `queue_item` waits for Listen (fetching an album's tracks)
     /// before the client gets an error; below the 3 s clients usually wait.
     const CONFIRM_TIMEOUT: Duration = Duration::from_millis(2500);
 
-    fn next_request(hub: &mut Hub) -> u64 {
-        hub.next_request += 1;
-        hub.next_request
+    #[derive(Default)]
+    struct Hub {
+        state: Option<String>,
+        clients: HashMap<u64, Outbox>,
+        /// open `search` requests: id -> the asking client (and when it asked)
+        pending: HashMap<u64, (u64, Instant)>,
+        /// commands waiting for Listen to confirm them (`queue_item`)
+        confirmations: HashMap<u64, mpsc::Sender<Result<(), String>>>,
+        next_request: u64,
+        next_client: u64,
+    }
+
+    impl Hub {
+        fn next_request(&mut self) -> u64 {
+            self.next_request += 1;
+            self.next_request
+        }
+
+        /// Register a client. Its first lines, `hello` and then the latest
+        /// state, are queued under the hub lock, so no newer state can land
+        /// before them.
+        fn connect(&mut self, outbox: Outbox, hello: String) -> u64 {
+            self.next_client += 1;
+            let client = self.next_client;
+            let greeted = outbox.try_send(hello).is_ok()
+                && match &self.state {
+                    Some(state) => outbox.try_send(state.clone()).is_ok(),
+                    None => true,
+                };
+            if greeted {
+                self.clients.insert(client, outbox);
+            }
+            client
+        }
+
+        /// Forget a client and the searches it is still waiting for. Dropping
+        /// its outbox ends its writer once the queued lines are out.
+        fn disconnect(&mut self, client: u64) {
+            self.clients.remove(&client);
+            self.pending.retain(|_, (owner, _)| *owner != client);
+        }
+
+        /// Queue a line for one client; a full or closed outbox drops it.
+        fn send(&mut self, client: u64, line: String) -> bool {
+            let queued = self
+                .clients
+                .get(&client)
+                .is_some_and(|outbox| outbox.try_send(line).is_ok());
+            if !queued {
+                self.disconnect(client);
+            }
+            queued
+        }
+
+        /// Keep the newest state and queue it for every client; clients that
+        /// cannot keep up or went away are dropped.
+        fn publish_state(&mut self, line: String) {
+            if self.state.as_deref() == Some(line.as_str()) {
+                return;
+            }
+            let stuck: Vec<u64> = self
+                .clients
+                .iter()
+                .filter(|(_, outbox)| outbox.try_send(line.clone()).is_err())
+                .map(|(client, _)| *client)
+                .collect();
+            for client in stuck {
+                self.disconnect(client);
+            }
+            self.state = Some(line);
+        }
+
+        /// Open a search for a client. Its ack is queued before Listen hears
+        /// of the search, so the result can never overtake it.
+        fn open_search(&mut self, client: u64) -> Option<u64> {
+            let request = self.next_request();
+            let ack = serde_json::json!({"type": "ack", "request": request}).to_string();
+            if !self.send(client, ack) {
+                return None;
+            }
+            self.pending.insert(request, (client, Instant::now()));
+            Some(request)
+        }
+
+        /// Queue a search result for the client that asked; false if it is gone.
+        fn reply(&mut self, request: u64, line: String) -> bool {
+            self.pending
+                .retain(|_, (_, asked)| asked.elapsed() < REQUEST_TTL);
+            match self.pending.remove(&request) {
+                Some((client, _)) => self.send(client, line),
+                None => false,
+            }
+        }
+    }
+
+    fn hub() -> MutexGuard<'static, Hub> {
+        static HUB: OnceLock<Mutex<Hub>> = OnceLock::new();
+        HUB.get_or_init(|| Mutex::new(Hub::default()))
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
     }
 
     /// Listen's outcome for a confirmed command; false if nobody waits for it.
     pub fn confirm(request: u64, outcome: Result<(), String>) -> bool {
-        let sender = {
-            let mut hub = hub().lock().unwrap_or_else(|p| p.into_inner());
-            hub.confirmations.remove(&request)
-        };
+        let sender = hub().confirmations.remove(&request);
         sender.is_some_and(|sender| sender.send(outcome).is_ok())
     }
 
@@ -427,8 +522,8 @@ mod socket {
     fn queue_and_wait(app: &tauri::AppHandle, item: &serde_json::Value) -> String {
         let (sender, receiver) = mpsc::channel();
         let request = {
-            let mut hub = hub().lock().unwrap_or_else(|p| p.into_inner());
-            let request = next_request(&mut hub);
+            let mut hub = hub();
+            let request = hub.next_request();
             hub.confirmations.insert(request, sender);
             request
         };
@@ -441,28 +536,18 @@ mod socket {
             Ok(()) => receiver.recv_timeout(CONFIRM_TIMEOUT).ok(),
             Err(_) => None,
         };
-        hub()
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .confirmations
-            .remove(&request);
+        hub().confirmations.remove(&request);
         confirmation_line(outcome)
     }
 
     /// Send a search result to the client that asked; false if it is gone.
     pub fn reply(request: u64, line: String) -> bool {
-        let mut hub = hub().lock().unwrap_or_else(|p| p.into_inner());
-        hub.pending
-            .retain(|_, (_, asked)| asked.elapsed() < REQUEST_TTL);
-        match hub.pending.remove(&request) {
-            Some((mut client, _)) => write_line(&mut client, &line).is_ok(),
-            None => false,
-        }
+        hub().reply(request, line)
     }
 
-    fn hub() -> &'static Mutex<Hub> {
-        static HUB: OnceLock<Mutex<Hub>> = OnceLock::new();
-        HUB.get_or_init(|| Mutex::new(Hub::default()))
+    /// Store the newest state line and queue it for every client.
+    pub fn publish_state(line: String) {
+        hub().publish_state(line);
     }
 
     pub fn socket_path() -> Option<PathBuf> {
@@ -470,21 +555,23 @@ mod socket {
         Some(PathBuf::from(runtime).join("crate").join("control.sock"))
     }
 
-    fn write_line(stream: &mut UnixStream, line: &str) -> std::io::Result<()> {
-        stream.write_all(line.as_bytes())?;
-        stream.write_all(b"\n")
-    }
-
-    /// Store the newest state line and send it to every client; clients that
-    /// cannot keep up (write timeout) or went away are dropped.
-    pub fn publish_state(line: String) {
-        let mut hub = hub().lock().unwrap_or_else(|p| p.into_inner());
-        if hub.state.as_deref() == Some(line.as_str()) {
-            return;
-        }
-        hub.clients
-            .retain_mut(|client| write_line(client, &line).is_ok());
-        hub.state = Some(line);
+    /// The only writer of a client's socket: each line and its newline go out
+    /// in one write. When the outbox closes (the client was dropped) or a write
+    /// fails, the socket is shut down, which also ends the client's reader.
+    fn spawn_writer(mut stream: UnixStream, lines: mpsc::Receiver<String>) -> std::io::Result<()> {
+        thread::Builder::new()
+            .name("crate-control-writer".into())
+            .spawn(move || {
+                for line in lines {
+                    let mut bytes = line.into_bytes();
+                    bytes.push(b'\n');
+                    if stream.write_all(&bytes).is_err() {
+                        break;
+                    }
+                }
+                let _ = stream.shutdown(Shutdown::Both);
+            })
+            .map(|_| ())
     }
 
     pub fn install(app: &tauri::AppHandle) {
@@ -530,27 +617,22 @@ mod socket {
     }
 
     fn serve_client(app: tauri::AppHandle, stream: UnixStream) {
-        let _ = stream.set_write_timeout(Some(Duration::from_millis(250)));
-        let Ok(mut writer) = stream.try_clone() else {
+        let _ = stream.set_write_timeout(Some(WRITE_TIMEOUT));
+        let Ok(writer) = stream.try_clone() else {
             return;
         };
-        {
-            let mut hub = hub().lock().unwrap_or_else(|p| p.into_inner());
-            let version = app.package_info().version.to_string();
-            if write_line(&mut writer, &hello_line(&version)).is_err() {
-                return;
-            }
-            if let Some(state) = hub.state.clone() {
-                if write_line(&mut writer, &state).is_err() {
-                    return;
-                }
-            }
-            if let Ok(broadcast) = stream.try_clone() {
-                hub.clients.push(broadcast);
-            }
+        let (outbox, lines) = mpsc::sync_channel(OUTBOX_LINES);
+        if spawn_writer(writer, lines).is_err() {
+            return;
         }
+        let version = app.package_info().version.to_string();
+        let client = hub().connect(outbox, hello_line(&version));
+        read_commands(&app, client, stream);
+        hub().disconnect(client);
+    }
 
-        // One command per line; a line longer than the limit ends the session.
+    /// One command per line; a line longer than the limit ends the session.
+    fn read_commands(app: &tauri::AppHandle, client: u64, stream: UnixStream) {
         let mut reader = BufReader::new(stream);
         let mut line = String::new();
         loop {
@@ -561,9 +643,9 @@ mod socket {
             {
                 Ok(0) | Err(_) => break,
                 Ok(_) if line.len() > MAX_COMMAND_BYTES => {
-                    let _ = write_line(
-                        &mut writer,
-                        r#"{"type":"error","error":"command too long"}"#,
+                    hub().send(
+                        client,
+                        r#"{"type":"error","error":"command too long"}"#.into(),
                     );
                     break;
                 }
@@ -575,34 +657,167 @@ mod socket {
                     let ack = match &result {
                         Ok(ControlCommand::Search { query }) => {
                             // answered later by Listen through `desktop_control_reply`
-                            let request = {
-                                let mut hub = hub().lock().unwrap_or_else(|p| p.into_inner());
-                                let request = next_request(&mut hub);
-                                if let Ok(client) = writer.try_clone() {
-                                    hub.pending
-                                        .insert(request, (client, std::time::Instant::now()));
-                                }
-                                request
+                            let Some(request) = hub().open_search(client) else {
+                                break;
                             };
                             use tauri::Emitter;
                             let _ = app.emit(
                                 super::CONTROL_EVENT,
                                 serde_json::json!({"cmd": "search", "query": query, "request": request}),
                             );
-                            serde_json::json!({"type": "ack", "request": request}).to_string()
+                            continue;
                         }
-                        Ok(ControlCommand::QueueItem { item }) => queue_and_wait(&app, item),
+                        Ok(ControlCommand::QueueItem { item }) => queue_and_wait(app, item),
                         Ok(command) => {
-                            super::dispatch(&app, command);
+                            super::dispatch(app, command);
                             ack_line(&result)
                         }
                         Err(_) => ack_line(&result),
                     };
-                    if write_line(&mut writer, &ack).is_err() {
+                    if !hub().send(client, ack) {
                         break;
                     }
                 }
             }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::sync::Arc;
+
+        fn line_kind(line: &str) -> (String, Option<u64>) {
+            let value: serde_json::Value = serde_json::from_str(line)
+                .unwrap_or_else(|err| panic!("not one JSON line ({err}): {line:.80}"));
+            (
+                value["type"].as_str().unwrap_or_default().to_owned(),
+                value["request"].as_u64(),
+            )
+        }
+
+        #[test]
+        fn connect_queues_hello_then_the_latest_state() {
+            let mut hub = Hub::default();
+            hub.publish_state(r#"{"type":"state","n":1}"#.into());
+            let (outbox, lines) = mpsc::sync_channel(8);
+            let client = hub.connect(outbox, r#"{"type":"hello"}"#.into());
+            hub.publish_state(r#"{"type":"state","n":2}"#.into());
+            let got: Vec<String> = lines.try_iter().collect();
+            assert_eq!(
+                got,
+                [
+                    r#"{"type":"hello"}"#,
+                    r#"{"type":"state","n":1}"#,
+                    r#"{"type":"state","n":2}"#
+                ]
+            );
+            assert!(hub.clients.contains_key(&client));
+        }
+
+        #[test]
+        fn a_client_that_stops_reading_is_dropped_without_waiting() {
+            let mut hub = Hub::default();
+            let (outbox, _lines) = mpsc::sync_channel(2);
+            let client = hub.connect(outbox, "{}".into());
+            let request = hub.open_search(client).unwrap();
+            let started = Instant::now();
+            for n in 0..5 {
+                hub.publish_state(format!(r#"{{"type":"state","n":{n}}}"#));
+            }
+            assert!(started.elapsed() < Duration::from_millis(50));
+            assert!(hub.clients.is_empty());
+            assert!(hub.pending.is_empty());
+            assert!(!hub.reply(request, "{}".into()));
+        }
+
+        #[test]
+        fn disconnect_forgets_the_clients_open_searches() {
+            let mut hub = Hub::default();
+            let (outbox, _lines) = mpsc::sync_channel(8);
+            let client = hub.connect(outbox, "{}".into());
+            let request = hub.open_search(client).unwrap();
+            hub.disconnect(client);
+            assert!(hub.pending.is_empty());
+            assert!(!hub.reply(request, "{}".into()));
+        }
+
+        /// States published from several threads race with search results;
+        /// the client still reads whole JSON lines, each ack before its result.
+        #[test]
+        fn racing_states_and_results_reach_the_client_as_whole_lines_in_order() {
+            const SEARCHES: u64 = 40;
+            let hub = Arc::new(Mutex::new(Hub::default()));
+            let (ours, theirs) = UnixStream::pair().unwrap();
+            let (outbox, lines) = mpsc::sync_channel(4096);
+            spawn_writer(ours, lines).unwrap();
+            let client = hub
+                .lock()
+                .unwrap()
+                .connect(outbox, r#"{"type":"hello"}"#.into());
+
+            let reader = thread::spawn(move || {
+                BufReader::new(theirs)
+                    .lines()
+                    .map(Result::unwrap)
+                    .collect::<Vec<_>>()
+            });
+
+            // Lines larger than a socket buffer page make split writes likely.
+            let padding = "x".repeat(16 * 1024);
+            let publishers: Vec<_> = (0..3)
+                .map(|thread_no| {
+                    let hub = Arc::clone(&hub);
+                    let padding = padding.clone();
+                    thread::spawn(move || {
+                        for n in 0..30 {
+                            let state = serde_json::json!({
+                                "type": "state", "t": thread_no, "n": n, "pad": padding
+                            });
+                            hub.lock().unwrap().publish_state(state.to_string());
+                        }
+                    })
+                })
+                .collect();
+            let requests: Vec<u64> = (0..SEARCHES)
+                .map(|_| hub.lock().unwrap().open_search(client).unwrap())
+                .collect();
+            let repliers: Vec<_> = requests
+                .chunks(10)
+                .map(|chunk| {
+                    let hub = Arc::clone(&hub);
+                    let chunk = chunk.to_vec();
+                    let padding = padding.clone();
+                    thread::spawn(move || {
+                        for request in chunk {
+                            let result = serde_json::json!({
+                                "type": "result", "request": request, "items": [padding]
+                            });
+                            assert!(hub.lock().unwrap().reply(request, result.to_string()));
+                        }
+                    })
+                })
+                .collect();
+            for handle in publishers.into_iter().chain(repliers) {
+                handle.join().unwrap();
+            }
+            hub.lock().unwrap().disconnect(client);
+
+            let received = reader.join().unwrap();
+            let kinds: Vec<_> = received.iter().map(|line| line_kind(line)).collect();
+            assert_eq!(kinds[0].0, "hello");
+            for request in requests {
+                let ack = kinds
+                    .iter()
+                    .position(|kind| *kind == ("ack".into(), Some(request)))
+                    .expect("ack");
+                let result = kinds
+                    .iter()
+                    .position(|kind| *kind == ("result".into(), Some(request)))
+                    .expect("result");
+                assert!(ack < result, "result {request} overtook its ack");
+            }
+            assert_eq!(kinds.iter().filter(|kind| kind.0 == "state").count(), 90);
         }
     }
 }
