@@ -335,18 +335,25 @@ mod tests {
 
     #[test]
     fn cache_root_follows_xdg_then_home() {
+        // absolute on every OS (`/x` has no drive letter on Windows, where
+        // this module also builds)
+        let base = std::env::temp_dir();
+        let cache = base.join("x").join("cache");
+        let home = base.join("home").join("u");
+        let under = |root: &Path| root.join("crate").join("launcher-art");
         assert_eq!(
-            cache_root_from(Some(Path::new("/x/cache")), Some(Path::new("/home/u"))),
-            Some(PathBuf::from("/x/cache/crate/launcher-art"))
+            cache_root_from(Some(&cache), Some(&home)),
+            Some(under(&cache))
         );
         assert_eq!(
-            cache_root_from(Some(Path::new("relative")), Some(Path::new("/home/u"))),
-            Some(PathBuf::from("/home/u/.cache/crate/launcher-art"))
+            cache_root_from(Some(Path::new("relative")), Some(&home)),
+            Some(under(&home.join(".cache")))
         );
         assert_eq!(
-            cache_root_from(None, Some(Path::new("/home/u"))),
-            Some(PathBuf::from("/home/u/.cache/crate/launcher-art"))
+            cache_root_from(None, Some(&home)),
+            Some(under(&home.join(".cache")))
         );
+        assert_eq!(cache_root_from(None, Some(Path::new("relative"))), None);
         assert_eq!(cache_root_from(None, None), None);
     }
 
