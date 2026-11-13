@@ -207,6 +207,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   audioRecovery.install();
   currentCallbacks = callbacks;
   const preferHtml5Audio = stableMobileAudioPipeline;
+  const linuxDesktop = isTauriRuntime && /\bLinux\b/i.test(navigator.userAgent);
   const probe =
     typeof document !== "undefined" ? document.createElement("audio") : null;
   recordDevLog(
@@ -241,8 +242,8 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     crossfade: getCrossfadeMs(),
     crossfadeShape: GAPLESS_CROSSFADE_EQUAL_POWER,
     persistentHTML5Audio: isMobileAudioRuntime,
-    releaseHTML5AfterDecode:
-      isTauriRuntime && /\bLinux\b/i.test(navigator.userAgent),
+    releaseHTML5AfterDecode: linuxDesktop,
+    routeHTML5ThroughWebAudio: linuxDesktop,
     volume: getLastVolume(),
     logLevel: GAPLESS_LOG_LEVEL_WARNING,
     // Keep the next mobile <audio> source ready before the active element

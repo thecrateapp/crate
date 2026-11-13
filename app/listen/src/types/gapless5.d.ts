@@ -18,6 +18,7 @@ declare module "@/lib/gapless5/gapless5" {
     crossfadeShape?: number;
     persistentHTML5Audio?: boolean;
     releaseHTML5AfterDecode?: boolean;
+    routeHTML5ThroughWebAudio?: boolean;
     playbackRate?: number;
     // Runtime values: Debug=1, Info=2, Warning=3, Error=4, None=5
     logLevel?: number;

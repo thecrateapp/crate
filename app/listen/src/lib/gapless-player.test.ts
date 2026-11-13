@@ -230,6 +230,7 @@ describe("initPlayer", () => {
     // analyser for the first track as well.
     expect(options.switchToWebAudioDuringPlayback).toBe(true);
     expect(options.releaseHTML5AfterDecode).toBe(false);
+    expect(options.routeHTML5ThroughWebAudio).toBe(false);
     expect(options.resolveAudioUrl).toBeUndefined();
     expect(player).toBeDefined();
   });
@@ -244,6 +245,7 @@ describe("initPlayer", () => {
       typeof Gapless5Type
     >[0];
     expect(options?.releaseHTML5AfterDecode).toBe(true);
+    expect(options?.routeHTML5ThroughWebAudio).toBe(true);
     const resolve = options!.resolveAudioUrl!;
     for (const url of [
       "tracks/one.flac",

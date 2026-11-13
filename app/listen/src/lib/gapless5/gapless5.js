@@ -142,6 +142,8 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
 
   // HTML5 Audio
   let audio = null;
+  let mediaElementSource = null;
+  let mediaElementConnected = false;
 
   // WebAudio
   let source = null;
@@ -311,9 +313,56 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     audio = null;
   };
 
+  const gainForPlayback = () => {
+    if (!gainNode) {
+      gainNode = player.context.createGain();
+      gainNode.connect(player.masterOut || player.context.destination);
+    }
+    gainNode.gain.value = this.getVolume();
+    return gainNode;
+  };
+
+  const prepareHtml5Output = (element) => {
+    if (
+      !player.routeHTML5ThroughWebAudio ||
+      !player.context?.createMediaElementSource
+    ) {
+      return;
+    }
+    // Route fades through the audio graph before loading media. On WebKitGTK,
+    // setting element.volume would overwrite WirePlumber's saved Crate volume.
+    try {
+      mediaElementSource = player.context.createMediaElementSource(element);
+    } catch (error) {
+      log.warn("Could not route HTML5 volume through WebAudio", error);
+    }
+  };
+
+  const connectHtml5Output = () => {
+    if (!mediaElementSource) {
+      // Direct HTML playback still honors explicit mute on older engines.
+      audio.volume = this.getVolume();
+      return;
+    }
+    const gain = gainForPlayback();
+    if (!mediaElementConnected) {
+      mediaElementSource.connect(gain);
+      mediaElementConnected = true;
+    }
+  };
+
+  const disconnectHtml5Output = () => {
+    if (mediaElementConnected) {
+      mediaElementSource.disconnect();
+      mediaElementConnected = false;
+    }
+  };
+
   const releaseHtml5Audio = () => {
     if (!audio) return;
     const audioObj = audio;
+    disconnectHtml5Output();
+    mediaElementSource = null;
     audio = null;
     detachHtml5Listeners(audioObj);
     if (player.persistentHTML5Audio) {
@@ -384,14 +433,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     request = null;
     buffer = inBuffer;
     endpos = inBuffer.duration * 1000;
-    if (!gainNode) {
-      gainNode = player.context.createGain();
-      // [vendored patch] route through player.masterOut instead of
-      // jumping straight to destination, so setOutputChain() can splice
-      // post-processing (e.g. equalizer) between masterOut and output.
-      gainNode.connect(player.masterOut || player.context.destination);
-    }
-    gainNode.gain.value = this.getVolume();
+    gainForPlayback();
 
     if (queuedState === Gapless5State.Play && state === Gapless5State.Loading) {
       this.setCrossfade(crossfadeIn, crossfadeOut); // re-clamp, now that endpos is reset
@@ -461,6 +503,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
 
     if (audio) {
       audio.pause();
+      disconnectHtml5Output();
       if (player.releaseHTML5AfterDecode && buffer) releaseHtml5Audio();
     }
     if (endedCallback !== null) {
@@ -587,6 +630,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
           setEndedCallbackTime(source.buffer.duration - offsetSec);
           if (audio) {
             audio.pause();
+            disconnectHtml5Output();
             if (player.releaseHTML5AfterDecode) releaseHtml5Audio();
           }
         } else if (source) {
@@ -601,8 +645,11 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
       });
     } else if (audio !== null) {
       const offsetSec = position / 1000;
-      audio.currentTime = offsetSec;
-      audio.volume = this.getVolume();
+      // A redundant seek to zero can stall WebKitGTK's new media source.
+      if (!mediaElementSource || audio.currentTime !== offsetSec) {
+        audio.currentTime = offsetSec;
+      }
+      connectHtml5Output();
       audio.loop = looped;
       audio.playbackRate = player.playbackRate;
 
@@ -708,7 +755,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
           log.debug(`Setting HTML5 audio loop to ${shouldLoop}`);
         }
       }
-      if (audio !== null) {
+      if (audio !== null && !mediaElementSource) {
         const nextVolume = this.getVolume();
         if (Math.abs(audio.volume - nextVolume) > 0.001) {
           audio.volume = nextVolume;
@@ -912,6 +959,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         audioObj.controls = false;
         audioObj.preload = "auto";
         audioObj.crossOrigin = "anonymous";
+        prepareHtml5Output(audioObj);
         // no pitch preservation, to be consistent with WebAudio:
         audioObj.preservesPitch = false;
         audioObj.mozPreservesPitch = false;
@@ -1505,6 +1553,8 @@ function Gapless5(options = {}, deprecated = {}) {
   this.resolveAudioUrl = options.resolveAudioUrl;
   this.persistentHTML5Audio =
     this.useHTML5Audio && options.persistentHTML5Audio === true;
+  this.routeHTML5ThroughWebAudio =
+    !this.persistentHTML5Audio && options.routeHTML5ThroughWebAudio === true;
   // WebKitGTK keeps a system stream for a paused media element with a source.
   this.releaseHTML5AfterDecode =
     this.switchToWebAudioDuringPlayback &&

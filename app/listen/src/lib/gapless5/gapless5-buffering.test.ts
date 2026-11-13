@@ -656,7 +656,8 @@ describe("Gapless5 WebAudio promotion", () => {
     Reflect.deleteProperty(window, "gapless5AudioContext");
   });
 
-  it.each(["retain", "release", "pause"])("%s at handoff", async (mode) => {
+  const modes = ["retain", "release", "pause", "unsupported", "denied"];
+  it.each(modes)("%s at handoff", async (mode) => {
     const release = mode !== "retain";
     vi.useFakeTimers();
     let resolveDecode: ((buffer: { duration: number }) => void) | undefined;
@@ -673,7 +674,15 @@ describe("Gapless5 WebAudio promotion", () => {
       buffered = ranges([[0, 180]]);
       controls = false;
       crossOrigin: string | null = null;
-      currentTime = 0;
+      private position = 0;
+      readonly seeks: number[] = [];
+      get currentTime() {
+        return this.position;
+      }
+      set currentTime(value: number) {
+        this.seeks.push(value);
+        this.position = value;
+      }
       duration = 180;
       error: MediaError | null = null;
       loop = false;
@@ -714,7 +723,17 @@ describe("Gapless5 WebAudio promotion", () => {
       connect: vi.fn(),
       disconnect: vi.fn(),
     });
+    const mediaSources = [node(), node()];
+    const routedSource = mediaSources[0]!;
+    const createMediaElementSource = vi.fn((element: FakeAudio) => {
+      expect(element.src).toBe("");
+      if (mode === "denied")
+        throw new DOMException("Unavailable", "NotSupportedError");
+      return mediaSources[instances.indexOf(element)];
+    });
     const context = {
+      createMediaElementSource:
+        mode === "unsupported" ? undefined : createMediaElementSource,
       baseLatency: 0,
       currentTime: 0,
       destination: node(),
@@ -757,6 +776,8 @@ describe("Gapless5 WebAudio promotion", () => {
       tracks: ["one", "two"],
       loadLimit: 2,
       releaseHTML5AfterDecode: release,
+      routeHTML5ThroughWebAudio: release,
+      volume: 0.63,
       useHTML5Audio: true,
       useWebAudio: true,
       switchToWebAudioDuringPlayback: true,
@@ -773,6 +794,33 @@ describe("Gapless5 WebAudio promotion", () => {
     player.play();
     await Promise.resolve();
     expect(first!.paused).toBe(false);
+    const routed = mode === "release" || mode === "pause";
+    expect(first!.volume).toBe(routed ? 1 : 0.63);
+    player.setVolume(0);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(first!.volume).toBe(routed ? 1 : 0);
+    if (routed) {
+      expect(first!.seeks).toEqual([]);
+      const gain = context.createGain.mock.results[1]!.value;
+      expect(routedSource.connect).toHaveBeenCalledWith(gain);
+      expect(gain.connect).toHaveBeenCalledWith(
+        context.createGain.mock.results[0]!.value,
+      );
+      expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+        0,
+        expect.any(Number),
+      );
+      player.pause();
+      expect(routedSource.disconnect).toHaveBeenCalledOnce();
+      player.setPosition(2000);
+      player.play();
+      await Promise.resolve();
+      expect(createMediaElementSource).toHaveBeenCalledTimes(2);
+      expect(routedSource.connect).toHaveBeenCalledTimes(2);
+      expect(first!.seeks).toEqual([2]);
+    }
+    if (mode === "denied")
+      expect(createMediaElementSource).toHaveBeenCalledTimes(2);
 
     for (let index = 0; index < 6; index += 1) {
       await Promise.resolve();
@@ -798,6 +846,7 @@ describe("Gapless5 WebAudio promotion", () => {
     for (let index = 0; index < 4; index += 1) await Promise.resolve();
     expect(first!.src).toBe(release ? "" : "one");
     expect(first!.load).toHaveBeenCalledTimes(release ? 2 : 1);
+    if (routed) expect(routedSource.disconnect).toHaveBeenCalledTimes(2);
     expect(first!.pauseCalls).toBeGreaterThan(0);
     if (mode === "pause") {
       expect(context.createBufferSource).not.toHaveBeenCalled();
