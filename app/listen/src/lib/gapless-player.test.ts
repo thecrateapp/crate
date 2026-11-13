@@ -5,6 +5,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const MockGapless5 = vi.hoisted(() => vi.fn());
 const mockRecordDevLog = vi.hoisted(() => vi.fn());
 const mockGetCrossfadeDurationPreference = vi.hoisted(() => vi.fn(() => 4));
+const desktopRuntime = vi.hoisted(() => ({ enabled: false }));
+const mockEnsureMediaAccessUrl = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/platform", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/platform")>()),
+  get isTauriRuntime() {
+    return desktopRuntime.enabled;
+  },
+  get usesConfigurableServer() {
+    return desktopRuntime.enabled;
+  },
+}));
+
+vi.mock("@/lib/api", () => ({
+  requiresMediaAccessTicket: (url: string) => url.startsWith("/api/"),
+  ensureMediaAccessUrl: mockEnsureMediaAccessUrl,
+}));
 
 vi.mock("@/lib/gapless5/gapless5", () => ({
   Gapless5: MockGapless5,
@@ -169,6 +186,8 @@ beforeEach(() => {
 
 afterEach(() => {
   destroyPlayer();
+  desktopRuntime.enabled = false;
+  vi.restoreAllMocks();
 });
 
 // ── initPlayer ────────────────────────────────────────────────────
@@ -210,7 +229,36 @@ describe("initPlayer", () => {
     // buffer is ready, promote the active source so visualizers receive the
     // analyser for the first track as well.
     expect(options.switchToWebAudioDuringPlayback).toBe(true);
+    expect(options.releaseHTML5AfterDecode).toBe(false);
+    expect(options.resolveAudioUrl).toBeUndefined();
     expect(player).toBeDefined();
+  });
+
+  it("resolves protected streams before desktop playback and preserves other URLs", async () => {
+    desktopRuntime.enabled = true;
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (X11; Linux x86_64)",
+    );
+    initPlayer();
+    const options = MockGapless5.mock.calls[0]![0] as ConstructorParameters<
+      typeof Gapless5Type
+    >[0];
+    expect(options?.releaseHTML5AfterDecode).toBe(true);
+    const resolve = options!.resolveAudioUrl!;
+    for (const url of [
+      "tracks/one.flac",
+      "blob:local-recording",
+      "https://cdn.example/song.flac",
+    ]) {
+      await expect(resolve(url)).resolves.toBe(url);
+    }
+    expect(mockEnsureMediaAccessUrl).not.toHaveBeenCalled();
+    const path = "/api/tracks/17/stream?delivery=balanced";
+    mockEnsureMediaAccessUrl.mockResolvedValueOnce(
+      path + "&media_ticket=fresh",
+    );
+    await expect(resolve(path)).resolves.toBe(path + "&media_ticket=fresh");
+    expect(mockEnsureMediaAccessUrl).toHaveBeenCalledWith(path, "stream");
   });
 
   it("reuses the existing instance on subsequent calls", () => {

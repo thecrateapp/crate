@@ -11,6 +11,8 @@ import {
   stableMobileAudioPipeline,
 } from "@/lib/mobile-audio-mode";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
+import { isTauriRuntime, usesConfigurableServer } from "@/lib/platform";
+import { ensureMediaAccessUrl, requiresMediaAccessTicket } from "@/lib/api";
 import { createAudioRecoveryController } from "./gapless-player-audio-recovery";
 import {
   getEqualizerState,
@@ -225,6 +227,12 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
   instance = new Gapless5({
     useHTML5Audio: true,
+    resolveAudioUrl: usesConfigurableServer
+      ? async (url) =>
+          requiresMediaAccessTicket(url)
+            ? ensureMediaAccessUrl(url, "stream")
+            : url
+      : undefined,
     // Android WebView and iOS WebKit are both more reliable for mobile
     // background/lock-screen playback when the live source is <audio>.
     // Desktop keeps WebAudio for EQ, visualizers and true RAM-backed gapless.
@@ -233,6 +241,8 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     crossfade: getCrossfadeMs(),
     crossfadeShape: GAPLESS_CROSSFADE_EQUAL_POWER,
     persistentHTML5Audio: isMobileAudioRuntime,
+    releaseHTML5AfterDecode:
+      isTauriRuntime && /\bLinux\b/i.test(navigator.userAgent),
     volume: getLastVolume(),
     logLevel: GAPLESS_LOG_LEVEL_WARNING,
     // Keep the next mobile <audio> source ready before the active element

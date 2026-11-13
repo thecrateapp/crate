@@ -311,6 +311,24 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     audio = null;
   };
 
+  const releaseHtml5Audio = () => {
+    if (!audio) return;
+    const audioObj = audio;
+    audio = null;
+    detachHtml5Listeners(audioObj);
+    if (player.persistentHTML5Audio) {
+      player.releasePersistentHTML5Audio(this, true);
+    } else {
+      try {
+        audioObj.removeAttribute?.("src");
+        audioObj.srcObject = null;
+        audioObj.load();
+      } catch {
+        // Releasing a detached media element is best-effort.
+      }
+    }
+  };
+
   this.unload = (isError) => {
     this.stop();
     setState(isError ? Gapless5State.Error : Gapless5State.None);
@@ -318,22 +336,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     const requestToAbort = request;
     request = null;
     requestToAbort?.abort();
-    if (audio) {
-      const audioObj = audio;
-      detachHtml5Listeners(audioObj);
-      if (player.persistentHTML5Audio) {
-        player.releasePersistentHTML5Audio(this, true);
-      } else {
-        try {
-          audioObj.removeAttribute?.("src");
-          audioObj.srcObject = null;
-          audioObj.load();
-        } catch {
-          // Releasing a detached media element is best-effort.
-        }
-      }
-    }
-    audio = null;
+    releaseHtml5Audio();
     source = null;
     buffer = null;
     position = 0;
@@ -406,6 +409,9 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
     if (state === Gapless5State.Loading) {
       state = Gapless5State.Stop;
     }
+    if (player.releaseHTML5AfterDecode && !this.inPlayState(true)) {
+      releaseHtml5Audio();
+    }
     player.onload(this.audioPath, true);
     player.playlist.updateLoading();
     player.uiDirty = true;
@@ -439,13 +445,23 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
   };
 
   this.stop = (resetPosition = false) => {
-    if (state === Gapless5State.None) {
+    if (state === Gapless5State.None || state === Gapless5State.Error) {
+      return;
+    }
+    // Skipping or pausing cancels the play request, not an in-flight preload.
+    if (state === Gapless5State.Loading) {
+      queuedState = Gapless5State.None;
+      if (resetPosition) {
+        this.setPosition(0);
+        this.setCrossfade(0, 0, false);
+      }
       return;
     }
     log.debug(`Stopping: ${this.audioPath}`);
 
     if (audio) {
       audio.pause();
+      if (player.releaseHTML5AfterDecode && buffer) releaseHtml5Audio();
     }
     if (endedCallback !== null) {
       window.clearTimeout(endedCallback);
@@ -571,6 +587,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
           setEndedCallbackTime(source.buffer.duration - offsetSec);
           if (audio) {
             audio.pause();
+            if (player.releaseHTML5AfterDecode) releaseHtml5Audio();
           }
         } else if (source) {
           // in case stop was requested while awaiting promise
@@ -602,6 +619,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         .play()
         .then(() => {
           if (generation !== loadGeneration) return;
+          if (player.releaseHTML5AfterDecode && buffer !== null) return;
           if (state === Gapless5State.Starting) {
             log.debug(
               `Playing HTML5 Audio${looped ? " (looped)" : ""}: ${
@@ -622,6 +640,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         })
         .catch((e) => {
           if (generation !== loadGeneration || e.name === "AbortError") return;
+          if (player.releaseHTML5AfterDecode && buffer !== null) return;
           log.warn(`Failed to play ${this.audioPath}: ${e.message}`);
           // Notify the player so the UI can react (e.g. show retry)
           if (e.name === "NotAllowedError") {
@@ -651,6 +670,9 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
 
   this.play = (syncPosition, webAudioSwitched = false) => {
     player.onPlayAllowed();
+    // A failed adjacent preload has already released both of its audio paths.
+    // Retry on a play request, so a broken URL cannot spin in updateLoading().
+    if (state === Gapless5State.Error) this.load();
     if (state === Gapless5State.Loading) {
       log.debug(`Loading ${this.audioPath}`);
       queuedState = Gapless5State.Play;
@@ -756,14 +778,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
       });
   };
 
-  this.load = () => {
-    if (state !== Gapless5State.None) {
-      return;
-    }
-    const generation = ++loadGeneration;
-    const { audioPath } = this;
-    player.onloadstart(audioPath);
-    state = Gapless5State.Loading;
+  const loadAudio = (resolvedUrl, generation) => {
     if (player.useWebAudio) {
       const isCurrentLoad = () => generation === loadGeneration;
       const onLoadWebAudio = (data) => {
@@ -781,7 +796,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
                 return;
               }
               log.warn(
-                `WebAudio decode failed for ${audioPath}: ${
+                `WebAudio decode failed: ${
                   error?.message || error
                 }`,
               );
@@ -789,7 +804,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
                 "gapless5",
                 "webaudio decode failed",
                 {
-                  path: audioPath,
+                  path: this.audioPath,
                   error: error?.message || String(error),
                   hasHtml5Audio: audio !== null,
                   html5ReadyState: audio?.readyState ?? null,
@@ -811,8 +826,8 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
             });
         }
       };
-      if (audioPath.startsWith("blob:")) {
-        fetchBlob(audioPath, (blob) => {
+      if (resolvedUrl.startsWith("blob:")) {
+        fetchBlob(resolvedUrl, (blob) => {
           if (!isCurrentLoad()) {
             return;
           }
@@ -843,7 +858,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
             "gapless5",
             "webaudio fetch failed",
             {
-              path: audioPath,
+              path: this.audioPath,
               reason,
               hasHtml5Audio: audio !== null,
               html5ReadyState: audio?.readyState ?? null,
@@ -853,14 +868,14 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
           );
           if (audio !== null && state === Gapless5State.Play) {
             log.warn(
-              `WebAudio fetch ${reason} for ${audioPath}; staying on HTML5`,
+              `WebAudio fetch ${reason}; staying on HTML5`,
             );
             request = null;
             return;
           }
           onError("Failed to load audio track");
         };
-        fetch(audioPath, { signal: controller.signal })
+        fetch(resolvedUrl, { signal: controller.signal })
           .then((response) => {
             if (!isCurrentLoad() || request !== controller) return null;
             if (!response.ok) {
@@ -875,7 +890,7 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
               "gapless5",
               "webaudio fetch loaded",
               {
-                path: audioPath,
+                path: this.audioPath,
                 status: loaded.response.status,
                 bytes: loaded.data.byteLength,
               },
@@ -926,18 +941,39 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         // TODO: switch to audio.networkState, now that it's universally supported
         return audioObj;
       };
-      if (audioPath.startsWith("blob:")) {
+      if (resolvedUrl.startsWith("blob:")) {
         // TODO: blob as srcObject is not supported on all browsers
-        fetchBlob(audioPath, (blob) => {
+        fetchBlob(resolvedUrl, (blob) => {
+          if (player.releaseHTML5AfterDecode && buffer !== null) return;
           audio = getHtml5Audio();
           audio.srcObject = blob;
           audio.load();
         });
       } else {
         audio = getHtml5Audio();
-        audio.src = audioPath;
+        audio.src = resolvedUrl;
         audio.load();
       }
+    }
+  };
+
+  this.load = () => {
+    if (state !== Gapless5State.None && state !== Gapless5State.Error) return;
+    const generation = ++loadGeneration;
+    state = Gapless5State.Loading;
+    player.onloadstart(this.audioPath);
+    // Keep the queue's identity stable while opening the current media URL.
+    if (player.resolveAudioUrl) {
+      player
+        .resolveAudioUrl(this.audioPath)
+        .then((url) => {
+          if (generation === loadGeneration) loadAudio(url, generation);
+        })
+        .catch((error) => {
+          if (generation === loadGeneration) onError(error);
+        });
+    } else {
+      loadAudio(this.audioPath, generation);
     }
   };
 }
@@ -1463,17 +1499,31 @@ function Gapless5(options = {}, deprecated = {}) {
   this.switchToWebAudioDuringPlayback =
     options.switchToWebAudioDuringPlayback !== false;
 
-  // This is a hack to activate WebAudio on certain iOS versions
+  // these default to true if not defined
+  this.useWebAudio = options.useWebAudio !== false;
+  this.useHTML5Audio = options.useHTML5Audio !== false;
+  this.resolveAudioUrl = options.resolveAudioUrl;
+  this.persistentHTML5Audio =
+    this.useHTML5Audio && options.persistentHTML5Audio === true;
+  // WebKitGTK keeps a system stream for a paused media element with a source.
+  this.releaseHTML5AfterDecode =
+    this.switchToWebAudioDuringPlayback &&
+    !this.persistentHTML5Audio &&
+    options.releaseHTML5AfterDecode === true;
+
+  // Unlock older iOS audio on the first play gesture. Linux needs no probe.
   const silenceWavData =
     "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
   let playAllowed = false; // true after user initiates action
-  const stubAudio = new Audio();
-  stubAudio.controls = false;
-  stubAudio.loop = true;
-  stubAudio.src = silenceWavData;
-  stubAudio.load();
+  const stubAudio = this.releaseHTML5AfterDecode ? null : new Audio();
+  if (stubAudio) {
+    stubAudio.controls = false;
+    stubAudio.loop = true;
+    stubAudio.src = silenceWavData;
+    stubAudio.load();
+  }
   this.onPlayAllowed = () => {
-    if (!playAllowed) {
+    if (stubAudio && !playAllowed) {
       playAllowed = true;
       stubAudio.play().then(() => {
         stubAudio.pause();
@@ -1481,11 +1531,6 @@ function Gapless5(options = {}, deprecated = {}) {
     }
   };
 
-  // these default to true if not defined
-  this.useWebAudio = options.useWebAudio !== false;
-  this.useHTML5Audio = options.useHTML5Audio !== false;
-  this.persistentHTML5Audio =
-    this.useHTML5Audio && options.persistentHTML5Audio === true;
   this.persistentAudioElement = this.persistentHTML5Audio ? new Audio() : null;
   this.persistentAudioOwner = null;
   this.acquirePersistentHTML5Audio = (owner) => {

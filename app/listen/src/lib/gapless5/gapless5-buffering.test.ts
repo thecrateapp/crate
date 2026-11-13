@@ -656,13 +656,18 @@ describe("Gapless5 WebAudio promotion", () => {
     Reflect.deleteProperty(window, "gapless5AudioContext");
   });
 
-  it("promotes an active HTML5 source when its WebAudio buffer finishes decoding", async () => {
+  it.each(["retain", "release", "pause"])("%s at handoff", async (mode) => {
+    const release = mode !== "retain";
     vi.useFakeTimers();
     let resolveDecode: ((buffer: { duration: number }) => void) | undefined;
     const decodePromise = new Promise<{ duration: number }>((resolve) => {
       resolveDecode = resolve;
     });
     const instances: FakeAudio[] = [];
+    let resume!: () => void;
+    const resumed = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
 
     class FakeAudio extends EventTarget {
       buffered = ranges([[0, 180]]);
@@ -689,7 +694,10 @@ describe("Gapless5 WebAudio promotion", () => {
         instances.push(this);
       }
 
-      load() {}
+      load = vi.fn();
+      removeAttribute(name: string) {
+        if (name === "src") this.src = "";
+      }
 
       pause() {
         this.pauseCalls += 1;
@@ -727,7 +735,7 @@ describe("Gapless5 WebAudio promotion", () => {
         },
       })),
       decodeAudioData: vi.fn(() => decodePromise),
-      resume: vi.fn(() => Promise.resolve()),
+      resume: vi.fn(() => resumed),
     };
 
     vi.stubGlobal("Audio", FakeAudio);
@@ -746,12 +754,17 @@ describe("Gapless5 WebAudio promotion", () => {
     });
 
     const player = new Gapless5({
-      tracks: ["one"],
+      tracks: ["one", "two"],
+      loadLimit: 2,
+      releaseHTML5AfterDecode: release,
       useHTML5Audio: true,
       useWebAudio: true,
       switchToWebAudioDuringPlayback: true,
     });
     const onSwitchToWebAudio = vi.fn();
+    expect(instances.some((audio) => audio.src.startsWith("data:"))).toBe(
+      !release,
+    );
     player.onswitchtowebaudio = onSwitchToWebAudio;
     const first = instances.find((audio) => audio.src === "one");
     expect(first).toBeDefined();
@@ -764,15 +777,36 @@ describe("Gapless5 WebAudio promotion", () => {
     for (let index = 0; index < 6; index += 1) {
       await Promise.resolve();
     }
-    expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
+    const second = instances.find((audio) => audio.src === "two");
+    expect(second).toBeDefined();
+    expect(context.decodeAudioData).toHaveBeenCalledTimes(2);
     resolveDecode?.({ duration: 180 });
     for (let index = 0; index < 4; index += 1) {
       await Promise.resolve();
     }
 
+    // The decoded neighbor can retire immediately. The live HTML stream plays
+    // through AudioContext.resume() so the handoff keeps its playback position.
+    expect(second!.src).toBe(release ? "" : "two");
+    expect(first!.src).toBe("one");
+    expect(first!.paused).toBe(false);
+    if (mode === "pause") {
+      player.pause();
+      expect(first!.src).toBe("");
+    }
+    resume();
+    for (let index = 0; index < 4; index += 1) await Promise.resolve();
+    expect(first!.src).toBe(release ? "" : "one");
+    expect(first!.load).toHaveBeenCalledTimes(release ? 2 : 1);
     expect(first!.pauseCalls).toBeGreaterThan(0);
+    if (mode === "pause") {
+      expect(context.createBufferSource).not.toHaveBeenCalled();
+      player.play();
+      await Promise.resolve();
+    } else {
+      expect(onSwitchToWebAudio).toHaveBeenCalledWith("one", null);
+    }
     expect(context.createBufferSource).toHaveBeenCalledTimes(1);
-    expect(onSwitchToWebAudio).toHaveBeenCalledWith("one", expect.any(Object));
 
     player.removeAllTracks();
     Reflect.deleteProperty(window, "gapless5AudioContext");
