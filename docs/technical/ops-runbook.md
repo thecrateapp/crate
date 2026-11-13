@@ -228,9 +228,12 @@ make backup-before-upgrade BACKUP_DC="docker compose -f docker-compose.home.yaml
 
 It runs `python -m crate.backups.cli before-upgrade --wait` inside
 `crate-maintenance-worker`: one dump per policy and its copies. It exits 0 when
-every copy succeeded or no policy is marked, 1 when one failed, 2 on timeout
-(`BACKUP_TIMEOUT`, 3 hours by default). With `CRATE_LOCAL_BACKUPS_ENABLED` off
-the dump is skipped and the command exits 1. `make deploy` does not call it yet.
+every copy succeeded, no policy is marked or `CRATE_LOCAL_BACKUPS_ENABLED` is
+off, 1 when one failed, 2 on timeout (`BACKUP_TIMEOUT`, 3 hours by default).
+`make deploy` runs it before the new images start; see
+[Managed backups](admin-backups.md#before-upgrades), which also covers the
+providers, the recovery kit, alerts, metrics, the command-line restore and the
+move from the off-site sidecars.
 
 ## Redis credential rotation
 

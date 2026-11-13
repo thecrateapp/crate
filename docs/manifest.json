@@ -305,6 +305,15 @@
     "order": 130
   },
   {
+    "sourcePath": "docs/technical/admin-backups.md",
+    "route": "/operations/managed-backups",
+    "section": "operations",
+    "title": "Managed backups",
+    "summary": "Set up the backups Admin manages, choose providers, keep the recovery kit, follow alerts and metrics, restore from the command line and move from the off-site sidecars.",
+    "keywords": ["backup", "restic", "recovery kit", "alerts", "restore"],
+    "order": 131
+  },
+  {
     "sourcePath": "docs/technical/artwork-delivery.md",
     "route": "/operations/artwork-delivery",
     "section": "operations",
