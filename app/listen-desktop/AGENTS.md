@@ -166,6 +166,12 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   inhibitors by default, and holds dim, lock and blank too) wait. Never `sleep`: that
   also refuses a manual suspend (Ryoku power menu, `systemctl suspend`); manual suspend
   and the lid still suspend.
+- **WebKit priority** (`linux_webkit_priority.rs`): WebKitGTK's JavaScriptCore asks RTKit
+  for nice -15 on the web process's main, `EventDispatcher` and `Core: Scrolling` threads,
+  which then starve the shell and compositor. A thread renices the app's own
+  `WebKitWebProces`/`WebKitNetworkPr` descendants back to 0 (3 s after setup, then every
+  10 s): only `SCHED_OTHER` threads below nice 0; realtime and nice >= 0 threads are left
+  alone. Failures are logged in debug builds only.
 - **Track notifications** (`linux_track_notifications.rs`): one transient card per new
   track, only while playing and with the window unfocused; it replaces the previous
   card (`replaces_id`), carries the cached cover (`image-path`), `desktop-entry`, and

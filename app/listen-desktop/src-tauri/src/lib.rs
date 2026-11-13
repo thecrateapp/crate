@@ -53,6 +53,8 @@ mod linux_sleep_inhibitor;
 #[cfg(target_os = "linux")]
 mod linux_track_notifications;
 #[cfg(target_os = "linux")]
+mod linux_webkit_priority;
+#[cfg(target_os = "linux")]
 mod linux_window_visibility;
 #[cfg(target_os = "macos")]
 mod macos_delegate;
@@ -1557,6 +1559,8 @@ pub fn run() {
                 linux_track_notifications::install(app.handle());
                 #[cfg(target_os = "linux")]
                 linux_window_visibility::install(app.handle());
+                #[cfg(target_os = "linux")]
+                linux_webkit_priority::install();
                 #[cfg(target_os = "windows")]
                 windows_media_controls::install(app);
 
