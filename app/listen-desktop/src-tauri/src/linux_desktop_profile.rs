@@ -5,10 +5,9 @@
 //! compositor (Hyprland, niri, Sway, i3, river) owns every window's geometry and
 //! draws borders and rounding itself: there Crate drops its titlebar, stops
 //! resizing or moving its window, and accepts a smaller minimum size so it fits
-//! a tile. Ryoku (a Hyprland or niri desktop) is reported too, for integrations
-//! that only make sense there.
+//! a tile.
 
-use std::{path::Path, sync::OnceLock};
+use std::sync::OnceLock;
 
 use serde::Serialize;
 
@@ -69,13 +68,12 @@ impl Compositor {
 pub struct LinuxDesktopProfile {
     pub compositor: Compositor,
     pub tiling: bool,
-    pub ryoku: bool,
 }
 
-/// Decide the profile from environment lookups and whether Ryoku is installed.
-/// Compositor sockets win over `XDG_CURRENT_DESKTOP`, which launchers and
-/// terminals sometimes carry over from another session.
-pub fn detect(env: impl Fn(&str) -> Option<String>, ryoku_installed: bool) -> LinuxDesktopProfile {
+/// Decide the profile from environment lookups. Compositor sockets win over
+/// `XDG_CURRENT_DESKTOP`, which launchers and terminals sometimes carry over
+/// from another session.
+pub fn detect(env: impl Fn(&str) -> Option<String>) -> LinuxDesktopProfile {
     let set = |key: &str| env(key).is_some_and(|value| !value.trim().is_empty());
 
     let compositor = if set("HYPRLAND_INSTANCE_SIGNATURE") {
@@ -93,8 +91,6 @@ pub fn detect(env: impl Fn(&str) -> Option<String>, ryoku_installed: bool) -> Li
     LinuxDesktopProfile {
         compositor,
         tiling: compositor.is_tiling(),
-        // Ryoku ships Hyprland or niri; a Ryoku install under GNOME is just GNOME.
-        ryoku: ryoku_installed && matches!(compositor, Compositor::Hyprland | Compositor::Niri),
     }
 }
 
@@ -115,18 +111,10 @@ fn from_current_desktop(value: &str) -> Compositor {
     Compositor::Other
 }
 
-fn ryoku_installed() -> bool {
-    let config_home = std::env::var_os("XDG_CONFIG_HOME")
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| Path::new(&home).join(".config")));
-    Path::new("/usr/share/ryoku").is_dir()
-        || config_home.is_some_and(|config| config.join("ryoku").is_dir())
-}
-
 /// The profile of this session, computed once.
 pub fn current() -> LinuxDesktopProfile {
     static PROFILE: OnceLock<LinuxDesktopProfile> = OnceLock::new();
-    *PROFILE.get_or_init(|| detect(|key| std::env::var(key).ok(), ryoku_installed()))
+    *PROFILE.get_or_init(|| detect(|key| std::env::var(key).ok()))
 }
 
 /// Give GTK the bundle identifier as the program name before it initialises.
@@ -178,12 +166,12 @@ mod tests {
         assert!(merged.ends_with("application.name='Mine'"));
     }
 
-    fn profile(vars: &[(&str, &str)], ryoku: bool) -> LinuxDesktopProfile {
+    fn profile(vars: &[(&str, &str)]) -> LinuxDesktopProfile {
         let map: HashMap<String, String> = vars
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
-        detect(|key| map.get(key).cloned(), ryoku)
+        detect(|key| map.get(key).cloned())
     }
 
     #[test]
@@ -224,7 +212,7 @@ mod tests {
             (&[], Compositor::Other, false),
         ];
         for (vars, compositor, tiling) in cases {
-            let p = profile(vars, false);
+            let p = profile(vars);
             assert_eq!(p.compositor, *compositor, "{vars:?}");
             assert_eq!(p.tiling, *tiling, "{vars:?}");
         }
@@ -232,44 +220,29 @@ mod tests {
 
     #[test]
     fn a_compositor_socket_beats_a_stale_current_desktop() {
-        let p = profile(
-            &[
-                ("XDG_CURRENT_DESKTOP", "GNOME"),
-                ("HYPRLAND_INSTANCE_SIGNATURE", "abc"),
-            ],
-            false,
-        );
+        let p = profile(&[
+            ("XDG_CURRENT_DESKTOP", "GNOME"),
+            ("HYPRLAND_INSTANCE_SIGNATURE", "abc"),
+        ]);
         assert_eq!(p.compositor, Compositor::Hyprland);
         assert!(p.tiling);
     }
 
     #[test]
     fn empty_socket_variables_are_ignored() {
-        let p = profile(
-            &[
-                ("HYPRLAND_INSTANCE_SIGNATURE", " "),
-                ("XDG_CURRENT_DESKTOP", "GNOME"),
-            ],
-            true,
-        );
+        let p = profile(&[
+            ("HYPRLAND_INSTANCE_SIGNATURE", " "),
+            ("XDG_CURRENT_DESKTOP", "GNOME"),
+        ]);
         assert_eq!(p.compositor, Compositor::Gnome);
-        assert!(!p.ryoku);
-    }
-
-    #[test]
-    fn ryoku_needs_its_compositor() {
-        assert!(profile(&[("HYPRLAND_INSTANCE_SIGNATURE", "abc")], true).ryoku);
-        assert!(profile(&[("NIRI_SOCKET", "/tmp/niri")], true).ryoku);
-        assert!(!profile(&[("HYPRLAND_INSTANCE_SIGNATURE", "abc")], false).ryoku);
-        assert!(!profile(&[("SWAYSOCK", "/tmp/sway")], true).ryoku);
     }
 
     #[test]
     fn serializes_for_the_frontend() {
-        let p = profile(&[("HYPRLAND_INSTANCE_SIGNATURE", "abc")], true);
+        let p = profile(&[("HYPRLAND_INSTANCE_SIGNATURE", "abc")]);
         assert_eq!(
             serde_json::to_value(p).unwrap(),
-            serde_json::json!({"compositor": "hyprland", "tiling": true, "ryoku": true})
+            serde_json::json!({"compositor": "hyprland", "tiling": true})
         );
     }
 

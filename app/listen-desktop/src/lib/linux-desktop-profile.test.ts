@@ -11,12 +11,10 @@ describe("linux desktop profile", () => {
     const invoke = vi.fn().mockResolvedValue({
       compositor: "hyprland",
       tiling: true,
-      ryoku: true,
     });
     await expect(loadLinuxDesktopProfile(invoke)).resolves.toEqual({
       compositor: "hyprland",
       tiling: true,
-      ryoku: true,
     });
     expect(invoke).toHaveBeenCalledWith("linux_desktop_profile");
   });
@@ -32,13 +30,21 @@ describe("linux desktop profile", () => {
     expect(parseLinuxDesktopProfile({ compositor: "gnome" })).toBeNull();
     expect(
       parseLinuxDesktopProfile({ compositor: "<script>", tiling: false }),
-    ).toEqual({ compositor: "other", tiling: false, ryoku: false });
+    ).toEqual({ compositor: "other", tiling: false });
+    // fields an older shell still sends are not carried along
+    expect(
+      parseLinuxDesktopProfile({
+        compositor: "niri",
+        tiling: true,
+        ryoku: true,
+      }),
+    ).toEqual({ compositor: "niri", tiling: true });
   });
 
   it("drops the titlebar on a tiling compositor", () => {
     const root = { dataset: {} as Record<string, string | undefined> };
     const result = applyLinuxDesktopProfile(
-      { compositor: "niri", tiling: true, ryoku: false },
+      { compositor: "niri", tiling: true },
       root,
     );
     expect(result.showTitlebar).toBe(false);
@@ -51,10 +57,8 @@ describe("linux desktop profile", () => {
   it("keeps the titlebar on a floating desktop and without a profile", () => {
     const root = { dataset: {} as Record<string, string | undefined> };
     expect(
-      applyLinuxDesktopProfile(
-        { compositor: "gnome", tiling: false, ryoku: false },
-        root,
-      ).showTitlebar,
+      applyLinuxDesktopProfile({ compositor: "gnome", tiling: false }, root)
+        .showTitlebar,
     ).toBe(true);
     expect(root.dataset.crateLinuxWm).toBe("floating");
 

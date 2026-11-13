@@ -84,8 +84,9 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
 
 - **Profile.** `linux_desktop_profile::current()` decides once per launch:
   compositor (`HYPRLAND_INSTANCE_SIGNATURE`, `NIRI_SOCKET`, `SWAYSOCK`, `I3SOCK`, then
-  `XDG_CURRENT_DESKTOP`), `tiling`, and `ryoku`. The `linux_desktop_profile` command
-  hands it to the frontend (`src/lib/linux-desktop-profile.ts`).
+  `XDG_CURRENT_DESKTOP`) and `tiling`. The `linux_desktop_profile` command hands it to
+  the frontend (`src/lib/linux-desktop-profile.ts`). There is no Ryoku flag: nothing
+  read it, and Ryoku integrations (bar plugin, launcher) talk to the control socket.
 - **Tiling compositors** (Hyprland, niri, Sway, i3, river) own window geometry. There
   the bounds clamp only lowers the minimum to `TILING_MIN_*` (600x480) and never calls
   `set_size`/`set_position`, and `main.tsx` drops the custom titlebar

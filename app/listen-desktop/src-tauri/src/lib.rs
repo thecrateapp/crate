@@ -828,7 +828,7 @@ async fn store_launcher_art(key: String, bytes: Vec<u8>) -> Result<bool, String>
     .map_err(|_| "art writer stopped".to_string())?
 }
 
-/// The Linux desktop profile (compositor, tiling, Ryoku) for the frontend, which
+/// The Linux desktop profile (compositor, tiling) for the frontend, which
 /// drops its own titlebar on a tiling compositor. `None` off Linux.
 #[cfg(desktop)]
 #[tauri::command]

@@ -7,7 +7,6 @@
 export type LinuxDesktopProfile = {
   compositor: string;
   tiling: boolean;
-  ryoku: boolean;
 };
 
 type Invoke = <T>(command: string) => Promise<T>;
@@ -39,11 +38,7 @@ export function parseLinuxDesktopProfile(
     /^[a-z0-9]{1,16}$/.test(record.compositor)
       ? record.compositor
       : "other";
-  return {
-    compositor,
-    tiling: record.tiling,
-    ryoku: record.ryoku === true,
-  };
+  return { compositor, tiling: record.tiling };
 }
 
 export function applyLinuxDesktopProfile(
