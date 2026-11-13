@@ -47,7 +47,7 @@ from crate.backups.settings import (
     prepare_dumps_dir,
     retention_policy,
 )
-from crate.db.advisory_locks import try_session_lock
+from crate.db.advisory_locks import try_session_lock, try_session_locks
 from crate.db.queries.backup_destinations import (
     get_backup_destination,
     list_backup_destinations,
@@ -476,45 +476,46 @@ def _handle_backup_restore_drill(task_id: str, params: dict, config: dict) -> di
     if waiting:
         return waiting
     connection = connection_from_env()
-    with try_session_lock(DRILL_LOCK) as drill_free:
-        if not drill_free:
+    # Both locks on one connection: nested, they would take the whole 1 + 1 pool
+    # of a worker and leave none for the run's own queries.
+    with try_session_locks(DRILL_LOCK, destination_lock_key(destination_id)) as busy:
+        if busy == DRILL_LOCK:
             return run_again_later(
                 LOCK_RETRY_SECONDS, progress="Waiting for the running restore drill"
             )
-        with try_session_lock(destination_lock_key(destination_id)) as acquired:
-            if not acquired:
-                return _lock_busy()
-            recovered = close_interrupted_destination_runs(destination_id)
-            run_id = start_backup_run(
-                "restore_drill",
-                task_id=task_id,
-                policy_id=policy["id"] if policy else None,
-                destination_id=destination_id,
+        if busy is not None:
+            return _lock_busy()
+        recovered = close_interrupted_destination_runs(destination_id)
+        run_id = start_backup_run(
+            "restore_drill",
+            task_id=task_id,
+            policy_id=policy["id"] if policy else None,
+            destination_id=destination_id,
+        )
+        try:
+            # Under the drill lock no drill runs: what is left was killed.
+            leftovers = offsite.clean_drill_leftovers(connection)
+            result = offsite.restore_drill(
+                row,
+                connection=connection,
+                recover_locks=recovered > 0,
+                should_cancel=lambda: is_cancelled(task_id),
             )
-            try:
-                # Under the drill lock no drill runs: what is left was killed.
-                leftovers = offsite.clean_drill_leftovers(connection)
-                result = offsite.restore_drill(
-                    row,
-                    connection=connection,
-                    recover_locks=recovered > 0,
-                    should_cancel=lambda: is_cancelled(task_id),
-                )
-            except BackupCancelled as exc:
-                finish_backup_run(run_id, status="failed", error=str(exc))
-                return {"run_id": run_id, "cancelled": True}
-            except Exception as exc:
-                message = _message(exc)
-                log.warning("Restore drill from %s failed: %s", row["name"], message)
-                finish_backup_run(run_id, status="failed", error=message)
-                return {"status": "failed", "error": message, "run_id": run_id}
-            details = {**result.to_dict(), "removed_leftovers": leftovers}
-            finish_backup_run(
-                run_id,
-                status="succeeded",
-                snapshot_id=result.snapshot_id,
-                details=details,
-            )
+        except BackupCancelled as exc:
+            finish_backup_run(run_id, status="failed", error=str(exc))
+            return {"run_id": run_id, "cancelled": True}
+        except Exception as exc:
+            message = _message(exc)
+            log.warning("Restore drill from %s failed: %s", row["name"], message)
+            finish_backup_run(run_id, status="failed", error=message)
+            return {"status": "failed", "error": message, "run_id": run_id}
+        details = {**result.to_dict(), "removed_leftovers": leftovers}
+        finish_backup_run(
+            run_id,
+            status="succeeded",
+            snapshot_id=result.snapshot_id,
+            details=details,
+        )
     return {"run_id": run_id, **details}
 
 

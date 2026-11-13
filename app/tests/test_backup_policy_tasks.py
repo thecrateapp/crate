@@ -423,6 +423,51 @@ def test_the_drill_task_holds_the_drill_lock_and_cleans_leftovers(
     assert drill["status"] == "succeeded" and drill["snapshot_id"] == "0d4c7a3e"
 
 
+def test_the_drill_runs_in_a_worker_with_a_one_plus_one_pool(
+    pg_db, backup_root, monkeypatch
+):
+    """Production workers run with pool 1 + 1; the drill's two locks share one."""
+    from crate.db.engine import reset_engine
+
+    del pg_db, backup_root
+    volume = _destination("Volume")
+    monkeypatch.setenv("CRATE_SQLALCHEMY_POOL_SIZE", "1")
+    monkeypatch.setenv("CRATE_SQLALCHEMY_MAX_OVERFLOW", "1")
+    monkeypatch.setenv("CRATE_SQLALCHEMY_POOL_TIMEOUT_SECONDS", "1")
+    reset_engine()
+    monkeypatch.setattr(offsite, "clean_drill_leftovers", lambda connection: [])
+    monkeypatch.setattr(
+        offsite,
+        "restore_drill",
+        lambda row, **kwargs: offsite.DrillResult(
+            snapshot_id="0d4c7a3e",
+            snapshot_time="2026-11-10T03:30:00Z",
+            database="crate_restore_drill_0123456789ab",
+            toc_entries=900,
+            tables=120,
+            rows={"library_tracks": 48212},
+            alembic_revision="164",
+        ),
+    )
+    try:
+        result = backups._handle_backup_restore_drill(
+            "t1", {"destination_id": volume}, {}
+        )
+        with try_session_lock(backups.destination_lock_key(volume)) as acquired:
+            assert acquired
+            busy = backups._handle_backup_restore_drill(
+                "t2", {"destination_id": volume}, {}
+            )
+    finally:
+        reset_engine()
+
+    assert result["snapshot_id"] == "0d4c7a3e"
+    assert busy == backups._lock_busy()
+    # The drill lock taken before the busy destination lock was released.
+    with try_session_lock(backups.DRILL_LOCK) as drill_free:
+        assert drill_free
+
+
 @pytest.mark.skipif(
     shutil.which(restic_bin()) is None or shutil.which(rclone_bin()) is None,
     reason="restic and rclone required",
