@@ -10,7 +10,8 @@
 //!   (`commands` lists every `cmd` accepted here), then
 //!   `{"type":"state","protocol":1,"player":{...},"eq":{...}}` whenever the
 //!   state changes, and `{"type":"ack"}` / `{"type":"error","error":"..."}` for
-//!   each command line;
+//!   each command line; past 16 connected clients a new one gets only
+//!   `{"type":"error","error":"too many clients"}` and is closed;
 //! - client -> server: a command such as `{"cmd":"play_pause"}`,
 //!   `{"cmd":"eq_mode","mode":"genre"}` or `{"cmd":"set_volume","volume":0.6}`.
 //!
@@ -405,7 +406,13 @@ mod socket {
     const OUTBOX_LINES: usize = 64;
     /// How long the writer waits on a client that stopped reading.
     const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
+    /// How long a `search` waits for Listen's result before it is forgotten.
     const REQUEST_TTL: Duration = Duration::from_secs(15);
+    /// Clients connected at once; one more is refused with an `error` line.
+    /// Widgets, the launcher and the MCP server need a handful; this bounds
+    /// the threads and outboxes a runaway script can make Crate hold.
+    const MAX_CLIENTS: usize = 16;
+    const TOO_MANY_CLIENTS: &str = r#"{"type":"error","error":"too many clients"}"#;
     /// How long a `queue_item` waits for Listen (fetching an album's tracks)
     /// before the client gets an error; below the 3 s clients usually wait.
     const CONFIRM_TIMEOUT: Duration = Duration::from_millis(2500);
@@ -430,8 +437,13 @@ mod socket {
 
         /// Register a client. Its first lines, `hello` and then the latest
         /// state, are queued under the hub lock, so no newer state can land
-        /// before them.
-        fn connect(&mut self, outbox: Outbox, hello: String) -> u64 {
+        /// before them. With `MAX_CLIENTS` already connected it is refused:
+        /// it gets only an `error` line, and dropping its outbox closes it.
+        fn connect(&mut self, outbox: Outbox, hello: String) -> Option<u64> {
+            if self.clients.len() >= MAX_CLIENTS {
+                let _ = outbox.try_send(TOO_MANY_CLIENTS.into());
+                return None;
+            }
             self.next_client += 1;
             let client = self.next_client;
             let greeted = outbox.try_send(hello).is_ok()
@@ -439,10 +451,19 @@ mod socket {
                     Some(state) => outbox.try_send(state.clone()).is_ok(),
                     None => true,
                 };
-            if greeted {
-                self.clients.insert(client, outbox);
+            if !greeted {
+                return None;
             }
-            client
+            self.clients.insert(client, outbox);
+            Some(client)
+        }
+
+        /// Forget searches Listen never answered. Cheap (a handful of
+        /// entries), so it runs on every state and every new search rather
+        /// than waiting for the next reply.
+        fn expire_pending(&mut self) {
+            self.pending
+                .retain(|_, (_, asked)| asked.elapsed() < REQUEST_TTL);
         }
 
         /// Forget a client and the searches it is still waiting for. Dropping
@@ -467,6 +488,7 @@ mod socket {
         /// Keep the newest state and queue it for every client; clients that
         /// cannot keep up or went away are dropped.
         fn publish_state(&mut self, line: String) {
+            self.expire_pending();
             if self.state.as_deref() == Some(line.as_str()) {
                 return;
             }
@@ -485,6 +507,7 @@ mod socket {
         /// Open a search for a client. Its ack is queued before Listen hears
         /// of the search, so the result can never overtake it.
         fn open_search(&mut self, client: u64) -> Option<u64> {
+            self.expire_pending();
             let request = self.next_request();
             let ack = serde_json::json!({"type": "ack", "request": request}).to_string();
             if !self.send(client, ack) {
@@ -496,8 +519,7 @@ mod socket {
 
         /// Queue a search result for the client that asked; false if it is gone.
         fn reply(&mut self, request: u64, line: String) -> bool {
-            self.pending
-                .retain(|_, (_, asked)| asked.elapsed() < REQUEST_TTL);
+            self.expire_pending();
             match self.pending.remove(&request) {
                 Some((client, _)) => self.send(client, line),
                 None => false,
@@ -626,7 +648,11 @@ mod socket {
             return;
         }
         let version = app.package_info().version.to_string();
-        let client = hub().connect(outbox, hello_line(&version));
+        // refused (too many clients) or gone already: the writer sends what
+        // was queued and closes the socket
+        let Some(client) = hub().connect(outbox, hello_line(&version)) else {
+            return;
+        };
         read_commands(&app, client, stream);
         hub().disconnect(client);
     }
@@ -701,7 +727,7 @@ mod socket {
             let mut hub = Hub::default();
             hub.publish_state(r#"{"type":"state","n":1}"#.into());
             let (outbox, lines) = mpsc::sync_channel(8);
-            let client = hub.connect(outbox, r#"{"type":"hello"}"#.into());
+            let client = hub.connect(outbox, r#"{"type":"hello"}"#.into()).unwrap();
             hub.publish_state(r#"{"type":"state","n":2}"#.into());
             let got: Vec<String> = lines.try_iter().collect();
             assert_eq!(
@@ -719,7 +745,7 @@ mod socket {
         fn a_client_that_stops_reading_is_dropped_without_waiting() {
             let mut hub = Hub::default();
             let (outbox, _lines) = mpsc::sync_channel(2);
-            let client = hub.connect(outbox, "{}".into());
+            let client = hub.connect(outbox, "{}".into()).unwrap();
             let request = hub.open_search(client).unwrap();
             let started = Instant::now();
             for n in 0..5 {
@@ -735,11 +761,73 @@ mod socket {
         fn disconnect_forgets_the_clients_open_searches() {
             let mut hub = Hub::default();
             let (outbox, _lines) = mpsc::sync_channel(8);
-            let client = hub.connect(outbox, "{}".into());
+            let client = hub.connect(outbox, "{}".into()).unwrap();
             let request = hub.open_search(client).unwrap();
             hub.disconnect(client);
             assert!(hub.pending.is_empty());
             assert!(!hub.reply(request, "{}".into()));
+        }
+
+        #[test]
+        fn refuses_clients_past_the_cap_with_an_error_line() {
+            let mut hub = Hub::default();
+            let mut kept = Vec::new();
+            for _ in 0..MAX_CLIENTS {
+                let (outbox, lines) = mpsc::sync_channel(8);
+                hub.connect(outbox, r#"{"type":"hello"}"#.into()).unwrap();
+                kept.push(lines);
+            }
+            let (outbox, lines) = mpsc::sync_channel(8);
+            assert_eq!(hub.connect(outbox, r#"{"type":"hello"}"#.into()), None);
+            assert_eq!(hub.clients.len(), MAX_CLIENTS);
+            // only the error, then the outbox closes (the writer shuts the socket)
+            assert_eq!(lines.recv().unwrap(), TOO_MANY_CLIENTS);
+            assert_eq!(line_kind(TOO_MANY_CLIENTS).0, "error");
+            assert!(lines.recv().is_err());
+
+            // a slot frees when a client leaves
+            let first = *hub.clients.keys().min().unwrap();
+            hub.disconnect(first);
+            let (outbox, _lines) = mpsc::sync_channel(8);
+            assert!(hub.connect(outbox, "{}".into()).is_some());
+        }
+
+        #[test]
+        fn a_client_whose_greeting_does_not_fit_is_not_registered() {
+            let mut hub = Hub::default();
+            hub.publish_state(r#"{"type":"state"}"#.into());
+            let (outbox, _lines) = mpsc::sync_channel(1);
+            assert_eq!(hub.connect(outbox, "{}".into()), None);
+            assert!(hub.clients.is_empty());
+        }
+
+        /// A search Listen never answered is forgotten on the next state or
+        /// search, not only when some other result arrives.
+        #[test]
+        fn unanswered_searches_expire_without_another_reply() {
+            let Some(long_ago) = Instant::now().checked_sub(REQUEST_TTL + Duration::from_secs(1))
+            else {
+                return; // the monotonic clock started less than a TTL ago
+            };
+            let mut hub = Hub::default();
+            let (outbox, _lines) = mpsc::sync_channel(64);
+            let client = hub.connect(outbox, "{}".into()).unwrap();
+
+            hub.pending.insert(1_000, (client, long_ago));
+            hub.publish_state(r#"{"type":"state","n":1}"#.into());
+            assert!(!hub.pending.contains_key(&1_000), "expired on publish");
+
+            hub.pending.insert(1_001, (client, long_ago));
+            // an unchanged state still sweeps
+            hub.publish_state(r#"{"type":"state","n":1}"#.into());
+            assert!(!hub.pending.contains_key(&1_001), "expired on a repeat");
+
+            hub.pending.insert(1_002, (client, long_ago));
+            let fresh = hub.open_search(client).unwrap();
+            assert!(!hub.pending.contains_key(&1_002), "expired on search");
+            assert!(hub.pending.contains_key(&fresh));
+            assert!(!hub.reply(1_002, "{}".into()));
+            assert!(hub.reply(fresh, "{}".into()));
         }
 
         /// States published from several threads race with search results;
@@ -754,7 +842,8 @@ mod socket {
             let client = hub
                 .lock()
                 .unwrap()
-                .connect(outbox, r#"{"type":"hello"}"#.into());
+                .connect(outbox, r#"{"type":"hello"}"#.into())
+                .unwrap();
 
             let reader = thread::spawn(move || {
                 BufReader::new(theirs)

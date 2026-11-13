@@ -125,7 +125,10 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   its socket, one whole line per write: lines never interleave, a `search` ack is
   queued before Listen hears of the search (so its `result` cannot overtake it), and
   `publish_state`/`desktop_control_reply` never block the main thread. A client whose
-  outbox fills or whose write stalls 2 s is dropped with its open searches.
+  outbox fills or whose write stalls 2 s is dropped with its open searches. At most 16
+  clients at once (`MAX_CLIENTS`): one more gets only
+  `{"type":"error","error":"too many clients"}` and is closed. A search Listen does
+  not answer within 15 s (`REQUEST_TTL`) is forgotten, swept on every state and search.
 - **Launcher art** (`desktop_launcher_art.rs`, `app/listen/src/lib/desktop-launcher-art.ts`):
   `art` is an absolute path in `$XDG_CACHE_HOME/crate/launcher-art/` (else
   `~/.cache/...`, dir 0700), named `<first 32 hex of sha256("crate-launcher-art/v1/<key>/256")>-256.<jpg|png|webp>`,
