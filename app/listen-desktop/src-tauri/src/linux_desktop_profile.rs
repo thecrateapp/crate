@@ -15,21 +15,17 @@ use serde::Serialize;
 /// (GTK takes it from the program name, see `set_program_name`).
 pub const LINUX_APP_ID: &str = "app.cratemusic.crate.desktop";
 
-/// The desktop entry id (file name without `.desktop`) that names Crate to
-/// notification daemons (`desktop-entry`) and MPRIS (`DesktopEntry`). It equals
-/// the app_id because compositors, docks and daemons look a window up as
-/// `<app_id>.desktop` first. Tauri's bundler cannot install an entry under that
-/// name: `.deb`/`.rpm` ship `Crate.desktop` (named after `productName`, with
-/// `StartupWMClass` set to the app_id by `linux/desktop-template.desktop`). So
-/// `linux_desktop_integration` writes `<LINUX_DESKTOP_ENTRY>.desktop` to
-/// `$XDG_DATA_HOME/applications` at every start, before any window exists.
+/// The id of the desktop entry Crate writes itself when no package installed
+/// one (AppImage, source runs). It equals the app_id because compositors,
+/// docks and daemons look a window up as `<app_id>.desktop` first. Tauri's
+/// bundler cannot install an entry under that name: `.deb`/`.rpm` ship
+/// `Crate.desktop` (named after `productName`, with `StartupWMClass` set to the
+/// app_id by `linux/desktop-template.desktop`), and where that is installed
+/// Crate goes by it instead. `linux_desktop_integration::identity` decides.
 pub const LINUX_DESKTOP_ENTRY: &str = LINUX_APP_ID;
 
-/// The icon name used for Crate everywhere (its desktop entry, notifications,
-/// the audio stream, the launcher). `linux_desktop_integration` installs it in
-/// `$XDG_DATA_HOME/icons/hicolor` at every start, for every kind of install;
-/// the packages' own icon is named after the binary (`crate-desktop`) and is
-/// missing from AppImage and source runs.
+/// The icon name of the entry Crate writes itself; the packages' own icon is
+/// named after the binary (`crate-desktop`). See `LINUX_DESKTOP_ENTRY`.
 pub const LINUX_ICON_NAME: &str = LINUX_APP_ID;
 
 /// Minimum logical size on a tiling compositor: a half-width tile on a 1366 px
@@ -130,18 +126,22 @@ pub fn set_program_name() {
     // Playback runs in WebKit's web process, which names its PulseAudio /
     // PipeWire stream on its own; libpulse merges PULSE_PROP into every client,
     // and the web process inherits it.
-    let merged = pulse_props(std::env::var("PULSE_PROP").ok().as_deref());
+    let merged = pulse_props(
+        std::env::var("PULSE_PROP").ok().as_deref(),
+        &crate::linux_desktop_integration::identity().icon,
+    );
     std::env::set_var("PULSE_PROP", merged);
 }
 
 /// The name a person sees for Crate: tray, mixer, notifications.
 pub const LINUX_APP_NAME: &str = "Crate";
 
-/// PULSE_PROP with Crate's stream identity, keeping any properties the user
-/// already set (theirs win: they come last).
-pub fn pulse_props(existing: Option<&str>) -> String {
+/// PULSE_PROP with Crate's stream identity (`icon` is Crate's icon name in
+/// this session), keeping any properties the user already set (theirs win:
+/// they come last).
+pub fn pulse_props(existing: Option<&str>, icon: &str) -> String {
     let ours = format!(
-        "application.name='{LINUX_APP_NAME}' application.icon_name='{LINUX_ICON_NAME}' media.role='music'"
+        "application.name='{LINUX_APP_NAME}' application.icon_name='{icon}' media.role='music'"
     );
     match existing.map(str::trim).filter(|s| !s.is_empty()) {
         Some(theirs) => format!("{ours} {theirs}"),
@@ -156,12 +156,15 @@ mod tests {
 
     #[test]
     fn pulse_props_name_the_stream_crate_and_keep_user_props() {
-        let ours = pulse_props(None);
+        let ours = pulse_props(None, LINUX_ICON_NAME);
         assert!(ours.contains("application.name='Crate'"));
         assert!(ours.contains("application.icon_name='app.cratemusic.crate.desktop'"));
+        assert!(
+            pulse_props(None, "crate-desktop").contains("application.icon_name='crate-desktop'")
+        );
         assert!(ours.contains("media.role='music'"));
-        assert_eq!(pulse_props(Some("   ")), ours);
-        let merged = pulse_props(Some("application.name='Mine'"));
+        assert_eq!(pulse_props(Some("   "), LINUX_ICON_NAME), ours);
+        let merged = pulse_props(Some("application.name='Mine'"), LINUX_ICON_NAME);
         assert!(merged.starts_with(&ours));
         assert!(merged.ends_with("application.name='Mine'"));
     }

@@ -34,6 +34,10 @@ noextract=("crate-linux-${pkgver}.deb")
 package() {
   bsdtar -xOf "crate-linux-${pkgver}.deb" 'data.tar.*' | bsdtar -xf - -C "$pkgdir"
   # the .deb ships /usr/bin, /usr/share/applications/Crate.desktop and hicolor icons
+  # Renaming the entry to app.cratemusic.crate.desktop.desktop (the window's app_id)
+  # waits for the first release whose app skips writing its own hidden user entry when
+  # a package installed one (feat/linux_desktop_ryoku): older apps write that hidden
+  # entry under the same id, which would hide Crate from launchers.
   chmod 0755 "$pkgdir/usr/bin/crate-desktop"
   find "$pkgdir/usr/share" -type d -exec chmod 0755 {} +
   find "$pkgdir/usr/share" -type f -exec chmod 0644 {} +

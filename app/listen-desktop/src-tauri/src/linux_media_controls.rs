@@ -194,7 +194,7 @@ impl MprisRoot {
 
     #[zbus(property)]
     fn desktop_entry(&self) -> String {
-        crate::linux_desktop_profile::LINUX_DESKTOP_ENTRY.into()
+        crate::linux_desktop_integration::identity().entry.clone()
     }
 
     #[zbus(property)]

@@ -349,16 +349,14 @@ fn icon_for(kind: &str) -> &'static str {
         "track" => "audio-x-generic",
         "album" => "media-optical-cd-audio",
         "artist" => "avatar-default",
-        _ => crate::linux_desktop_profile::LINUX_ICON_NAME,
+        _ => crate::linux_desktop_integration::identity().icon.as_str(),
     }
 }
 
-/// The row shown when no Crate is running; picking it starts one.
-fn not_running_row() -> String {
-    format!(
-        "Crate is not running: start it\0icon\x1f{}\x1finfo\x1f{START_INFO}\n",
-        crate::linux_desktop_profile::LINUX_ICON_NAME
-    )
+/// The row shown when no Crate is running; picking it starts one. `icon` is
+/// Crate's icon (`linux_desktop_integration::identity`).
+fn not_running_row(icon: &str) -> String {
+    format!("Crate is not running: start it\0icon\x1f{icon}\x1finfo\x1f{START_INFO}\n")
 }
 
 /// Rows for pass 1, from `search` result items.
@@ -414,7 +412,10 @@ pub fn launcher() {
                 print!("{}", launcher_rows(&items));
             }
         }
-        Err(_) => print!("{}", not_running_row()),
+        Err(_) => print!(
+            "{}",
+            not_running_row(&crate::linux_desktop_integration::identity().icon)
+        ),
     }
 }
 
@@ -476,10 +477,10 @@ mod tests {
     }
 
     #[test]
-    fn the_not_running_row_uses_crates_installed_icon() {
+    fn the_not_running_row_uses_crates_icon() {
         assert_eq!(
-            not_running_row(),
-            "Crate is not running: start it\0icon\x1fapp.cratemusic.crate.desktop\x1finfo\x1f__start__\n"
+            not_running_row("crate-desktop"),
+            "Crate is not running: start it\0icon\x1fcrate-desktop\x1finfo\x1f__start__\n"
         );
     }
 

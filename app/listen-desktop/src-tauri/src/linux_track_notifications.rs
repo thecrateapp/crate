@@ -199,14 +199,12 @@ pub fn track_update(app: &tauri::AppHandle, payload: &DesktopMediaSessionPayload
     });
 }
 
-/// The card's hints. `desktop-entry` names the entry the daemon groups the card
-/// under and takes the app's icon and settings from.
-fn hints(image: Option<&str>) -> HashMap<&'static str, Value<'_>> {
+/// The card's hints. `desktop-entry` (Crate's entry in this session) names
+/// the entry the daemon groups the card under and takes the app's icon and
+/// settings from.
+fn hints<'a>(entry: &'a str, image: Option<&'a str>) -> HashMap<&'static str, Value<'a>> {
     let mut hints: HashMap<&str, Value<'_>> = HashMap::new();
-    hints.insert(
-        "desktop-entry",
-        Value::from(crate::linux_desktop_profile::LINUX_DESKTOP_ENTRY),
-    );
+    hints.insert("desktop-entry", Value::from(entry));
     hints.insert("category", Value::from("x-gnome.music"));
     hints.insert("transient", Value::from(true));
     hints.insert("urgency", Value::from(0u8));
@@ -222,7 +220,8 @@ fn hints(image: Option<&str>) -> HashMap<&'static str, Value<'_>> {
 // through `show_newest` and `run` with a fake daemon.
 fn notify(card: &Card, replaces: u32) -> zbus::Result<u32> {
     let connection = zbus::blocking::Connection::session()?;
-    let hints = hints(card.image.as_deref());
+    let identity = crate::linux_desktop_integration::identity();
+    let hints = hints(&identity.entry, card.image.as_deref());
     let actions = vec!["default", "Show Crate", "next", "Next"];
     let reply = connection.call_method(
         Some(DEST),
@@ -232,7 +231,7 @@ fn notify(card: &Card, replaces: u32) -> zbus::Result<u32> {
         &(
             "Crate",
             replaces,
-            crate::linux_desktop_profile::LINUX_ICON_NAME,
+            identity.icon.as_str(),
             card.summary.as_str(),
             card.body.as_str(),
             actions,
@@ -417,14 +416,11 @@ mod tests {
 
     #[test]
     fn hints_name_crates_desktop_entry_and_carry_the_cover() {
-        let hints = hints(Some("/cache/cover.jpg"));
-        assert_eq!(
-            hints["desktop-entry"],
-            Value::from("app.cratemusic.crate.desktop")
-        );
+        let hints = hints("Crate", Some("/cache/cover.jpg"));
+        assert_eq!(hints["desktop-entry"], Value::from("Crate"));
         assert_eq!(hints["image-path"], Value::from("/cache/cover.jpg"));
         assert_eq!(hints["transient"], Value::from(true));
-        assert!(!super::hints(None).contains_key("image-path"));
+        assert!(!super::hints("Crate", None).contains_key("image-path"));
     }
 
     #[test]

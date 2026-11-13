@@ -96,17 +96,24 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   starts, because GTK 3 takes the Wayland app_id from it. The window then reports
   `app.cratemusic.crate.desktop`, which matches the desktop entries' `StartupWMClass`
   (it used to report `crate-desktop`).
-- **Desktop entry and icon names.** One name, `app.cratemusic.crate.desktop`
-  (`LINUX_APP_ID` = `LINUX_DESKTOP_ENTRY` = `LINUX_ICON_NAME`), for the app_id, the
-  notification `desktop-entry` hint, MPRIS `DesktopEntry`, the notification and launcher
-  icon and `PULSE_PROP`'s `application.icon_name`. Tauri's bundler cannot install an
-  entry under it: `.deb`/`.rpm` (and the AUR package, which repackages the `.deb`) ship
-  `Crate.desktop` (named after `productName`) with `Icon=crate-desktop` and hicolor icons
-  named after the binary. So `linux_desktop_integration::ensure_registered` writes
-  `$XDG_DATA_HOME/applications/app.cratemusic.crate.desktop.desktop` (`NoDisplay`) and
-  `$XDG_DATA_HOME/icons/hicolor/<n>x<n>/apps/app.cratemusic.crate.desktop.png` at every
-  start, for every kind of install. Do not point any of them at `crate-desktop`: that
-  icon is missing from AppImage and source runs.
+- **Desktop entry and icon names.** The window's app_id is always
+  `app.cratemusic.crate.desktop`. The entry and icon Crate names itself by (notification
+  `desktop-entry` hint and icon, MPRIS `DesktopEntry`, launcher icon, `PULSE_PROP`'s
+  `application.icon_name`) come from `linux_desktop_integration::identity()`, decided
+  once per launch:
+  - A visible entry for Crate is installed (a `[Desktop Entry]` with `Type=Application`,
+    not `Hidden`/`NoDisplay`, `StartupWMClass=app.cratemusic.crate.desktop` and an `Exec`
+    running `crate-desktop`, this executable or the AppImage; searched in
+    `$XDG_DATA_HOME`, then `$XDG_DATA_DIRS`, with id shadowing): Crate goes by that
+    entry's id and `Icon` (the packages' `Crate` / `crate-desktop`), writes nothing, and
+    removes the hidden entry and icons an earlier version wrote (only files byte-identical
+    to what it writes), so docks show one Crate.
+  - None (AppImage, source runs): `ensure_registered` writes
+    `$XDG_DATA_HOME/applications/app.cratemusic.crate.desktop.desktop` (`NoDisplay`) and
+    `$XDG_DATA_HOME/icons/hicolor/<n>x<n>/apps/app.cratemusic.crate.desktop.png` at every
+    start, and Crate goes by `LINUX_DESKTOP_ENTRY`/`LINUX_ICON_NAME` (the app id).
+  Tauri's bundler names the packaged entry after `productName` (`Crate.desktop`,
+  `Icon=crate-desktop`, icons named after the binary) and cannot rename it.
 - **Control socket** (`desktop_control.rs`): `$XDG_RUNTIME_DIR/crate/control.sock`
   (dir 0700, socket 0600), JSON lines, protocol 1. Server sends `hello` (with
   `commands`, every `cmd` accepted; `COMMANDS` in Rust, kept in step by a test), then
