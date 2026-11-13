@@ -8,6 +8,7 @@
  * positions keep using `commitNow`.
  */
 export const PLAYBACK_TICK_COMMIT_INTERVAL_MS = 250;
+export const PLAYBACK_HIDDEN_COMMIT_INTERVAL_MS = 1_000;
 
 export interface TickTimeCommitter {
   /** An engine progress tick: commit if the second changed, else coalesce. */
@@ -23,6 +24,13 @@ export interface TickTimeCommitterOptions {
   /** Latest exact time, read when a coalesced commit fires. */
   read: () => number;
   intervalMs?: number;
+  /**
+   * While true (the desktop window is on no monitor) the trailing commit waits
+   * `hiddenIntervalMs`: nothing is drawn, so second changes are enough, and the
+   * trailing commit still lands the exact time after a pause.
+   */
+  isHidden?: () => boolean;
+  hiddenIntervalMs?: number;
   now?: () => number;
   setTimer?: (callback: () => void, delayMs: number) => unknown;
   clearTimer?: (handle: unknown) => void;
@@ -32,6 +40,8 @@ export function createTickTimeCommitter({
   commit,
   read,
   intervalMs = PLAYBACK_TICK_COMMIT_INTERVAL_MS,
+  isHidden = () => false,
+  hiddenIntervalMs = PLAYBACK_HIDDEN_COMMIT_INTERVAL_MS,
   now = () => performance.now(),
   setTimer = (callback, delayMs) => setTimeout(callback, delayMs),
   clearTimer = (handle) =>
@@ -68,7 +78,8 @@ export function createTickTimeCommitter({
         return;
       }
       if (timer !== null || time === lastCommitted) return;
-      timer = setTimer(flush, Math.max(0, intervalMs - (now() - lastCommitAt)));
+      const interval = isHidden() ? hiddenIntervalMs : intervalMs;
+      timer = setTimer(flush, Math.max(0, interval - (now() - lastCommitAt)));
     },
     commitNow(time) {
       cancelTimer();

@@ -7,6 +7,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { PlaybackQueueReadiness } from "./playback-intelligence-model";
+import { isWindowHidden } from "@crate/ui/lib/motion-gate";
 import {
   createTickTimeCommitter,
   type TickTimeCommitter,
@@ -237,6 +238,7 @@ export function usePlayerRuntimeState() {
     tickCommitterRef.current = createTickTimeCommitter({
       commit: setCurrentTimeState,
       read: () => currentTimeRef.current,
+      isHidden: isWindowHidden,
     });
   }
   useEffect(() => {

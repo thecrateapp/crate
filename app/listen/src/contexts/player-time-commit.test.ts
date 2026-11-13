@@ -126,6 +126,46 @@ describe("createTickTimeCommitter", () => {
     expect(h.commit).toHaveBeenLastCalledWith(40.1);
   });
 
+  it("commits about once a second while the desktop window is hidden", () => {
+    let hidden = true;
+    let clock = 0;
+    let exact = 0;
+    const timers: Array<{ at: number; run: () => void }> = [];
+    const commit = vi.fn();
+    const committer = createTickTimeCommitter({
+      commit,
+      read: () => exact,
+      isHidden: () => hidden,
+      now: () => clock,
+      setTimer: (run, delay) => timers.push({ at: clock + delay, run }),
+      clearTimer: () => timers.splice(0),
+    });
+    const advanceTo = (time: number) => {
+      for (const timer of timers.splice(0)) {
+        if (timer.at <= time) timer.run();
+        else timers.push(timer);
+      }
+      clock = time;
+    };
+    for (let ms = 0; ms <= 10_000; ms += 27) {
+      advanceTo(ms);
+      exact = 0.4 + ms / 1000;
+      committer.tick(exact);
+    }
+    // One per second change plus at most one trailing commit per second.
+    expect(commit.mock.calls.length).toBeLessThanOrEqual(21);
+    expect(commit.mock.calls.length).toBeGreaterThanOrEqual(10);
+
+    hidden = false;
+    commit.mockClear();
+    for (let ms = 10_027; ms <= 20_000; ms += 27) {
+      advanceTo(ms);
+      exact = 0.4 + ms / 1000;
+      committer.tick(exact);
+    }
+    expect(commit.mock.calls.length).toBeGreaterThanOrEqual(38);
+  });
+
   it("dispose cancels a pending commit but keeps working", () => {
     const h = harness();
     h.tick(50.1);
