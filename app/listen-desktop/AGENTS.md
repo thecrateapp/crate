@@ -110,6 +110,11 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   `kind`, `title`, `subtitle`, `ref`, `duration` (tracks, whole seconds) and `art`.
   Refs never carry media URLs: Crate signs those with a
   `media_ticket` (`lib/desktop-control-search.ts` strips them).
+  Each client has a bounded outbox (64 lines) and one writer thread, the only writer of
+  its socket, one whole line per write: lines never interleave, a `search` ack is
+  queued before Listen hears of the search (so its `result` cannot overtake it), and
+  `publish_state`/`desktop_control_reply` never block the main thread. A client whose
+  outbox fills or whose write stalls 2 s is dropped with its open searches.
 - **Launcher art** (`desktop_launcher_art.rs`, `app/listen/src/lib/desktop-launcher-art.ts`):
   `art` is an absolute path in `$XDG_CACHE_HOME/crate/launcher-art/` (else
   `~/.cache/...`, dir 0700), named `<first 32 hex of sha256("crate-launcher-art/v1/<key>/256")>-256.<jpg|png|webp>`,
