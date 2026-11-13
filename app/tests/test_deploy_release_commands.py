@@ -473,6 +473,140 @@ def test_deploy_ships_the_offsite_backup_build_context() -> None:
     assert copied <= {Path(file).name for file in files}
 
 
+def _before_upgrade(
+    tmp_path: Path,
+    *,
+    running: bool = True,
+    engine: str | None = None,
+    cli_exit: int = 0,
+    skip: str = "0",
+) -> tuple[subprocess.CompletedProcess, list[list[str]]]:
+    """Run cmd_backup_before_upgrade against a fake docker; return its calls."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir(exist_ok=True)
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
+        "args = sys.argv[1:]\n"
+        "with open(os.environ['DOCKER_TEST_LOG'], 'a') as log:\n"
+        "    log.write(json.dumps(args) + '\\n')\n"
+        "if args[0] == 'ps':\n"
+        "    print('abc123' if os.environ['FAKE_RUNNING'] == '1' else '')\n"
+        "elif args[:3] == ['exec', 'crate-maintenance-worker', 'printenv']:\n"
+        "    value = os.environ.get('FAKE_ENGINE')\n"
+        "    if value is None:\n"
+        "        sys.exit(1)\n"
+        "    print(value)\n"
+        "elif 'before-upgrade' in args:\n"
+        "    sys.exit(int(os.environ['FAKE_CLI_EXIT']))\n"
+    )
+    docker.chmod(0o755)
+    log = tmp_path / "docker.jsonl"
+    log.write_text("")
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        "DOCKER_TEST_LOG": str(log),
+        "FAKE_RUNNING": "1" if running else "0",
+        "FAKE_CLI_EXIT": str(cli_exit),
+        "DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE": skip,
+        "DEPLOY_BACKUP_TIMEOUT": "600",
+    }
+    if engine is not None:
+        env["FAKE_ENGINE"] = engine
+    result = subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            "log() { printf '%s\\n' \"$*\"; }\n"
+            + _shell_function("cmd_backup_before_upgrade")
+            + "\ncmd_backup_before_upgrade\n",
+        ],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    return result, calls
+
+
+def _ran_backup(calls: list[list[str]]) -> bool:
+    return any("before-upgrade" in call for call in calls)
+
+
+@pytest.mark.parametrize(
+    ("options", "reason"),
+    [
+        ({"skip": "1"}, "DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE=1"),
+        ({"running": False}, "not running"),
+        ({"engine": "false"}, "engine is off"),
+        ({"engine": " OFF\n"}, "engine is off"),
+        ({"engine": "0"}, "engine is off"),
+    ],
+)
+def test_before_upgrade_backup_is_a_no_op_when_nothing_can_run(
+    tmp_path: Path, options: dict, reason: str
+) -> None:
+    result, calls = _before_upgrade(tmp_path, **options)
+    assert result.returncode == 0, result.stderr
+    assert reason in result.stdout
+    assert not _ran_backup(calls)
+
+
+@pytest.mark.parametrize("engine", [None, "true", "1"])
+def test_before_upgrade_backup_runs_and_waits_while_the_engine_is_on(
+    tmp_path: Path, engine: str | None
+) -> None:
+    result, calls = _before_upgrade(tmp_path, engine=engine)
+    assert result.returncode == 0, result.stderr
+    assert calls[-1] == [
+        "exec",
+        "crate-maintenance-worker",
+        "python",
+        "-m",
+        "crate.backups.cli",
+        "before-upgrade",
+        "--wait",
+        "--timeout",
+        "600",
+    ]
+
+
+def test_a_failed_before_upgrade_backup_stops_the_deploy(tmp_path: Path) -> None:
+    result, calls = _before_upgrade(tmp_path, engine="true", cli_exit=1)
+    assert result.returncode == 1
+    assert _ran_backup(calls)
+
+
+def test_deploy_backs_up_before_anything_changes() -> None:
+    deploy = (ROOT / "scripts/deploy.sh").read_text()
+    remote = (ROOT / "scripts/deploy-remote.sh").read_text()
+    run = deploy[deploy.index("run_deploy() {") :]
+    run = run[: run.index("\n}\n")]
+    hook = run.index("remote_deploy backup-before-upgrade")
+    assert run.index("remote_deploy release-preflight") < hook
+    for later in (
+        "remote_deploy backup\n",
+        "trap rollback_on_error EXIT",
+        "sync_config",
+        "remote_deploy pull",
+        "remote_deploy up",
+    ):
+        assert hook < run.index(later), later
+    forwarded = deploy[deploy.index("remote_deploy() {") :]
+    forwarded = forwarded[: forwarded.index("\n}\n")]
+    assert "DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE='$DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE'" in (
+        forwarded
+    )
+    assert "DEPLOY_BACKUP_TIMEOUT='$DEPLOY_BACKUP_TIMEOUT'" in forwarded
+    assert "  backup-before-upgrade) host_guard cmd_backup_before_upgrade ;;" in remote
+
+
 PROJECTOR_OVERLAY = "deploy/observability/compose.projector-prometheus.yaml"
 TRAEFIK_OVERLAY = "deploy/observability/compose.traefik-metrics.yaml"
 APP_METRICS_OVERLAY = "deploy/observability/compose.app-metrics.yaml"
@@ -1123,6 +1257,7 @@ HOST_LOCK_FUNCTIONS = (
 )
 MUTATING_STEPS = {
     "backup",
+    "backup-before-upgrade",
     "recovery-snapshot",
     "config",
     "pull",

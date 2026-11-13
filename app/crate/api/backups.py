@@ -79,6 +79,7 @@ from crate.db.queries.backup_policies import get_backup_policy, list_backup_poli
 from crate.db.queries.backup_runs import (
     count_backup_runs,
     latest_destination_runs,
+    latest_local_runs,
     latest_successful_dump,
     list_backup_runs,
     repository_size_series,
@@ -195,6 +196,7 @@ def api_backups_overview(request: Request):
             latest=latest_destination_runs(),
             latest_dump=latest_successful_dump(),
             size_series=repository_size_series(days=90),
+            local_runs=latest_local_runs(),
         ),
         "local_retention": {
             "keep_daily": retention.daily,

@@ -132,3 +132,18 @@ def test_the_make_target_calls_the_hook():
     makefile = (ROOT / "Makefile").read_text()
     assert "backup-before-upgrade:" in makefile
     assert "python -m crate.backups.cli before-upgrade --wait" in makefile
+
+
+def test_waiting_prints_a_line_every_minute_for_the_deploy(monkeypatch, capsys):
+    statuses = iter(["pending", "running", "running", "running", "completed"])
+    monkeypatch.setattr(
+        cli, "get_task", lambda task_id: {"status": next(statuses), "result": {}}
+    )
+    ticks = iter(range(0, 1000, 30))
+    monkeypatch.setattr(cli.time, "monotonic", lambda: float(next(ticks)))
+    monkeypatch.setattr(cli.time, "sleep", lambda seconds: None)
+
+    assert cli._wait("task-9", deadline=10_000) == {}
+    lines = capsys.readouterr().out.splitlines()
+    assert lines == ["Waiting for task task-9 (running)"] * len(lines)
+    assert 1 <= len(lines) <= 2

@@ -64,6 +64,7 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "backup_verify": TaskTypeInfo("Backup Verification", "library"),
     "backup_restore_drill": TaskTypeInfo("Backup Restore Drill", "library"),
     "backup_policies_tick": TaskTypeInfo("Backup Policies", "library"),
+    "backup_alerts": TaskTypeInfo("Backup Alerts", "library"),
     "scan": TaskTypeInfo("Health Check", "library"),
     "health_check": TaskTypeInfo("Health Check", "library"),
     "quality_check": TaskTypeInfo("Library Quality Check", "library"),

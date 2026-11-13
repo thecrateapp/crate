@@ -603,6 +603,9 @@ services:
       # the dumps, until BK6 moves production to it. Self-hosted installs keep the
       # default (on). The scheduler reads it in crate-worker, the tasks in this one.
       - CRATE_LOCAL_BACKUPS_ENABLED=${CRATE_LOCAL_BACKUPS_ENABLED:-false}
+      # The engine's backup directory: empty keeps ${DATA_DIR}/crate/backups (/data);
+      # /backups uses the mount below, crate-postgres-backup's volume (BK6).
+      - CRATE_BACKUP_DIR=${CRATE_BACKUP_DIR:-}
       - SENTRY_SERVICE=worker-default
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
@@ -699,6 +702,8 @@ services:
       - ${MEDIA_DIR}/downloads/soulseek:/downloads/soulseek
       - ${DATA_DIR}/crate:/data
       - ${CACHE_DIR:-./data/cache}:/cache
+      # Destination tests run here and reach a local destination in the backup dir.
+      - ${POSTGRES_BACKUP_DIR:-${DATA_DIR}/backups/postgres}:/backups
     networks:
       - crate
     depends_on:
@@ -820,6 +825,9 @@ services:
       # the dumps, until BK6 moves production to it. Self-hosted installs keep the
       # default (on). The scheduler reads it in crate-worker, the tasks in this one.
       - CRATE_LOCAL_BACKUPS_ENABLED=${CRATE_LOCAL_BACKUPS_ENABLED:-false}
+      # The engine's backup directory: empty keeps ${DATA_DIR}/crate/backups (/data);
+      # /backups writes dumps/ and drills/ into crate-postgres-backup's volume (BK6).
+      - CRATE_BACKUP_DIR=${CRATE_BACKUP_DIR:-}
       - SENTRY_SERVICE=worker-maintenance
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
@@ -912,6 +920,8 @@ services:
       - ${MEDIA_DIR}/music:/music
       - ${DATA_DIR}/crate:/data
       - ${CACHE_DIR:-./data/cache}:/cache
+      # The backups engine's dumps, drills and local repositories (CRATE_BACKUP_DIR).
+      - ${POSTGRES_BACKUP_DIR:-${DATA_DIR}/backups/postgres}:/backups
     networks:
       - crate
     depends_on:

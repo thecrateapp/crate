@@ -260,6 +260,44 @@ def confirm_recovery_kit(*, session: Session | None = None) -> int:
         return _impl(current)
 
 
+def replace_repository_password(
+    destination_id: str, repo_password_ref: str, *, session: Session | None = None
+) -> str | None:
+    """Point a destination at another repository password; return the old reference.
+
+    Only the import of an existing repository does this (BK6): the engine's own
+    passwords never change. The last recovery kit no longer holds the password, so
+    the destination counts as not covered until the next kit is confirmed.
+    """
+    valid = valid_uuid(destination_id)
+    if valid is None:
+        return None
+
+    def _impl(current: Session) -> str | None:
+        row = current.execute(
+            text(
+                """
+                UPDATE backup_destinations AS d SET
+                    repo_password_ref = :ref,
+                    recovery_kit_downloaded_at = NULL,
+                    recovery_kit_confirmed_at = NULL,
+                    updated_at = now()
+                FROM (
+                    SELECT id, repo_password_ref FROM backup_destinations
+                    WHERE id = CAST(:id AS uuid) FOR UPDATE
+                ) AS previous
+                WHERE d.id = previous.id
+                RETURNING previous.repo_password_ref
+                """
+            ),
+            {"id": valid, "ref": repo_password_ref},
+        ).first()
+        return None if row is None else str(row[0])
+
+    with optional_scope(session) as current:
+        return _impl(current)
+
+
 __all__ = [
     "CHECK_STATUSES",
     "confirm_recovery_kit",
@@ -267,5 +305,6 @@ __all__ = [
     "insert_backup_destination",
     "mark_recovery_kit_downloaded",
     "record_destination_check",
+    "replace_repository_password",
     "update_backup_destination",
 ]

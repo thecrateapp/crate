@@ -6,6 +6,10 @@ test), ``failing`` (the last test, copy or check failed: red, BG1-3), ``late``
 policy: amber, BG1-6) and ``healthy``. The sidebar counter is the number of
 failing destinations (BG1-1). Everything comes from a handful of small reads of
 the backup tables; nothing here runs restic.
+
+Alerts (BK6): a failing destination (its last test or copy failed), a late copy, a
+failed verification or restore drill, and a failed local run (the latest dump or
+local retention). ``crate.backups.alerts`` pushes them from a scheduled task.
 """
 
 from __future__ import annotations
@@ -73,9 +77,14 @@ def build_overview(
     latest: Mapping[str, Mapping[str, Mapping[str, Any]]],
     latest_dump: Mapping[str, Any] | None,
     size_series: Mapping[str, list[dict[str, Any]]],
+    local_runs: Mapping[str, Mapping[str, Any]] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """The overview payload from rows already read (public destination views)."""
+    """The overview payload from rows already read (public destination views).
+
+    ``local_runs`` holds the latest run of each local kind, whatever its status
+    (``latest_local_runs``); a failed one raises an alert until a later run passes.
+    """
     now = now or datetime.now(timezone.utc)
     links = _tiers_by_destination(policy_rows)
     entries = []
@@ -151,6 +160,24 @@ def build_overview(
                         else "restore_drill",
                     }
                 )
+
+    for kind, label in (
+        ("dump", "database dump"),
+        ("local_retention", "local retention"),
+    ):
+        run = (local_runs or {}).get(kind)
+        if run and run.get("status") == "failed":
+            alerts.append(
+                {
+                    "level": "danger",
+                    "kind": f"{kind}_failed",
+                    "destination_id": None,
+                    "title": f"The last {label} failed",
+                    "text": run.get("error") or f"The last {label} failed.",
+                    "at": _run_time(run),
+                    "action": None,
+                }
+            )
 
     usable = [e for e in entries if e["health"] != "disabled"]
     copies = [(e["last_copy_at"], e) for e in entries if e["last_copy_at"] is not None]

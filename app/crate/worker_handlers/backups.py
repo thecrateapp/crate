@@ -15,6 +15,10 @@ Both run on the maintenance queue under one session advisory lock, so a dump and
 prune never overlap, and both record a ``backup_runs`` row. A dump that fails or is
 cancelled leaves no file and a failed run; after a good dump the retention task is
 queued. Settings: ``crate.backups.settings``.
+
+Alerts and metrics (BK6): ``backup_alerts`` runs every 5 minutes while backups are
+in use, pushes the alerts of ``crate.backups.alerts`` and records the gauges of
+``crate.backups.metrics``.
 """
 
 from __future__ import annotations
@@ -514,6 +518,18 @@ def _handle_backup_restore_drill(task_id: str, params: dict, config: dict) -> di
     return {"run_id": run_id, **details}
 
 
+def _handle_backup_alerts(task_id: str, params: dict, config: dict) -> dict:
+    """Push the backup alerts (one open alert per condition until it clears) and
+    refresh the backup gauges (BK6)."""
+    del task_id, params, config
+    from crate.backups.alerts import read_inputs, sync_backup_alerts
+    from crate.backups.metrics import record_backup_metrics
+
+    inputs = read_inputs()
+    summary = sync_backup_alerts(inputs=inputs).summary()
+    return {**summary, "metrics": len(record_backup_metrics(inputs))}
+
+
 def _handle_backup_policies_tick(task_id: str, params: dict, config: dict) -> dict:
     """Start the due policies; queue the due verifications and restore drills."""
     del task_id, params, config
@@ -583,6 +599,7 @@ BACKUP_TASK_HANDLERS = {
     "backup_verify": _handle_backup_verify,
     "backup_restore_drill": _handle_backup_restore_drill,
     "backup_policies_tick": _handle_backup_policies_tick,
+    "backup_alerts": _handle_backup_alerts,
 }
 
 __all__ = [

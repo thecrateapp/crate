@@ -368,7 +368,7 @@ export function BackupsOverview({
       <div className="grid gap-8 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Section
           title="Alerts"
-          description="Also sent through Admin notifications."
+          description="Crate Operator also sends each new one, through its backup alerts rule."
           className="xl:order-2"
         >
           {overview.alerts.length ? (

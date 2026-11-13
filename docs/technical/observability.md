@@ -497,15 +497,16 @@ A fix closes the loop in Sentry without anyone resolving the issue by hand:
 
 The monitoring stack, `crate-observability`, runs Prometheus, Grafana and
 exporters for the host, containers, PostgreSQL and Redis. With application
-metrics enabled it also scrapes 78 application metric families and evaluates 29
-recording rules: request, stream, playback, worker and telemetry rates and
-percentiles, each with the sample it came from. No rule turns missing data into
-zero.
+metrics enabled it also scrapes 83 application metric families and evaluates 32
+recording rules: request, stream, playback, worker, backup and telemetry rates,
+percentiles and gauges, each with the sample it came from. No rule turns missing
+data into zero.
 
 Grafana provisions six dashboards in the **Crate infrastructure** folder: host and
 containers, PostgreSQL and Redis, and for the application an overview, playback,
-workers and projector, and telemetry health, which shows whether collection
-itself is working. Grafana only listens on the server's loopback;
+workers and projector (with the backups' age, size and run duration, see
+[Managed backups](admin-backups.md#metrics)), and telemetry health, which shows
+whether collection itself is working. Grafana only listens on the server's loopback;
 `make observability-grafana` opens an SSH tunnel and the browser.
 
 On a home installation the `crate` installer offers the stack as an optional,
