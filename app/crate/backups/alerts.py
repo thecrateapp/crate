@@ -17,6 +17,7 @@ channel is Crate Operator's supervisor (``docs/technical/crate-operator.md``): t
 Crate MCP serves the open alerts in ``get_observability_summary`` as
 ``sources.backup_alerts`` and the ``backups/backup-alerts`` digest rule sends each
 new occurrence once, by its ``id``. Openings and resolutions are also logged.
+The same task records the backup gauges (``crate.backups.metrics``).
 """
 
 from __future__ import annotations

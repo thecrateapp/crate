@@ -37,7 +37,7 @@ bytes and ratios. **Prometheus** is the exported family name, without the
 not exported is still in System Health or the PostgreSQL history. See
 [Observability](observability.md) for what each surface shows.
 
-The catalogue defines 845 metrics; 80 are exported to Prometheus.
+The catalogue defines 848 metrics; 83 are exported to Prometheus.
 
 ## Metrics by family
 
@@ -82,6 +82,16 @@ Artwork requests and queueing, materialisation time, size and errors, and the wo
 | `artwork.materialize.errors` | counter | 1 | `kind`, `reason` | `crate_artwork_materialize_errors` | PostgreSQL history only |
 | `artwork.queue` | counter | 1 | `kind`, `outcome` | `crate_artwork_queue` | PostgreSQL history only |
 | `artwork.requests` | counter | 1 | `kind`, `outcome` | `crate_artwork_requests` | PostgreSQL history only |
+
+### Backups
+
+Per destination kind and run kind, from the backups engine every 5 minutes: when the last good run finished, how long it took, and how much a repository or the latest local dump holds. Several destinations of one kind report the oldest success, the longest run and the summed size.
+
+| Metric | Type | Unit | Labels | Prometheus | Shown in |
+| --- | --- | --- | --- | --- | --- |
+| `backup.bytes` | gauge | bytes | `destination` | `crate_backup_bytes` | Grafana: Workers and projector |
+| `backup.last_success.timestamp` | gauge | seconds | `destination`, `kind` | `crate_backup_last_success_timestamp_seconds` | Grafana: Workers and projector |
+| `backup.run.duration` | gauge | seconds | `destination`, `kind` | `crate_backup_run_duration_seconds` | Grafana: Workers and projector |
 
 ### Cast spectrum
 
@@ -356,7 +366,7 @@ Queue depth and running tasks, wait and duration per queue and task type, and re
 
 ## Recording rules
 
-Prometheus evaluates 29 recording rules from
+Prometheus evaluates 32 recording rules from
 `deploy/observability/recording-rules.yml`. Ratios and percentiles come with
 the sample they were computed from, and no rule turns missing data into zero.
 
@@ -391,6 +401,9 @@ the sample they were computed from, and no rule turns missing data into zero.
 | `crate:worker_resource_deferred:increase15m` | crate-app-workers | `crate_worker_resource_deferred_total` |
 | `crate:media_worker_packages:increase15m` | crate-app-workers | `crate_media_worker_package_completed_total` |
 | `crate:media_worker_package_failures:increase15m` | crate-app-workers | `crate_media_worker_package_failed_total` |
+| `crate:backup_last_success_age_seconds:last2m` | crate-app-backups | `crate_backup_last_success_timestamp_seconds` |
+| `crate:backup_bytes:last2m` | crate-app-backups | `crate_backup_bytes` |
+| `crate:backup_run_duration_seconds:last2m` | crate-app-backups | `crate_backup_run_duration_seconds` |
 
 ## Grafana dashboards
 
@@ -402,6 +415,6 @@ Provisioned in the **Crate infrastructure** folder from
 | Crate application · Overview | `app-overview.json` | Collectors up, API requests, API error ratio, API p95 latency, API sample, Requests by client, Stream p95 latency, Concurrent streams |
 | Crate application · Playback | `app-playback.json` | Startup p95, Starts observed, Stalls per start, Stall p95, Stalls and recoveries, Transcode failure ratio, Transcodes, Stream requests |
 | Crate application · Telemetry health | `app-telemetry.json` | Collectors up, Scrape age, Samples per scrape, Sample limit reached, Scrape duration, Rule evaluation |
-| Crate application · Workers and projector | `app-workers.json` | Queue depth, Running tasks, Task p95 duration, Queue wait p95, Task failure ratio, Tasks by outcome, Resource deferrals, Projector and workers collection, Media packages |
+| Crate application · Workers and projector | `app-workers.json` | Queue depth, Running tasks, Task p95 duration, Queue wait p95, Task failure ratio, Tasks by outcome, Resource deferrals, Projector and workers collection, Media packages, Backup age, Backup size, Backup run duration |
 | Crate infrastructure · PostgreSQL and Redis | `infra-data.json` | PostgreSQL reachable, PostgreSQL connections by state, PostgreSQL locks, PostgreSQL transaction rate, Statement mean execution time, PostgreSQL block read time, Redis reachable by role, Redis memory used, Redis connections, Redis command rate, Redis evictions, Redis rejected connections |
 | Crate infrastructure · host and containers | `infra-runtime.json` | Scrape success by target, Last scrape sample age, Host CPU busy, Host memory used, Filesystem used, Host load (1 minute), Container CPU cores, Container working set, Container receive throughput, Container block IO, Prometheus active series, Collector scrape duration |

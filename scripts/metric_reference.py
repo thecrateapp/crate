@@ -39,6 +39,11 @@ FAMILIES = (
         "Artwork requests and queueing, materialisation time, size and errors, and the work left in the artwork backfill.",
     ),
     (
+        "backup.",
+        "Backups",
+        "Per destination kind and run kind, from the backups engine every 5 minutes: when the last good run finished, how long it took, and how much a repository or the latest local dump holds. Several destinations of one kind report the oldest success, the longest run and the summed size.",
+    ),
+    (
         "cast.spectrum.",
         "Cast spectrum",
         "Spectrum files generated for the Cast receiver and their size.",
