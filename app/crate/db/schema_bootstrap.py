@@ -179,3 +179,8 @@ def create_schema(cur):
     )
 
     create_smart_mix_stem_files_v158_schema(cur)
+    from crate.db.schema_sections.backup_runs_v162 import (
+        create_backup_runs_v162_schema,
+    )
+
+    create_backup_runs_v162_schema(cur)

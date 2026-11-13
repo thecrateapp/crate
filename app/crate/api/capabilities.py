@@ -8,6 +8,7 @@ from crate.api.schemas.capabilities import (
     CapabilitiesResponse,
     DecksCapabilities,
     DecksFeature,
+    FederationCapabilities,
     SmartMixAiAssistedCapabilities,
     SmartMixCapabilities,
     SmartMixStemsCapabilities,
@@ -27,7 +28,10 @@ from crate.db.queries.smart_mix_admin import (
     get_smart_mix_refinement_latency_ms,
     get_smart_mix_structure_percent,
 )
+from crate.db.repositories.federation import get_local_node, list_peers
 from crate.db.repositories.smart_mix_stems import stem_uploads_enabled
+from crate.federation.results_envelope import RESULTS_CONTRACT
+from crate.federation.search_fanout import DEFAULT_SETTINGS, eligible_search_peers
 from crate.llm.prompts.smart_mix_transition import PROMPT_VERSION
 from crate.smart_mix_ai import gate_reason, provider_kind, refinement_gate
 from crate.db.cache_settings import get_setting
@@ -115,8 +119,35 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             contract_version=DECKS_CONTRACT_VERSION,
             features=_decks_features(request),
         ),
+        federation=_federation_capabilities(request),
         access_token=_access_token_capabilities(request, vdj_automation),
     )
+
+
+def _federation_capabilities(request: Request) -> FederationCapabilities:
+    return FederationCapabilities(
+        search_stream=_federated_search_available(request),
+        results_contract=RESULTS_CONTRACT,
+        min_query_length=DEFAULT_SETTINGS.min_query_length,
+        window_ms=int(DEFAULT_SETTINGS.deadline_s * 1000),
+    )
+
+
+def _federated_search_available(request: Request) -> bool:
+    """A local node with at least one direct peer that may be searched."""
+    user = getattr(request.state, "user", None)
+    # Access tokens only search the local library.
+    if user and user.get("auth_type") == "access_token":
+        return False
+    try:
+        if not get_local_node():
+            return False
+        return bool(eligible_search_peers(list_peers(trust_state="approved")))
+    except Exception:
+        # Capabilities bootstrap every client: an unreadable federation state
+        # keeps Listen on the canonical search.
+        log.warning("Federation state unreadable for capabilities", exc_info=True)
+        return False
 
 
 def _listen_planner(available: bool) -> str | None:

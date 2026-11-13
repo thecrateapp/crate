@@ -589,6 +589,7 @@ export const GOVERNED_TASKS = [
   "backfill_artwork_variants",
   "backfill_smart_mix_profiles",
   "backfill_track_audio_fingerprints",
+  "backup_dump",
   "batch_covers",
   "batch_retag",
   "cleanup_artwork_variants",

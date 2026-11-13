@@ -75,6 +75,8 @@ services:
 
   crate-postgres:
     mem_limit: 4g
+    # Parallel queries keep dynamic shared memory in /dev/shm; Docker defaults it to 64MB.
+    shm_size: 1g
 
   crate-site:
     image: ${CRATE_SITE_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-site:${CRATE_IMAGE_TAG:-latest}}

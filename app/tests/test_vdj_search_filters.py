@@ -114,6 +114,69 @@ def test_dj_search_finds_tracks_that_still_need_analysis(pg_db, tmp_path: Path) 
     assert results[0]["analysis_required"] is True
 
 
+def test_dj_search_carries_the_decks_audio_and_profile_fields(
+    pg_db, tmp_path: Path
+) -> None:
+    # Same columns and meaning as the S3 track pages: the file's format, the
+    # current profile's quality whatever it is ('unavailable' included), and
+    # nothing from a stale profile.
+    del pg_db
+    tracks = _library(
+        tmp_path,
+        [
+            ("Full", 124.0, "8A", 0.7),
+            ("Failed", 124.0, "8A", 0.7),
+            ("Stale", 124.0, "8A", 0.7),
+            ("Pending", None, None, None),
+        ],
+        artist="Payload Parity",
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE library_tracks SET format = 'flac', bitrate = 1411, "
+                "sample_rate = 44100 WHERE entity_uid = CAST(:uid AS uuid)"
+            ),
+            {"uid": tracks["Full"]},
+        )
+        session.execute(
+            text(
+                "UPDATE track_mix_profiles SET quality = 'unavailable' "
+                "WHERE track_id = (SELECT id FROM library_tracks "
+                "WHERE entity_uid = CAST(:uid AS uuid))"
+            ),
+            {"uid": tracks["Failed"]},
+        )
+        session.execute(
+            text(
+                "UPDATE track_mix_profiles SET source_stale_at = NOW() "
+                "WHERE track_id = (SELECT id FROM library_tracks "
+                "WHERE entity_uid = CAST(:uid AS uuid))"
+            ),
+            {"uid": tracks["Stale"]},
+        )
+
+    results = {
+        item["title"]: item for item in search_dj_tracks('artist:"payload parity"', 50)
+    }
+
+    full = results["Full"]
+    assert (full["format"], full["bitrate"], full["sample_rate"]) == (
+        "flac",
+        1411,
+        44100,
+    )
+    assert {title: item["profile_quality"] for title, item in results.items()} == {
+        "Full": "full",
+        "Failed": "unavailable",
+        "Stale": None,
+        "Pending": None,
+    }
+    # The failed analysis still counts as no usable profile for the DJ fields.
+    assert results["Failed"]["analysis_required"] is True
+    assert results["Failed"]["camelot"] is None
+
+
 def test_dj_search_caps_results_at_50(pg_db, tmp_path: Path) -> None:
     del pg_db
     _library(tmp_path, [(f"Track {index}", 122.0, "8A", 0.5) for index in range(60)])
@@ -364,3 +427,5 @@ def test_dj_search_never_reads_stale_profiles() -> None:
 
     assert source.count("track_mix_profiles p") == 3
     assert source.count("p.source_stale_at IS NULL") == 3
+    # The Decks profile quality reads the same current profile, never a stale one.
+    assert source.count("track_mix_profiles") == source.count("source_stale_at IS NULL")

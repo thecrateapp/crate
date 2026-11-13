@@ -37,7 +37,7 @@ bytes and ratios. **Prometheus** is the exported family name, without the
 not exported is still in System Health or the PostgreSQL history. See
 [Observability](observability.md) for what each surface shows.
 
-The catalogue defines 842 metrics; 78 are exported to Prometheus.
+The catalogue defines 845 metrics; 80 are exported to Prometheus.
 
 ## Metrics by family
 
@@ -153,6 +153,14 @@ Preparation of tracks from federated peers, from the request to ready, rate limi
 | `federation.playback.prepare.requested` | counter | 1 | `effective_policy`, `origin`, `requested_policy` | `crate_federation_playback_prepare_requested` | PostgreSQL history only |
 | `federation.playback.prepare.unavailable` | counter | 1 | `effective_policy`, `origin`, `requested_policy` | `crate_federation_playback_prepare_unavailable` | PostgreSQL history only |
 
+### Federated search stream
+
+Searches that asked for local and network results as one stream (FED1).
+
+| Metric | Type | Unit | Labels | Prometheus | Shown in |
+| --- | --- | --- | --- | --- | --- |
+| `catalog.search_stream.requests` | counter | 1 | `mode` | not exported | PostgreSQL history only |
+
 ### Federation risk
 
 Risk signals raised about federated peers.
@@ -246,6 +254,15 @@ Radio batches by source (generated, replayed or recovered), outcome, fill, gener
 | `radio.batch.ms` | histogram | seconds | `profile`, `stage` | not exported | PostgreSQL history only |
 | `radio.batch.relaxation` | counter | 1 | `level`, `profile` | not exported | PostgreSQL history only |
 | `radio.batch.vectors` | counter | 1 | `coverage`, `profile` | not exported | PostgreSQL history only |
+
+### SSE pub/sub
+
+Redis pub/sub subscriptions held by each API process for its SSE and Jam streams, and the subscriptions that could not be opened, either because the shared async pool was full or because Redis failed. The open count rises and falls with connected clients; a count that only climbs means a stream is not closing its subscription.
+
+| Metric | Type | Unit | Labels | Prometheus | Shown in |
+| --- | --- | --- | --- | --- | --- |
+| `sse.pubsub.open` | gauge | 1 | none | `crate_sse_pubsub_open` | PostgreSQL history only |
+| `sse.pubsub.open_failures` | counter | 1 | `reason` | `crate_sse_pubsub_open_failures` | PostgreSQL history only |
 
 ### Search results
 

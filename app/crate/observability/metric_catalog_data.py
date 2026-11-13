@@ -161,6 +161,7 @@ LABEL_VALUES = {
     "radio_vector_coverage": ("present", "missing"),
     "recommendation_rules_revision": ("1",),
     "recommendation_surface": ("radio", "path"),
+    "sse_pubsub_failure": ("pool_exhausted", "redis_error"),
     "stream_format": (
         "flac",
         "mp3",
@@ -411,6 +412,11 @@ METRIC_SPECS = {
         {"format_version": "cast_format_version"},
     ),
     "catalog.search.serving_mode": (
+        "counter_delta",
+        "1",
+        {"mode": "catalog_serving_mode"},
+    ),
+    "catalog.search_stream.requests": (
         "counter_delta",
         "1",
         {"mode": "catalog_serving_mode"},
@@ -722,6 +728,12 @@ METRIC_SPECS = {
     "shows.import.failed": ("counter_delta", "1", {}),
     "shows.import.invalid": ("counter_delta", "1", {}),
     "shows.import.linked_source": ("counter_delta", "1", {}),
+    "sse.pubsub.open": ("gauge", "1", {}),
+    "sse.pubsub.open_failures": (
+        "counter_delta",
+        "1",
+        {"reason": "sse_pubsub_failure"},
+    ),
     "storage.cache.used_bytes": ("gauge", "bytes", {}),
     "storage.data.used_bytes": ("gauge", "bytes", {}),
     "storage.music.used_bytes": ("gauge", "bytes", {}),

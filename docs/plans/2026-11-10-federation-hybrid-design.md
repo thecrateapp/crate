@@ -1,6 +1,6 @@
 # Federation: hybrid ingestion and federated search · Design
 
-Date: 2026-11-10. Status: **approved direction**. Diego chose the hybrid approach and per-peer summaries, and asked to ship the hotfix as v3.3.1 (#410 + P1 + migration). The values marked *to confirm* are still his.
+Date: 2026-11-10. Status: **approved direction**. Diego chose the hybrid approach and per-peer summaries, and asked to ship the hotfix as v3.3.1 (#410 + P1 + migration). The values marked *to confirm* were decided on 2026-11-12 (§10).
 
 This consolidates the Codex proposal (`docs/superpowers/specs/2026-11-10-federation-hybrid-ingestion-design.md` in the `hotfix-federation` worktree) with Claude's review. The implementation plan is `2026-11-10-federation-hybrid-implementation-plan.md`.
 
@@ -34,14 +34,14 @@ This consolidates the Codex proposal (`docs/superpowers/specs/2026-11-10-federat
 | FED-D4 | **Results aggregate within a short window.** No single winner: first results show at about 300 ms, the window stays open up to 1.5–2 s, and late answers go to the cache and to "more results from the network". The playback source is chosen per track at play time (availability, latency, quality), with the next source as fallback. |
 | FED-D5 | **A common, versioned result envelope,** not the full API DTOs (§5). Changes are additive; unknown fields are ignored. |
 | FED-D6 | **Source identity** = `node_uid + entity_type + remote_entity_uid`. User references (likes, playlists, URLs) are stored as source references and resolved through an alias map to the canonical entity at read time. They are never rewritten, and a wrong merge can be undone without breaking references. |
-| FED-D7 | **Metadata access lease of 24 h** (*to confirm*), renewed at half-life. Revocations are **pushed** through the delta feed, so with the peer online they apply immediately; the lease only bounds the worst case while the owner is unreachable. Once it expires, cached remote results are hidden but kept. **Playback always revalidates** and fails closed. |
+| FED-D7 | **Metadata access lease of 24 h** (decided 2026-11-12), renewed at half-life. Revocations are **pushed** through the delta feed, so with the peer online they apply immediately; the lease only bounds the worst case while the owner is unreachable. Once it expires, cached remote results are hidden but kept. **Playback always revalidates** and fails closed. |
 | FED-D8 | **Selective replication:** pairing enables on-demand search; a full replica is an opt-in per peer. The acceptance case (Home with Les Pedants) keeps the full replica. |
 | FED-D9 | **Snapshot:** the sender's worker reads at `REPEATABLE READ` (with `pg_export_snapshot()` for parallel readers), records watermark S from the same snapshot, and writes compressed NDJSON blocks, bounded, checksummed and resumable. Blocks are cached per permission scope. HTTP only serves an existing generation and never rebuilds the catalogue. |
 | FED-D10 | **Deltas** use the v159 publication feed: an outbox whose rows get their public sequence only after commit, from a single publisher. That gives commit order, and A → B → A and delete → restore → delete reach consumers as separate rows. A cursor outside the retained history, a scope change or an explicit repair triggers a bootstrap; nothing else does. |
 | FED-D11 | **Fencing:** a per-peer `sync_generation` is incremented under row lock when a session starts. Every page write, tombstone and checkpoint update checks `generation = :mine`, and the checkpoint only moves forward. A stale session aborts instead of writing. Revoking a peer bumps the generation in the same transaction. **This fixes P1.** |
 | FED-D12 | **Import:** blocks are loaded with `COPY` into staging, followed by set-based upserts, with the checkpoint in the same transaction. A generation is published only after integrity, version and scope checks. The previous generation stays readable until then. |
 | FED-D13 | **Consolidation** runs asynchronously from source-index changes. It processes bounded batches in dependency order (artist → album → track); a child waiting for its parent is retried promptly, not hidden for an hour. Matching uses strong identifiers (MusicBrainz recording and release IDs, ISRC, AcoustID when present); **a shared name never merges on its own**. Matching never authorises touching local files. |
-| FED-D14 | **Remote search triggers:** <ul><li>only on a submitted query, or as-you-type debounced at 300–500 ms with at least 3 characters;</li><li>it fans out when local results are under *k* (*to confirm*, starting at 5), when a peer's summary suggests more material than the local index has (for example more albums of the artist), or when that peer's replica is stale beyond its freshness budget;</li><li>a hit only goes to peers whose summary may contain the key.</li></ul> |
+| FED-D14 | **Remote search triggers:** <ul><li>only on a submitted query, or as-you-type debounced at 300–500 ms with at least 3 characters;</li><li>it fans out when local results are under *k* (5, decided 2026-11-12), when a peer's summary suggests more material than the local index has (for example more albums of the artist), or when that peer's replica is stale beyond its freshness budget;</li><li>a hit only goes to peers whose summary may contain the key.</li></ul> |
 | FED-D15 | **`node_uid` is stable** across reinstalls and key rotation, and is never derived from the hostname. |
 | FED-D16 | **Privacy:** remote queries carry the node identity. They carry a scoped user grant only when the owner's permissions require it. Query text is not logged beyond what abuse limits need. |
 | FED-D17 | **Protection:** inbound query quotas per peer, per-peer timeouts, and a negative cache per query and peer (short TTL). |
@@ -139,7 +139,7 @@ The hybrid lets this evolve later (introductions, summary-based routing between 
 | Permissions | Search, snapshot, delta, metadata and playback keep their own scopes and revocations |
 | Identity | A result can be opened, saved and played before and after consolidation without breaking references |
 
-**Reference profiles** (*to confirm*):
+**Reference profiles** (decided 2026-11-12):
 - **Laptop:** 8 cores, NVMe, 100 Mbit/s, RTT 30 ms.
 - **CI runner.**
 
@@ -153,9 +153,11 @@ Each measurement separates generation, transfer, import, indexing, search availa
 - **The v159 publisher bridge** for older writers must survive partial service starts during upgrade and rollback (`docs/technical/federation-upgrade-and-rollback.md`).
 - **Out of scope:** audio download during bootstrap, obligations to share whole libraries, visual changes to Admin or Listen beyond the coverage and "more results" states, a DHT, and multi-hop relay.
 
-## 10. Open values for Diego
+## 10. Open values
+
+**Decided (Diego, 2026-11-12):** the proposals below, as written.
 
 1. **Metadata lease:** 24 h, with pushed revocation (FED-D7).
 2. ***k* for "too few local results":** 5 (FED-D14).
-3. **Aggregation window:** first results at about 300 ms, closing at 1.5–2 s (FED-D4).
+3. **Aggregation window:** first results at about 300 ms, closing at 1.5–2 s (FED-D4). FED1 uses 1.5 s per peer and a 2 s total deadline, with a 300 ms debounce and at least 3 characters in Listen.
 4. **The reference profiles** (§8).
