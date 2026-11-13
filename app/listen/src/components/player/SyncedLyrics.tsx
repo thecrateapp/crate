@@ -1,6 +1,11 @@
 import { useContext, useEffect, useRef, type RefObject } from "react";
+import { PlayerStateContext } from "../../contexts/player-context";
 import { PlayerProgressContext } from "../../contexts/player-progress-context";
-import { isMotionBlocked } from "../../lib/motion-availability";
+import { usePlayerTimeReader } from "../../contexts/player-time-reader";
+import {
+  isMotionBlocked,
+  subscribeToMotionAvailability,
+} from "../../lib/motion-availability";
 import "./player-lyrics.css";
 export interface SyncedLine {
   time: number;
@@ -14,10 +19,14 @@ function LyricsClock({
   root: RefObject<HTMLDivElement | null>;
 }) {
   const progress = useContext(PlayerProgressContext);
+  const isPlaying = useContext(PlayerStateContext)?.isPlaying ?? false;
+  const readTime = usePlayerTimeReader();
   const previous = useRef(-2);
   const previousLines = useRef(lines);
-  useEffect(() => {
-    const time = progress?.currentTime ?? 0;
+  const durationRef = useRef(progress?.duration);
+  durationRef.current = progress?.duration;
+  const applyRef = useRef<(time: number) => void>(() => undefined);
+  applyRef.current = (time: number) => {
     let active = -1;
     for (let i = lines.length - 1; i >= 0; i--)
       if (time >= lines[i]!.time) {
@@ -55,7 +64,7 @@ function LyricsClock({
       previous.current = active;
     }
     const start = lines[active]?.time ?? 0;
-    const end = lines[active + 1]?.time ?? progress?.duration ?? start;
+    const end = lines[active + 1]?.time ?? durationRef.current ?? start;
     rows[active]?.style.setProperty(
       "--lyric-progress",
       String(
@@ -64,7 +73,39 @@ function LyricsClock({
           : 0,
       ),
     );
-  }, [progress?.currentTime, progress?.duration, lines, root]);
+  };
+  // Committed progress (~4 Hz, and every seek) always lands. The reader holds
+  // the same value or a newer tick, so this never steps the underline back.
+  useEffect(() => {
+    applyRef.current(readTime());
+  }, [progress?.currentTime, progress?.duration, lines, root, readTime]);
+  // Between commits the underline follows the exact engine time, as smoothly
+  // as before the commits were coalesced. The loop only runs while playing
+  // (isPlaying starts/stops it; it opens no socket or fetch) and motion is on.
+  useEffect(() => {
+    if (!isPlaying) return;
+    let raf = 0;
+    let lastTime = Number.NaN;
+    const frame = () => {
+      const time = readTime();
+      if (time !== lastTime) {
+        lastTime = time;
+        applyRef.current(time);
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    const start = () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      if (!isMotionBlocked()) raf = requestAnimationFrame(frame);
+    };
+    const unsubscribe = subscribeToMotionAvailability(start);
+    start();
+    return () => {
+      cancelAnimationFrame(raf);
+      unsubscribe();
+    };
+  }, [isPlaying, readTime]);
   return null;
 }
 /** Static lyric rows; the small clock leaf owns active state, underline and line scrolling. */

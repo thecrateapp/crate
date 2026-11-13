@@ -196,6 +196,20 @@ describe("usePlayerEngineCallbacks", () => {
     expect(options.recordPlaybackQualityProgress).toHaveBeenCalledWith(12);
   });
 
+  it("routes engine ticks through the coalescing tick committer", () => {
+    const options = {
+      ...createOptions(),
+      commitPlaybackTick: vi.fn(),
+    };
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onTimeUpdate?.(12_500, 0);
+
+    expect(options.commitPlaybackTick).toHaveBeenCalledWith(12.5);
+    expect(options.commitCurrentTime).not.toHaveBeenCalled();
+    expect(options.recordPlaybackQualityProgress).toHaveBeenCalledWith(12.5);
+  });
+
   it("marks playback active as soon as the engine accepts a play request", () => {
     const options = createOptions();
     options.isPlayingRef.current = false;

@@ -86,6 +86,10 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     commitIsPlaying,
     commitIsBuffering,
   } = runtimeState;
+  const readCurrentTime = useCallback(
+    () => currentTimeRef.current,
+    [currentTimeRef],
+  );
 
   const refillCallbacksRef = useRef<{
     recover: () => boolean;
@@ -416,6 +420,7 @@ export function usePlayerProviderRuntime(children: ReactNode) {
       currentTrack={currentTrack}
       playbackNeedsUserGesture={playbackNeedsUserGesture}
       progressValue={progressValue}
+      readCurrentTime={readCurrentTime}
       resumeAfterUserGesture={resumeAfterUserGesture}
       stateValue={stateValue}
     >

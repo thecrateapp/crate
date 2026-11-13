@@ -1,11 +1,16 @@
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
 import type { PlaybackQueueReadiness } from "./playback-intelligence-model";
+import {
+  createTickTimeCommitter,
+  type TickTimeCommitter,
+} from "./player-time-commit";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import type { EngineMixState } from "@/lib/playback-engine";
@@ -227,9 +232,28 @@ export function usePlayerRuntimeState() {
     setCurrentIndexState(nextIndex);
   }, []);
 
+  const tickCommitterRef = useRef<TickTimeCommitter | null>(null);
+  if (tickCommitterRef.current === null) {
+    tickCommitterRef.current = createTickTimeCommitter({
+      commit: setCurrentTimeState,
+      read: () => currentTimeRef.current,
+    });
+  }
+  useEffect(() => {
+    const committer = tickCommitterRef.current;
+    return () => committer?.dispose();
+  }, []);
+
+  /** Discrete position changes (seek, restore, reset, remote): commit now. */
   const commitCurrentTime = useCallback((nextTime: number) => {
     currentTimeRef.current = nextTime;
-    setCurrentTimeState(nextTime);
+    tickCommitterRef.current?.commitNow(nextTime);
+  }, []);
+
+  /** Engine progress ticks: exact ref every tick, React state at ~4 Hz. */
+  const commitPlaybackTick = useCallback((nextTime: number) => {
+    currentTimeRef.current = nextTime;
+    tickCommitterRef.current?.tick(nextTime);
   }, []);
 
   const commitDuration = useCallback((nextDuration: number) => {
@@ -315,6 +339,7 @@ export function usePlayerRuntimeState() {
     clearPrevRestartLatch,
     commitCurrentIndex,
     commitCurrentTime,
+    commitPlaybackTick,
     commitDuration,
     commitIsPlaying,
     commitIsBuffering,

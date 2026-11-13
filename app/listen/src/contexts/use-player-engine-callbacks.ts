@@ -50,6 +50,8 @@ interface UsePlayerEngineCallbacksParams {
   engineTrackMapRef: MutableRefObject<Map<string, Track[]>>;
   queueRef: MutableRefObject<Track[]>;
   commitCurrentTime: (time: number) => void;
+  /** Engine progress ticks; falls back to commitCurrentTime when absent. */
+  commitPlaybackTick?: (time: number) => void;
   commitDuration: (duration: number) => void;
   commitIsPlaying: (isPlaying: boolean) => void;
   commitIsBuffering: (isBuffering: boolean) => void;
@@ -114,6 +116,7 @@ export function usePlayerEngineCallbacks({
   engineTrackMapRef,
   queueRef,
   commitCurrentTime,
+  commitPlaybackTick = commitCurrentTime,
   commitDuration,
   commitIsPlaying,
   commitIsBuffering,
@@ -160,7 +163,7 @@ export function usePlayerEngineCallbacks({
         bufferingIntentRef.current = false;
         commitIsBuffering(false);
       }
-      commitCurrentTime(positionSeconds);
+      commitPlaybackTick(positionSeconds);
       recordProgress(positionSeconds);
       recordPlaybackQualityProgress(positionSeconds);
       if (trackIndex !== currentIndexRef.current && trackIndex >= 0) {
