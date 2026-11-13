@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   isMotionBlocked,
-  setWindowInactive,
+  isWindowHidden,
+  setWindowHidden,
   subscribeToMotionAvailability,
   useMotionAllowed,
 } from "./motion-gate";
@@ -64,16 +65,18 @@ describe("motion-gate", () => {
     expect(isMotionBlocked()).toBe(true);
   });
 
-  it("blocks motion while a native shell marks the window inactive", () => {
+  it("blocks motion while a native shell marks the window hidden", () => {
     mockReducedMotion(false);
     mockVisibility("visible");
 
-    setWindowInactive(true);
-    expect(document.documentElement.dataset.crateWindow).toBe("inactive");
+    setWindowHidden(true);
+    expect(document.documentElement.dataset.crateWindow).toBe("hidden");
+    expect(isWindowHidden()).toBe(true);
     expect(isMotionBlocked()).toBe(true);
 
-    setWindowInactive(false);
+    setWindowHidden(false);
     expect(document.documentElement.dataset.crateWindow).toBeUndefined();
+    expect(isWindowHidden()).toBe(false);
     expect(isMotionBlocked()).toBe(false);
   });
 
@@ -87,19 +90,19 @@ describe("motion-gate", () => {
     expect(isMotionBlocked()).toBe(false);
   });
 
-  it("re-renders useMotionAllowed when the window becomes inactive", async () => {
+  it("re-renders useMotionAllowed when the window is hidden and shown", async () => {
     mockReducedMotion(false);
     const { result } = renderHook(() => useMotionAllowed());
     expect(result.current).toBe(true);
 
     await act(async () => {
-      setWindowInactive(true);
+      setWindowHidden(true);
       await Promise.resolve();
     });
     expect(result.current).toBe(false);
 
     await act(async () => {
-      setWindowInactive(false);
+      setWindowHidden(false);
       await Promise.resolve();
     });
     expect(result.current).toBe(true);

@@ -3,18 +3,27 @@ import { useSyncExternalStore } from "react";
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 /**
- * A native shell (Tauri desktop) marks the document inactive while its window
- * is unfocused or minimised. WebKitGTK keeps reporting `visible` for a window
- * behind others or on another workspace, so visibility alone never pauses
- * decorative loops there. Browsers and the PWA never set this attribute.
+ * A native shell (Tauri desktop) marks the document hidden while the
+ * compositor shows its window on no monitor, or it is minimised. WebKitGTK
+ * keeps `document.visibilityState` at "visible" there, and keeps running
+ * requestAnimationFrame and CSS animations. An unfocused but visible window is
+ * not hidden and keeps animating. Browsers and the PWA never set this.
+ * CSS keys off the same attribute to pause infinite animations.
  */
-export const WINDOW_ACTIVITY_ATTRIBUTE = "data-crate-window";
+export const WINDOW_VISIBILITY_ATTRIBUTE = "data-crate-window";
 
-export function setWindowInactive(inactive: boolean): void {
+export function setWindowHidden(hidden: boolean): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  if (inactive) root.dataset.crateWindow = "inactive";
+  if (hidden) root.dataset.crateWindow = "hidden";
   else delete root.dataset.crateWindow;
+}
+
+export function isWindowHidden(): boolean {
+  return (
+    typeof document !== "undefined" &&
+    document.documentElement.dataset.crateWindow === "hidden"
+  );
 }
 
 function reducedMotionQuery(): MediaQueryList | null {
@@ -27,8 +36,7 @@ export function isMotionBlocked(): boolean {
   if (typeof document !== "undefined") {
     if (document.visibilityState === "hidden") return true;
     if (document.documentElement.dataset.crateMotion === "reduced") return true;
-    if (document.documentElement.dataset.crateWindow === "inactive")
-      return true;
+    if (isWindowHidden()) return true;
   }
   return reducedMotionQuery()?.matches ?? false;
 }
@@ -46,7 +54,7 @@ export function subscribeToMotionAvailability(
       attributeObserver = new MutationObserver(onChange);
       attributeObserver.observe(document.documentElement, {
         attributes: true,
-        attributeFilter: ["data-crate-motion", WINDOW_ACTIVITY_ATTRIBUTE],
+        attributeFilter: ["data-crate-motion", WINDOW_VISIBILITY_ATTRIBUTE],
       });
     }
   }

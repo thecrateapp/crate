@@ -17,7 +17,7 @@ import { recordTauriAuthDiagnostic } from "@/lib/tauri-auth-diagnostic";
 
 import { initLinuxScrollBehavior } from "./linux-scroll";
 import { initLinuxDesktopTheme } from "./linux-theme";
-import { initWindowActivityBridge } from "./window-activity";
+import { initWindowVisibilityBridge } from "./window-visibility";
 
 let tauriRuntimeInitialized = false;
 let tauriOAuthRuntimeStarted = false;
@@ -36,7 +36,7 @@ export function initTauriRuntime(): void {
   initLinuxDesktopTheme();
   ensureDesktopWindowSize();
   installNativeHttpFetch();
-  void initWindowActivityBridge();
+  void initWindowVisibilityBridge();
   void initTrayBridge();
   void initBandcampCookieBridge();
 }

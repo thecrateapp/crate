@@ -52,6 +52,8 @@ mod linux_media_controls;
 mod linux_sleep_inhibitor;
 #[cfg(target_os = "linux")]
 mod linux_track_notifications;
+#[cfg(target_os = "linux")]
+mod linux_window_visibility;
 #[cfg(target_os = "macos")]
 mod macos_delegate;
 #[cfg(target_os = "macos")]
@@ -844,6 +846,23 @@ fn linux_desktop_profile() -> Option<serde_json::Value> {
     }
 }
 
+/// Whether the main window is on screen per the compositor: `true`, `false`,
+/// or `None` when unknown (off Hyprland, or before the first answer). Later
+/// changes arrive as the `crate:window-visibility` event.
+#[cfg(desktop)]
+#[tauri::command]
+fn desktop_window_visibility() -> Option<bool> {
+    #[cfg(target_os = "linux")]
+    {
+        linux_window_visibility::current()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 fn register_deep_link_listener(
@@ -1536,6 +1555,8 @@ pub fn run() {
                 desktop_control::install(app.handle());
                 #[cfg(target_os = "linux")]
                 linux_track_notifications::install(app.handle());
+                #[cfg(target_os = "linux")]
+                linux_window_visibility::install(app.handle());
                 #[cfg(target_os = "windows")]
                 windows_media_controls::install(app);
 
@@ -1585,6 +1606,7 @@ pub fn run() {
             open_bandcamp_cookie_interceptor,
             linux_desktop_theme_snapshot,
             linux_desktop_profile,
+            desktop_window_visibility,
             update_desktop_control_state,
             desktop_control_reply,
             desktop_control_done,

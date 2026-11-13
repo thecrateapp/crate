@@ -150,7 +150,7 @@ describe("WaveformCanvas", () => {
       expect(frames.pending).toBe(1);
     });
 
-    it("stops the loop while the desktop window is inactive", async () => {
+    it("stops the loop while the desktop window is hidden", async () => {
       const frames = installManualFrames();
       const readAudioFrame = vi.fn(loudFrame);
       render(
@@ -165,7 +165,7 @@ describe("WaveformCanvas", () => {
       expect(readAudioFrame).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        document.documentElement.dataset.crateWindow = "inactive";
+        document.documentElement.dataset.crateWindow = "hidden";
         await Promise.resolve();
       });
       frames.run(100);
