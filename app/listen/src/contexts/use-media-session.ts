@@ -14,6 +14,7 @@ import {
   syncNativeMediaSession,
 } from "@/lib/native-media-session";
 import { isTauriRuntime } from "@/lib/platform";
+import { getCurrentServerId } from "@/lib/server-store";
 
 /**
  * Sync the Web MediaSession API with the current player state.
@@ -199,7 +200,8 @@ export function useMediaSession({
       artist: currentTrack.artist || "",
       album: currentTrack.album || "",
       artwork: coverUrl || null,
-      mediaId: `${mediaAccessVersion}:${currentTrack.id}`,
+      // A renewed artwork ticket can update the cover of the same track.
+      mediaId: `${getCurrentServerId() ?? "local"}:${currentTrack.id}`,
       isPlaying,
       position: nativePositionSeconds,
       duration: duration || 0,
