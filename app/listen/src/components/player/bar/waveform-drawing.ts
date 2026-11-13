@@ -123,13 +123,70 @@ export function buildBandTargets(
   });
 }
 
+/** The analyser paints at most this often; bars ease by the frames skipped. */
+export const WAVEFORM_FRAME_INTERVAL_MS = 1000 / 30;
+// rAF timestamps jitter; without slack a 60 Hz panel would drop to 20 fps.
+const FRAME_INTERVAL_SLACK_MS = 1;
+
+export interface FrameLimiter {
+  /** Display frames to advance the animation by; 0 means skip this frame. */
+  next(timestamp: number): number;
+  reset(): void;
+}
+
+/**
+ * Caps a requestAnimationFrame loop to `intervalMs`. The returned step count is
+ * the number of display frames since the last paint, so per-frame easing can
+ * be applied that many times and the motion keeps the pace it had uncapped.
+ */
+export function createFrameLimiter(
+  intervalMs = WAVEFORM_FRAME_INTERVAL_MS,
+): FrameLimiter {
+  let lastPaint: number | null = null;
+  let frames = 0;
+  return {
+    next(timestamp) {
+      frames += 1;
+      if (
+        lastPaint !== null &&
+        timestamp - lastPaint < intervalMs - FRAME_INTERVAL_SLACK_MS
+      )
+        return 0;
+      const steps = lastPaint === null ? 1 : frames;
+      lastPaint = timestamp;
+      frames = 0;
+      return steps;
+    },
+    reset() {
+      lastPaint = null;
+      frames = 0;
+    },
+  };
+}
+
+/** True when no band can rise above the display floor, so every bar is 0. */
+export function isSilentSpectrum(frequenciesDb: ArrayLike<number>): boolean {
+  // A-weighting adds at most ~0.5 dB (0.35 x +1.3 dB); 1 dB keeps a margin.
+  const floor = MIN_DISPLAY_DB - 1;
+  for (let index = 0; index < frequenciesDb.length; index += 1) {
+    if ((frequenciesDb[index] ?? -Infinity) > floor) return false;
+  }
+  return true;
+}
+
 export function syncWaveformCanvasSize(
   canvas: HTMLCanvasElement,
   context: CanvasRenderingContext2D,
   previousSize: WaveformCanvasSize,
+  measured?: { width: number; height: number },
 ): WaveformCanvasSize {
-  const width = Math.max(1, Math.floor(canvas.clientWidth));
-  const height = Math.max(1, Math.floor(canvas.clientHeight));
+  // `measured` comes from a ResizeObserver; reading clientWidth every frame
+  // forces a layout flush whenever anything else in the page changed.
+  const width = Math.max(1, Math.floor(measured?.width ?? canvas.clientWidth));
+  const height = Math.max(
+    1,
+    Math.floor(measured?.height ?? canvas.clientHeight),
+  );
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const nextSize = { width, height, dpr };
   if (
@@ -155,6 +212,7 @@ export function drawWaveformFrame({
   palette,
   peaks,
   sampleRate,
+  steps = 1,
   width,
 }: {
   cachedGradient: CanvasGradient | null;
@@ -167,8 +225,15 @@ export function drawWaveformFrame({
   palette: WaveformPalette;
   peaks: number[];
   sampleRate: number;
+  /** Display frames this paint stands for (see createFrameLimiter). */
+  steps?: number;
   width: number;
-}): { gradient: CanvasGradient | null; gradientHeight: number } {
+}): {
+  gradient: CanvasGradient | null;
+  gradientHeight: number;
+  /** Whether any bar or peak was painted. */
+  visible: boolean;
+} {
   const centers = getDisplayedCenters(width);
   const targets = buildBandTargets(frequenciesDb, sampleRate, centers);
   const barCount = centers.length;
@@ -201,24 +266,30 @@ export function drawWaveformFrame({
     );
   }
 
+  const frameSteps = Math.max(1, steps);
+  let visible = false;
   context.clearRect(0, 0, width, height);
   context.fillStyle = gradient ?? palette.peakActive ?? "transparent";
   for (let index = 0; index < barCount; index += 1) {
     const target = targets[index] ?? 0;
     const currentValue = current[index] ?? 0;
+    const rate = target > currentValue ? attack : release;
+    // One step is current + (target - current) * rate; n steps compound it.
     const eased =
-      currentValue +
-      (target - currentValue) * (target > currentValue ? attack : release);
+      frameSteps === 1
+        ? currentValue + (target - currentValue) * rate
+        : target + (currentValue - target) * Math.pow(1 - rate, frameSteps);
     current[index] = eased;
     peaks[index] =
       target >= (peaks[index] ?? 0)
         ? target
-        : Math.max(eased, (peaks[index] ?? 0) - peakDrop);
+        : Math.max(eased, (peaks[index] ?? 0) - peakDrop * frameSteps);
 
     const barHeight = Math.max(0, eased * usableHeight);
     if (barHeight > 0.5) {
       const x = offsetX + index * (barWidth + BAR_GAP);
       context.fillRect(x, baselineY - barHeight, barWidth, barHeight);
+      visible = true;
     }
   }
 
@@ -229,10 +300,11 @@ export function drawWaveformFrame({
     if (peakHeight > 1) {
       const x = offsetX + index * (barWidth + BAR_GAP);
       context.fillRect(x, baselineY - peakHeight, barWidth, 2);
+      visible = true;
     }
   }
 
-  return { gradient, gradientHeight };
+  return { gradient, gradientHeight, visible };
 }
 
 function dbToAmplitude(db: number) {

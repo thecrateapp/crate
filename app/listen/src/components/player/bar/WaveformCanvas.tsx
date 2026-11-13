@@ -5,7 +5,9 @@ import {
 import { memo, useEffect, useLayoutEffect, useRef } from "react";
 
 import {
+  createFrameLimiter,
   drawWaveformFrame,
+  isSilentSpectrum,
   readWaveformPalette,
   syncWaveformCanvasSize,
 } from "./waveform-drawing";
@@ -46,37 +48,73 @@ export const WaveformCanvas = memo(function WaveformCanvas({
     const palette = readWaveformPalette(canvas);
     let cachedGradient: CanvasGradient | null = null;
     let cachedGradientHeight = 0;
+    // Painting at the panel's refresh rate (90-144 Hz) re-rasterised the
+    // masked, blurred player shell every frame; ~30 fps reads the same.
+    const limiter = createFrameLimiter();
+    let lastPaintVisible = true;
 
-    const drawFrame = () => {
+    // Measure through ResizeObserver so the loop never forces layout.
+    let measured: { width: number; height: number } | undefined;
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      measured = { width: canvas.clientWidth, height: canvas.clientHeight };
+      resizeObserver = new ResizeObserver(() => {
+        measured = { width: canvas.clientWidth, height: canvas.clientHeight };
+      });
+      resizeObserver.observe(canvas);
+    }
+
+    const schedule = () => {
+      if (isPlaying && !isMotionBlocked())
+        rafRef.current = requestAnimationFrame(drawFrame);
+    };
+
+    function drawFrame(timestamp: number) {
       if (cancelled) return;
+      const steps = limiter.next(timestamp);
+      if (steps === 0) {
+        schedule();
+        return;
+      }
+
+      const sampled = readAudioFrameRef.current?.();
+      const frameDb = sampled?.frequenciesDb ?? frequenciesDbRef.current;
+      // Silence after the bars have fallen: the canvas is already empty.
+      if (isPlaying && !lastPaintVisible && isSilentSpectrum(frameDb)) {
+        schedule();
+        return;
+      }
 
       sizeRef.current = syncWaveformCanvasSize(
-        canvas,
-        context,
+        canvas!,
+        context!,
         sizeRef.current,
+        measured,
       );
-      const sampled = readAudioFrameRef.current?.();
       const frame = drawWaveformFrame({
         cachedGradient,
         cachedGradientHeight,
-        context,
+        context: context!,
         current: currentRef.current,
-        frequenciesDb: sampled?.frequenciesDb ?? frequenciesDbRef.current,
+        frequenciesDb: frameDb,
         height: sizeRef.current.height,
         isPlaying,
         palette,
         peaks: peaksRef.current,
         sampleRate: sampled?.sampleRate ?? sampleRate,
+        steps,
         width: sizeRef.current.width,
       });
       cachedGradient = frame.gradient;
       cachedGradientHeight = frame.gradientHeight;
-      if (isPlaying && !isMotionBlocked())
-        rafRef.current = requestAnimationFrame(drawFrame);
-    };
+      lastPaintVisible = frame.visible;
+      schedule();
+    }
 
     const start = () => {
       cancelAnimationFrame(rafRef.current);
+      limiter.reset();
+      lastPaintVisible = true;
       if (!isMotionBlocked()) rafRef.current = requestAnimationFrame(drawFrame);
     };
     const unsubscribe = subscribeToMotionAvailability(start);
@@ -85,9 +123,17 @@ export const WaveformCanvas = memo(function WaveformCanvas({
     return () => {
       cancelled = true;
       unsubscribe();
+      resizeObserver?.disconnect();
       cancelAnimationFrame(rafRef.current);
     };
   }, [isPlaying, sampleRate]);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 size-full" />;
+  // will-change gives the canvas its own compositing layer, so a repaint does
+  // not re-rasterise the masked wrapper and the blurred shell around it.
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 size-full will-change-transform"
+    />
+  );
 });
