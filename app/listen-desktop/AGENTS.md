@@ -147,8 +147,11 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   `DesktopControlCommand` in step. Consumers: the Ryoku bar's Crate plugin, scripts.
 - **MPRIS** now seeks (`Seek`, `SetPosition`, `CanSeek` when a track has a length) and
   reports/sets `Volume`, `Shuffle` and `LoopStatus` from the control state.
-- **Sleep.** `linux_sleep_inhibitor` holds a logind `sleep`/`block` inhibitor only while
-  playing: idle suspend waits, screen lock and blanking do not, the lid still suspends.
+- **Idle.** `linux_sleep_inhibitor` holds a logind `idle`/`block` inhibitor only while
+  playing: logind's `IdleAction` and hypridle's idle listeners (it honours logind idle
+  inhibitors by default, and holds dim, lock and blank too) wait. Never `sleep`: that
+  also refuses a manual suspend (Ryoku power menu, `systemctl suspend`); manual suspend
+  and the lid still suspend.
 - **Track notifications** (`linux_track_notifications.rs`): one transient card per new
   track, only while playing and with the window unfocused; it replaces the previous
   card (`replaces_id`), carries the cached cover (`image-path`), `desktop-entry`, and

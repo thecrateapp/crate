@@ -1,19 +1,20 @@
-//! Keep the system awake while music plays.
+//! Keep idle actions from firing while music plays.
 //!
-//! Idle daemons (hypridle on Hyprland/Ryoku, GNOME's and KDE's power managers)
-//! end an idle period with `systemctl suspend`, which logind refuses while a
-//! `sleep` inhibitor in `block` mode is held. Crate holds one only while it
-//! plays, so the screen still dims, blanks and locks as configured, but the
-//! computer does not suspend in the middle of an album. Closing a laptop lid
-//! still suspends: logind ignores inhibitors for the lid by default
-//! (`LidSwitchIgnoreInhibited=yes`).
+//! Crate holds a logind `idle` inhibitor in `block` mode only while it plays.
+//! logind then skips its own `IdleAction`, and idle daemons that honour logind
+//! idle inhibitors hold back their idle-triggered actions: hypridle (Hyprland
+//! and niri on Ryoku) does by default (`ignore_systemd_inhibit = false`), and it
+//! holds every listener, so dimming, locking and blanking wait as well as an
+//! idle suspend. It is deliberately not a `sleep` inhibitor: that would also
+//! refuse a suspend the user asks for (the Ryoku power menu,
+//! `systemctl suspend`). Manual suspend and closing a laptop lid still suspend.
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc, Mutex, OnceLock,
 };
 
-const WHAT: &str = "sleep";
+const WHAT: &str = "idle";
 const WHO: &str = "Crate";
 const WHY: &str = "Playing music";
 const MODE: &str = "block";
@@ -60,7 +61,7 @@ fn run(wake: mpsc::Receiver<()>) {
         match step(WANT_INHIBIT.load(Ordering::SeqCst), held.is_some()) {
             Step::Acquire => match zbus::block_on(acquire()) {
                 Ok(fd) => held = Some(fd),
-                Err(err) => eprintln!("could not take the sleep inhibitor: {err}"),
+                Err(err) => eprintln!("could not take the idle inhibitor: {err}"),
             },
             // Closing the descriptor releases the inhibitor.
             Step::Release => held = None,
@@ -95,8 +96,11 @@ mod tests {
         assert_eq!(step(false, false), Step::Keep);
     }
 
+    /// `idle`, never `sleep`: a `sleep` block also refuses the suspend a user
+    /// asks for from a power menu or `systemctl suspend`.
     #[test]
-    fn blocks_sleep_only_not_idle_or_the_lid() {
-        assert_eq!((WHAT, MODE), ("sleep", "block"));
+    fn inhibits_idle_only_so_manual_suspend_still_works() {
+        assert_eq!((WHAT, MODE), ("idle", "block"));
+        assert!(!WHAT.split(':').any(|what| what == "sleep"));
     }
 }
