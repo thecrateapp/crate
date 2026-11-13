@@ -29,6 +29,8 @@ from crate.db.repositories.tasks import create_task_dedup
 
 TERMINAL = frozenset({"completed", "failed", "cancelled"})
 POLL_SECONDS = 5.0
+# A line at least this often while waiting: the deploy runs the command over ssh.
+PROGRESS_SECONDS = 60.0
 DEFAULT_TIMEOUT = 3 * 3600
 
 
@@ -41,12 +43,18 @@ class _TimedOut(Exception):
 
 
 def _wait(task_id: str, deadline: float) -> dict:
+    reported = time.monotonic()
     while True:
         task = get_task(task_id) or {}
         if task.get("status") in TERMINAL:
             break
-        if time.monotonic() > deadline:
+        now = time.monotonic()
+        if now > deadline:
             raise _TimedOut(f"Timed out waiting for task {task_id}")
+        if now - reported >= PROGRESS_SECONDS:
+            reported = now
+            print(f"Waiting for task {task_id} ({task.get('status') or 'queued'})")
+            sys.stdout.flush()
         time.sleep(POLL_SECONDS)
     if task["status"] != "completed":
         raise _Failed(str(task.get("error") or f"Task {task_id} {task['status']}"))
