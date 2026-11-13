@@ -39,6 +39,7 @@ export const ADMIN_CONSOLE_ENTRY_CAPABILITIES = [
   "ops.tasks.manage",
   "ops.runtime.manage",
   "settings.manage",
+  "system.backups.manage",
   "auth.manage",
   "audit.view",
   "users.view",

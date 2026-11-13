@@ -129,6 +129,9 @@ const PlaybackDelivery = lazy(() =>
 const Logs = lazy(() =>
   import("@/pages/Logs").then((m) => ({ default: m.Logs })),
 );
+const Backups = lazy(() =>
+  import("@/pages/Backups").then((m) => ({ default: m.Backups })),
+);
 const Errors = lazy(() =>
   import("@/pages/Errors").then((m) => ({ default: m.Errors })),
 );
@@ -197,6 +200,7 @@ const LIBRARY_TRACK_REMOVE = ["library.track.remove"] as const;
 const OPS_HEALTH_VIEW = ["ops.health.view"] as const;
 const OPS_LOGS_VIEW = ["ops.logs.view"] as const;
 const OPS_ERRORS_VIEW = ["ops.errors.view"] as const;
+const BACKUPS_MANAGE = ["system.backups.manage"] as const;
 const OPS_TASKS_MANAGE = ["ops.tasks.manage"] as const;
 const OPS_RUNTIME_MANAGE = ["ops.runtime.manage"] as const;
 const SETTINGS_MANAGE = ["settings.manage"] as const;
@@ -406,6 +410,14 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={OPS_LOGS_VIEW}>
                       <Logs />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="backups"
+                  element={
+                    <RequireCapabilities anyOf={BACKUPS_MANAGE}>
+                      <Backups />
                     </RequireCapabilities>
                   }
                 />

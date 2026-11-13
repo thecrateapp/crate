@@ -819,7 +819,16 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "crate.worker_handlers.backups",
         "BACKUP_TASK_HANDLERS",
-        ("backup_dump", "backup_local_retention"),
+        (
+            "backup_dump",
+            "backup_local_retention",
+            "backup_test_destination",
+            "backup_probe_destination",
+            "backup_offsite",
+            "backup_verify",
+            "backup_restore_drill",
+            "backup_policies_tick",
+        ),
     ),
     (
         "crate.worker_handlers.smart_mix_stems",

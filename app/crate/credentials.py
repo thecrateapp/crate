@@ -191,6 +191,11 @@ def fingerprint_secret(payload: dict[str, Any]) -> str:
     return hashlib.sha256(sanitized.encode("utf-8")).hexdigest()[:16]
 
 
+def credential_key_fingerprint() -> str:
+    """16 hex characters naming the key in use, for the recovery kit; not the key."""
+    return hashlib.sha256(_credential_key()).hexdigest()[:16]
+
+
 def redacted(value: str) -> str:
     if not value:
         return ""
@@ -201,6 +206,7 @@ def redacted(value: str) -> str:
 
 __all__ = [
     "CredentialSecretError",
+    "credential_key_fingerprint",
     "fingerprint_secret",
     "load_secret",
     "purge_expired_secrets",

@@ -8,6 +8,7 @@ import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
+import { useBackupsFailingCount } from "@/hooks/use-backups-failing";
 import { usePendingApprovals } from "@/hooks/use-pending-approvals";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -148,6 +149,12 @@ const navItems = [
     capabilities: ["ops.runtime.manage"],
   },
   {
+    to: "/backups",
+    label: "Backups",
+    badgeKey: "backups_failing" as const,
+    capabilities: ["system.backups.manage"],
+  },
+  {
     to: "/users",
     label: "Users",
     capabilities: ["users.view"],
@@ -244,6 +251,7 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
   const { hasAnyCapability } = useAuth();
   const { data: opsSnapshot } = useOpsSnapshot();
   const pendingApprovals = usePendingApprovals();
+  const backupsFailing = useBackupsFailingCount();
   const visibleNavItems = getVisibleNavItems(hasAnyCapability);
 
   const stats = {
@@ -251,6 +259,7 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
     pending_imports: opsSnapshot?.status.pending_imports || 0,
     running_tasks: opsSnapshot?.status.running_tasks || 0,
     pending_approvals: pendingApprovals,
+    backups_failing: backupsFailing,
   };
 
   function toggleExpanded() {

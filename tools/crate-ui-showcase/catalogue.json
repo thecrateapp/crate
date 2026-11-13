@@ -55,7 +55,7 @@
         "app/shared/ui/icons/navigation.tsx": "114e260df40ed2c875e4cd68ccd50952c0f466d9548a9b7c5d211654d2fb9c6a",
         "app/shared/ui/icons/people.tsx": "ce97e7bdaa81f3d3fdbe0ed2f86a7e9949b3d66b2d36c96425ccee4a4df2a563",
         "app/shared/ui/icons/status.tsx": "fdfd553a284008cfa0ebba1e55d002dc2ada37bb489e0e51dcdcd74265a36e5e",
-        "app/shared/ui/icons/system.tsx": "20905cda8ba015c8226a6aa2054498d76e14597aca80482bc1013a0104dbfd17",
+        "app/shared/ui/icons/system.tsx": "ee5e3cb5c79a1dfc1c2f575993b1828f439a14252d10a60d82bd064094f81ae0",
         "app/shared/ui/icons/toolbox.tsx": "b793d9e34476a05180b0039f45d764387622022edbc33658a492c51165e19f42",
         "app/shared/ui/icons/translation.tsx": "c717ccbeb754dd40c7e774f7e0279a54562d31fd0ee96a2cb22954acfa8850ce",
         "app/shared/ui/tokens/animations.css": "aec5fc762a96b85c70edd9ad835b55597b001d46abbd3b498fdad2db33d60cfa",
@@ -73,8 +73,8 @@
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
         "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
         "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
-        "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "ba2b1bbf0d0ac015f4255953e21054b078bef9c753828e1f9929421964613b4a",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "f9c7c8d6dc9e26ad020eaaf25ac4568df64494a511053c1ceabd3b50ebdae1cb"
+        "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "12b50c1f3e62d0c86e7658954f154109f46c3bd067e95d5bbcb4945c1110fae1",
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "ea7174ec939d8ce85b244141ac159c3ba912ac8864315b9e6e7c527534b02f7a"
       },
       "category": "Foundations"
     },

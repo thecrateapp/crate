@@ -184,3 +184,18 @@ def create_schema(cur):
     )
 
     create_backup_runs_v162_schema(cur)
+    from crate.db.schema_sections.backup_destinations_v163 import (
+        create_backup_destinations_v163_schema,
+    )
+
+    create_backup_destinations_v163_schema(cur)
+    from crate.db.schema_sections.backup_policies_v164 import (
+        create_backup_policies_v164_schema,
+    )
+
+    create_backup_policies_v164_schema(cur)
+    from crate.db.schema_sections.backup_destination_snapshots_v165 import (
+        create_backup_destination_snapshots_v165_schema,
+    )
+
+    create_backup_destination_snapshots_v165_schema(cur)

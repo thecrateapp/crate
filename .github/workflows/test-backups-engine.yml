@@ -1,0 +1,139 @@
+name: Backups engine
+
+# The admin-managed backups engine against real restic, rclone, MinIO and SFTP
+# (admin backups, BK2). The backend shards skip these tests: their runners have
+# neither restic nor rclone. The binaries are the worker image's pins, read from
+# app/Dockerfile and checked against the same SHA-256.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "app/crate/backups/**"
+      - "app/crate/worker_handlers/backups.py"
+      - "app/crate/db/**/backup_*.py"
+      - "app/tests/test_backup_*.py"
+      - "app/Dockerfile"
+      - ".github/workflows/test-backups-engine.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/crate/backups/**"
+      - "app/crate/worker_handlers/backups.py"
+      - "app/crate/db/**/backup_*.py"
+      - "app/tests/test_backup_*.py"
+      - "app/Dockerfile"
+      - ".github/workflows/test-backups-engine.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backups-engine-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  restic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: crate
+          POSTGRES_PASSWORD: crate
+          POSTGRES_DB: crate_test
+        options: >-
+          --health-cmd "pg_isready -U crate -d crate_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: app/requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+        working-directory: app
+
+      - name: Install the worker image's PostgreSQL 15 client
+        # The runner's own client is newer: its dumps carry settings (for example
+        # transaction_timeout) that PostgreSQL 15 rejects on restore. The worker
+        # image pairs a 15 client with the 15 server; so do the tests.
+        run: |
+          set -eu
+          if ! grep -rqs apt.postgresql.org /etc/apt/sources.list.d/; then
+            key=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+            sudo install -d "$(dirname "$key")"
+            for url in https://apt.postgresql.org/pub/repos/apt/ACCC4CF8.asc \
+                       https://www.postgresql.org/media/keys/ACCC4CF8.asc; do
+              sudo curl -fsSL --retry 5 --retry-all-errors -o "$key" "$url" && break
+            done
+            # The same key the worker image checks (app/Dockerfile).
+            echo "$(sed -n 's/^ARG PGDG_ACCC4CF8_ASC_SHA256=//p' app/Dockerfile)  $key" | sha256sum -c -
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+              | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          fi
+          for attempt in 1 2 3; do
+            if sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-15; then
+              break
+            fi
+            [ "$attempt" = 3 ] && exit 1
+            sleep 20
+          done
+          echo /usr/lib/postgresql/15/bin >> "$GITHUB_PATH"
+
+      - name: Install the worker image's restic and rclone
+        run: |
+          arg() { sed -n "s/^ARG $1=//p" app/Dockerfile; }
+          restic_version="$(arg CRATE_RESTIC_VERSION)"
+          rclone_version="$(arg CRATE_RCLONE_VERSION)"
+          mkdir -p "$RUNNER_TEMP/bin" && cd "$RUNNER_TEMP"
+          curl -fsSL --retry 5 -o restic.bz2 \
+            "https://github.com/restic/restic/releases/download/v${restic_version}/restic_${restic_version}_linux_amd64.bz2"
+          echo "$(cd "$GITHUB_WORKSPACE" && arg CRATE_RESTIC_SHA256_AMD64)  restic.bz2" | sha256sum -c -
+          bunzip2 restic.bz2 && install -m 0755 restic "$RUNNER_TEMP/bin/restic"
+          curl -fsSL --retry 5 -o rclone.zip \
+            "https://downloads.rclone.org/v${rclone_version}/rclone-v${rclone_version}-linux-amd64.zip"
+          echo "$(cd "$GITHUB_WORKSPACE" && arg CRATE_RCLONE_SHA256_AMD64)  rclone.zip" | sha256sum -c -
+          unzip -q rclone.zip
+          install -m 0755 "rclone-v${rclone_version}-linux-amd64/rclone" "$RUNNER_TEMP/bin/rclone"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install age (opens the recovery kit in the tests)
+        env:
+          AGE_VERSION: "1.2.1"
+          # age publishes no checksum file: this is the hash of the release
+          # archive as downloaded on 2026-11-12.
+          AGE_SHA256: "7df45a6cc87d4da11cc03a539a7470c15b1041ab2b396af088fe9990f7c79d50"
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 5 -o age.tar.gz \
+            "https://github.com/FiloSottile/age/releases/download/v${AGE_VERSION}/age-v${AGE_VERSION}-linux-amd64.tar.gz"
+          echo "${AGE_SHA256}  age.tar.gz" | sha256sum -c -
+          tar xzf age.tar.gz
+          install -m 0755 age/age "$RUNNER_TEMP/bin/age"
+
+      - name: Run the backups engine tests
+        env:
+          CRATE_POSTGRES_USER: crate
+          CRATE_POSTGRES_PASSWORD: crate
+          CRATE_POSTGRES_HOST: localhost
+          CRATE_POSTGRES_PORT: "5432"
+          CRATE_POSTGRES_DB: crate_test
+          POSTGRES_SUPERUSER_USER: crate
+          POSTGRES_SUPERUSER_PASSWORD: crate
+          POSTGRES_SUPERUSER_DB: crate_test
+          CRATE_BACKUP_INTEGRATION_REQUIRED: "1"
+        run: |
+          restic version && rclone version | head -n 1 && age --version && pg_restore --version
+          python -m pytest tests/test_backup_*.py -q -rs --tb=short
+        working-directory: app

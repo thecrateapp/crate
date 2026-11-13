@@ -36,6 +36,7 @@ DEFAULT_SCHEDULES = {
     "cleanup_smart_mix_refinements": 86400,  # 24h — AI refinements unread for 180 days
     "analyze_playlist_stems": 1800,  # 30min — Smart Mix playlist stems: retries, file changes
     "backup_dump": 86400,  # 24h — local database dump, then its retention (BK1)
+    "backup_policies_tick": 300,  # 5min — start due backup policies, verify, drill (BK3)
 }
 
 SCHEDULED_TASKS = [
@@ -67,7 +68,10 @@ ERROR_FIX_SCHEDULED_TASKS = {"track_error_fixes"}
 # maintenance window, then its retention. On unless CRATE_LOCAL_BACKUPS_ENABLED is
 # off, which production sets while the crate-postgres-backup sidecar runs (until
 # BK6).
+# Once an enabled scheduled backup policy exists (BK3), the policies make the
+# dumps and the tick starts them; the default nightly dump stands down.
 LOCAL_BACKUP_SCHEDULED_TASKS = {"backup_dump"}
+BACKUP_POLICY_SCHEDULED_TASKS = {"backup_policies_tick"}
 
 
 def get_schedules() -> dict[str, int]:
@@ -145,9 +149,22 @@ def _scheduled_task_enabled(task_type: str) -> bool:
     if task_type in LOCAL_BACKUP_SCHEDULED_TASKS:
         from crate.backups.settings import local_backups_enabled
 
-        return local_backups_enabled()
+        return local_backups_enabled() and not _has_scheduled_backup_policies()
+
+    if task_type in BACKUP_POLICY_SCHEDULED_TASKS:
+        return _has_scheduled_backup_policies()
 
     return True
+
+
+def _has_scheduled_backup_policies() -> bool:
+    try:
+        from crate.db.queries.backup_policies import list_enabled_scheduled_policies
+
+        return bool(list_enabled_scheduled_policies())
+    except Exception:
+        log.debug("Unable to read the backup policies", exc_info=True)
+        return False
 
 
 def _has_due_federation_directories() -> bool:

@@ -291,6 +291,11 @@ track; the Icons story renders it beside Bot, ArrowLeft and Play. The same chang
 `.crate-info-badge[data-variant="icon"]` recipe to `recipes.css`: a 24 px circle without padding
 for InfoBadge's icon-only variant (see InfoBadge).
 
+Backup destination icons (2026-11-12): `SsdRound` (the backup volume), `CloudStorage` (S3 and
+B2), `ServerPath` (SFTP) and `FolderCloud` (Google Drive and Dropbox) are Solar outlines. Admin's
+Backups page marks each destination's kind with them (BG1-2); the Icons story renders the four
+on their own line.
+
 Empty states (2026-10-26): `crate-empty-state` centres its content (items and text) with 24px inline
 padding inside any container, and keeps its 32px block padding and 160px minimum. The recipe is
 unlayered, so caller `py-*`, `min-h-*` or alignment utilities have no effect.

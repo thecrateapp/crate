@@ -33,6 +33,12 @@ export function severityTone(level?: string | null): SeverityTone {
   return TONES[level?.trim().toLowerCase() || ""] ?? "neutral";
 }
 
+/** The text colour of a severity, for copy that belongs to a severity reading
+ * (a failing destination's error, for example). The scale stays in this file. */
+export function severityTextClass(level?: string | null): string {
+  return TONE_CLASS[severityTone(level)];
+}
+
 export function SeverityMeter({
   level,
   label,
