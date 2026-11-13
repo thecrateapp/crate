@@ -601,8 +601,16 @@ def rclone_remote(
     *,
     backup_dir: Path,
     work_dir: Path,
+    bucket_exists: bool = False,
 ) -> RcloneRemote:
-    """The same place as an rclone remote, for the write, read and delete probe."""
+    """The same place as an rclone remote, for the write, read and delete probe.
+
+    ``bucket_exists`` is true once the destination holds a repository (created or
+    imported). The S3 probe then skips rclone's CreateBucket call, which a key
+    scoped to one bucket's objects (Cloudflare R2's "Object Read & Write") is
+    refused with a 403. A new destination keeps it, so a bucket that does not
+    exist yet is created by its first test.
+    """
     provider(kind)
     prefix = f"{_RCLONE_ENV}"
     if kind == "local":
@@ -620,6 +628,8 @@ def rclone_remote(
             f"{prefix}SECRET_ACCESS_KEY": str(secrets.get("secret_access_key", "")),
             f"{prefix}FORCE_PATH_STYLE": "false" if lookup == "dns" else "true",
         }
+        if bucket_exists:
+            env[f"{prefix}NO_CHECK_BUCKET"] = "true"
         if config.get("region"):
             env[f"{prefix}REGION"] = str(config["region"])
         path = "/".join(p for p in (config["bucket"], config.get("prefix")) if p)

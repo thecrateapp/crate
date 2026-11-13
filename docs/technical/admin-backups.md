@@ -295,6 +295,17 @@ repositories and runs the engine beside the sidecars for one weekly cycle:
    with it. If that client is a "Desktop app", the import and the copies work, but
    **Connect** in Admin needs a Web client and a new token.
 
+   If the sidecar has no client of its own (`RCLONE_CONFIG_GDRIVE_CLIENT_ID` is
+   empty, so rclone used its shared client), the Drive import is refused with
+   "Add your own Google Drive OAuth client ID and secret". It cannot be worked
+   around: the engine never uses rclone's shared client (D4), and with the
+   `drive.file` scope a new client cannot see the files the shared client wrote.
+   Create the install's Web client instead (above), **Connect Google Drive** as a
+   new destination in another folder, and let the engine start a new repository
+   there. The sidecar's Drive repository keeps its history until it is retired;
+   keep its `RESTIC_PASSWORD` and `RCLONE_CONFIG_GDRIVE_TOKEN` in the password
+   manager to read it later with rclone's own client.
+
 3. Download and confirm a new recovery kit.
 4. Turn the engine on (`CRATE_LOCAL_BACKUPS_ENABLED=true`) and recreate the workers.
 5. Create the policy that matches the sidecars, for example **Nightly**, daily at
