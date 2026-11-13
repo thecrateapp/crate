@@ -21,6 +21,7 @@ import {
 } from "@/lib/backups";
 
 const TH = "font-mono text-label uppercase tracking-caps";
+const CELL_MONO = "font-mono text-sm text-text-secondary";
 
 /**
  * The destination's snapshots as the worker last listed them (BG1-13): the API
@@ -68,17 +69,18 @@ export function SnapshotsTab({
           </TableHeader>
           <TableBody>
             {data.snapshots.map((snapshot) => (
-              <TableRow
-                key={snapshot.id}
-                className="border-border-quiet-subtle"
-              >
-                <TableCell className="py-2 font-mono text-sm text-text-primary">
-                  {snapshot.id.slice(0, 8)}
+              <TableRow key={snapshot.id}>
+                <TableCell>
+                  <span className="font-mono text-sm text-text-primary">
+                    {snapshot.id.slice(0, 8)}
+                  </span>
                 </TableCell>
-                <TableCell className="whitespace-nowrap py-2 font-mono text-sm text-text-secondary">
-                  {formatStamp(snapshot.time)}
+                <TableCell>
+                  <span className={CELL_MONO}>
+                    {formatStamp(snapshot.time)}
+                  </span>
                 </TableCell>
-                <TableCell className="py-2">
+                <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {snapshot.tags.length
                       ? snapshot.tags.map((tag) => (
@@ -87,8 +89,8 @@ export function SnapshotsTab({
                       : "—"}
                   </div>
                 </TableCell>
-                <TableCell className="py-2 font-mono text-sm text-text-secondary">
-                  {snapshot.host ?? "—"}
+                <TableCell>
+                  <span className={CELL_MONO}>{snapshot.host ?? "—"}</span>
                 </TableCell>
               </TableRow>
             ))}

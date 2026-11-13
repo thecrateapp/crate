@@ -155,9 +155,9 @@ function ProviderPicker({
                   {KIND_LABEL[value]}
                 </span>
                 {selected ? (
-                  <InfoBadge tone="accent" className="ml-auto">
-                    Selected
-                  </InfoBadge>
+                  <span className="ml-auto inline-flex">
+                    <InfoBadge tone="accent">Selected</InfoBadge>
+                  </span>
                 ) : null}
               </span>
               <span className="text-sm text-text-muted">
@@ -772,10 +772,8 @@ export function DestinationDrawer({
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="snapshots">Snapshots</TabsTrigger>
         </TabsList>
-        <TabsContent value="settings" className="mt-0">
-          {form}
-        </TabsContent>
-        <TabsContent value="snapshots" className="mt-0">
+        <TabsContent value="settings">{form}</TabsContent>
+        <TabsContent value="snapshots">
           {tab === "snapshots" ? (
             <SnapshotsTab destination={destination} />
           ) : null}
@@ -789,10 +787,10 @@ export function DestinationDrawer({
     <Sheet open={open} onOpenChange={(next) => (next ? null : close())}>
       <SheetContent
         side="right"
-        className="w-full gap-0 p-0 sm:max-w-3xl"
+        className="w-full gap-0 sm:max-w-3xl"
         aria-describedby={undefined}
       >
-        <SheetHeader className="border-b border-border-quiet px-5 py-4 pr-16">
+        <SheetHeader>
           <MonoLabel
             as="p"
             size="eyebrow"
@@ -810,8 +808,10 @@ export function DestinationDrawer({
             {description}
           </SheetDescription>
         </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{body}</div>
-        <SheetFooter className="flex-row flex-wrap items-center justify-between border-t border-border-quiet px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto border-t border-border-quiet p-4">
+          {body}
+        </div>
+        <SheetFooter className="flex-row flex-wrap items-center justify-between">
           <div className="flex gap-2">
             {step === "form" && !editing ? (
               <Button

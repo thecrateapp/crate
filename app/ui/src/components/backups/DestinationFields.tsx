@@ -88,7 +88,6 @@ function TextField({
   label,
   hint,
   placeholder,
-  mono = true,
   type,
 }: {
   props: FieldsProps;
@@ -96,13 +95,11 @@ function TextField({
   label: string;
   hint?: ReactNode;
   placeholder?: string;
-  mono?: boolean;
   type?: string;
 }) {
   return (
     <FormField label={label} hint={hint}>
       <Input
-        className={mono ? "font-mono" : undefined}
         type={type}
         inputMode={type === "number" ? "numeric" : undefined}
         spellCheck={false}
@@ -160,10 +157,10 @@ export function LocalFields(props: FieldsProps) {
         hint="Relative to the backup volume. Crate creates it if it does not exist."
       >
         {(control) => (
-          <div className="flex min-w-0 items-stretch">
+          <div className="flex min-w-0 items-center gap-2">
             <span
               aria-hidden="true"
-              className="flex items-center rounded-l-md border border-r-0 border-border-quiet bg-surface-control px-3 font-mono text-sm text-text-subtle"
+              className="font-mono text-sm text-text-subtle"
             >
               /backups/
             </span>
@@ -171,7 +168,6 @@ export function LocalFields(props: FieldsProps) {
               id={control.id}
               aria-labelledby={control["aria-labelledby"]}
               aria-describedby={control["aria-describedby"]}
-              className="rounded-l-none font-mono"
               spellCheck={false}
               autoComplete="off"
               value={props.draft.config.path ?? ""}
@@ -706,7 +702,6 @@ export function PasteToken(
           >
             <Textarea
               rows={3}
-              className="font-mono text-label"
               spellCheck={false}
               placeholder='{"access_token":"…","token_type":"Bearer","refresh_token":"…","expiry":"…"}'
               value={props.draft.secrets.token ?? ""}

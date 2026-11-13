@@ -44,6 +44,7 @@ import { displayHealth } from "./BackupsOverview";
 import { RetentionStrip } from "./RetentionStrip";
 
 const TH = "font-mono text-label uppercase tracking-caps";
+const CELL_MONO = "font-mono text-sm text-text-secondary";
 const HHMM = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 const TIER_LABEL: Record<BackupTier, string> = {
   daily: "Daily",
@@ -208,26 +209,27 @@ function Row({
   children: ReactNode;
 }) {
   return (
-    <FormField
-      kind="group"
-      label={label}
-      hint={hint}
-      error={error}
-      labelClassName="md:pt-3"
-      className="gap-x-3 border-b border-border-quiet-subtle py-4 last:border-b-0 md:grid-cols-[200px_minmax(0,1fr)] md:items-start [&>[data-slot=form-field-error]]:md:col-start-2 [&>[data-slot=form-field-hint]]:md:col-start-2"
-    >
-      {(field) => (
-        <div
-          id={field.id}
-          role="group"
-          aria-labelledby={field["aria-labelledby"]}
-          aria-describedby={field["aria-describedby"]}
-          className="flex min-w-0 flex-wrap items-center gap-2"
-        >
-          {children}
-        </div>
-      )}
-    </FormField>
+    <div className="border-b border-border-quiet-subtle py-4 last:border-b-0">
+      <FormField
+        kind="group"
+        label={label}
+        hint={hint}
+        error={error}
+        className="gap-x-3 md:grid-cols-[200px_minmax(0,1fr)] md:items-center [&>[data-slot=form-field-error]]:md:col-start-2 [&>[data-slot=form-field-hint]]:md:col-start-2"
+      >
+        {(field) => (
+          <div
+            id={field.id}
+            role="group"
+            aria-labelledby={field["aria-labelledby"]}
+            aria-describedby={field["aria-describedby"]}
+            className="flex min-w-0 flex-wrap items-center gap-2"
+          >
+            {children}
+          </div>
+        )}
+      </FormField>
+    </div>
   );
 }
 
@@ -252,7 +254,7 @@ function TimeInput({
       aria-label={label}
       aria-invalid={invalid || undefined}
       placeholder="HH:MM"
-      className="w-24 font-mono"
+      className="w-24"
       value={value}
       onChange={(event) => onChange(event.target.value)}
     />
@@ -282,7 +284,7 @@ function NumberInput({
       max={max}
       aria-label={label}
       aria-invalid={invalid || undefined}
-      className="w-20 font-mono"
+      className="w-20"
       value={value}
       onChange={(event) => onChange(event.target.value)}
     />
@@ -341,14 +343,8 @@ function TierMatrix({
             const tiers = draft.destinations[d.id] ?? [];
             const copies = keptCopies(counts, tiers, today);
             return (
-              <TableRow
-                key={d.id}
-                className={cn(
-                  "border-border-quiet-subtle",
-                  !available && "opacity-60",
-                )}
-              >
-                <TableCell className="py-2">
+              <TableRow key={d.id} className={cn(!available && "opacity-60")}>
+                <TableCell>
                   <div className="flex items-center gap-3">
                     <KindMark kind={d.kind} />
                     <span className="text-sm text-text-primary">{d.name}</span>
@@ -358,7 +354,7 @@ function TierMatrix({
                   </div>
                 </TableCell>
                 {TIERS.map((tier) => (
-                  <TableCell key={tier} className="py-2 text-center">
+                  <TableCell key={tier} className="text-center">
                     <Checkbox
                       checked={tiers.includes(tier)}
                       disabled={!available}
@@ -370,23 +366,26 @@ function TierMatrix({
                   </TableCell>
                 ))}
                 {!available ? (
-                  <TableCell
-                    colSpan={2}
-                    className="whitespace-nowrap py-2 text-right text-sm text-text-muted"
-                  >
-                    {d.repository_initialized_at
-                      ? "Destination disabled"
-                      : "Test the connection first"}
+                  <TableCell colSpan={2} className="text-right">
+                    <span className="text-sm text-text-muted">
+                      {d.repository_initialized_at
+                        ? "Destination disabled"
+                        : "Test the connection first"}
+                    </span>
                   </TableCell>
                 ) : (
                   <>
-                    <TableCell className="whitespace-nowrap py-2 text-right font-mono text-sm text-text-secondary">
-                      {tiers.length ? `Up to ${copies}` : "—"}
+                    <TableCell className="text-right">
+                      <span className={CELL_MONO}>
+                        {tiers.length ? `Up to ${copies}` : "—"}
+                      </span>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap py-2 text-right font-mono text-sm text-text-secondary">
-                      {tiers.length && dumpBytes
-                        ? `About ${formatBackupBytes(copies * dumpBytes)}`
-                        : "—"}
+                    <TableCell className="text-right">
+                      <span className={CELL_MONO}>
+                        {tiers.length && dumpBytes
+                          ? `About ${formatBackupBytes(copies * dumpBytes)}`
+                          : "—"}
+                      </span>
                     </TableCell>
                   </>
                 )}

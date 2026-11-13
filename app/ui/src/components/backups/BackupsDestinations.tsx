@@ -27,6 +27,7 @@ import { HealthDot, KindMark } from "./backup-ui";
 import { displayHealth } from "./BackupsOverview";
 
 const TH = "font-mono text-label uppercase tracking-caps";
+const CELL_MONO = "font-mono text-sm text-text-secondary";
 
 function statusNote(d: BackupDestinationHealth, now: number) {
   const health = displayHealth(d);
@@ -99,11 +100,8 @@ export function BackupsDestinations({
                 />
               );
               return (
-                <TableRow
-                  key={d.id}
-                  className="border-border-quiet-subtle align-top"
-                >
-                  <TableCell className="py-3">
+                <TableRow key={d.id} className="align-top">
+                  <TableCell>
                     <div className="flex min-w-0 items-start gap-3">
                       <KindMark kind={d.kind} className="mt-0.5" />
                       <div className="min-w-0">
@@ -119,24 +117,28 @@ export function BackupsDestinations({
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="whitespace-normal py-3">
+                  <TableCell className="whitespace-normal">
                     <div className="space-y-1">
                       <HealthDot health={displayHealth(d)} />
                       {statusNote(d, now)}
                     </div>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap py-3 font-mono text-sm text-text-secondary">
-                    {formatAgo(d.last_checked_at, now)}
+                  <TableCell>
+                    <span className={CELL_MONO}>
+                      {formatAgo(d.last_checked_at, now)}
+                    </span>
                   </TableCell>
-                  <TableCell className="py-3 text-right font-mono text-sm text-text-secondary">
-                    {d.snapshot_count ?? "—"}
+                  <TableCell className="text-right">
+                    <span className={CELL_MONO}>{d.snapshot_count ?? "—"}</span>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap py-3 text-right font-mono text-sm text-text-secondary">
-                    {d.repository_bytes == null
-                      ? "—"
-                      : formatBackupBytes(d.repository_bytes)}
+                  <TableCell className="text-right">
+                    <span className={CELL_MONO}>
+                      {d.repository_bytes == null
+                        ? "—"
+                        : formatBackupBytes(d.repository_bytes)}
+                    </span>
                   </TableCell>
-                  <TableCell className="py-3">
+                  <TableCell>
                     {tested ? (
                       toggle
                     ) : (
@@ -147,7 +149,7 @@ export function BackupsDestinations({
                       </TooltipHint>
                     )}
                   </TableCell>
-                  <TableCell className="py-3">
+                  <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         type="button"

@@ -37,6 +37,7 @@ import { severityTextClass } from "@/components/admin/status-indicators";
 import { CopyAction, RunStatusDot } from "./backup-ui";
 
 const TH = "font-mono text-label uppercase tracking-caps";
+const CELL_MONO = "font-mono text-sm text-text-secondary";
 const PAGE = 50;
 
 type KindFilter =
@@ -391,13 +392,8 @@ export function BackupsRuns({
                   const started = formatStamp(run.started_at);
                   return (
                     <Fragment key={run.id}>
-                      <TableRow
-                        className={cn(
-                          "border-border-quiet-subtle",
-                          open && "border-b-0 bg-surface-control",
-                        )}
-                      >
-                        <TableCell className="py-1.5">
+                      <TableRow>
+                        <TableCell>
                           <button
                             type="button"
                             aria-expanded={open}
@@ -423,41 +419,55 @@ export function BackupsRuns({
                             )}
                           </button>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap py-1.5 font-mono text-xs text-text-secondary">
-                          {started}
+                        <TableCell>
+                          <span className="font-mono text-xs text-text-secondary">
+                            {started}
+                          </span>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap py-1.5 text-sm text-text-primary">
-                          {kind}
+                        <TableCell>
+                          <span className="text-sm text-text-primary">
+                            {kind}
+                          </span>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap py-1.5 text-sm text-text-secondary">
-                          {run.destination_name ?? "—"}
+                        <TableCell>
+                          <span className="text-sm text-text-secondary">
+                            {run.destination_name ?? "—"}
+                          </span>
                         </TableCell>
-                        <TableCell className="py-1.5 text-sm text-text-secondary">
-                          {run.policy_name ?? "Manual"}
+                        <TableCell>
+                          <span className="text-sm text-text-secondary">
+                            {run.policy_name ?? "Manual"}
+                          </span>
                         </TableCell>
-                        <TableCell className="py-1.5">
+                        <TableCell>
                           <RunStatusDot status={run.status} />
                         </TableCell>
-                        <TableCell className="whitespace-nowrap py-1.5 text-right font-mono text-sm text-text-secondary">
-                          {run.status === "running" && !run.finished_at
-                            ? formatSeconds(
-                                (now - Date.parse(run.started_at)) / 1000,
-                              )
-                            : formatSeconds(run.duration_seconds)}
+                        <TableCell className="text-right">
+                          <span className={CELL_MONO}>
+                            {run.status === "running" && !run.finished_at
+                              ? formatSeconds(
+                                  (now - Date.parse(run.started_at)) / 1000,
+                                )
+                              : formatSeconds(run.duration_seconds)}
+                          </span>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap py-1.5 text-right font-mono text-sm text-text-secondary">
-                          {runSize(run)}
+                        <TableCell className="text-right">
+                          <span className={CELL_MONO}>{runSize(run)}</span>
                         </TableCell>
-                        <TableCell className="py-1.5 font-mono text-sm text-text-secondary">
-                          {run.snapshot_id ? run.snapshot_id.slice(0, 8) : "—"}
+                        <TableCell>
+                          <span className={CELL_MONO}>
+                            {run.snapshot_id
+                              ? run.snapshot_id.slice(0, 8)
+                              : "—"}
+                          </span>
                         </TableCell>
                       </TableRow>
                       {open ? (
-                        <TableRow className="border-border-quiet-subtle bg-surface-control hover:bg-surface-control">
+                        <TableRow>
                           <TableCell
                             id={`run-${run.id}`}
                             colSpan={9}
-                            className="whitespace-normal px-4 pb-4 pt-0"
+                            className="whitespace-normal"
                           >
                             <RunDetail
                               run={run}

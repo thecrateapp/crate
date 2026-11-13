@@ -182,64 +182,66 @@ export function RecoveryKitDialog({
     >
       {step === "download" ? (
         <form onSubmit={(event) => void submit(event)} noValidate>
-          <ModalBody className="space-y-4 px-5 py-4">
-            <div className="space-y-2 rounded-md border border-border-quiet p-4">
-              <MonoLabel as="p">The kit holds</MonoLabel>
-              <ul className="m-0 list-disc space-y-1 pl-5 text-sm text-text-secondary">
-                <li>
-                  Location and repository password of all {destinationCount}{" "}
-                  destination{destinationCount === 1 ? "" : "s"}, the SFTP key
-                  included
-                </li>
-                <li>Restore steps with restic and pg_restore</li>
-                <li>The fingerprint of CRATE_CREDENTIAL_KEY, not the key</li>
-              </ul>
-            </div>
-            <p className="text-sm text-state-warning-text">
-              Anyone with this file and its passphrase can read your backups.
-              Keep it off this server.
-            </p>
-            <FormField label="Account password" error={passwordError}>
-              <Input
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </FormField>
-            <FormField
-              label="Kit passphrase"
-              hint={`${KIT_PASSPHRASE_MIN} characters or more. Crate never stores it.`}
-              error={passphraseError}
-            >
-              <Input
-                type="password"
-                autoComplete="new-password"
-                value={passphrase}
-                onChange={(event) => setPassphrase(event.target.value)}
-                required
-              />
-            </FormField>
-            <FormField label="Repeat the passphrase" error={repeatError}>
-              <Input
-                type="password"
-                autoComplete="new-password"
-                value={repeat}
-                onChange={(event) => setRepeat(event.target.value)}
-                required
-              />
-            </FormField>
-            <p className="text-xs text-text-muted">
-              The file is crate-recovery-kit-YYYYMMDD.md.age, encrypted with
-              age: open it with <code className="font-mono">age -d</code> and
-              the passphrase.
-            </p>
-            {formError ? (
-              <p role="alert" className="text-sm text-state-warning-text">
-                {formError}
+          <ModalBody>
+            <div className="space-y-4 px-5 py-4">
+              <div className="space-y-2 rounded-md border border-border-quiet p-4">
+                <MonoLabel as="p">The kit holds</MonoLabel>
+                <ul className="m-0 list-disc space-y-1 pl-5 text-sm text-text-secondary">
+                  <li>
+                    Location and repository password of all {destinationCount}{" "}
+                    destination{destinationCount === 1 ? "" : "s"}, the SFTP key
+                    included
+                  </li>
+                  <li>Restore steps with restic and pg_restore</li>
+                  <li>The fingerprint of CRATE_CREDENTIAL_KEY, not the key</li>
+                </ul>
+              </div>
+              <p className="text-sm text-state-warning-text">
+                Anyone with this file and its passphrase can read your backups.
+                Keep it off this server.
               </p>
-            ) : null}
+              <FormField label="Account password" error={passwordError}>
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+              </FormField>
+              <FormField
+                label="Kit passphrase"
+                hint={`${KIT_PASSPHRASE_MIN} characters or more. Crate never stores it.`}
+                error={passphraseError}
+              >
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={passphrase}
+                  onChange={(event) => setPassphrase(event.target.value)}
+                  required
+                />
+              </FormField>
+              <FormField label="Repeat the passphrase" error={repeatError}>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={repeat}
+                  onChange={(event) => setRepeat(event.target.value)}
+                  required
+                />
+              </FormField>
+              <p className="text-xs text-text-muted">
+                The file is crate-recovery-kit-YYYYMMDD.md.age, encrypted with
+                age: open it with <code className="font-mono">age -d</code> and
+                the passphrase.
+              </p>
+              {formError ? (
+                <p role="alert" className="text-sm text-state-warning-text">
+                  {formError}
+                </p>
+              ) : null}
+            </div>
           </ModalBody>
           <ModalFooter>
             <Button
@@ -261,18 +263,20 @@ export function RecoveryKitDialog({
         </form>
       ) : (
         <>
-          <ModalBody className="space-y-4 px-5 py-4">
-            <div className="space-y-2 rounded-md border border-border-quiet bg-raised-surface p-4">
-              <StatusDot tone="on" label="Kit downloaded" />
-              <p className="break-all font-mono text-sm text-text-primary">
-                {filename}
+          <ModalBody>
+            <div className="space-y-4 px-5 py-4">
+              <div className="space-y-2 rounded-md border border-border-quiet bg-raised-surface p-4">
+                <StatusDot tone="on" label="Kit downloaded" />
+                <p className="break-all font-mono text-sm text-text-primary">
+                  {filename}
+                </p>
+              </div>
+              <p className="text-sm text-text-secondary">
+                Move the file somewhere off this server, such as a password
+                manager or another computer, and keep its passphrase apart from
+                it. Then confirm.
               </p>
             </div>
-            <p className="text-sm text-text-secondary">
-              Move the file somewhere off this server, such as a password
-              manager or another computer, and keep its passphrase apart from
-              it. Then confirm.
-            </p>
           </ModalBody>
           <ModalFooter>
             <Button
