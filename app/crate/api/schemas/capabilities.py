@@ -119,10 +119,30 @@ class AccessTokenCapabilities(BaseModel):
     automation: bool
 
 
+class FederationCapabilities(BaseModel):
+    """Streamed federated search for Listen (FED1.5, FED-D18)."""
+
+    search_stream: bool = Field(
+        description=(
+            "GET /api/catalog/search-stream is offered: local results at once, then "
+            "remote results from direct peers within the window. When false, "
+            "clients keep /api/catalog/search."
+        )
+    )
+    results_contract: str = Field(
+        description="The node-to-node result envelope this server reads and serves."
+    )
+    min_query_length: int = Field(
+        description="Queries with fewer characters (spaces ignored) never fan out."
+    )
+    window_ms: int = Field(description="How long remote results may keep arriving.")
+
+
 class CapabilitiesResponse(BaseModel):
     smart_mix: SmartMixCapabilities
     vdj: VDJCapabilities
     decks: DecksCapabilities
+    federation: FederationCapabilities
     access_token: AccessTokenCapabilities | None = Field(
         default=None, exclude_if=lambda value: value is None
     )

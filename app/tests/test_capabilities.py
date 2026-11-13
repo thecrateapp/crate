@@ -13,6 +13,13 @@ _DECKS_CAPABILITIES = {
         "local_refinement",
     ],
 }
+# The test database has no local federation node, so search stays canonical.
+_FEDERATION_CAPABILITIES = {
+    "search_stream": False,
+    "results_contract": "crate.federation.results/1",
+    "min_query_length": 3,
+    "window_ms": 2000,
+}
 
 
 def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
@@ -58,6 +65,7 @@ def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
             "automation": False,
         },
         "decks": _DECKS_CAPABILITIES,
+        "federation": _FEDERATION_CAPABILITIES,
     }
 
 
@@ -118,6 +126,7 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
             "automation": False,
         },
         "decks": _DECKS_CAPABILITIES,
+        "federation": _FEDERATION_CAPABILITIES,
     }
 
 

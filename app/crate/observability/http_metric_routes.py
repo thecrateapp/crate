@@ -404,6 +404,7 @@ HTTP_ROUTES = frozenset(
         "/api/catalog/me/follows",
         "/api/catalog/me/follows/:param",
         "/api/catalog/search",
+        "/api/catalog/search-stream",
         "/api/catalog/tracks/:param/eq",
         "/api/catalog/tracks/:param/eq-features",
         "/api/catalog/tracks/:param/eq/curves",

@@ -49,6 +49,11 @@ FAMILIES = (
         "Which serving mode answered a catalog search.",
     ),
     (
+        "catalog.search_stream.",
+        "Federated search stream",
+        "Searches that asked for local and network results as one stream (FED1).",
+    ),
+    (
         "federation.playback.",
         "Federated playback",
         "Preparation of tracks from federated peers, from the request to ready, rate limited, unavailable or a fallback to the original file.",
@@ -117,6 +122,11 @@ FAMILIES = (
         "shows.import.",
         "Show imports",
         "Show imports: candidates, created, linked, already present, conflicts, invalid and failed.",
+    ),
+    (
+        "sse.",
+        "SSE pub/sub",
+        "Redis pub/sub subscriptions held by each API process for its SSE and Jam streams, and the subscriptions that could not be opened, either because the shared async pool was full or because Redis failed. The open count rises and falls with connected clients; a count that only climbs means a stream is not closing its subscription.",
     ),
     (
         "storage.",

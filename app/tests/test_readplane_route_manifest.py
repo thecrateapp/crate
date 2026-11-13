@@ -34,6 +34,7 @@ def test_route_manifest_covers_interactive_sse_and_stream_reads():
     assert "/api/search" in by_class["interactive"]
     assert "/api/cache/events" in by_class["sse"]
     assert "/api/me/home/discovery-stream" in by_class["sse"]
+    assert "/api/catalog/search-stream" in by_class["sse"]
     assert "/api/federation/remote/streams/" in by_class["stream"]
     assert "/api/tracks/" in by_class["stream"]
 
@@ -50,6 +51,11 @@ def test_listen_proxy_uses_bounded_route_specific_readplane_locations():
     assert "server crate-api:8585 backup;" in nginx
     assert "location = /api/cache/events" in nginx
     assert "location = /api/me/home/discovery-stream" in nginx
+    search_stream = nginx.split("location = /api/catalog/search-stream {", 1)[1].split(
+        "}", 2
+    )[1]
+    assert "proxy_pass $read_backend;" in search_stream
+    assert "proxy_buffering off;" in search_stream
     assert "location ^~ /api/catalog/" in nginx
     assert "location = /api/me/stats/dashboard" in nginx
     assert "location ^~ /api/federation/remote/streams/" in nginx
