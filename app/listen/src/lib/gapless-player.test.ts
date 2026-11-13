@@ -414,6 +414,22 @@ describe("initPlayer", () => {
     expect(onDurationChange).toHaveBeenCalledWith(180_000);
   });
 
+  it("reports the decoded buffer as lost when its current source fails", () => {
+    const current = "/tracks/1/stream";
+    mock.getTrack.mockReturnValue(current);
+    const onError = vi.fn(() => isCurrentTrackFullyBuffered());
+    const player = initPlayer({ onError });
+    player.onload?.(current, true);
+    player.onerror?.("/tracks/2/stream", "preload failed");
+    expect(onError).toHaveLastReturnedWith(true);
+
+    const denied = new DOMException("User gesture required", "NotAllowedError");
+    player.onerror?.(current, denied);
+    expect(onError).toHaveLastReturnedWith(true);
+    player.onerror?.(current, "source failed");
+    expect(onError).toHaveLastReturnedWith(false);
+  });
+
   it("wires onloadstart to onBuffering callback", () => {
     const onBuffering = vi.fn();
     initPlayer({ onBuffering });

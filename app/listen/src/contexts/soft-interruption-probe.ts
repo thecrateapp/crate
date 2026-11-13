@@ -1,6 +1,8 @@
 import { getStreamUrl } from "@/contexts/player-utils";
 import type { Track } from "@/contexts/player-types";
 import { isOnline as isRuntimeOnline } from "@/lib/capacitor";
+import { ensureMediaAccessUrl, requiresMediaAccessTicket } from "@/lib/api";
+import { usesConfigurableServer } from "@/lib/platform";
 
 const STREAM_PROBE_TIMEOUT_MS = 4000;
 
@@ -19,10 +21,23 @@ export async function probeTrackAvailability(
     STREAM_PROBE_TIMEOUT_MS,
   );
   try {
-    const response = await fetch(getStreamUrl(track), {
+    const streamUrl = getStreamUrl(track);
+    const url = requiresMediaAccessTicket(streamUrl)
+      ? await Promise.race([
+          ensureMediaAccessUrl(streamUrl, "stream"),
+          new Promise<never>((_, reject) => {
+            controller.signal.addEventListener(
+              "abort",
+              () => reject(controller.signal.reason),
+              { once: true },
+            );
+          }),
+        ])
+      : streamUrl;
+    const response = await fetch(url, {
       method: "GET",
       headers: { Range: "bytes=0-0" },
-      credentials: "include",
+      credentials: usesConfigurableServer ? "omit" : "same-origin",
       cache: "no-store",
       signal: controller.signal,
     });

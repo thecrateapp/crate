@@ -327,6 +327,11 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onerror = (path, err) => {
+    // A terminal source error has already unloaded its decoded buffer.
+    // A user-gesture rejection keeps the source available for another play.
+    if (path === instance?.getTrack() && !isPlaybackGestureRequiredError(err)) {
+      currentTrackFullyBuffered = false;
+    }
     recordDevLog(
       "gapless",
       "error",

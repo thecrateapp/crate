@@ -538,6 +538,35 @@ describe("useSoftInterruption", () => {
     expect(recoverCurrentTrack).not.toHaveBeenCalled();
   });
 
+  it("stops retrying after three failed playback starts with successful probes", async () => {
+    serverUp();
+    const recoverCurrentTrack = vi.fn(async () => true);
+    const refs = createRefs({ recoverCurrentTrack });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+    const needsGesture = vi.fn();
+    window.addEventListener(PLAYBACK_NEEDS_USER_GESTURE_EVENT, needsGesture);
+    try {
+      act(() => result.current.beginSoftInterruption("stream"));
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        await act(() => vi.advanceTimersByTimeAsync(3_000));
+        expect(recoverCurrentTrack).toHaveBeenCalledTimes(attempt);
+        // The request was dispatched, but the source failed before onPlay.
+        act(() => result.current.beginSoftInterruption("stream"));
+      }
+      await act(() => vi.advanceTimersByTimeAsync(12_000));
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(recoverCurrentTrack).toHaveBeenCalledTimes(3);
+      expect(needsGesture).toHaveBeenCalledOnce();
+      expect(refs.commitIsPlaying).toHaveBeenLastCalledWith(false);
+      expect(refs.commitIsBuffering).toHaveBeenLastCalledWith(false);
+    } finally {
+      window.removeEventListener(
+        PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+        needsGesture,
+      );
+    }
+  });
+
   describe("with the Android native player", () => {
     beforeEach(() => {
       mockUseNativePlayer.mockReturnValue(true);

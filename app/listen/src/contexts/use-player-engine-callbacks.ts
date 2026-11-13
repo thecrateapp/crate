@@ -156,7 +156,7 @@ export function usePlayerEngineCallbacks({
       if (isCastSessionActive()) return;
       const positionSeconds = positionMs / 1000;
       clearStallTimer();
-      if (bufferingIntentRef.current) {
+      if (bufferingIntentRef.current && !isSoftInterrupted()) {
         bufferingIntentRef.current = false;
         commitIsBuffering(false);
       }
@@ -184,7 +184,7 @@ export function usePlayerEngineCallbacks({
         markSeekPosition(pendingRestoreTimeRef.current);
         pendingRestoreTimeRef.current = 0;
       }
-      if (!isPlayingRef.current) {
+      if (!isPlayingRef.current && !isSoftInterrupted()) {
         commitIsBuffering(false);
       }
       bufferingIntentRef.current = false;
@@ -198,7 +198,7 @@ export function usePlayerEngineCallbacks({
         recordPlaybackIntent();
       }
       bufferingIntentRef.current = true;
-      if (!isPlayingRef.current) {
+      if (!isPlayingRef.current && !isSoftInterrupted()) {
         commitIsPlaying(true);
       }
     },
@@ -346,6 +346,10 @@ export function usePlayerEngineCallbacks({
       }
       console.error("[gapless] error:", err);
       cancelRestoreAutoplay();
+      // The active source has stopped. A new play request can still fail
+      // after the server accepts its range probe. Only onPlay confirms audio.
+      bufferingIntentRef.current = false;
+      commitIsPlaying(false);
       if (requested) playbackRequestStartedAtRef.current = null;
       void isRuntimeOnline().then((online) => {
         if (requested) {
@@ -354,7 +358,9 @@ export function usePlayerEngineCallbacks({
             online ? playbackFailureCause(err) : "network",
           );
         }
-        beginSoftInterruption(online ? "stream" : "offline");
+        if (!isCastSessionActive() && isCurrentEnginePath(path)) {
+          beginSoftInterruption(online ? "stream" : "offline");
+        }
       });
     },
     onBuffering: (path) => {
