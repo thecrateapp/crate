@@ -622,7 +622,7 @@ is connected. `make agent-status AGENT_PROFILE=operator` reports missing supervi
 | `instance/health-score` | `low`    | Opens when the health score is at or below 70, critical at or below 40, clears at 80 or above. Includes the list of breaches. Evidence older than 300 seconds does not count. A reopen within 30 minutes of the previous message is deferred. |
 | `tasks/failed-tasks`    | `digest` | Newest failed tasks of the last 24 hours (cancellations excluded), grouped by task type, at most one message per group every 30 minutes. Rows carry ID, type, error code and time, never error text.                                          |
 | `library/new-releases`  | `digest` | New releases detected for library artists in the last 7 days, at most one message per hour.                                                                                                                                                   |
-| `backups/backup-alerts` | `digest` | Each new backup alert (failing destination, late copy, failed verification, drill, dump or retention) once, grouped by kind, at most one message per group every 30 minutes. Rows carry ID, kind, level, destination and time.                |
+| `backups/backup-alerts` | `digest` | Each new backup alert (failing destination, late copy, failed verification, drill, dump or retention) once, grouped by kind, at most one message per group every 30 minutes. Ships disabled: enable it once backups are in use.               |
 
 Rules need two consecutive samples to open or recover. The first sample of a digest is
 a baseline and sends nothing. The example also contains `worker-evidence`, `pending` and

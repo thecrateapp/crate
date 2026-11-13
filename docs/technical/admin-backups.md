@@ -167,8 +167,12 @@ Crate Operator pushes them. The Crate MCP serves the open alerts in
 `get_observability_summary` as `sources.backup_alerts`, and the supervisor's
 `backups/backup-alerts` digest sends each new one once, grouped by kind, at most one
 message per kind every 30 minutes (see [Crate Operator](crate-operator.md)). The
-example configs ship the rule; an existing `supervisor-config.json` keeps its own
-rules on a setup rerun, so add it there and restart the supervisor:
+source exists only while backups are in use (it is dropped a day after the last
+run with no alert open), so the example configs ship the rule disabled. Once
+backups run, enable it in `supervisor-config.json` (a setup rerun keeps your own
+rules, so an existing install adds it by hand), check the config with
+`python -m deploy.operator.server --config <path> --check` and restart the
+supervisor:
 
 ```json
 {
@@ -176,6 +180,7 @@ rules on a setup rerun, so add it there and restart the supervisor:
   "subsystem": "backups",
   "tool": "get_observability_summary",
   "source_path": ["data", "sources", "backup_alerts"],
+  "enabled": true,
   "kind": "digest",
   "field": ["rows"],
   "group_field": ["kind"],

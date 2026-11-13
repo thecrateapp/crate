@@ -126,6 +126,7 @@
       "subsystem": "backups",
       "tool": "get_observability_summary",
       "source_path": ["data", "sources", "backup_alerts"],
+      "enabled": false,
       "kind": "digest",
       "field": ["rows"],
       "group_field": ["kind"],

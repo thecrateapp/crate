@@ -182,8 +182,9 @@ def test_open_alerts_reach_the_observability_summary(pg_db):
     from crate import agent_observability
     from crate.db.ops_runtime import set_ops_runtime_state
 
+    # Backups not in use: no source, and the summary's availability is unchanged.
     absent = agent_observability.get_observability_summary()["data"]["sources"]
-    assert absent["backup_alerts"]["availability"] == "unavailable"
+    assert "backup_alerts" not in absent
 
     sync = alerts.reconcile(
         None,
@@ -206,6 +207,28 @@ def test_open_alerts_reach_the_observability_summary(pg_db):
             "opened_at": sync.opened[0]["opened_at"],
         }
     ]
+
+
+def test_a_day_old_state_without_open_alerts_is_dropped():
+    from crate import agent_observability
+
+    def record(age_hours, rows):
+        observed = datetime.now(timezone.utc) - timedelta(hours=age_hours)
+        return {
+            "backup_alerts": {
+                "source": "backup_alerts",
+                "observed_at": observed.isoformat(),
+                "payload": {"open": rows},
+            }
+        }
+
+    assert agent_observability._backup_alerts(record(25, []), None) is None
+    assert agent_observability._backup_alerts(record(1, []), None) is not None
+    old_open = agent_observability._backup_alerts(
+        record(25, [{"id": "a1b2", "kind": "copy_late"}]), None
+    )
+    assert old_open is not None and old_open["availability"] != "available"
+    assert agent_observability._backup_alerts({}, None) is None
 
 
 @pytest.mark.parametrize(

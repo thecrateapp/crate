@@ -705,7 +705,8 @@ def backup_alerts_summary(now, rows):
 def test_example_configs_ship_the_backup_alerts_digest():
     for name in ("config.operator.example.json", "config.example.json"):
         rule = example_rules(name)["backup-alerts"]
-        assert (rule.subsystem, rule.kind, rule.enabled) == ("backups", "digest", True)
+        # Off until backups are in use: without them the source does not exist.
+        assert (rule.subsystem, rule.kind, rule.enabled) == ("backups", "digest", False)
         assert list(rule.source_path) == ["data", "sources", "backup_alerts"]
         assert list(rule.group_field) == ["kind"] and "text" not in rule.row_fields
     installer = (
@@ -718,7 +719,7 @@ def test_example_configs_ship_the_backup_alerts_digest():
 
 
 def test_each_backup_alert_occurrence_is_announced_once(state):
-    rule = example_rules()["backup-alerts"]
+    rule = replace(example_rules()["backup-alerts"], enabled=True)
     supervisor = Supervisor(state, "lab", [rule])
 
     def see(now, rows):

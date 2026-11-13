@@ -353,10 +353,24 @@ BACKUP_ALERT_FIELDS = ("id", "kind", "level", "destination", "opened_at")
 
 
 def _backup_alerts(records, failure):
-    """Open backup alerts as the ``backup_alerts`` task stored them (BK6)."""
+    """Open backup alerts as the ``backup_alerts`` task stored them (BK6).
+
+    Backups are optional, so the source exists only while the task keeps evidence:
+    None without a record, or for a record a day old with no open alert (backups
+    are no longer in use). A missing optional source never degrades the summary.
+    """
     record = records.get("backup_alerts")
-    payload = (record or {}).get("payload")
+    if not record:
+        return None
+    payload = record.get("payload")
     rows = payload.get("open") if isinstance(payload, dict) else None
+    observed = _date(record.get("observed_at"))
+    if (
+        not rows
+        and observed is not None
+        and (_now() - observed).total_seconds() > 86400
+    ):
+        return None
     valid = (
         isinstance(rows, list)
         and len(rows) <= 20
@@ -368,7 +382,7 @@ def _backup_alerts(records, failure):
             for row in rows
         )
     )
-    if not record or not valid or not isinstance(rows, list):
+    if not valid or not isinstance(rows, list):
         result = _source("backup_alerts", record, None, failure, fresh=900)
         if record and payload and not failure:
             result["reason"] = (
@@ -637,7 +651,9 @@ def get_observability_summary():
         failure,
         "Newest 20 releases detected for library artists within 7 days.",
     )
-    sources["backup_alerts"] = _backup_alerts(records, failure)
+    backups = _backup_alerts(records, failure)
+    if backups is not None:
+        sources["backup_alerts"] = backups
     result = _result(
         "observability_summary",
         sources,
