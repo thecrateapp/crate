@@ -115,6 +115,27 @@ describe("Backups page", () => {
     ).toHaveClass("text-state-danger-text");
   });
 
+  it("switches views with the page tabs, not chips", async () => {
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Backups />, { route: "/backups" });
+    const tablist = await screen.findByRole("tablist", {
+      name: "Backups views",
+    });
+    expect(tablist).toHaveAttribute("data-slot", "tabs-list");
+    expect(
+      within(tablist)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["Overview", "Destinations", "Policies", "Runs"]);
+
+    await user.click(within(tablist).getByRole("tab", { name: "Runs" }));
+
+    expect(
+      within(tablist).getByRole("tab", { name: "Runs", selected: true }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("tabpanel")).toBeInTheDocument();
+  });
+
   it("chooses the policy from the Run now menu when there are several", async () => {
     const user = userEvent.setup();
     renderWithAdminProviders(<Backups />, { route: "/backups" });

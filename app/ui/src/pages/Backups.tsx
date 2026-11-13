@@ -4,9 +4,13 @@ import { toast } from "sonner";
 
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
-
 import { Button } from "@crate/ui/shadcn/button";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
 
 import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import { BackupsDestinations } from "@/components/backups/BackupsDestinations";
@@ -51,6 +55,10 @@ const VIEW_ITEMS: { value: BackupsView; label: string }[] = [
   { value: "policies", label: "Policies" },
   { value: "runs", label: "Runs" },
 ];
+
+function isBackupsView(value: string): value is BackupsView {
+  return (VIEWS as readonly string[]).includes(value);
+}
 
 const OVERVIEW_URL = `${BACKUPS_API}/overview`;
 const POLICIES_URL = `${BACKUPS_API}/policies`;
@@ -329,21 +337,30 @@ export function Backups() {
         title="Backups"
         description="Database dumps, off-site copies, retention, verification and restore drills."
       />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="max-w-full overflow-x-auto">
-          <SegmentedControl<BackupsView>
-            as="tabs"
-            label="Backups views"
-            value={view}
-            onValueChange={setView}
-            items={VIEW_ITEMS}
-          />
+      <Tabs
+        value={view}
+        onValueChange={(value) => {
+          if (isBackupsView(value)) setView(value);
+        }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="max-w-full overflow-x-auto">
+            <TabsList aria-label="Backups views">
+              {VIEW_ITEMS.map((item) => (
+                <TabsTrigger key={item.value} value={item.value}>
+                  {item.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+          {actions ? (
+            <div className="flex flex-wrap items-center gap-2">{actions}</div>
+          ) : null}
         </div>
-        {actions ? (
-          <div className="flex flex-wrap items-center gap-2">{actions}</div>
-        ) : null}
-      </div>
-      <div className="space-y-8">{content}</div>
+        <TabsContent value={view}>
+          <div className="space-y-8">{content}</div>
+        </TabsContent>
+      </Tabs>
       <DestinationDrawer
         target={drawer}
         destination={
