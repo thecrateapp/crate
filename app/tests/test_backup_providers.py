@@ -197,8 +197,19 @@ def test_rclone_probe_remotes_reach_the_same_place(tmp_path):
     assert s3.env["RCLONE_CONFIG_CRATEBK_TYPE"] == "s3"
     assert s3.env["RCLONE_CONFIG_CRATEBK_ENDPOINT"] == "https://minio:9000"
     assert s3.env["RCLONE_CONFIG_CRATEBK_SECRET_ACCESS_KEY"] == SECRET
-    # A key scoped to the bucket's objects cannot create buckets (R2 returns 403).
-    assert s3.env["RCLONE_CONFIG_CRATEBK_NO_CHECK_BUCKET"] == "true"
+    # A new destination's first test may create its bucket.
+    assert "RCLONE_CONFIG_CRATEBK_NO_CHECK_BUCKET" not in s3.env
+    # Once it holds a repository the bucket exists, and a key scoped to the
+    # bucket's objects cannot create buckets (R2 returns 403).
+    existing = providers.rclone_remote(
+        "s3",
+        {"endpoint": "https://minio:9000", "bucket": "b", "prefix": "p", "region": ""},
+        {"access_key_id": "AK", "secret_access_key": SECRET},
+        backup_dir=tmp_path,
+        work_dir=tmp_path,
+        bucket_exists=True,
+    )
+    assert existing.env["RCLONE_CONFIG_CRATEBK_NO_CHECK_BUCKET"] == "true"
 
     local = providers.rclone_remote(
         "local", {"path": "restic"}, {}, backup_dir=tmp_path, work_dir=tmp_path

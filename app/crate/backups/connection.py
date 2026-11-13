@@ -146,6 +146,7 @@ def check_destination(
                 secrets.credentials,
                 backup_dir=backup_dir(),
                 work_dir=work_dir,
+                bucket_exists=row.get("repository_initialized_at") is not None,
             )
             # The probe goes first elsewhere: restic retries a refused request for
             # minutes, rclone gives up after one retry.
