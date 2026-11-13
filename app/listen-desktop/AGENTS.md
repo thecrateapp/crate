@@ -161,7 +161,9 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
 - **Track notifications** (`linux_track_notifications.rs`): one transient card per new
   track, only while playing and with the window unfocused; it replaces the previous
   card (`replaces_id`), carries the cached cover (`image-path`), `desktop-entry`, and
-  the actions "Show Crate" (default) and "Next" (handled from `ActionInvoked`).
+  the actions "Show Crate" (default) and "Next" (handled from `ActionInvoked`). Cards
+  go through one worker thread (the only `Notify` caller), so each replaces the id the
+  previous one returned; a burst queued meanwhile shows only its newest card.
 - **MCP** (`desktop_mcp.rs`): `crate-desktop --mcp` is an MCP server on stdio (JSON-RPC,
   tools: now_playing, play_pause, next_track, previous_track, seek, set_shuffle,
   set_repeat, set_equalizer, show_crate). It is a client of the control socket plus
