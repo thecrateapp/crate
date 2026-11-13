@@ -154,3 +154,32 @@ export function getMediaAccessTargets(scope: string): MediaAccessTarget[] {
   if (!scoped) return [];
   return Array.from(scoped.values());
 }
+
+/**
+ * Remembered targets whose ticket is missing or expires within `withinMs`.
+ *
+ * Tickets are random per issue, and the ticket is part of every artwork URL.
+ * Re-issuing a still-valid ticket changes the URL, so WebKit treats a cover it
+ * already has as a new resource. Renewing only what is about to expire keeps
+ * URLs (and the HTTP/memory caches behind them) stable for the ticket's life:
+ * 12 h for the bearer-token sessions of the desktop and mobile apps.
+ */
+export function getMediaAccessTargetsDueForRefresh(
+  scope: string,
+  withinMs: number,
+  now: number = Date.now(),
+): MediaAccessTarget[] {
+  const scoped = targetsByScope.get(scope);
+  if (!scoped) return [];
+  const tickets = ticketsByScope.get(scope);
+  const due: MediaAccessTarget[] = [];
+  for (const [key, target] of scoped) {
+    const current = tickets?.get(key);
+    const expiresAt = current?.ticket
+      ? new Date(current.expires_at).getTime()
+      : Number.NaN;
+    if (!Number.isFinite(expiresAt) || expiresAt <= now + withinMs)
+      due.push(target);
+  }
+  return due;
+}
