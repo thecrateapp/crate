@@ -190,6 +190,24 @@ def test_the_lock_is_one_holder_at_a_time(pg_db):
         assert again is True
 
 
+def test_several_locks_are_taken_on_one_connection(pg_db):
+    del pg_db
+    from crate.db.advisory_locks import try_session_locks
+
+    with try_session_locks("crate:test:a", "crate:test:b") as busy:
+        assert busy is None
+        with try_session_lock("crate:test:b") as other:
+            assert other is False
+    with try_session_lock("crate:test:a") as other:
+        with try_session_locks("crate:test:b", "crate:test:a") as busy:
+            assert (other, busy) == (True, "crate:test:a")
+        # "b" was released when "a" turned out busy.
+        with try_session_lock("crate:test:b") as b_free:
+            assert b_free is True
+    with try_session_locks("crate:test:a", "crate:test:b") as busy:
+        assert busy is None
+
+
 def test_a_dump_closes_the_run_a_killed_worker_left_and_its_partial(
     pg_db, backup_root, queued, tmp_path, monkeypatch
 ):
