@@ -4,6 +4,7 @@ import {
   albumArtKey,
   artistArtKey,
   findLoadedImage,
+  launcherArtScope,
   launcherArtUrl,
   ON_DEMAND_PLAN,
   PREWARM_PLAN,
@@ -13,9 +14,12 @@ import {
   type LauncherArtDeps,
 } from "./desktop-launcher-art";
 
+/** The scope of the server the tests talk to. */
+const S = launcherArtScope();
+
 function rememberAlbums(count: number): string[] {
   return Array.from({ length: count }, (_, i) => {
-    const key = `album:${i + 1}`;
+    const key = `album:${S}:${i + 1}`;
     rememberLauncherArtSource(key, {
       kind: "album",
       input: { albumId: i + 1 },
@@ -56,11 +60,39 @@ function deps(overrides: Partial<LauncherArtDeps> = {}) {
 describe("launcher art", () => {
   afterEach(() => resetLauncherArtForTests());
 
+  it("scopes keys by server so two servers' album 11 differ", () => {
+    const a = launcherArtScope("https://a.example.test");
+    const b = launcherArtScope("https://b.example.test");
+    expect(a).toMatch(/^[0-9a-f]{16}$/);
+    expect(b).not.toBe(a);
+    expect(launcherArtScope("https://a.example.test/")).toBe(a);
+    expect(launcherArtScope("HTTPS://A.example.test")).toBe(a);
+    expect(launcherArtScope("https://a.example.test/crate")).not.toBe(a);
+    expect(albumArtKey({ albumId: 11 }, a)).toBe(`album:${a}:11`);
+    expect(albumArtKey({ albumId: 11 }, b)).toBe(`album:${b}:11`);
+    expect(artistArtKey({ artistId: 3 }, b)).toBe(`artist:${b}:3`);
+    expect(albumArtKey({ albumId: 11 }, "https://a.example.test")).toBeNull();
+    // by default, the server the app talks to now
+    expect(albumArtKey({ albumId: 11 })).toBe(`album:${S}:11`);
+  });
+
+  it("does not fetch another server's key after a switch", async () => {
+    const other = launcherArtScope("https://other.example.test");
+    const key = `album:${other}:11`;
+    rememberLauncherArtSource(key, { kind: "album", input: { albumId: 11 } });
+    const d = deps();
+    await prefetchLauncherArt([key], d);
+    expect(d.authorize).not.toHaveBeenCalled();
+    expect(d.store).not.toHaveBeenCalled();
+  });
+
   it("keys art by entity id, never by URL", () => {
-    expect(albumArtKey({ albumId: 11, globalAlbumUid: "g1" })).toBe("album:11");
-    expect(albumArtKey({ globalAlbumUid: "g-1" })).toBe("album:g:g-1");
-    expect(albumArtKey({ albumEntityUid: "e_1" })).toBe("album:e:e_1");
-    expect(artistArtKey({ artistId: 3 })).toBe("artist:3");
+    expect(albumArtKey({ albumId: 11, globalAlbumUid: "g1" })).toBe(
+      `album:${S}:11`,
+    );
+    expect(albumArtKey({ globalAlbumUid: "g-1" })).toBe(`album:${S}:g:g-1`);
+    expect(albumArtKey({ albumEntityUid: "e_1" })).toBe(`album:${S}:e:e_1`);
+    expect(artistArtKey({ artistId: 3 })).toBe(`artist:${S}:3`);
     expect(artistArtKey({})).toBeNull();
     expect(albumArtKey({ globalAlbumUid: "https://x/y?ticket=1" })).toBeNull();
   });
@@ -78,12 +110,12 @@ describe("launcher art", () => {
   });
 
   it("fetches missing art with the session and hands only bytes to the shell", async () => {
-    rememberLauncherArtSource("album:11", {
+    rememberLauncherArtSource(`album:${S}:11`, {
       kind: "album",
       input: { albumId: 11 },
     });
     const d = deps();
-    await prefetchLauncherArt(["album:11", "album:12", 7, "x"], d);
+    await prefetchLauncherArt([`album:${S}:11`, `album:${S}:12`, 7, "x"], d);
 
     expect(d.authorize).toHaveBeenCalledTimes(1);
     expect(d.fetch).toHaveBeenCalledWith(
@@ -91,14 +123,17 @@ describe("launcher art", () => {
       expect.objectContaining({ priority: "high" }),
     );
     expect(d.toSquare).toHaveBeenCalledWith(expect.any(Blob), 256);
-    expect(d.store).toHaveBeenCalledWith("album:11", [0xff, 0xd8, 0xff, 0xe0]);
+    expect(d.store).toHaveBeenCalledWith(
+      `album:${S}:11`,
+      [0xff, 0xd8, 0xff, 0xe0],
+    );
     expect(JSON.stringify(vi.mocked(d.store).mock.calls)).not.toMatch(
       /SECRET|http|\/api/,
     );
   });
 
   it("drops failures and does not fetch a key twice at once", async () => {
-    rememberLauncherArtSource("artist:3", {
+    rememberLauncherArtSource(`artist:${S}:3`, {
       kind: "artist",
       input: { artistId: 3 },
     });
@@ -111,8 +146,8 @@ describe("launcher art", () => {
           }),
       ),
     });
-    const first = prefetchLauncherArt(["artist:3"], d);
-    await prefetchLauncherArt(["artist:3"], d);
+    const first = prefetchLauncherArt([`artist:${S}:3`], d);
+    await prefetchLauncherArt([`artist:${S}:3`], d);
     await vi.waitFor(() => expect(d.fetch).toHaveBeenCalledTimes(1));
     release(new Response(null, { status: 404 }));
     await first;
@@ -120,12 +155,12 @@ describe("launcher art", () => {
 
     const failing = deps({ authorize: vi.fn().mockRejectedValue(new Error()) });
     await expect(
-      prefetchLauncherArt(["artist:3"], failing),
+      prefetchLauncherArt([`artist:${S}:3`], failing),
     ).resolves.toBeUndefined();
     expect(failing.store).not.toHaveBeenCalled();
 
     const undecodable = deps({ toSquare: vi.fn().mockResolvedValue(null) });
-    await prefetchLauncherArt(["artist:3"], undecodable);
+    await prefetchLauncherArt([`artist:${S}:3`], undecodable);
     expect(undecodable.store).not.toHaveBeenCalled();
     await expect(
       prefetchLauncherArt(undefined, deps()),

@@ -22,12 +22,18 @@ vi.mock("@/lib/platform", async (importOriginal) => ({
   },
 }));
 
-import { resetLauncherArtForTests } from "@/lib/desktop-launcher-art";
+import {
+  launcherArtScope,
+  resetLauncherArtForTests,
+} from "@/lib/desktop-launcher-art";
 
 import {
   QUEUE_PREWARM_DELAY_MS,
   useLauncherArtPrewarm,
 } from "./use-launcher-art-prewarm";
+
+/** The launcher-art scope of the server the tests talk to. */
+const S = launcherArtScope();
 
 function track(id: string, albumId: number, artistId: number): Track {
   return {
@@ -89,7 +95,7 @@ describe("useLauncherArtPrewarm", () => {
     expect(api).toHaveBeenCalledWith(
       expect.stringMatching(/^\/api\/me\/history\?limit=/),
     );
-    expect(missingCalls()).toContainEqual(["album:50", "artist:5"]);
+    expect(missingCalls()).toContainEqual([`album:${S}:50`, `artist:${S}:5`]);
   });
 
   it("skips the startup fetches where the shell has no launcher cache", async () => {
@@ -110,10 +116,10 @@ describe("useLauncherArtPrewarm", () => {
       { initialProps: { current: track("a", 1, 2) } },
     );
     await flush();
-    expect(missingCalls()).toContainEqual(["album:1", "artist:2"]);
+    expect(missingCalls()).toContainEqual([`album:${S}:1`, `artist:${S}:2`]);
     rerender({ current: track("b", 3, 4) });
     await flush();
-    expect(missingCalls()).toContainEqual(["album:3", "artist:4"]);
+    expect(missingCalls()).toContainEqual([`album:${S}:3`, `artist:${S}:4`]);
     const before = missingCalls().length;
     rerender({ current: { ...track("b", 3, 4) } });
     await flush();
@@ -132,9 +138,11 @@ describe("useLauncherArtPrewarm", () => {
       await vi.advanceTimersByTimeAsync(QUEUE_PREWARM_DELAY_MS);
     });
     const queueCalls = missingCalls().filter((keys) =>
-      keys.includes("album:9"),
+      keys.includes(`album:${S}:9`),
     );
-    expect(queueCalls).toEqual([["album:7", "artist:8", "album:9"]]);
+    expect(queueCalls).toEqual([
+      [`album:${S}:7`, `artist:${S}:8`, `album:${S}:9`],
+    ]);
   });
 
   it("stays off outside the desktop app", async () => {

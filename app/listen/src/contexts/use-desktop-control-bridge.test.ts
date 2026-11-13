@@ -28,6 +28,10 @@ import {
 } from "@/lib/desktop-control";
 
 import { useDesktopControlBridge } from "./use-desktop-control-bridge";
+import { launcherArtScope } from "@/lib/desktop-launcher-art";
+
+/** The launcher-art scope of the server the tests talk to. */
+const S = launcherArtScope();
 
 function input() {
   return {
@@ -163,7 +167,7 @@ describe("useDesktopControlBridge", () => {
     window.__crateTauriInvoke = vi.fn((name: string) =>
       Promise.resolve(
         name === "desktop_control_reply"
-          ? { delivered: true, missingArt: ["album:11"] }
+          ? { delivered: true, missingArt: [`album:${S}:11`] }
           : undefined,
       ),
     ) as typeof window.__crateTauriInvoke;
@@ -179,9 +183,9 @@ describe("useDesktopControlBridge", () => {
     const reply = (
       window.__crateTauriInvoke as ReturnType<typeof vi.fn>
     ).mock.calls.find(([name]) => name === "desktop_control_reply");
-    expect(reply?.[1].items[0].art_key).toBe("album:11");
+    expect(reply?.[1].items[0].art_key).toBe(`album:${S}:11`);
     expect(prefetchLauncherArt).toHaveBeenCalledWith(
-      ["album:11"],
+      [`album:${S}:11`],
       expect.objectContaining({
         store: expect.any(Function),
         loadedImage: expect.any(Function),

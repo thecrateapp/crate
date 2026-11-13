@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Track } from "@/contexts/player-types";
 
 import {
+  launcherArtScope,
   resetLauncherArtForTests,
   type LauncherArtDeps,
 } from "./desktop-launcher-art";
@@ -15,6 +16,9 @@ import {
   trackArtEntries,
   warmLauncherArt,
 } from "./desktop-launcher-prewarm";
+
+/** The launcher-art scope of the server the tests talk to. */
+const S = launcherArtScope();
 
 const history = [
   {
@@ -75,13 +79,13 @@ describe("launcher art prewarm set", () => {
   it("collects top artists, then what was played, then follows, once each", async () => {
     const entries = await loadPrewarmEntries(fetcher());
     expect(entries.map(([key]) => key)).toEqual([
-      "artist:9",
-      "album:11",
-      "artist:3",
-      "album:12",
-      "artist:4",
-      "album:13",
-      "artist:g:ga-1",
+      `artist:${S}:9`,
+      `album:${S}:11`,
+      `artist:${S}:3`,
+      `album:${S}:12`,
+      `artist:${S}:4`,
+      `album:${S}:13`,
+      `artist:${S}:g:ga-1`,
     ]);
     expect(entries[1]?.[1]).toEqual({
       kind: "album",
@@ -98,11 +102,11 @@ describe("launcher art prewarm set", () => {
       fetcher({ "/api/me/home/discovery": undefined }),
     );
     expect(entries.map(([key]) => key)).toEqual([
-      "album:11",
-      "artist:3",
-      "album:12",
-      "artist:4",
-      "artist:g:ga-1",
+      `album:${S}:11`,
+      `artist:${S}:3`,
+      `album:${S}:12`,
+      `artist:${S}:4`,
+      `artist:${S}:g:ga-1`,
     ]);
   });
 
@@ -115,7 +119,7 @@ describe("launcher art prewarm set", () => {
     const keys = set.entries().map(([key]) => key);
     expect(keys.filter((k) => k.startsWith("album:"))).toHaveLength(200);
     expect(keys.filter((k) => k.startsWith("artist:"))).toHaveLength(100);
-    expect(keys[0]).toBe("album:0");
+    expect(keys[0]).toBe(`album:${S}:0`);
   });
 
   it("warms a track's album and artist", () => {
@@ -128,8 +132,8 @@ describe("launcher art prewarm set", () => {
       albumId: 11,
     } as Track;
     expect(trackArtEntries([track, track]).map(([key]) => key)).toEqual([
-      "album:11",
-      "artist:3",
+      `album:${S}:11`,
+      `artist:${S}:3`,
     ]);
     expect(
       trackArtEntries([{ id: "x", title: "x", artist: "y" } as Track]),
@@ -156,7 +160,9 @@ describe("warmLauncherArt", () => {
   it("fetches only what the shell has not cached, at low priority", async () => {
     const entries = await loadPrewarmEntries(fetcher());
     const art = artDeps();
-    const missing = vi.fn(() => Promise.resolve(["album:12", "artist:9"]));
+    const missing = vi.fn(() =>
+      Promise.resolve([`album:${S}:12`, `artist:${S}:9`]),
+    );
     const warmed = await warmLauncherArt(entries, {
       missing,
       art,
@@ -165,8 +171,8 @@ describe("warmLauncherArt", () => {
     expect(missing).toHaveBeenCalledWith(entries.map(([key]) => key));
     expect(warmed).toBe(2);
     expect(art.store.mock.calls.map(([key]) => key).sort()).toEqual([
-      "album:12",
-      "artist:9",
+      `album:${S}:12`,
+      `artist:${S}:9`,
     ]);
     expect(art.fetch).toHaveBeenCalledWith(
       expect.any(String),

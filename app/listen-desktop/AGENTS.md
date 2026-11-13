@@ -129,7 +129,10 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
 - **Launcher art** (`desktop_launcher_art.rs`, `app/listen/src/lib/desktop-launcher-art.ts`):
   `art` is an absolute path in `$XDG_CACHE_HOME/crate/launcher-art/` (else
   `~/.cache/...`, dir 0700), named `<first 32 hex of sha256("crate-launcher-art/v1/<key>/256")>-256.<jpg|png|webp>`,
-  where the key is `album:<id>` or `artist:<id>` (ids only, never URLs). Listen tags
+  where the key is `album:<server>:<id>` or `artist:<server>:<id>` (ids only, never
+  URLs; `<server>` is `launcherArtScope()`, 16 hex of FNV-1a 64 over the normalized
+  server URL, so two servers' album 11 never share a cover; Rust refuses unscoped keys,
+  and Listen skips fetching another server's key after a switch). Listen tags
   items with `art_key`; `desktop_control_reply` swaps it for `art` when cached and
   returns `missingArt`; Listen fetches those with its session, crops 256 px JPEG
   squares and sends bytes to `store_launcher_art` (temp file + rename, mtime LRU,

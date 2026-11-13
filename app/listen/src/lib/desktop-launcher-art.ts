@@ -1,15 +1,18 @@
 // Artwork for desktop launchers that show control-socket search results.
 //
-// Each search item carries an internal `art_key` (`album:<id>` or
-// `artist:<id>`). The native shell swaps it for the path of a cached image
+// Each search item carries an internal `art_key` (`album:<server>:<id>` or
+// `artist:<server>:<id>`). The native shell swaps it for the path of a cached image
 // when it has one, and answers `desktop_control_reply` with the keys it lacks.
 // This module fetches those with the app's session, crops them to 256 px
 // squares and hands the bytes to the shell (`store_launcher_art`), which
 // writes them to its cache; the next search shows them.
 //
 // Image URLs carry the user's media ticket, so they stay in this module: keys
-// are entity ids, and only bytes cross to the shell.
+// are entity ids, and only bytes cross to the shell. Ids are only unique within
+// one Crate server, so every key carries the server's scope
+// (`launcherArtScope`): two servers' album 11 never share a cover.
 
+import { getApiBase } from "@/lib/api";
 import type { AlbumRouteInput, ArtistRouteInput } from "@/lib/library-routes";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 
@@ -17,7 +20,7 @@ export const LAUNCHER_ART_SIZE = 256;
 // a full prewarm (300) plus a few searches
 const MAX_REMEMBERED_SOURCES = 512;
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
-const KEY_PATTERN = /^(album|artist):[A-Za-z0-9._:-]{1,150}$/;
+const KEY_PATTERN = /^(album|artist):[0-9a-f]{16}:[A-Za-z0-9._:-]{1,150}$/;
 
 export type LauncherArtSource =
   | { kind: "album"; input: AlbumRouteInput }
@@ -25,46 +28,105 @@ export type LauncherArtSource =
 
 type Id = string | number | null | undefined;
 
+/** The server the app talks to now (Listen Web: its own origin). */
+function currentServerUrl(): string {
+  return getApiBase() || globalThis.location?.origin || "";
+}
+
+function normalizedServer(serverUrl: string): string {
+  try {
+    const url = new URL(serverUrl);
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return serverUrl.trim().replace(/\/+$/, "").toLowerCase();
+  }
+}
+
+const FNV_OFFSET = 0xcbf29ce484222325n;
+const FNV_PRIME = 0x100000001b3n;
+const U64 = 0xffffffffffffffffn;
+// a prewarm builds hundreds of keys for the same server
+let lastScope: { serverUrl: string; scope: string } | null = null;
+
+/**
+ * 16 hex digits naming a Crate server in launcher-art keys: FNV-1a (64 bit)
+ * of its normalized URL. A hash, not the URL, so keys keep a charset no URL
+ * fits in; it only has to tell a user's few servers apart.
+ */
+export function launcherArtScope(
+  serverUrl: string = currentServerUrl(),
+): string {
+  if (lastScope?.serverUrl === serverUrl) return lastScope.scope;
+  let hash = FNV_OFFSET;
+  for (const byte of new TextEncoder().encode(normalizedServer(serverUrl))) {
+    hash ^= BigInt(byte);
+    hash = (hash * FNV_PRIME) & U64;
+  }
+  const scope = hash.toString(16).padStart(16, "0");
+  lastScope = { serverUrl, scope };
+  return scope;
+}
+
 function keyFor(
   kind: "album" | "artist",
+  scope: string,
   id: Id,
   globalUid: Id,
   entityUid: Id,
 ): string | null {
   const candidates = [
-    id != null && id !== "" ? `${kind}:${id}` : null,
-    globalUid ? `${kind}:g:${globalUid}` : null,
-    entityUid ? `${kind}:e:${entityUid}` : null,
+    id != null && id !== "" ? `${kind}:${scope}:${id}` : null,
+    globalUid ? `${kind}:${scope}:g:${globalUid}` : null,
+    entityUid ? `${kind}:${scope}:e:${entityUid}` : null,
   ];
   return candidates.find((key) => key && KEY_PATTERN.test(key)) ?? null;
 }
 
-/** A stable cache key for an album's cover: an id, never a URL. */
-export function albumArtKey(input: {
-  albumId?: Id;
-  globalAlbumUid?: Id;
-  albumEntityUid?: Id;
-}): string | null {
+/**
+ * A stable cache key for an album's cover on the current server (or
+ * `scope`'s): an id, never a URL.
+ */
+export function albumArtKey(
+  input: {
+    albumId?: Id;
+    globalAlbumUid?: Id;
+    albumEntityUid?: Id;
+  },
+  scope: string = launcherArtScope(),
+): string | null {
   return keyFor(
     "album",
+    scope,
     input.albumId,
     input.globalAlbumUid,
     input.albumEntityUid,
   );
 }
 
-/** A stable cache key for an artist's photo: an id, never a URL. */
-export function artistArtKey(input: {
-  artistId?: Id;
-  globalArtistUid?: Id;
-  artistEntityUid?: Id;
-}): string | null {
+/**
+ * A stable cache key for an artist's photo on the current server (or
+ * `scope`'s): an id, never a URL.
+ */
+export function artistArtKey(
+  input: {
+    artistId?: Id;
+    globalArtistUid?: Id;
+    artistEntityUid?: Id;
+  },
+  scope: string = launcherArtScope(),
+): string | null {
   return keyFor(
     "artist",
+    scope,
     input.artistId,
     input.globalArtistUid,
     input.artistEntityUid,
   );
+}
+
+/** The server scope inside a key. */
+function scopeOf(key: string): string {
+  return key.split(":", 2)[1] ?? "";
 }
 
 const sources = new Map<string, LauncherArtSource>();
@@ -271,9 +333,16 @@ async function fetchOne(
   markStored(job.key);
 }
 
+/**
+ * Jobs for the keys of the server the app talks to now. A key remembered
+ * before a server switch is skipped: its source would be fetched from the new
+ * server and stored as the old server's image.
+ */
 function plannedJobs(keys: string[]): ArtJob[] {
   const jobs: ArtJob[] = [];
+  const scope = launcherArtScope();
   for (const key of keys) {
+    if (scopeOf(key) !== scope) continue;
     const source = sources.get(key);
     const url = source ? launcherArtUrl(source) : "";
     if (url) jobs.push({ key, url, reuse: null, authorized: null });

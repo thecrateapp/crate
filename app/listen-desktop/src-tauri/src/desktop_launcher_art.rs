@@ -1,8 +1,9 @@
 //! Square artwork for desktop launchers that show control-socket search
 //! results (the Ryoku launcher, rofi).
 //!
-//! Listen tags each search item with an internal `art_key` (`album:<id>` or
-//! `artist:<id>`); `desktop_control_reply` swaps it for `art`, the absolute
+//! Listen tags each search item with an internal `art_key`
+//! (`album:<server>:<id>` or `artist:<server>:<id>`); `desktop_control_reply`
+//! swaps it for `art`, the absolute
 //! path of a cached image, when that image is on disk, and reports the keys it
 //! lacks. Listen then fetches those images with its own session, crops them to
 //! 256 px squares and hands the bytes back through `store_launcher_art`, which
@@ -12,8 +13,11 @@
 //!   `~/.cache/crate/launcher-art/`), mode 0700.
 //! - File name: the first 32 hex digits of SHA-256 over
 //!   `crate-launcher-art/v1/<key>/<size>`, then `-<size>.<jpg|png|webp>`. The
-//!   key is an entity id; image URLs carry the user's media ticket, so a URL,
-//!   ticket or token never reaches a file name, the socket or a log.
+//!   key is an entity id scoped by the Crate server (`<server>` is 16 hex
+//!   digits Listen derives from the server URL), since two servers number their
+//!   albums alike and must not share a cover. Image URLs carry the user's media
+//!   ticket, so a URL, ticket or token never reaches a file name, the socket or
+//!   a log.
 //! - A file is published by renaming a fully written temp file, so a path in a
 //!   reply always names a complete image.
 //! - The cache is an LRU (mtime, touched on every hit) capped at
@@ -38,7 +42,9 @@ pub const MAX_ART_BYTES: usize = 1024 * 1024;
 pub const MAX_CACHE_BYTES: u64 = 100 * 1024 * 1024;
 const PRUNE_INTERVAL: Duration = Duration::from_secs(5 * 60);
 const TEMP_MAX_AGE: Duration = Duration::from_secs(60 * 60);
-const MAX_KEY_CHARS: usize = 160;
+const MAX_KEY_CHARS: usize = 180;
+/// Hex digits of the server scope in a key.
+const SCOPE_HEX_DIGITS: usize = 16;
 const EXTENSIONS: [&str; 3] = ["jpg", "png", "webp"];
 
 /// `$XDG_CACHE_HOME/crate/launcher-art`, else `$HOME/.cache/crate/launcher-art`.
@@ -64,13 +70,22 @@ pub fn cache_root() -> Option<PathBuf> {
     cache_root_from(var("XDG_CACHE_HOME").as_deref(), var("HOME").as_deref())
 }
 
-/// `album:<id>` or `artist:<id>`, where the id is a plain identifier: no
-/// slashes, no query characters, so no URL or ticket fits in a key.
+/// `album:<server>:<id>` or `artist:<server>:<id>`: `<server>` is 16 lowercase
+/// hex digits and the id a plain identifier (no slashes, no query characters),
+/// so no URL or ticket fits in a key. A key without a server is refused: it
+/// could name another server's album.
 pub fn valid_key(key: &str) -> bool {
-    let Some((kind, id)) = key.split_once(':') else {
+    let Some((kind, rest)) = key.split_once(':') else {
+        return false;
+    };
+    let Some((scope, id)) = rest.split_once(':') else {
         return false;
     };
     matches!(kind, "album" | "artist")
+        && scope.len() == SCOPE_HEX_DIGITS
+        && scope
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         && !id.is_empty()
         && key.chars().count() <= MAX_KEY_CHARS
         && id
@@ -306,6 +321,15 @@ mod tests {
         root
     }
 
+    /// Two servers' scopes (Listen derives them from the server URL).
+    const S: &str = "0123456789abcdef";
+    const T: &str = "fedcba9876543210";
+
+    fn k(kind_and_id: &str) -> String {
+        let (kind, id) = kind_and_id.split_once(':').unwrap();
+        format!("{kind}:{S}:{id}")
+    }
+
     const JPEG: &[u8] = &[0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, b'J', b'F', b'I', b'F'];
     const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR";
 
@@ -327,17 +351,16 @@ mod tests {
     }
 
     #[test]
-    fn keys_are_entity_ids_never_urls() {
+    fn keys_are_server_scoped_entity_ids_never_urls() {
         for key in [
             "album:11",
             "artist:3",
             "album:g:7f3a-b2",
             "artist:e:abc_DEF.9",
         ] {
-            assert!(valid_key(key), "{key}");
+            assert!(valid_key(&k(key)), "{key}");
         }
         for key in [
-            "",
             "album:",
             "track:9",
             "album:https://x/cover?media_ticket=s3cret",
@@ -346,16 +369,47 @@ mod tests {
             "album:1&token=x",
             "album:a b",
         ] {
+            assert!(!valid_key(&k(key)), "{key}");
+        }
+        for key in [
+            "",
+            "album",
+            // no server: could be any server's album 11
+            "album:11",
+            "artist:g:7f3a-b2",
+            // the scope is 16 lowercase hex digits, nothing else
+            "album:0123456789ABCDEF:11",
+            "album:0123456789abcde:11",
+            "album:0123456789abcdef0:11",
+            "album:https//x.example:11",
+        ] {
             assert!(!valid_key(key), "{key}");
         }
-        assert!(!valid_key(&format!("album:{}", "a".repeat(MAX_KEY_CHARS))));
+        assert!(valid_key(&format!("album:{S}:{}", "a".repeat(150))));
+        assert!(!valid_key(&format!(
+            "album:{S}:{}",
+            "a".repeat(MAX_KEY_CHARS)
+        )));
+    }
+
+    #[test]
+    fn the_same_album_on_two_servers_has_two_images() {
+        let root = temp_root("servers");
+        let ours = store(&root, &format!("album:{S}:11"), JPEG).unwrap();
+        assert_eq!(lookup(&root, &format!("album:{T}:11")), None);
+        let theirs = store(&root, &format!("album:{T}:11"), PNG).unwrap();
+        assert_ne!(ours, theirs);
+        assert_eq!(fs::read(&ours).unwrap(), JPEG);
+        assert_eq!(lookup(&root, &format!("album:{T}:11")), Some(theirs));
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
     fn file_names_are_a_stable_hash_of_key_and_size() {
-        let stem = file_stem("album:11");
-        assert_eq!(stem, file_stem("album:11"));
-        assert_ne!(stem, file_stem("artist:11"));
+        let stem = file_stem(&k("album:11"));
+        assert_eq!(stem, file_stem(&k("album:11")));
+        assert_ne!(stem, file_stem(&k("artist:11")));
+        assert_ne!(stem, file_stem(&format!("album:{T}:11")));
         assert!(stem.ends_with("-256"));
         assert_eq!(stem.len(), 32 + 4);
         assert!(stem[..32].bytes().all(|b| b.is_ascii_hexdigit()));
@@ -374,12 +428,13 @@ mod tests {
     #[test]
     fn stores_atomically_and_looks_up_by_key() {
         let root = temp_root("store");
-        assert_eq!(lookup(&root, "album:11"), None);
-        let path = store(&root, "album:11", JPEG).unwrap();
+        let key = k("album:11");
+        assert_eq!(lookup(&root, &key), None);
+        let path = store(&root, &key, JPEG).unwrap();
         assert_eq!(path.parent(), Some(root.as_path()));
         assert!(path.to_str().unwrap().ends_with("-256.jpg"));
         assert_eq!(fs::read(&path).unwrap(), JPEG);
-        assert_eq!(lookup(&root, "album:11"), Some(path.clone()));
+        assert_eq!(lookup(&root, &key), Some(path.clone()));
         // no temp file left behind
         let names: Vec<_> = fs::read_dir(&root)
             .unwrap()
@@ -393,22 +448,23 @@ mod tests {
             assert_eq!(mode, 0o700);
         }
         // a new format replaces the old file
-        let png = store(&root, "album:11", PNG).unwrap();
+        let png = store(&root, &key, PNG).unwrap();
         assert!(png.to_str().unwrap().ends_with("-256.png"));
         assert!(!path.exists());
-        assert_eq!(lookup(&root, "album:11"), Some(png));
+        assert_eq!(lookup(&root, &key), Some(png));
         let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
     fn rejects_bad_art() {
         let root = temp_root("reject");
-        assert!(store(&root, "album:https://x?ticket=1", JPEG).is_err());
-        assert!(store(&root, "album:1", b"<html>").is_err());
-        assert!(store(&root, "album:1", b"").is_err());
+        assert!(store(&root, &k("album:https://x?ticket=1"), JPEG).is_err());
+        assert!(store(&root, "album:1", JPEG).is_err(), "unscoped key");
+        assert!(store(&root, &k("album:1"), b"<html>").is_err());
+        assert!(store(&root, &k("album:1"), b"").is_err());
         let mut huge = JPEG.to_vec();
         huge.resize(MAX_ART_BYTES + 1, 0);
-        assert!(store(&root, "album:1", &huge).is_err());
+        assert!(store(&root, &k("album:1"), &huge).is_err());
         assert!(!root.exists() || fs::read_dir(&root).unwrap().next().is_none());
         let _ = fs::remove_dir_all(&root);
     }
@@ -420,7 +476,7 @@ mod tests {
         for (index, key) in ["album:1", "album:2", "album:3"].iter().enumerate() {
             let mut bytes = JPEG.to_vec();
             bytes.resize(1000, 0);
-            let path = store(&root, key, &bytes).unwrap();
+            let path = store(&root, &k(key), &bytes).unwrap();
             let at = SystemTime::now() - Duration::from_secs(100 - index as u64 * 10);
             OpenOptions::new()
                 .write(true)
@@ -452,8 +508,8 @@ mod tests {
     #[test]
     fn partitions_keys_into_cache_hits_and_misses() {
         let root = temp_root("partition");
-        let cached = store(&root, "album:1", JPEG).unwrap();
-        let keys: Vec<String> = [
+        let cached = store(&root, &k("album:1"), JPEG).unwrap();
+        let mut keys: Vec<String> = [
             "album:1",
             "album:2",
             "artist:3",
@@ -462,14 +518,15 @@ mod tests {
             "track:4",
         ]
         .iter()
-        .map(|k| k.to_string())
+        .map(|key| k(key))
         .collect();
+        keys.push("album:5".into());
         let (hits, missing) = partition_missing(&root, &keys);
         assert_eq!(hits, vec![cached]);
-        assert_eq!(missing, vec!["album:2".to_string(), "artist:3".to_string()]);
+        assert_eq!(missing, vec![k("album:2"), k("artist:3")]);
 
         let many: Vec<String> = (0..MAX_CHECK_KEYS + 50)
-            .map(|i| format!("album:{i}"))
+            .map(|i| k(&format!("album:{i}")))
             .collect();
         let (_, missing) = partition_missing(&root, &many);
         assert_eq!(missing.len(), MAX_CHECK_KEYS - 1, "album:1 is cached");
@@ -479,17 +536,17 @@ mod tests {
     #[test]
     fn resolves_cached_art_and_reports_missing_keys() {
         let root = temp_root("resolve");
-        let cached = store(&root, "artist:3", PNG).unwrap();
+        let cached = store(&root, &k("artist:3"), PNG).unwrap();
         let mut items = json!([
-            {"kind": "artist", "title": "Repion", "art_key": "artist:3"},
-            {"kind": "album", "title": "Pronto", "art_key": "album:11", "art": "https://x/c?media_ticket=s"},
-            {"kind": "track", "title": "Barrio", "art_key": "album:11", "duration": 201},
-            {"kind": "track", "title": "Bad", "art_key": "album:https://x?ticket=1"},
+            {"kind": "artist", "title": "Repion", "art_key": k("artist:3")},
+            {"kind": "album", "title": "Pronto", "art_key": k("album:11"), "art": "https://x/c?media_ticket=s"},
+            {"kind": "track", "title": "Barrio", "art_key": k("album:11"), "duration": 201},
+            {"kind": "track", "title": "Bad", "art_key": k("album:https://x?ticket=1")},
             "not an object"
         ]);
         let (hits, missing) = resolve_items(Some(&root), &mut items);
         assert_eq!(hits, vec![cached.clone()]);
-        assert_eq!(missing, vec!["album:11".to_string()]);
+        assert_eq!(missing, vec![k("album:11")]);
         assert_eq!(items[0]["art"], cached.to_str().unwrap());
         assert!(items[0].get("art_key").is_none());
         // a caller-supplied value never survives, and a miss sends no art
@@ -501,7 +558,7 @@ mod tests {
         assert!(Path::new(items[0]["art"].as_str().unwrap()).is_absolute());
 
         // without a cache directory nothing resolves and nothing is fetched
-        let mut items = json!([{"kind": "album", "art_key": "album:11"}]);
+        let mut items = json!([{"kind": "album", "art_key": k("album:11")}]);
         assert_eq!(resolve_items(None, &mut items), (vec![], vec![]));
         assert!(items[0].get("art_key").is_none());
         let _ = fs::remove_dir_all(&root);

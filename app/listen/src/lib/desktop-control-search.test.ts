@@ -9,6 +9,10 @@ import {
   searchForDesktop,
   toDesktopSearchItems,
 } from "./desktop-control-search";
+import { launcherArtScope } from "./desktop-launcher-art";
+
+/** The launcher-art scope of the server the tests talk to. */
+const S = launcherArtScope();
 
 const data = {
   artists: [
@@ -153,15 +157,15 @@ describe("desktop search", () => {
       sink,
     );
     expect(items.map((i) => [i.kind, i.art_key, i.duration])).toEqual([
-      ["artist", "artist:3", undefined],
-      ["album", "album:11", undefined],
-      ["track", "album:11", 202],
+      ["artist", `artist:${S}:3`, undefined],
+      ["album", `album:${S}:11`, undefined],
+      ["track", `album:${S}:11`, 202],
     ]);
-    expect(sink).toHaveBeenCalledWith("artist:3", {
+    expect(sink).toHaveBeenCalledWith(`artist:${S}:3`, {
       kind: "artist",
       input: expect.objectContaining({ artistId: 3, artistName: "Repion" }),
     });
-    expect(sink).toHaveBeenCalledWith("album:11", {
+    expect(sink).toHaveBeenCalledWith(`album:${S}:11`, {
       kind: "album",
       input: expect.objectContaining({ albumId: 11, albumName: "Pronto" }),
     });

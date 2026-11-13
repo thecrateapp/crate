@@ -1699,9 +1699,9 @@ mod tests {
     #[test]
     fn control_reply_strips_art_keys_and_reports_what_to_fetch() {
         let items = serde_json::json!([
-            {"kind": "album", "title": "A", "art_key": "album:launcher-art-test-never-cached",
+            {"kind": "album", "title": "A", "art_key": "album:0123456789abcdef:launcher-art-test-never-cached",
              "art": "https://example.invalid/cover?media_ticket=secret"},
-            {"kind": "track", "title": "T", "art_key": "album:launcher-art-test-never-cached",
+            {"kind": "track", "title": "T", "art_key": "album:0123456789abcdef:launcher-art-test-never-cached",
              "duration": 61.4}
         ]);
         // no socket client asked for request 0, so nothing is delivered
@@ -1710,7 +1710,7 @@ mod tests {
         if super::desktop_launcher_art::cache_root().is_some() {
             assert_eq!(
                 result.missing_art,
-                vec!["album:launcher-art-test-never-cached"]
+                vec!["album:0123456789abcdef:launcher-art-test-never-cached"]
             );
         } else {
             assert!(result.missing_art.is_empty());
@@ -1721,14 +1721,16 @@ mod tests {
     #[test]
     fn launcher_art_missing_lists_uncached_keys_or_none_without_a_cache() {
         let keys = vec![
-            "album:launcher-art-test-never-cached".to_string(),
+            "album:0123456789abcdef:launcher-art-test-never-cached".to_string(),
             "album:https://x?ticket=1".to_string(),
         ];
         let missing = tauri::async_runtime::block_on(super::launcher_art_missing(keys));
         if super::desktop_launcher_art::cache_root().is_some() {
             assert_eq!(
                 missing,
-                Some(vec!["album:launcher-art-test-never-cached".to_string()])
+                Some(vec![
+                    "album:0123456789abcdef:launcher-art-test-never-cached".to_string()
+                ])
             );
         } else {
             assert_eq!(missing, None);
