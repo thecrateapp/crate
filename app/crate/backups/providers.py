@@ -619,6 +619,10 @@ def rclone_remote(
             f"{prefix}ACCESS_KEY_ID": str(secrets.get("access_key_id", "")),
             f"{prefix}SECRET_ACCESS_KEY": str(secrets.get("secret_access_key", "")),
             f"{prefix}FORCE_PATH_STYLE": "false" if lookup == "dns" else "true",
+            # The bucket already exists. Without this rclone calls CreateBucket
+            # before the probe upload, which a key scoped to one bucket's objects
+            # (Cloudflare R2's "Object Read & Write") is refused with a 403.
+            f"{prefix}NO_CHECK_BUCKET": "true",
         }
         if config.get("region"):
             env[f"{prefix}REGION"] = str(config["region"])
