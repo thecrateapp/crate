@@ -561,12 +561,17 @@ function LiveTaskEvents({
 
 function TaskEventLog({
   taskId,
+  status,
   emptyMessage = "No task log recorded.",
 }: {
   taskId: string;
+  status: string;
   emptyMessage?: string;
 }) {
-  const { events, connected, done } = useTaskEvents(taskId);
+  const { events, connected, done } = useTaskEvents(taskId, {
+    status,
+    replayLog: true,
+  });
 
   if (events.length === 0) {
     if (done) {
@@ -816,7 +821,7 @@ function ActiveTaskCard({
   onExpand: () => void;
   onCancel: () => void;
 }) {
-  const taskEventStream = useTaskEvents(task.id);
+  const taskEventStream = useTaskEvents(task.id, { status: task.status });
   const { events, done } = taskEventStream;
   const liveStatus = done?.status || task.status;
   const status = getStatusMeta(liveStatus);
@@ -1057,7 +1062,7 @@ function HistoryTaskRow({
               <MonoLabel as="div" size="eyebrow">
                 Task log
               </MonoLabel>
-              <TaskEventLog taskId={task.id} />
+              <TaskEventLog taskId={task.id} status={task.status} />
             </div>
           ) : task.result ? (
             <div className="space-y-2">

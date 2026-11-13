@@ -32,8 +32,21 @@ function taskEventSource(index = 0) {
   return source;
 }
 
-function TaskEventProbe({ taskId, label }: { taskId: string; label: string }) {
-  const { events, connected, done } = useTaskEvents(taskId);
+function TaskEventProbe({
+  taskId,
+  label,
+  status,
+  replayLog,
+}: {
+  taskId: string;
+  label: string;
+  status?: string;
+  replayLog?: boolean;
+}) {
+  const { events, connected, done } = useTaskEvents(taskId, {
+    status,
+    replayLog,
+  });
   return (
     <output aria-label={label}>
       {`${events.length}:${connected}:${events[0]?.data.message ?? ""}:${done?.status ?? ""}`}
@@ -112,7 +125,11 @@ describe("useTaskEvents", () => {
     );
 
     act(() => {
-      taskEventSource().dispatch("task_event", { id: 1, type: "info", data: {} });
+      taskEventSource().dispatch("task_event", {
+        id: 1,
+        type: "info",
+        data: {},
+      });
     });
     act(() => screen.getByRole("button").click());
 
@@ -131,7 +148,11 @@ describe("useTaskEvents", () => {
         type: "info",
         data: { message: "Started" },
       });
-      taskEventSource(0).dispatch("task_event", { id: 2, type: "info", data: {} });
+      taskEventSource(0).dispatch("task_event", {
+        id: 2,
+        type: "info",
+        data: {},
+      });
       taskEventSource(0).onerror?.(new Event("error"));
       vi.advanceTimersByTime(5000);
     });
@@ -143,8 +164,16 @@ describe("useTaskEvents", () => {
         type: "info",
         data: { message: "Started" },
       });
-      taskEventSource(1).dispatch("task_event", { id: 2, type: "info", data: {} });
-      taskEventSource(1).dispatch("task_event", { id: 3, type: "info", data: {} });
+      taskEventSource(1).dispatch("task_event", {
+        id: 2,
+        type: "info",
+        data: {},
+      });
+      taskEventSource(1).dispatch("task_event", {
+        id: 3,
+        type: "info",
+        data: {},
+      });
     });
 
     expect(screen.getByLabelText("consumer")).toHaveTextContent(
@@ -245,5 +274,100 @@ describe("useTaskEvents", () => {
 
     expect(taskEventSources).toHaveLength(1);
     expect(taskEventSource().close).toHaveBeenCalledOnce();
+  });
+
+  describe("tasks the client already knows are finished", () => {
+    it.each(["completed", "failed", "cancelled"])(
+      "opens no stream for a %s task and reports it done",
+      (status) => {
+        render(
+          <TaskEventProbe
+            taskId={`known-${status}`}
+            label="finished"
+            status={status}
+          />,
+        );
+
+        expect(taskEventSources).toHaveLength(0);
+        expect(screen.getByLabelText("finished")).toHaveTextContent(
+          `0:false::${status}`,
+        );
+      },
+    );
+
+    it("reads the stored log of a finished task once and never reconnects", () => {
+      vi.useFakeTimers();
+      render(
+        <TaskEventProbe
+          taskId="finished-log"
+          label="log"
+          status="failed"
+          replayLog
+        />,
+      );
+
+      expect(taskEventSources).toHaveLength(1);
+      act(() => {
+        taskEventSource().dispatch("task_event", {
+          id: 1,
+          type: "info",
+          data: { message: "Moved 3 files" },
+        });
+        taskEventSource().onerror?.(new Event("error"));
+      });
+      act(() => vi.advanceTimersByTime(60_000));
+
+      expect(taskEventSources).toHaveLength(1);
+      expect(screen.getByLabelText("log")).toHaveTextContent(
+        "1:false:Moved 3 files:failed",
+      );
+    });
+
+    it("stops reconnecting once the snapshot says the task finished", () => {
+      vi.useFakeTimers();
+      const { rerender } = render(
+        <TaskEventProbe taskId="finishing" label="card" status="running" />,
+      );
+
+      act(() => taskEventSource().onerror?.(new Event("error")));
+      rerender(
+        <TaskEventProbe taskId="finishing" label="card" status="completed" />,
+      );
+      act(() => vi.advanceTimersByTime(60_000));
+
+      expect(taskEventSources).toHaveLength(1);
+      expect(screen.getByLabelText("card")).toHaveTextContent(
+        "0:false::completed",
+      );
+    });
+
+    it("lets an open stream finish but does not reconnect it after the task ends", () => {
+      vi.useFakeTimers();
+      const { rerender } = render(
+        <TaskEventProbe
+          taskId="open-finishing"
+          label="card"
+          status="running"
+        />,
+      );
+      act(() => taskEventSource().onopen?.(new Event("open")));
+
+      rerender(
+        <TaskEventProbe
+          taskId="open-finishing"
+          label="card"
+          status="completed"
+        />,
+      );
+      expect(taskEventSource().close).not.toHaveBeenCalled();
+
+      act(() => taskEventSource().onerror?.(new Event("error")));
+      act(() => vi.advanceTimersByTime(60_000));
+
+      expect(taskEventSources).toHaveLength(1);
+      expect(screen.getByLabelText("card")).toHaveTextContent(
+        "0:false::completed",
+      );
+    });
   });
 });

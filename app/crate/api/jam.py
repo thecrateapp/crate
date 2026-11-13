@@ -946,90 +946,103 @@ async def jam_room_ws(websocket: WebSocket, room_id: str):
     pubsub = None
     listener_task: asyncio.Task | None = None
     left_room = False
-    try:
-        pubsub = await open_pubsub(_room_channel(room_id))
-        peer.distributed = True
-    except (ConnectionError, RuntimeError):
-        log.exception("Failed to open Redis pubsub for room %s", room_id)
-        await peer.send_json(
-            {
-                "type": "warning",
-                "detail": "Room sync is running in local fallback mode",
-            }
-        )
-    touch_jam_room_member(room_id, user_id)
-    await peer.send_json(
-        {
-            "type": "state_sync",
-            "room": _serialize_room(room, user_id=user_id, active_members_only=True),
-        }
-    )
-
-    try:
-        clock = await _get_sync_clock(room_id)
-        if clock is None:
-            seed = _room_sync_clock_seed(room)
-            if seed is not None:
-                current_track, position_ms, playing = seed
-                clock = await _set_sync_clock(
-                    room_id,
-                    track=current_track,
-                    position_ms=position_ms,
-                    playing=playing,
-                )
-        if clock:
-            await peer.send_json(_build_sync_clock_payload(clock, force_sync=True))
-    except (RuntimeError, ConnectionResetError, BrokenPipeError):
-        log.exception("Failed to send sync clock for room %s", room_id)
-
-    await _broadcast_room_presence(room_id)
-
     heartbeat_task: asyncio.Task | None = None
     heartbeat_owner = secrets.token_urlsafe(16)
-
-    async def _sync_heartbeat():
-        while True:
-            await asyncio.sleep(_SYNC_HEARTBEAT_SECONDS)
-            if not await _renew_heartbeat_lock(room_id, heartbeat_owner):
-                break
-            clock = await _get_sync_clock(room_id)
-            if not clock or not clock.get("playing"):
-                continue
-            await _broadcast_to_room(room_id, _build_sync_clock_payload(clock))
-
-    if await _acquire_heartbeat_lock(room_id, heartbeat_owner):
-        heartbeat_task = asyncio.create_task(_sync_heartbeat())
-
-    async def _redis_listener():
-        if pubsub is None:
-            return
-        try:
-            while True:
-                message = await pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=1.0
-                )
-                if message and message.get("type") == "message":
-                    data_str = message.get("data")
-                    if data_str and isinstance(data_str, str):
-                        try:
-                            await peer.send_text(data_str)
-                            payload = json.loads(data_str)
-                            if payload.get("type") in {"room_ended", "room_deleted"}:
-                                await peer.close(code=4409, reason="Room closed")
-                                break
-                        except (RuntimeError, ConnectionResetError, BrokenPipeError):
-                            log.debug(
-                                "Redis listener send failed for room %s",
-                                room_id,
-                                exc_info=True,
-                            )
-                            break
-        except (ConnectionError, RuntimeError):
-            log.debug("Redis listener ended for room %s", room_id, exc_info=True)
-
-    listener_task = asyncio.create_task(_redis_listener())
-
+    # Everything after the pubsub is opened runs inside this try, so the
+    # finally below releases the subscription and the local peer even when
+    # the client leaves while the room is still being set up.
     try:
+        try:
+            pubsub = await open_pubsub(_room_channel(room_id))
+            peer.distributed = True
+        except Exception:
+            # redis-py's own ConnectionError (a full pool included) is not the
+            # builtin one; open_pubsub already logged it as a warning.
+            log.debug("Failed to open Redis pubsub for room %s", room_id, exc_info=True)
+            await peer.send_json(
+                {
+                    "type": "warning",
+                    "detail": "Room sync is running in local fallback mode",
+                }
+            )
+        touch_jam_room_member(room_id, user_id)
+        await peer.send_json(
+            {
+                "type": "state_sync",
+                "room": _serialize_room(
+                    room, user_id=user_id, active_members_only=True
+                ),
+            }
+        )
+
+        try:
+            clock = await _get_sync_clock(room_id)
+            if clock is None:
+                seed = _room_sync_clock_seed(room)
+                if seed is not None:
+                    current_track, position_ms, playing = seed
+                    clock = await _set_sync_clock(
+                        room_id,
+                        track=current_track,
+                        position_ms=position_ms,
+                        playing=playing,
+                    )
+            if clock:
+                await peer.send_json(_build_sync_clock_payload(clock, force_sync=True))
+        except (RuntimeError, ConnectionResetError, BrokenPipeError):
+            log.exception("Failed to send sync clock for room %s", room_id)
+
+        await _broadcast_room_presence(room_id)
+
+        async def _sync_heartbeat():
+            while True:
+                await asyncio.sleep(_SYNC_HEARTBEAT_SECONDS)
+                if not await _renew_heartbeat_lock(room_id, heartbeat_owner):
+                    break
+                clock = await _get_sync_clock(room_id)
+                if not clock or not clock.get("playing"):
+                    continue
+                await _broadcast_to_room(room_id, _build_sync_clock_payload(clock))
+
+        if await _acquire_heartbeat_lock(room_id, heartbeat_owner):
+            heartbeat_task = asyncio.create_task(_sync_heartbeat())
+
+        async def _redis_listener():
+            if pubsub is None:
+                return
+            try:
+                while True:
+                    message = await pubsub.get_message(
+                        ignore_subscribe_messages=True, timeout=1.0
+                    )
+                    if message and message.get("type") == "message":
+                        data_str = message.get("data")
+                        if data_str and isinstance(data_str, str):
+                            try:
+                                await peer.send_text(data_str)
+                                payload = json.loads(data_str)
+                                if payload.get("type") in {
+                                    "room_ended",
+                                    "room_deleted",
+                                }:
+                                    await peer.close(code=4409, reason="Room closed")
+                                    break
+                            except (
+                                RuntimeError,
+                                ConnectionResetError,
+                                BrokenPipeError,
+                            ):
+                                log.debug(
+                                    "Redis listener send failed for room %s",
+                                    room_id,
+                                    exc_info=True,
+                                )
+                                break
+            except (ConnectionError, RuntimeError):
+                log.debug("Redis listener ended for room %s", room_id, exc_info=True)
+
+        listener_task = asyncio.create_task(_redis_listener())
+
         while True:
             raw = await websocket.receive_text()
             try:
