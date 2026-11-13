@@ -79,9 +79,7 @@ def try_session_locks(*lock_keys: str) -> Iterator[str | None]:
         cursor = connection.cursor()
         try:
             for lock_key in lock_keys:
-                cursor.execute(
-                    "SELECT pg_try_advisory_lock(hashtext(%s))", (lock_key,)
-                )
+                cursor.execute("SELECT pg_try_advisory_lock(hashtext(%s))", (lock_key,))
                 row = cursor.fetchone()
                 if not (row and row[0]):
                     busy = lock_key
