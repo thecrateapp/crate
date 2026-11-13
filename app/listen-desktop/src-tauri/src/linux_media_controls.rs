@@ -194,7 +194,7 @@ impl MprisRoot {
 
     #[zbus(property)]
     fn desktop_entry(&self) -> String {
-        "app.cratemusic.crate.desktop".into()
+        crate::linux_desktop_profile::LINUX_DESKTOP_ENTRY.into()
     }
 
     #[zbus(property)]

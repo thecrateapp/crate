@@ -12,10 +12,26 @@ use std::{path::Path, sync::OnceLock};
 
 use serde::Serialize;
 
-/// The Wayland app_id / X11 class Crate's windows should carry. It equals the
-/// bundle identifier, so it matches the installed desktop entry
-/// (`app.cratemusic.crate.desktop.desktop`) and its `StartupWMClass`.
+/// The Wayland app_id / X11 class Crate's windows carry: the bundle identifier
+/// (GTK takes it from the program name, see `set_program_name`).
 pub const LINUX_APP_ID: &str = "app.cratemusic.crate.desktop";
+
+/// The desktop entry id (file name without `.desktop`) that names Crate to
+/// notification daemons (`desktop-entry`) and MPRIS (`DesktopEntry`). It equals
+/// the app_id because compositors, docks and daemons look a window up as
+/// `<app_id>.desktop` first. Tauri's bundler cannot install an entry under that
+/// name: `.deb`/`.rpm` ship `Crate.desktop` (named after `productName`, with
+/// `StartupWMClass` set to the app_id by `linux/desktop-template.desktop`). So
+/// `linux_desktop_integration` writes `<LINUX_DESKTOP_ENTRY>.desktop` to
+/// `$XDG_DATA_HOME/applications` at every start, before any window exists.
+pub const LINUX_DESKTOP_ENTRY: &str = LINUX_APP_ID;
+
+/// The icon name used for Crate everywhere (its desktop entry, notifications,
+/// the audio stream, the launcher). `linux_desktop_integration` installs it in
+/// `$XDG_DATA_HOME/icons/hicolor` at every start, for every kind of install;
+/// the packages' own icon is named after the binary (`crate-desktop`) and is
+/// missing from AppImage and source runs.
+pub const LINUX_ICON_NAME: &str = LINUX_APP_ID;
 
 /// Minimum logical size on a tiling compositor: a half-width tile on a 1366 px
 /// screen, minus gaps, must still hold the window.
@@ -137,7 +153,7 @@ pub const LINUX_APP_NAME: &str = "Crate";
 /// already set (theirs win: they come last).
 pub fn pulse_props(existing: Option<&str>) -> String {
     let ours = format!(
-        "application.name='{LINUX_APP_NAME}' application.icon_name='crate-desktop' media.role='music'"
+        "application.name='{LINUX_APP_NAME}' application.icon_name='{LINUX_ICON_NAME}' media.role='music'"
     );
     match existing.map(str::trim).filter(|s| !s.is_empty()) {
         Some(theirs) => format!("{ours} {theirs}"),
@@ -154,6 +170,7 @@ mod tests {
     fn pulse_props_name_the_stream_crate_and_keep_user_props() {
         let ours = pulse_props(None);
         assert!(ours.contains("application.name='Crate'"));
+        assert!(ours.contains("application.icon_name='app.cratemusic.crate.desktop'"));
         assert!(ours.contains("media.role='music'"));
         assert_eq!(pulse_props(Some("   ")), ours);
         let merged = pulse_props(Some("application.name='Mine'"));
@@ -261,5 +278,36 @@ mod tests {
         let conf: serde_json::Value =
             serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
         assert_eq!(conf["identifier"], LINUX_APP_ID);
+    }
+
+    /// One name for the window, its desktop entry and its icon: a daemon or
+    /// dock that resolves any of them finds the same entry.
+    #[test]
+    fn the_desktop_entry_and_icon_are_named_after_the_app_id() {
+        assert_eq!(LINUX_DESKTOP_ENTRY, "app.cratemusic.crate.desktop");
+        assert_eq!(LINUX_DESKTOP_ENTRY, LINUX_APP_ID);
+        assert_eq!(LINUX_ICON_NAME, LINUX_APP_ID);
+    }
+
+    /// The packaged entry is `Crate.desktop` (Tauri's bundler names it after
+    /// `productName`); its `StartupWMClass` still claims the window.
+    #[test]
+    fn the_packaged_entry_claims_the_window_by_wm_class() {
+        let template = include_str!("../linux/desktop-template.desktop");
+        assert!(
+            template
+                .lines()
+                .any(|line| line == format!("StartupWMClass={LINUX_APP_ID}")),
+            "desktop template must set StartupWMClass={LINUX_APP_ID}"
+        );
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(conf["productName"], "Crate");
+        for format in ["deb", "rpm"] {
+            assert_eq!(
+                conf["bundle"]["linux"][format]["desktopTemplate"],
+                "linux/desktop-template.desktop"
+            );
+        }
     }
 }

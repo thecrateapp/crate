@@ -142,12 +142,13 @@ pub fn track_update(app: &tauri::AppHandle, payload: &DesktopMediaSessionPayload
         });
 }
 
-fn notify(summary: &str, body: &str, image: Option<&str>) -> zbus::Result<()> {
-    let connection = zbus::blocking::Connection::session()?;
+/// The card's hints. `desktop-entry` names the entry the daemon groups the card
+/// under and takes the app's icon and settings from.
+fn hints(image: Option<&str>) -> HashMap<&'static str, Value<'_>> {
     let mut hints: HashMap<&str, Value<'_>> = HashMap::new();
     hints.insert(
         "desktop-entry",
-        Value::from(crate::linux_desktop_profile::LINUX_APP_ID),
+        Value::from(crate::linux_desktop_profile::LINUX_DESKTOP_ENTRY),
     );
     hints.insert("category", Value::from("x-gnome.music"));
     hints.insert("transient", Value::from(true));
@@ -155,6 +156,12 @@ fn notify(summary: &str, body: &str, image: Option<&str>) -> zbus::Result<()> {
     if let Some(image) = image {
         hints.insert("image-path", Value::from(image));
     }
+    hints
+}
+
+fn notify(summary: &str, body: &str, image: Option<&str>) -> zbus::Result<()> {
+    let connection = zbus::blocking::Connection::session()?;
+    let hints = hints(image);
     let actions = vec!["default", "Show Crate", "next", "Next"];
     let reply = connection.call_method(
         Some(DEST),
@@ -164,7 +171,7 @@ fn notify(summary: &str, body: &str, image: Option<&str>) -> zbus::Result<()> {
         &(
             "Crate",
             LAST_ID.load(Ordering::SeqCst),
-            crate::linux_desktop_profile::LINUX_APP_ID,
+            crate::linux_desktop_profile::LINUX_ICON_NAME,
             summary,
             body,
             actions,
@@ -291,6 +298,18 @@ mod tests {
             ]),
             1
         );
+    }
+
+    #[test]
+    fn hints_name_crates_desktop_entry_and_carry_the_cover() {
+        let hints = hints(Some("/cache/cover.jpg"));
+        assert_eq!(
+            hints["desktop-entry"],
+            Value::from("app.cratemusic.crate.desktop")
+        );
+        assert_eq!(hints["image-path"], Value::from("/cache/cover.jpg"));
+        assert_eq!(hints["transient"], Value::from(true));
+        assert!(!super::hints(None).contains_key("image-path"));
     }
 
     #[test]

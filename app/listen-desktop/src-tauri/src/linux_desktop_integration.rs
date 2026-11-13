@@ -1,9 +1,14 @@
+//! Registers Crate's desktop entry and icons in the user's data dir at every
+//! start, so the window's app_id resolves to an entry and an icon under every
+//! kind of install (packages, AppImage, source runs). See `LINUX_DESKTOP_ENTRY`.
+
 use std::{
     env, fs, io,
     path::{Path, PathBuf},
 };
 
-const APP_ID: &str = "app.cratemusic.crate.desktop";
+use crate::linux_desktop_profile::{LINUX_APP_ID, LINUX_DESKTOP_ENTRY, LINUX_ICON_NAME};
+
 const APP_NAME: &str = "Crate";
 const APP_COMMENT: &str = "Crate desktop music player";
 
@@ -22,9 +27,20 @@ pub fn ensure_registered() -> io::Result<()> {
         return Ok(());
     };
 
-    install_icons(&data_home)?;
-    install_desktop_file(&data_home)?;
-    Ok(())
+    let exec_path = env::var_os("APPIMAGE")
+        .map(PathBuf::from)
+        .or_else(|| env::current_exe().ok())
+        .map(shell_quoted_path)
+        .unwrap_or_else(|| APP_NAME.to_string());
+    register_in(&data_home, &exec_path)
+}
+
+fn register_in(data_home: &Path, exec_path: &str) -> io::Result<()> {
+    install_icons(data_home)?;
+    write_if_changed(
+        &desktop_file_path(data_home),
+        desktop_file(exec_path).as_bytes(),
+    )
 }
 
 fn xdg_data_home() -> Option<PathBuf> {
@@ -45,37 +61,33 @@ fn install_icons(data_home: &Path) -> io::Result<()> {
             .join("hicolor")
             .join(format!("{size}x{size}"))
             .join("apps")
-            .join(format!("{APP_ID}.png"));
+            .join(format!("{LINUX_ICON_NAME}.png"));
         write_if_changed(&icon_path, bytes)?;
     }
     Ok(())
 }
 
-fn install_desktop_file(data_home: &Path) -> io::Result<()> {
-    let applications_dir = data_home.join("applications");
-    let desktop_path = applications_dir.join(format!("{APP_ID}.desktop"));
-    let exec_path = env::var_os("APPIMAGE")
-        .map(PathBuf::from)
-        .or_else(|| env::current_exe().ok())
-        .map(shell_quoted_path)
-        .unwrap_or_else(|| APP_NAME.to_string());
+fn desktop_file_path(data_home: &Path) -> PathBuf {
+    data_home
+        .join("applications")
+        .join(format!("{LINUX_DESKTOP_ENTRY}.desktop"))
+}
 
-    let desktop_file = format!(
+fn desktop_file(exec_path: &str) -> String {
+    format!(
         "[Desktop Entry]\n\
          Type=Application\n\
          Name={APP_NAME}\n\
          Comment={APP_COMMENT}\n\
          Exec={exec_path} %u\n\
-         Icon={APP_ID}\n\
+         Icon={LINUX_ICON_NAME}\n\
          Terminal=false\n\
          Categories=Audio;Music;Player;\n\
          MimeType=x-scheme-handler/cratemusic;\n\
          StartupNotify=true\n\
-         StartupWMClass={APP_ID}\n\
+         StartupWMClass={LINUX_APP_ID}\n\
          NoDisplay=true\n"
-    );
-
-    write_if_changed(&desktop_path, desktop_file.as_bytes())
+    )
 }
 
 fn shell_quoted_path(path: PathBuf) -> String {
@@ -92,4 +104,36 @@ fn write_if_changed(path: &Path, bytes: &[u8]) -> io::Result<()> {
         fs::create_dir_all(parent)?;
     }
     fs::write(path, bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registers_the_entry_and_icons_under_the_app_id() {
+        let dir = std::env::temp_dir().join(format!(
+            "crate-desktop-integration-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        register_in(&dir, "\"/opt/crate/crate-desktop\"").unwrap();
+
+        let entry = fs::read_to_string(
+            dir.join("applications")
+                .join("app.cratemusic.crate.desktop.desktop"),
+        )
+        .unwrap();
+        let lines: Vec<&str> = entry.lines().collect();
+        assert!(lines.contains(&"Icon=app.cratemusic.crate.desktop"));
+        assert!(lines.contains(&"StartupWMClass=app.cratemusic.crate.desktop"));
+        assert!(lines.contains(&"Exec=\"/opt/crate/crate-desktop\" %u"));
+        for (size, bytes) in ICONS {
+            let icon = dir
+                .join(format!("icons/hicolor/{size}x{size}/apps"))
+                .join("app.cratemusic.crate.desktop.png");
+            assert_eq!(fs::read(&icon).unwrap(), *bytes, "{}", icon.display());
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

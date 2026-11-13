@@ -95,6 +95,17 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   starts, because GTK 3 takes the Wayland app_id from it. The window then reports
   `app.cratemusic.crate.desktop`, which matches the desktop entries' `StartupWMClass`
   (it used to report `crate-desktop`).
+- **Desktop entry and icon names.** One name, `app.cratemusic.crate.desktop`
+  (`LINUX_APP_ID` = `LINUX_DESKTOP_ENTRY` = `LINUX_ICON_NAME`), for the app_id, the
+  notification `desktop-entry` hint, MPRIS `DesktopEntry`, the notification and launcher
+  icon and `PULSE_PROP`'s `application.icon_name`. Tauri's bundler cannot install an
+  entry under it: `.deb`/`.rpm` (and the AUR package, which repackages the `.deb`) ship
+  `Crate.desktop` (named after `productName`) with `Icon=crate-desktop` and hicolor icons
+  named after the binary. So `linux_desktop_integration::ensure_registered` writes
+  `$XDG_DATA_HOME/applications/app.cratemusic.crate.desktop.desktop` (`NoDisplay`) and
+  `$XDG_DATA_HOME/icons/hicolor/<n>x<n>/apps/app.cratemusic.crate.desktop.png` at every
+  start, for every kind of install. Do not point any of them at `crate-desktop`: that
+  icon is missing from AppImage and source runs.
 - **Control socket** (`desktop_control.rs`): `$XDG_RUNTIME_DIR/crate/control.sock`
   (dir 0700, socket 0600), JSON lines, protocol 1. Server sends `hello` (with
   `commands`, every `cmd` accepted; `COMMANDS` in Rust, kept in step by a test), then
