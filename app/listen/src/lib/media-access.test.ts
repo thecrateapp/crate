@@ -4,6 +4,7 @@ import {
   clearMediaAccessTickets,
   getMediaAccessResumeVersion,
   getMediaAccessTargets,
+  getMediaAccessTargetsDueForRefresh,
   getMediaAccessTicketsVersion,
   getMediaAccessTicket,
   invalidateMediaAccessAudience,
@@ -172,5 +173,37 @@ describe("media access ticket cache", () => {
     unsubscribe();
     signalMediaAccessResume();
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps still-valid tickets out of background renewal", () => {
+    const now = Date.parse("2026-11-13T12:00:00Z");
+    setMediaAccessTickets(
+      [
+        {
+          audience: "artwork",
+          path: "/api/albums/1/cover",
+          ticket: "long-lived",
+          expires_at: new Date(now + 12 * 60 * 60_000).toISOString(),
+        },
+        {
+          audience: "artwork",
+          path: "/api/albums/2/cover",
+          ticket: "about-to-expire",
+          expires_at: new Date(now + 30_000).toISOString(),
+        },
+      ],
+      "server-a",
+    );
+    // Remembered but never issued (for example a failed batch).
+    getMediaAccessTicket("artwork", "/api/albums/3/cover", "server-a");
+
+    expect(
+      getMediaAccessTargetsDueForRefresh("server-a", 95_000, now).map(
+        (target) => target.path,
+      ),
+    ).toEqual(["/api/albums/2/cover", "/api/albums/3/cover"]);
+    expect(getMediaAccessTargetsDueForRefresh("server-b", 95_000, now)).toEqual(
+      [],
+    );
   });
 });

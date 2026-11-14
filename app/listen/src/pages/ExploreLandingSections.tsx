@@ -146,14 +146,10 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
   const { playAll } = usePlayerActions();
   const [loadingMood, setLoadingMood] = useState<string | null>(null);
 
+  // No AudioContext here: the player owns the only one and already handles a
+  // play that needs a fresh gesture. A second, never-closed context kept an
+  // extra audio render thread alive for the whole session.
   async function playMood(mood: string) {
-    try {
-      const w = window as unknown as Record<string, AudioContext>;
-      if (!w.__crateAudioCtx) w.__crateAudioCtx = new AudioContext();
-      if (w.__crateAudioCtx.state === "suspended") w.__crateAudioCtx.resume();
-    } catch {
-      /* ok */
-    }
     setLoadingMood(mood);
     try {
       const data = await api<{

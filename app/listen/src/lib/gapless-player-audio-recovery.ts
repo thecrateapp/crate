@@ -24,14 +24,10 @@ export interface AudioRecoveryDependencies {
 
 export interface AudioRecoveryController {
   install(): void;
+  reset(): void;
   needsRecovery(options?: AudioRecoveryOptions): boolean;
   prepare(reason: string, options?: AudioRecoveryOptions): Promise<void>;
-  clearSharedGaplessAudioContext(previousContext: AudioContext | null): void;
 }
-
-type WindowWithGaplessContext = Window & {
-  gapless5AudioContext?: AudioContext;
-};
 
 export function createAudioRecoveryController(
   dependencies: AudioRecoveryDependencies,
@@ -39,6 +35,13 @@ export function createAudioRecoveryController(
   let lifecycleRecoveryInstalled = false;
   let contextWakeInFlight: Promise<void> | null = null;
   let hiddenAt: number | null = null;
+  let generation = 0;
+
+  const reset = (): void => {
+    generation += 1;
+    contextWakeInFlight = null;
+    hiddenAt = null;
+  };
 
   // Empirical mitigation, not a documented API contract: on Tauri desktop
   // (WKWebView/WebKitGTK), an AudioContext can report state "running" after
@@ -79,17 +82,6 @@ export function createAudioRecoveryController(
         { reason, error: String(error) },
         "debug",
       );
-    }
-  };
-
-  const clearSharedGaplessAudioContext = (
-    previousContext: AudioContext | null,
-  ): void => {
-    if (typeof window === "undefined") return;
-    const w = window as WindowWithGaplessContext;
-    if (!w.gapless5AudioContext) return;
-    if (!previousContext || w.gapless5AudioContext === previousContext) {
-      w.gapless5AudioContext = undefined;
     }
   };
 
@@ -147,7 +139,7 @@ export function createAudioRecoveryController(
       }
     }
 
-    ctx = dependencies.getAudioContext();
+    if (ctx !== dependencies.getAudioContext()) return;
     if (ctx?.state === "closed") {
       dependencies.rebuildPlayer(`${reason}:resume-closed`);
       dependencies.clearOutputStale();
@@ -195,12 +187,12 @@ export function createAudioRecoveryController(
     if (contextWakeInFlight) {
       if (!wantsStaleTauriRebuild) return contextWakeInFlight;
       const currentWake = contextWakeInFlight;
-      return trackWake(
-        currentWake.then(
-          () => prepareInner(reason, options),
-          () => prepareInner(reason, options),
-        ),
-      );
+      const requestedGeneration = generation;
+      const nextWake = () => {
+        if (requestedGeneration === generation)
+          return prepareInner(reason, options);
+      };
+      return trackWake(currentWake.then(nextWake, nextWake));
     }
 
     return trackWake(prepareInner(reason, options));
@@ -250,8 +242,8 @@ export function createAudioRecoveryController(
 
   return {
     install,
+    reset,
     needsRecovery,
     prepare,
-    clearSharedGaplessAudioContext,
   };
 }

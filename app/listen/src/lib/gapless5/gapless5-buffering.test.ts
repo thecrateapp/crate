@@ -85,6 +85,87 @@ describe("getStartOffsetMs", () => {
   });
 });
 
+describe("Gapless5.dispose", () => {
+  it("releases each timer and closes the shared output only after its last owner", () => {
+    vi.useFakeTimers();
+    const contexts: Array<{ close: ReturnType<typeof vi.fn> }> = [];
+    class OutputContext {
+      state = "running";
+      destination = {};
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+      createGain = () => ({ connect: vi.fn(), disconnect: vi.fn() });
+      constructor() {
+        contexts.push(this);
+      }
+    }
+    vi.stubGlobal("AudioContext", OutputContext);
+    vi.stubGlobal("gapless5AudioContext", undefined);
+    const registry: Record<string, Gapless5> = {};
+    vi.stubGlobal("gapless5Players", registry);
+    const options = { useWebAudio: false, useHTML5Audio: false };
+    const first = new Gapless5(options);
+    const second = new Gapless5(options);
+    expect(contexts).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(2);
+    first.dispose();
+    expect(Object.values(registry)).toEqual([second]);
+    expect(contexts[0]!.close).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(100);
+    expect(vi.getTimerCount()).toBe(1);
+    const removedEffectOutput = {
+      connect: vi.fn(),
+      disconnect: vi.fn(() => {
+        throw new DOMException("Already disconnected", "InvalidAccessError");
+      }),
+    } as unknown as AudioNode;
+    second.setOutputChain(removedEffectOutput, removedEffectOutput);
+    second.dispose();
+    second.dispose();
+    expect(Object.keys(registry)).toEqual([]);
+    expect(contexts[0]!.close).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    const replacement = new Gapless5(options);
+    expect(contexts).toHaveLength(2);
+    replacement.dispose();
+  });
+
+  it("ignores an HTML5 blob load that finishes after disposal", async () => {
+    vi.useFakeTimers();
+    let resolveBody!: (body: Blob) => void;
+    const body = new Promise<Blob>((resolve) => {
+      resolveBody = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, blob: () => body })),
+    );
+    const constructAudio = vi.fn();
+    class StubAudio {
+      load() {}
+      constructor() {
+        constructAudio();
+      }
+    }
+    vi.stubGlobal("Audio", StubAudio);
+    const player = new Gapless5({
+      tracks: ["blob:offline"],
+      useWebAudio: false,
+      useHTML5Audio: true,
+    });
+    const before = constructAudio.mock.calls.length;
+    const onerror = vi.fn();
+    player.onerror = onerror;
+    player.dispose();
+    resolveBody(new Blob());
+    await vi.advanceTimersByTimeAsync(1);
+    expect(constructAudio).toHaveBeenCalledTimes(before);
+    expect(onerror).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
 describe("Gapless5.replaceTrack", () => {
   it("preserves the active cursor when refreshing the next source", () => {
     vi.useFakeTimers();
@@ -575,19 +656,33 @@ describe("Gapless5 WebAudio promotion", () => {
     Reflect.deleteProperty(window, "gapless5AudioContext");
   });
 
-  it("promotes an active HTML5 source when its WebAudio buffer finishes decoding", async () => {
+  const modes = ["retain", "release", "pause", "unsupported", "denied"];
+  it.each(modes)("%s at handoff", async (mode) => {
+    const release = mode !== "retain";
     vi.useFakeTimers();
     let resolveDecode: ((buffer: { duration: number }) => void) | undefined;
     const decodePromise = new Promise<{ duration: number }>((resolve) => {
       resolveDecode = resolve;
     });
     const instances: FakeAudio[] = [];
+    let resume!: () => void;
+    const resumed = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
 
     class FakeAudio extends EventTarget {
       buffered = ranges([[0, 180]]);
       controls = false;
       crossOrigin: string | null = null;
-      currentTime = 0;
+      private position = 0;
+      readonly seeks: number[] = [];
+      get currentTime() {
+        return this.position;
+      }
+      set currentTime(value: number) {
+        this.seeks.push(value);
+        this.position = value;
+      }
       duration = 180;
       error: MediaError | null = null;
       loop = false;
@@ -608,7 +703,10 @@ describe("Gapless5 WebAudio promotion", () => {
         instances.push(this);
       }
 
-      load() {}
+      load = vi.fn();
+      removeAttribute(name: string) {
+        if (name === "src") this.src = "";
+      }
 
       pause() {
         this.pauseCalls += 1;
@@ -625,7 +723,17 @@ describe("Gapless5 WebAudio promotion", () => {
       connect: vi.fn(),
       disconnect: vi.fn(),
     });
+    const mediaSources = [node(), node()];
+    const routedSource = mediaSources[0]!;
+    const createMediaElementSource = vi.fn((element: FakeAudio) => {
+      expect(element.src).toBe("");
+      if (mode === "denied")
+        throw new DOMException("Unavailable", "NotSupportedError");
+      return mediaSources[instances.indexOf(element)];
+    });
     const context = {
+      createMediaElementSource:
+        mode === "unsupported" ? undefined : createMediaElementSource,
       baseLatency: 0,
       currentTime: 0,
       destination: node(),
@@ -646,7 +754,7 @@ describe("Gapless5 WebAudio promotion", () => {
         },
       })),
       decodeAudioData: vi.fn(() => decodePromise),
-      resume: vi.fn(() => Promise.resolve()),
+      resume: vi.fn(() => resumed),
     };
 
     vi.stubGlobal("Audio", FakeAudio);
@@ -665,12 +773,19 @@ describe("Gapless5 WebAudio promotion", () => {
     });
 
     const player = new Gapless5({
-      tracks: ["one"],
+      tracks: ["one", "two"],
+      loadLimit: 2,
+      releaseHTML5AfterDecode: release,
+      routeHTML5ThroughWebAudio: release,
+      volume: 0.63,
       useHTML5Audio: true,
       useWebAudio: true,
       switchToWebAudioDuringPlayback: true,
     });
     const onSwitchToWebAudio = vi.fn();
+    expect(instances.some((audio) => audio.src.startsWith("data:"))).toBe(
+      !release,
+    );
     player.onswitchtowebaudio = onSwitchToWebAudio;
     const first = instances.find((audio) => audio.src === "one");
     expect(first).toBeDefined();
@@ -679,19 +794,68 @@ describe("Gapless5 WebAudio promotion", () => {
     player.play();
     await Promise.resolve();
     expect(first!.paused).toBe(false);
+    const routed = mode === "release" || mode === "pause";
+    expect(first!.volume).toBe(routed ? 1 : 0.63);
+    player.setVolume(0);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(first!.volume).toBe(routed ? 1 : 0);
+    if (routed) {
+      expect(first!.seeks).toEqual([]);
+      const gain = context.createGain.mock.results[1]!.value;
+      expect(routedSource.connect).toHaveBeenCalledWith(gain);
+      expect(gain.connect).toHaveBeenCalledWith(
+        context.createGain.mock.results[0]!.value,
+      );
+      expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+        0,
+        expect.any(Number),
+      );
+      player.pause();
+      expect(routedSource.disconnect).toHaveBeenCalledOnce();
+      player.setPosition(2000);
+      player.play();
+      await Promise.resolve();
+      expect(createMediaElementSource).toHaveBeenCalledTimes(2);
+      expect(routedSource.connect).toHaveBeenCalledTimes(2);
+      expect(first!.seeks).toEqual([2]);
+    }
+    if (mode === "denied")
+      expect(createMediaElementSource).toHaveBeenCalledTimes(2);
 
     for (let index = 0; index < 6; index += 1) {
       await Promise.resolve();
     }
-    expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
+    const second = instances.find((audio) => audio.src === "two");
+    expect(second).toBeDefined();
+    expect(context.decodeAudioData).toHaveBeenCalledTimes(2);
     resolveDecode?.({ duration: 180 });
     for (let index = 0; index < 4; index += 1) {
       await Promise.resolve();
     }
 
+    // The decoded neighbor can retire immediately. The live HTML stream plays
+    // through AudioContext.resume() so the handoff keeps its playback position.
+    expect(second!.src).toBe(release ? "" : "two");
+    expect(first!.src).toBe("one");
+    expect(first!.paused).toBe(false);
+    if (mode === "pause") {
+      player.pause();
+      expect(first!.src).toBe("");
+    }
+    resume();
+    for (let index = 0; index < 4; index += 1) await Promise.resolve();
+    expect(first!.src).toBe(release ? "" : "one");
+    expect(first!.load).toHaveBeenCalledTimes(release ? 2 : 1);
+    if (routed) expect(routedSource.disconnect).toHaveBeenCalledTimes(2);
     expect(first!.pauseCalls).toBeGreaterThan(0);
+    if (mode === "pause") {
+      expect(context.createBufferSource).not.toHaveBeenCalled();
+      player.play();
+      await Promise.resolve();
+    } else {
+      expect(onSwitchToWebAudio).toHaveBeenCalledWith("one", null);
+    }
     expect(context.createBufferSource).toHaveBeenCalledTimes(1);
-    expect(onSwitchToWebAudio).toHaveBeenCalledWith("one", expect.any(Object));
 
     player.removeAllTracks();
     Reflect.deleteProperty(window, "gapless5AudioContext");

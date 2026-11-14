@@ -10,6 +10,7 @@ use std::{
 use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
 use zbus::{block_on, connection, interface};
 
+use crate::desktop_control::{ControlCommand, PlayerExtras, RepeatMode};
 use crate::DesktopMediaSessionPayload;
 
 const MPRIS_BUS_NAME: &str = "org.mpris.MediaPlayer2.crate";
@@ -17,6 +18,44 @@ const MPRIS_PATH: &str = "/org/mpris/MediaPlayer2";
 
 static MPRIS_STATE: OnceLock<Arc<Mutex<MprisState>>> = OnceLock::new();
 static MPRIS_CONNECTION: OnceLock<zbus::Connection> = OnceLock::new();
+/// Volume, shuffle and repeat as Listen last published them (desktop_control).
+static MPRIS_EXTRAS: Mutex<PlayerExtras> = Mutex::new(PlayerExtras {
+    volume: 1.0,
+    shuffle: false,
+    repeat: RepeatMode::Off,
+});
+
+fn extras() -> PlayerExtras {
+    *MPRIS_EXTRAS.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+fn loop_status_for(repeat: RepeatMode) -> &'static str {
+    match repeat {
+        RepeatMode::Off => "None",
+        RepeatMode::One => "Track",
+        RepeatMode::All => "Playlist",
+    }
+}
+
+fn repeat_for_loop_status(value: &str) -> Option<RepeatMode> {
+    match value {
+        "None" => Some(RepeatMode::Off),
+        "Track" => Some(RepeatMode::One),
+        "Playlist" => Some(RepeatMode::All),
+        _ => None,
+    }
+}
+
+/// MPRIS Seek: an offset in microseconds from the current position. Past the
+/// end means "next track" (MPRIS spec); before the start clamps to 0.
+fn seek_target(position: f64, duration: f64, offset_us: i64) -> Option<f64> {
+    let target = position + offset_us as f64 / 1_000_000.0;
+    if duration > 0.0 && target >= duration {
+        None
+    } else {
+        Some(target.max(0.0))
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 struct MprisState {
@@ -155,7 +194,7 @@ impl MprisRoot {
 
     #[zbus(property)]
     fn desktop_entry(&self) -> String {
-        "app.cratemusic.crate.desktop".into()
+        crate::linux_desktop_integration::identity().entry.clone()
     }
 
     #[zbus(property)]
@@ -184,6 +223,12 @@ struct MprisPlayer {
 impl MprisPlayer {
     fn emit_command(&self, command: crate::PlaybackCommand) {
         crate::emit_system_media_command(&self.app, command);
+    }
+
+    fn control(&self, command: ControlCommand) {
+        if let Ok(command) = command.validated() {
+            crate::desktop_control::dispatch(&self.app, &command);
+        }
     }
 
     fn state(&self) -> MprisState {
@@ -224,9 +269,26 @@ impl MprisPlayer {
         self.emit_command(crate::PlaybackCommand::Play);
     }
 
-    fn seek(&self, _offset: i64) {}
+    fn seek(&self, offset: i64) {
+        let state = self.state();
+        match seek_target(state.position, state.duration, offset) {
+            Some(position) => self.control(ControlCommand::Seek { position }),
+            None => self.emit_command(crate::PlaybackCommand::Next),
+        }
+    }
 
-    fn set_position(&self, _track_id: OwnedObjectPath, _position: i64) {}
+    fn set_position(&self, track_id: OwnedObjectPath, position: i64) {
+        let state = self.state();
+        // The spec ignores stale track ids and positions outside the track.
+        if track_id.as_str() != mpris_track_path(state.media_id.as_deref()) || position < 0 {
+            return;
+        }
+        let seconds = position as f64 / 1_000_000.0;
+        if state.duration > 0.0 && seconds > state.duration {
+            return;
+        }
+        self.control(ControlCommand::Seek { position: seconds });
+    }
 
     fn open_uri(&self, _uri: &str) {}
 
@@ -237,11 +299,15 @@ impl MprisPlayer {
 
     #[zbus(property)]
     fn loop_status(&self) -> String {
-        "None".into()
+        loop_status_for(extras().repeat).into()
     }
 
     #[zbus(property)]
-    fn set_loop_status(&self, _value: String) {}
+    fn set_loop_status(&self, value: String) {
+        if let Some(mode) = repeat_for_loop_status(&value) {
+            self.control(ControlCommand::SetRepeat { mode });
+        }
+    }
 
     #[zbus(property)]
     fn rate(&self) -> f64 {
@@ -253,11 +319,13 @@ impl MprisPlayer {
 
     #[zbus(property)]
     fn shuffle(&self) -> bool {
-        false
+        extras().shuffle
     }
 
     #[zbus(property)]
-    fn set_shuffle(&self, _value: bool) {}
+    fn set_shuffle(&self, value: bool) {
+        self.control(ControlCommand::SetShuffle { on: value });
+    }
 
     #[zbus(property)]
     fn metadata(&self) -> HashMap<String, OwnedValue> {
@@ -266,11 +334,13 @@ impl MprisPlayer {
 
     #[zbus(property)]
     fn volume(&self) -> f64 {
-        1.0
+        extras().volume
     }
 
     #[zbus(property)]
-    fn set_volume(&self, _value: f64) {}
+    fn set_volume(&self, value: f64) {
+        self.control(ControlCommand::SetVolume { volume: value });
+    }
 
     #[zbus(property)]
     fn position(&self) -> i64 {
@@ -309,7 +379,8 @@ impl MprisPlayer {
 
     #[zbus(property)]
     fn can_seek(&self) -> bool {
-        false
+        let state = self.state();
+        state.title.is_some() && state.duration.is_finite() && state.duration > 0.0
     }
 
     #[zbus(property)]
@@ -382,6 +453,46 @@ pub fn update_position(payload: &crate::DesktopMediaPosition) {
     }
 }
 
+/// Volume, shuffle and repeat from the desktop control state.
+pub fn update_extras(updated: PlayerExtras) {
+    let previous = {
+        let mut current = MPRIS_EXTRAS.lock().unwrap_or_else(|p| p.into_inner());
+        std::mem::replace(&mut *current, updated)
+    };
+    if previous == updated {
+        return;
+    }
+    let Some(connection) = MPRIS_CONNECTION.get().cloned() else {
+        return;
+    };
+    connection
+        .clone()
+        .executor()
+        .spawn(
+            async move {
+                let Ok(iface) = connection
+                    .object_server()
+                    .interface::<_, MprisPlayer>(MPRIS_PATH)
+                    .await
+                else {
+                    return;
+                };
+                let player = iface.get().await;
+                if previous.volume != updated.volume {
+                    let _ = player.volume_changed(iface.signal_emitter()).await;
+                }
+                if previous.shuffle != updated.shuffle {
+                    let _ = player.shuffle_changed(iface.signal_emitter()).await;
+                }
+                if previous.repeat != updated.repeat {
+                    let _ = player.loop_status_changed(iface.signal_emitter()).await;
+                }
+            },
+            "crate_mpris_extras_changed",
+        )
+        .detach();
+}
+
 pub fn active_artwork_path() -> Option<PathBuf> {
     let state = MPRIS_STATE.get()?.lock().ok()?;
     let artwork = state.artwork.as_deref()?;
@@ -433,6 +544,7 @@ fn emit_player_properties_changed(
                 }
                 if metadata_changed {
                     let _ = player.metadata_changed(iface.signal_emitter()).await;
+                    let _ = player.can_seek_changed(iface.signal_emitter()).await;
                 }
                 if position_changed {
                     let _ = player.position_changed(iface.signal_emitter()).await;
@@ -501,8 +613,32 @@ fn object_path_value(value: &str) -> OwnedValue {
 #[cfg(test)]
 mod tests {
     use super::{
-        mpris_track_path, safe_artwork_url, seconds_to_microseconds, MprisChanges, MprisState,
+        loop_status_for, mpris_track_path, repeat_for_loop_status, safe_artwork_url,
+        seconds_to_microseconds, seek_target, MprisChanges, MprisState,
     };
+    use crate::desktop_control::RepeatMode;
+
+    #[test]
+    fn loop_status_maps_to_repeat_modes_both_ways() {
+        for (mode, status) in [
+            (RepeatMode::Off, "None"),
+            (RepeatMode::One, "Track"),
+            (RepeatMode::All, "Playlist"),
+        ] {
+            assert_eq!(loop_status_for(mode), status);
+            assert_eq!(repeat_for_loop_status(status), Some(mode));
+        }
+        assert_eq!(repeat_for_loop_status("Forever"), None);
+    }
+
+    #[test]
+    fn seek_offsets_clamp_at_the_start_and_skip_past_the_end() {
+        assert_eq!(seek_target(30.0, 180.0, 10_000_000), Some(40.0));
+        assert_eq!(seek_target(5.0, 180.0, -10_000_000), Some(0.0));
+        assert_eq!(seek_target(175.0, 180.0, 10_000_000), None);
+        // Unknown duration: never treated as past the end.
+        assert_eq!(seek_target(10.0, 0.0, 5_000_000), Some(15.0));
+    }
 
     #[test]
     fn artwork_urls_do_not_leak_tokens_over_dbus() {

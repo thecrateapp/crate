@@ -5,6 +5,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const MockGapless5 = vi.hoisted(() => vi.fn());
 const mockRecordDevLog = vi.hoisted(() => vi.fn());
 const mockGetCrossfadeDurationPreference = vi.hoisted(() => vi.fn(() => 4));
+const desktopRuntime = vi.hoisted(() => ({ enabled: false }));
+const mockEnsureMediaAccessUrl = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/platform", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/platform")>()),
+  get isTauriRuntime() {
+    return desktopRuntime.enabled;
+  },
+  get usesConfigurableServer() {
+    return desktopRuntime.enabled;
+  },
+}));
+
+vi.mock("@/lib/api", () => ({
+  requiresMediaAccessTicket: (url: string) => url.startsWith("/api/"),
+  ensureMediaAccessUrl: mockEnsureMediaAccessUrl,
+}));
 
 vi.mock("@/lib/gapless5/gapless5", () => ({
   Gapless5: MockGapless5,
@@ -84,6 +101,7 @@ type MockGapless5Instance = {
   play: MockFn;
   pause: MockFn;
   stop: MockFn;
+  dispose: MockFn;
   next: MockFn;
   prev: MockFn;
   gotoTrack: MockFn;
@@ -117,6 +135,7 @@ function mkMockInstance(
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
+    dispose: vi.fn(),
     next: vi.fn(),
     prev: vi.fn(),
     gotoTrack: vi.fn(),
@@ -167,6 +186,8 @@ beforeEach(() => {
 
 afterEach(() => {
   destroyPlayer();
+  desktopRuntime.enabled = false;
+  vi.restoreAllMocks();
 });
 
 // ── initPlayer ────────────────────────────────────────────────────
@@ -208,7 +229,38 @@ describe("initPlayer", () => {
     // buffer is ready, promote the active source so visualizers receive the
     // analyser for the first track as well.
     expect(options.switchToWebAudioDuringPlayback).toBe(true);
+    expect(options.releaseHTML5AfterDecode).toBe(false);
+    expect(options.routeHTML5ThroughWebAudio).toBe(false);
+    expect(options.resolveAudioUrl).toBeUndefined();
     expect(player).toBeDefined();
+  });
+
+  it("resolves protected streams before desktop playback and preserves other URLs", async () => {
+    desktopRuntime.enabled = true;
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (X11; Linux x86_64)",
+    );
+    initPlayer();
+    const options = MockGapless5.mock.calls[0]![0] as ConstructorParameters<
+      typeof Gapless5Type
+    >[0];
+    expect(options?.releaseHTML5AfterDecode).toBe(true);
+    expect(options?.routeHTML5ThroughWebAudio).toBe(true);
+    const resolve = options!.resolveAudioUrl!;
+    for (const url of [
+      "tracks/one.flac",
+      "blob:local-recording",
+      "https://cdn.example/song.flac",
+    ]) {
+      await expect(resolve(url)).resolves.toBe(url);
+    }
+    expect(mockEnsureMediaAccessUrl).not.toHaveBeenCalled();
+    const path = "/api/tracks/17/stream?delivery=balanced";
+    mockEnsureMediaAccessUrl.mockResolvedValueOnce(
+      path + "&media_ticket=fresh",
+    );
+    await expect(resolve(path)).resolves.toBe(path + "&media_ticket=fresh");
+    expect(mockEnsureMediaAccessUrl).toHaveBeenCalledWith(path, "stream");
   });
 
   it("reuses the existing instance on subsequent calls", () => {
@@ -364,6 +416,22 @@ describe("initPlayer", () => {
     expect(onDurationChange).toHaveBeenCalledWith(180_000);
   });
 
+  it("reports the decoded buffer as lost when its current source fails", () => {
+    const current = "/tracks/1/stream";
+    mock.getTrack.mockReturnValue(current);
+    const onError = vi.fn(() => isCurrentTrackFullyBuffered());
+    const player = initPlayer({ onError });
+    player.onload?.(current, true);
+    player.onerror?.("/tracks/2/stream", "preload failed");
+    expect(onError).toHaveLastReturnedWith(true);
+
+    const denied = new DOMException("User gesture required", "NotAllowedError");
+    player.onerror?.(current, denied);
+    expect(onError).toHaveLastReturnedWith(true);
+    player.onerror?.(current, "source failed");
+    expect(onError).toHaveLastReturnedWith(false);
+  });
+
   it("wires onloadstart to onBuffering callback", () => {
     const onBuffering = vi.fn();
     initPlayer({ onBuffering });
@@ -477,8 +545,7 @@ describe("destroyPlayer", () => {
     initPlayer();
     destroyPlayer();
 
-    expect(mock.stop).toHaveBeenCalled();
-    expect(mock.removeAllTracks).toHaveBeenCalled();
+    expect(mock.dispose).toHaveBeenCalledOnce();
     expect(getPlayer()).toBeNull();
   });
 
@@ -514,7 +581,7 @@ describe("destroyPlayer", () => {
 
   it("gracefully handles errors during cleanup", () => {
     initPlayer();
-    mock.stop.mockImplementation(() => {
+    mock.dispose.mockImplementation(() => {
       throw new Error("context closed");
     });
 

@@ -15,6 +15,7 @@ import {
   androidNativeEngine,
   shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
+import { eqModeOf, reportResolvedEqualizer } from "@/lib/desktop-control";
 import { setEqualizer as engineSetEqualizer } from "@/lib/gapless-player";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 
@@ -91,7 +92,25 @@ export function useResolvedEqualizer(
 
 export function useEqualizerRuntime(currentTrack: Track | undefined) {
   const [snapshot] = useEqualizerSnapshotState();
-  const { effectiveGains } = useResolvedEqualizer(snapshot, currentTrack);
+  const { effectiveGains, effectiveEq, trackGenre } = useResolvedEqualizer(
+    snapshot,
+    currentTrack,
+  );
+
+  // Share what was resolved with the desktop control bridge, so a desktop
+  // widget shows the same curve without fetching it a second time.
+  useEffect(() => {
+    reportResolvedEqualizer({
+      mode: eqModeOf(snapshot),
+      gains: effectiveGains,
+      source: snapshot.smart ? (effectiveEq?.source ?? null) : null,
+      detail: snapshot.smart
+        ? effectiveEq?.label || effectiveEq?.genre?.name || null
+        : snapshot.genreAdaptive && !snapshot.adaptive
+          ? (trackGenre?.primary?.name ?? null)
+          : null,
+    });
+  }, [effectiveEq, effectiveGains, snapshot, trackGenre]);
 
   useEffect(() => {
     if (shouldUseAndroidNativePlayer()) {

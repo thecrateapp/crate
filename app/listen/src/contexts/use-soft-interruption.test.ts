@@ -153,6 +153,49 @@ describe("useSoftInterruption", () => {
     expect(refs.bufferingIntentRef.current).toBe(false);
   });
 
+  it("keeps its controls stable when the caller passes new inline callbacks", () => {
+    // The player passes arrow functions inline on every render. If the
+    // controls followed them, every progress commit would re-create the
+    // player actions and re-render every consumer of the actions context.
+    const refs = createRefs();
+    const firstStallEnded = vi.fn();
+    const latestStall = vi.fn();
+    const latestStallEnded = vi.fn();
+    const { result, rerender } = renderHook(
+      (callbacks: {
+        onPlaybackStall: () => void;
+        onPlaybackStallEnded: (d: number, b: number) => void;
+      }) => useSoftInterruption({ ...refs, ...callbacks }),
+      {
+        initialProps: {
+          onPlaybackStall: vi.fn(),
+          onPlaybackStallEnded: firstStallEnded,
+        },
+      },
+    );
+    const first = result.current;
+
+    rerender({
+      onPlaybackStall: latestStall,
+      onPlaybackStallEnded: latestStallEnded,
+    });
+
+    expect(result.current.beginSoftInterruption).toBe(
+      first.beginSoftInterruption,
+    );
+    expect(result.current.cancelSoftInterruption).toBe(
+      first.cancelSoftInterruption,
+    );
+
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+      result.current.cancelSoftInterruption();
+    });
+    expect(latestStall).toHaveBeenCalledOnce();
+    expect(latestStallEnded).toHaveBeenCalledOnce();
+    expect(firstStallEnded).not.toHaveBeenCalled();
+  });
+
   it("records one quality stall for a single interrupted track", () => {
     const onPlaybackStall = vi.fn();
     const refs = createRefs({ onPlaybackStall });
@@ -536,6 +579,35 @@ describe("useSoftInterruption", () => {
 
     expect(gaplessPlayer.fadeInAndPlay).toHaveBeenCalled();
     expect(recoverCurrentTrack).not.toHaveBeenCalled();
+  });
+
+  it("stops retrying after three failed playback starts with successful probes", async () => {
+    serverUp();
+    const recoverCurrentTrack = vi.fn(async () => true);
+    const refs = createRefs({ recoverCurrentTrack });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+    const needsGesture = vi.fn();
+    window.addEventListener(PLAYBACK_NEEDS_USER_GESTURE_EVENT, needsGesture);
+    try {
+      act(() => result.current.beginSoftInterruption("stream"));
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        await act(() => vi.advanceTimersByTimeAsync(3_000));
+        expect(recoverCurrentTrack).toHaveBeenCalledTimes(attempt);
+        // The request was dispatched, but the source failed before onPlay.
+        act(() => result.current.beginSoftInterruption("stream"));
+      }
+      await act(() => vi.advanceTimersByTimeAsync(12_000));
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(recoverCurrentTrack).toHaveBeenCalledTimes(3);
+      expect(needsGesture).toHaveBeenCalledOnce();
+      expect(refs.commitIsPlaying).toHaveBeenLastCalledWith(false);
+      expect(refs.commitIsBuffering).toHaveBeenLastCalledWith(false);
+    } finally {
+      window.removeEventListener(
+        PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+        needsGesture,
+      );
+    }
   });
 
   describe("with the Android native player", () => {

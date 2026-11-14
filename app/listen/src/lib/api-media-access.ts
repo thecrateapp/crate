@@ -5,6 +5,7 @@ import {
   clearMediaAccessTickets,
   getMediaAccessTicket,
   getMediaAccessTargets,
+  getMediaAccessTargetsDueForRefresh,
   invalidateMediaAccessAudience,
   invalidateMediaAccessTicket,
   signalMediaAccessResume,
@@ -149,6 +150,31 @@ export async function refreshMediaAccessTickets(
   return succeeded;
 }
 
+/** Interval between background ticket renewals. */
+export const MEDIA_ACCESS_RENEW_INTERVAL_MS = 45_000;
+// Renew ahead of expiry by two intervals so a ticket never lapses between
+// passes. Short-lived (60 s) tickets are still renewed on every pass.
+const MEDIA_ACCESS_RENEW_AHEAD_MS = 2 * MEDIA_ACCESS_RENEW_INTERVAL_MS + 5_000;
+
+/**
+ * Background renewal: only tickets that are missing or about to expire. A
+ * still-valid ticket keeps its URL, so cached artwork is not fetched again.
+ */
+export async function refreshDueMediaAccessTickets(
+  now: number = Date.now(),
+): Promise<boolean> {
+  if (!usesConfigurableServer) return true;
+  const server = getCurrentServer();
+  if (!server?.token) return refreshMediaAccessTickets();
+  const due = getMediaAccessTargetsDueForRefresh(
+    server.id,
+    MEDIA_ACCESS_RENEW_AHEAD_MS,
+    now,
+  );
+  if (due.length === 0) return true;
+  return refreshMediaAccessTickets(due);
+}
+
 export interface MediaAccessUrlResolvers {
   resolveApiUrl(path: string): string;
   isApiUrl(url: string): boolean;
@@ -253,8 +279,8 @@ export function startMediaAccessTicketRefresh(): () => void {
     recoverAfterResume();
   };
   const interval = window.setInterval(
-    () => void refreshMediaAccessTickets(),
-    45_000,
+    () => void refreshDueMediaAccessTickets(),
+    MEDIA_ACCESS_RENEW_INTERVAL_MS,
   );
   const handleServerChange = () => {
     const nextServerIdentity = serverIdentity();

@@ -11,6 +11,8 @@ import {
   stableMobileAudioPipeline,
 } from "@/lib/mobile-audio-mode";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
+import { isTauriRuntime, usesConfigurableServer } from "@/lib/platform";
+import { ensureMediaAccessUrl, requiresMediaAccessTicket } from "@/lib/api";
 import { createAudioRecoveryController } from "./gapless-player-audio-recovery";
 import {
   getEqualizerState,
@@ -205,6 +207,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   audioRecovery.install();
   currentCallbacks = callbacks;
   const preferHtml5Audio = stableMobileAudioPipeline;
+  const linuxDesktop = isTauriRuntime && /\bLinux\b/i.test(navigator.userAgent);
   const probe =
     typeof document !== "undefined" ? document.createElement("audio") : null;
   recordDevLog(
@@ -225,6 +228,12 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
   instance = new Gapless5({
     useHTML5Audio: true,
+    resolveAudioUrl: usesConfigurableServer
+      ? async (url) =>
+          requiresMediaAccessTicket(url)
+            ? ensureMediaAccessUrl(url, "stream")
+            : url
+      : undefined,
     // Android WebView and iOS WebKit are both more reliable for mobile
     // background/lock-screen playback when the live source is <audio>.
     // Desktop keeps WebAudio for EQ, visualizers and true RAM-backed gapless.
@@ -233,6 +242,8 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     crossfade: getCrossfadeMs(),
     crossfadeShape: GAPLESS_CROSSFADE_EQUAL_POWER,
     persistentHTML5Audio: isMobileAudioRuntime,
+    releaseHTML5AfterDecode: linuxDesktop,
+    routeHTML5ThroughWebAudio: linuxDesktop,
     volume: getLastVolume(),
     logLevel: GAPLESS_LOG_LEVEL_WARNING,
     // Keep the next mobile <audio> source ready before the active element
@@ -317,6 +328,11 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onerror = (path, err) => {
+    // A terminal source error has already unloaded its decoded buffer.
+    // A user-gesture rejection keeps the source available for another play.
+    if (path === instance?.getTrack() && !isPlaybackGestureRequiredError(err)) {
+      currentTrackFullyBuffered = false;
+    }
     recordDevLog(
       "gapless",
       "error",
@@ -379,27 +395,20 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
 export function destroyPlayer(): void {
   playerControls.cancelPendingRecovery();
+  audioRecovery.reset();
   stopFade();
   resetEqualizer();
   setEqualizerHost(null);
   lastPlaybackRate = 1.0;
   if (instance) {
-    // Gapless-5 shares a single AudioContext across every instance via
-    // `window.gapless5AudioContext` — if we don't clear it here, the next
-    // initPlayer() in this same page session (e.g. logout → login without
-    // a reload) reuses a context that belonged to the instance we just
-    // tore down instead of getting a fresh one.
-    const previousContext = getAudioContext();
     try {
-      instance.stop();
-      instance.removeAllTracks();
+      instance.dispose();
     } catch {
       /* ignore */
     }
     instance = null;
     currentAnalyser = null;
     currentTrackFullyBuffered = false;
-    audioRecovery.clearSharedGaplessAudioContext(previousContext);
   }
   setVolumeSink(null);
   tauriPlaybackWasActive = false;
@@ -499,7 +508,6 @@ const playerControls: GaplessPlayerControls = createGaplessPlayerControls({
 function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   if (!instance) return;
   const previous = instance;
-  const previousContext = getAudioContext();
   const tracks = previous.getTracks();
   const index = Math.max(0, Math.min(previous.getIndex(), tracks.length - 1));
   const previousTrackPath = previous.getTrack();
@@ -534,8 +542,7 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   resetEqualizer();
   setEqualizerHost(null);
   try {
-    previous.stop();
-    previous.removeAllTracks();
+    previous.dispose();
   } catch {
     /* ignore */
   }
@@ -543,7 +550,6 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   instance = null;
   currentAnalyser = null;
   currentTrackFullyBuffered = false;
-  audioRecovery.clearSharedGaplessAudioContext(previousContext);
 
   const nextPlayer = initPlayer(currentCallbacks);
   if (tracks.length > 0) {
