@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /repo/app/ryoku
 COPY app/ryoku/package.json app/ryoku/package-lock.json ./
 RUN npm ci --no-audit --no-fund

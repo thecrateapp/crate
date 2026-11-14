@@ -9,7 +9,9 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
-const url = new URL(Astro.url.pathname, Astro.site).href;
+// Static builds see the output file (/index.html); the public URL has no file name.
+const path = Astro.url.pathname.replace(/(?:index)?\.html$/, "");
+const url = new URL(path, Astro.site).href;
 ---
 
 <!doctype html>
