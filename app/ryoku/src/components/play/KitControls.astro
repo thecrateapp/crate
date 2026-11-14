@@ -7,10 +7,27 @@ import Beam from "./Beam.astro";
   <div class="row">
     <p class="eyebrow"><b>Presets</b></p>
     <div class="chips" role="radiogroup" aria-label="Equalizer preset">
-      <button type="button" role="radio" aria-checked="true" data-chip="manual" tabindex="0">Manual</button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked="true"
+        data-state="active"
+        class="crate-form-chip"
+        data-chip="manual"
+        tabindex="0">Manual</button
+      >
       {
         PRESETS.map((preset) => (
-          <button type="button" role="radio" aria-checked="false" data-chip={preset.id} data-gains={JSON.stringify(preset.gains)} tabindex="-1">
+          <button
+            type="button"
+            role="radio"
+            aria-checked="false"
+            data-state="inactive"
+            class="crate-form-chip"
+            data-chip={preset.id}
+            data-gains={JSON.stringify(preset.gains)}
+            tabindex="-1"
+          >
             {preset.label}
           </button>
         ))
@@ -21,12 +38,29 @@ import Beam from "./Beam.astro";
     <p class="eyebrow"><b>Beam</b></p>
     <Beam label="Kit Beam" class="kit-beam" />
     <div class="controls">
-      <button type="button" class="switch" role="switch" aria-checked="true" aria-label="Beam" data-beam-toggle>
-        <span></span>
+      <button
+        type="button"
+        class="crate-form-switch"
+        role="switch"
+        aria-checked="true"
+        data-state="checked"
+        aria-label="Beam"
+        data-beam-toggle
+      >
+        <span class="crate-form-switch-thumb" data-state="checked"></span>
       </button>
       <label class="speed">
         <span>Leg</span>
-        <input type="range" min="400" max="1800" step="50" value="900" data-beam-leg aria-label="Beam leg length" />
+        <input
+          type="range"
+          class="crate-form-slider"
+          min="400"
+          max="1800"
+          step="50"
+          value="900"
+          data-beam-leg
+          aria-label="Beam leg length"
+        />
         <output data-beam-leg-value>900 ms</output>
       </label>
     </div>
@@ -43,6 +77,7 @@ import Beam from "./Beam.astro";
     const chips = [...kit.querySelectorAll<HTMLButtonElement>("[data-chip]")];
     const beam = kit.querySelector<HTMLElement>("[data-beam]")!;
     const toggle = kit.querySelector<HTMLButtonElement>("[data-beam-toggle]")!;
+    const thumb = toggle.querySelector<HTMLElement>(".crate-form-switch-thumb")!;
     const leg = kit.querySelector<HTMLInputElement>("[data-beam-leg]")!;
     const legValue = kit.querySelector<HTMLOutputElement>("[data-beam-leg-value]")!;
 
@@ -50,13 +85,16 @@ import Beam from "./Beam.astro";
       chips.forEach((other) => {
         const on = other === chip;
         other.setAttribute("aria-checked", String(on));
+        other.dataset.state = on ? "active" : "inactive";
         other.tabIndex = on ? 0 : -1;
       });
     };
     const choose = (chip: HTMLButtonElement) => {
       check(chip);
       if (chip.dataset.gains) {
-        document.dispatchEvent(new CustomEvent(PRESET_EVENT, { detail: JSON.parse(chip.dataset.gains) }));
+        document.dispatchEvent(
+          new CustomEvent(PRESET_EVENT, { detail: JSON.parse(chip.dataset.gains) }),
+        );
       }
     };
 
@@ -67,25 +105,29 @@ import Beam from "./Beam.astro";
     const onKey = (event: KeyboardEvent) => {
       const i = chips.indexOf(event.target as HTMLButtonElement);
       if (i < 0) return;
-      const delta = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
-      if (!delta) return;
-      const next = chips[(i + delta + chips.length) % chips.length];
+      const forward = event.key === "ArrowRight" || event.key === "ArrowDown";
+      const back = event.key === "ArrowLeft" || event.key === "ArrowUp";
+      if (!forward && !back) return;
+      const next = chips[(i + (forward ? 1 : -1) + chips.length) % chips.length];
       next.focus();
       choose(next);
       event.preventDefault();
     };
     const onManual = () => check(chips[0]);
 
-    const still = reducedMotion();
-    if (still) {
-      toggle.setAttribute("aria-checked", "false");
-      toggle.disabled = true;
-    }
-    const onToggle = () => {
-      const on = toggle.getAttribute("aria-checked") !== "true";
+    const setSwitch = (on: boolean) => {
+      const state = on ? "checked" : "unchecked";
       toggle.setAttribute("aria-checked", String(on));
+      toggle.dataset.state = state;
+      thumb.dataset.state = state;
       beam.dataset.running = String(on);
     };
+    if (reducedMotion()) {
+      setSwitch(false);
+      toggle.disabled = true;
+      leg.disabled = true;
+    }
+    const onToggle = () => setSwitch(toggle.getAttribute("aria-checked") !== "true");
     const onLeg = () => {
       beam.dataset.leg = leg.value;
       legValue.textContent = `${leg.value} ms`;
@@ -127,25 +169,6 @@ import Beam from "./Beam.astro";
     gap: 8px;
   }
 
-  [data-chip] {
-    padding: 7px 14px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: transparent;
-    color: var(--fg-2);
-    font-family: var(--mono);
-    font-size: 11.5px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: border-color 0.2s var(--ease-snap), color 0.2s var(--ease-snap);
-  }
-
-  [data-chip][aria-checked="true"] {
-    border-color: var(--cyan-hi);
-    color: var(--cyan-hi);
-  }
-
   .controls {
     display: flex;
     flex-wrap: wrap;
@@ -153,67 +176,25 @@ import Beam from "./Beam.astro";
     gap: 16px 24px;
   }
 
-  .switch {
-    position: relative;
-    width: 42px;
-    height: 24px;
-    padding: 0;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: transparent;
-    cursor: pointer;
-  }
-
-  .switch span {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--fg-3);
-    transition: transform 0.3s var(--spring-snappy), background-color 0.2s;
-  }
-
-  .switch[aria-checked="true"] {
-    border-color: var(--cyan);
-  }
-
-  .switch[aria-checked="true"] span {
-    transform: translateX(18px);
-    background: var(--cyan-hi);
-  }
-
-  .switch:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
   .speed {
     display: flex;
+    flex: 1;
     align-items: center;
     gap: 12px;
-    font-family: var(--mono);
-    font-size: 11.5px;
-    color: var(--fg-3);
     min-width: 0;
-    flex: 1;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: var(--fg-3);
   }
 
-  input[type="range"] {
+  .speed :global(.crate-form-slider) {
     flex: 1;
-    min-width: 0;
-    accent-color: var(--cyan);
   }
 
   output {
     min-width: 7ch;
     color: var(--fg-2);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .switch span {
-      transition: none;
-    }
+    font-variant-numeric: tabular-nums;
   }
 </style>
