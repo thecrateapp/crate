@@ -1,0 +1,200 @@
+---
+import { bandX, curvePath, gainY } from "../../lib/eq";
+import { BANDS } from "../../data/presets";
+
+const W = 600;
+const H = 160;
+const flat = BANDS.map(() => 0);
+---
+
+<figure class="eq" data-eq data-w={W} data-h={H}>
+  <svg viewBox={`0 -10 ${W} ${H + 20}`} aria-label="Equalizer, ten bands from 31 Hz to 16 kHz">
+    {[12, 6, -6, -12].map((g) => <line class="grid" x1="0" x2={W} y1={gainY(g, H)} y2={gainY(g, H)} />)}
+    <line class="zero" x1="0" x2={W} y1={H / 2} y2={H / 2} />
+    <path class="glow" data-eq-curve-glow d={curvePath(flat, W, H)} />
+    <path class="curve" data-eq-curve d={curvePath(flat, W, H)} />
+    {
+      BANDS.map((band, i) => (
+        <circle
+          class="band"
+          data-eq-band={i}
+          cx={bandX(i, BANDS.length, W)}
+          cy={H / 2}
+          r="7"
+          tabindex="0"
+          role="slider"
+          aria-label={`${band} Hz`}
+          aria-valuemin="-12"
+          aria-valuemax="12"
+          aria-valuenow="0"
+          aria-valuetext="0 dB"
+        />
+      ))
+    }
+  </svg>
+  <figcaption>
+    {BANDS.map((band) => <span>{band}</span>)}
+  </figcaption>
+</figure>
+
+<script>
+  import { mountOnPage } from "@crate-web/scripts/motion/page";
+  import { bandX, curvePath, gainAt, gainY, MAX_DB } from "../../lib/eq";
+  import { MANUAL_EVENT, PRESET_EVENT } from "../../data/presets";
+
+  mountOnPage("[data-eq]", () => {
+    const root = document.querySelector<HTMLElement>("[data-eq]")!;
+    const svg = root.querySelector("svg")!;
+    const W = Number(root.dataset.w);
+    const H = Number(root.dataset.h);
+    const handles = [...root.querySelectorAll<SVGCircleElement>("[data-eq-band]")];
+    const curve = root.querySelector<SVGPathElement>("[data-eq-curve]")!;
+    const glow = root.querySelector<SVGPathElement>("[data-eq-curve-glow]")!;
+    const gains = handles.map(() => 0);
+
+    const render = () => {
+      const d = curvePath(gains, W, H);
+      curve.setAttribute("d", d);
+      glow.setAttribute("d", d);
+      handles.forEach((handle, i) => {
+        handle.setAttribute("cy", String(gainY(gains[i], H)));
+        handle.setAttribute("aria-valuenow", String(gains[i]));
+        handle.setAttribute("aria-valuetext", `${gains[i] > 0 ? "+" : ""}${gains[i]} dB`);
+      });
+    };
+
+    const set = (i: number, gain: number, manual = true) => {
+      gains[i] = Math.min(MAX_DB, Math.max(-MAX_DB, gain));
+      render();
+      if (manual) document.dispatchEvent(new CustomEvent(MANUAL_EVENT));
+    };
+
+    const toChart = (event: PointerEvent) => {
+      const rect = svg.getBoundingClientRect();
+      return {
+        x: ((event.clientX - rect.left) / rect.width) * W,
+        y: ((event.clientY - rect.top) / rect.height) * (H + 20) - 10,
+      };
+    };
+
+    let active = -1;
+    const onDown = (event: PointerEvent) => {
+      const { x, y } = toChart(event);
+      let nearest = 0;
+      handles.forEach((_, i) => {
+        if (Math.abs(bandX(i, handles.length, W) - x) < Math.abs(bandX(nearest, handles.length, W) - x)) nearest = i;
+      });
+      active = nearest;
+      svg.setPointerCapture(event.pointerId);
+      handles[active].focus({ preventScroll: true });
+      set(active, gainAt(y, H));
+      event.preventDefault();
+    };
+    const onMove = (event: PointerEvent) => {
+      if (active < 0) return;
+      set(active, gainAt(toChart(event).y, H));
+    };
+    const onUp = () => {
+      active = -1;
+    };
+
+    const steps: Record<string, number> = { ArrowUp: 0.5, ArrowRight: 0.5, ArrowDown: -0.5, ArrowLeft: -0.5, PageUp: 3, PageDown: -3 };
+    const onKey = (event: KeyboardEvent) => {
+      const i = handles.indexOf(event.target as SVGCircleElement);
+      if (i < 0) return;
+      if (event.key in steps) set(i, gains[i] + steps[event.key]);
+      else if (event.key === "Home") set(i, MAX_DB);
+      else if (event.key === "End") set(i, -MAX_DB);
+      else return;
+      event.preventDefault();
+    };
+
+    const onPreset = (event: Event) => {
+      const next = (event as CustomEvent<number[]>).detail;
+      next.forEach((gain, i) => (gains[i] = gain));
+      render();
+    };
+
+    svg.addEventListener("pointerdown", onDown);
+    svg.addEventListener("pointermove", onMove);
+    svg.addEventListener("pointerup", onUp);
+    svg.addEventListener("pointercancel", onUp);
+    svg.addEventListener("keydown", onKey);
+    document.addEventListener(PRESET_EVENT, onPreset);
+    return () => {
+      svg.removeEventListener("pointerdown", onDown);
+      svg.removeEventListener("pointermove", onMove);
+      svg.removeEventListener("pointerup", onUp);
+      svg.removeEventListener("pointercancel", onUp);
+      svg.removeEventListener("keydown", onKey);
+      document.removeEventListener(PRESET_EVENT, onPreset);
+    };
+  });
+</script>
+
+<style>
+  .eq {
+    margin: 0;
+    padding: 20px 20px 14px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: rgba(9, 16, 22, 0.6);
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    touch-action: none;
+    cursor: ns-resize;
+  }
+
+  .grid {
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+
+  .zero {
+    stroke: var(--fg-3);
+    stroke-width: 1;
+    stroke-dasharray: 4 5;
+  }
+
+  .curve {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+  }
+
+  .glow {
+    fill: none;
+    stroke: var(--cyan);
+    stroke-width: 10;
+    stroke-opacity: 0.18;
+    filter: blur(4px);
+  }
+
+  .band {
+    fill: var(--bg);
+    stroke: var(--cyan-hi);
+    stroke-width: 2;
+    cursor: grab;
+  }
+
+  .band:focus-visible {
+    outline: none;
+    fill: var(--cyan-hi);
+  }
+
+  figcaption {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    margin-top: 10px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--fg-3);
+    text-align: center;
+  }
+</style>
