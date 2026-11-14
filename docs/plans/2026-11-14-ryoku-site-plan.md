@@ -93,6 +93,7 @@
 
 ### Task 6: Storyboard (review gate)
 
+- [ ] **Step 0:** Check Crate Decks (the Crate-themed DJ app, repo crate-decks) is Crate-styled enough to appear; if so, give it a shot in the hero and the Reddit cut (Diego's idea, 2026-11-14).
 - [ ] **Step 1:** Write `docs/screencast/storyboard.md` in crate-for-ryoku: the hero loop (30-45 s, seamless), each surface clip (4-8 s), the Reddit cut (60-90 s), shot by shot (what opens, closes, notifies, plays; timings), and the pre-session checklist (do-not-disturb, work windows closed, Groove wallpaper, music with a publishable licence, nothing personal on screen).
 - [ ] **Step 2:** Turn it into timelines under `tools/director/timelines/` and dry-run each.
 - [ ] **Step 3: Review gate.** Diego approves the storyboard and the dry-runs before any recording.
