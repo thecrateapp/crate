@@ -70,6 +70,57 @@ def test_application_update_keeps_legacy_monitoring_sentinel(tmp_path, operation
     assert "--remove-orphans" not in starts[0]
 
 
+def test_rollback_skips_and_removes_services_the_restored_compose_lacks(tmp_path):
+    """A release that adds a service fails verify: the restored compose has no such
+    service, so rollback must not ask compose to start it, and must retire its container."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake = fake_bin / "docker"
+    fake.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
+        "with open(os.environ['DOCKER_TEST_LOG'], 'a') as output:\n"
+        "    output.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+    )
+    fake.chmod(0o755)
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / "changed_services").write_text("crate-api\ncrate-ryoku-site\n")
+    (tmp_path / ".deploy").mkdir()
+    log = tmp_path / "docker.jsonl"
+    shell = (
+        "log() { :; }\nrecord_agent_deployment() { :; }\ncmd_verify() { :; }\n"
+        'compose_has_service() { [[ "$1" == crate-api ]]; }\n'
+        "COMPOSE=(docker compose --project-name crate)\n"
+        'dc() { "${COMPOSE[@]}" "$@"; }\n'
+        + _shell_function("cmd_rollback")
+        + "\ncmd_rollback\n"
+    )
+
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", shell],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "BACKUP_DIR": str(backup),
+            "DEPLOY_ID": "fixture",
+            "DOCKER_TEST_LOG": str(log),
+        },
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+
+    assert result.returncode == 0, result.stderr
+    commands = [json.loads(line) for line in log.read_text().splitlines()]
+    starts = [command for command in commands if "up" in command]
+    assert len(starts) == 1
+    assert starts[0][-1] == "crate-api"
+    assert "crate-ryoku-site" not in starts[0]
+    assert ["rm", "-f", "crate-ryoku-site"] in commands
+
+
 def test_state_rollback_never_implicitly_retires_other_project_services():
     assert "--remove-orphans" not in _shell_function("cmd_state_rollback")
 

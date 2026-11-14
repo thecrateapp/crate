@@ -1106,6 +1106,19 @@ cmd_rollback() {
   record_agent_deployment rollback
   dc config -q
 
+  # A release that added a service is rolled back to a compose file without it:
+  # retire that service's container instead of asking compose to start it.
+  local restorable=()
+  for service in "${rollback_services[@]}"; do
+    if compose_has_service "$service"; then
+      restorable+=("$service")
+    else
+      log "Removing ${service}: the restored release does not define it"
+      docker rm -f "$service" >/dev/null 2>&1 || true
+    fi
+  done
+  rollback_services=("${restorable[@]}")
+
   if (( ${#rollback_services[@]} == 0 )); then
     log "No application service changed; rollback only restored release configuration"
     DEPLOY_PUBLIC_CHECKS=0 cmd_verify
