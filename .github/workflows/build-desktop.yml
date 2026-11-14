@@ -259,6 +259,9 @@ jobs:
       - name: Test stable artifact names
         run: npm run --workspace=app/listen-desktop test:stable-names
 
+      - name: Test Arch package rendering
+        run: npm run --workspace=app/listen-desktop test:arch-package
+
       - name: Test debug symbol selection
         run: npm run --workspace=app/listen-desktop test:debug-symbols
 
@@ -883,3 +886,101 @@ jobs:
         with:
           body_path: docs/releases/${{ github.ref_name }}.md
           files: desktop-artifacts/*
+
+  arch-package:
+    # The Arch package of a release: crate-desktop-bin repackages the release's
+    # .deb (packaging/aur/crate-desktop-bin). It is attached to the release
+    # (`sudo pacman -U <asset URL>`) and, when the AUR_SSH_PRIVATE_KEY secret
+    # exists, pushed to the AUR. Without the secret the AUR step is skipped.
+    name: Arch package
+    needs: build-desktop
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    permissions:
+      contents: write
+    steps:
+      - name: Install tools
+        run: pacman -Syu --noconfirm --needed git github-cli nodejs openssh
+
+      - uses: actions/checkout@v6
+
+      - name: Render PKGBUILD
+        id: render
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::notice title=Arch package::$TAG is not a plain release; no Arch package."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          recipe=packaging/aur/crate-desktop-bin
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "crate-linux-${version}.deb" --dir "$recipe"
+          sha256="$(sha256sum "$recipe/crate-linux-${version}.deb" | cut -d' ' -f1)"
+          node app/listen-desktop/scripts/arch-package.mjs "$recipe/PKGBUILD" "$version" "$sha256"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Build the package
+        if: steps.render.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          # makepkg refuses to run as root; the .deb is already beside the
+          # PKGBUILD, so it is checked against the pinned sha256, not fetched
+          useradd --create-home builder
+          cp -r packaging/aur/crate-desktop-bin /home/builder/pkg
+          chown -R builder: /home/builder/pkg
+          su builder -c 'cd ~/pkg && makepkg --nodeps --noconfirm && makepkg --printsrcinfo > .SRCINFO'
+          cp /home/builder/pkg/*.pkg.tar.zst /home/builder/pkg/.SRCINFO \
+            packaging/aur/crate-desktop-bin/
+
+      - name: Attach the package to the GitHub release
+        if: steps.render.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd packaging/aur/crate-desktop-bin
+          pkg="$(ls crate-desktop-bin-*-x86_64.pkg.tar.zst)"
+          # a stable name too: releases/latest/download/crate-desktop-bin-x86_64.pkg.tar.zst
+          cp "$pkg" crate-desktop-bin-x86_64.pkg.tar.zst
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            "$pkg" crate-desktop-bin-x86_64.pkg.tar.zst
+
+      - name: Publish to the AUR
+        if: steps.render.outputs.skip == 'false'
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_COMMIT_NAME: ${{ vars.AUR_COMMIT_NAME || 'Crate release bot' }}
+          AUR_COMMIT_EMAIL: ${{ vars.AUR_COMMIT_EMAIL || 'noreply@cratemusic.app' }}
+          VERSION: ${{ steps.render.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AUR_SSH_PRIVATE_KEY" ]; then
+            echo "::notice title=AUR::AUR_SSH_PRIVATE_KEY is not set; crate-desktop-bin $VERSION was not pushed to the AUR."
+            exit 0
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          # host key pinned; fingerprint SHA256:RFzBCUItH9LZS0cKB5UE6ceAYhBD5C8GeOBip8Z11+4,
+          # as published on aur.archlinux.org
+          echo 'aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN' > ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          git clone ssh://aur@aur.archlinux.org/crate-desktop-bin.git aur
+          cp packaging/aur/crate-desktop-bin/PKGBUILD packaging/aur/crate-desktop-bin/.SRCINFO aur/
+          cd aur
+          git add PKGBUILD .SRCINFO
+          if git diff --cached --quiet; then
+            echo "The AUR already has crate-desktop-bin $VERSION."
+            exit 0
+          fi
+          git -c user.name="$AUR_COMMIT_NAME" -c user.email="$AUR_COMMIT_EMAIL" \
+            commit -m "Update to $VERSION"
+          git push origin HEAD:master

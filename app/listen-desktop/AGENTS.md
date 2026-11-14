@@ -112,8 +112,8 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
     `$XDG_DATA_HOME/applications/app.cratemusic.crate.desktop.desktop` (`NoDisplay`) and
     `$XDG_DATA_HOME/icons/hicolor/<n>x<n>/apps/app.cratemusic.crate.desktop.png` at every
     start, and Crate goes by `LINUX_DESKTOP_ENTRY`/`LINUX_ICON_NAME` (the app id).
-  Tauri's bundler names the packaged entry after `productName` (`Crate.desktop`,
-  `Icon=crate-desktop`, icons named after the binary) and cannot rename it.
+    Tauri's bundler names the packaged entry after `productName` (`Crate.desktop`,
+    `Icon=crate-desktop`, icons named after the binary) and cannot rename it.
 - **Control socket** (`desktop_control.rs`): `$XDG_RUNTIME_DIR/crate/control.sock`
   (dir 0700, socket 0600), JSON lines, protocol 1. Server sends `hello` (with
   `commands`, every `cmd` accepted; `COMMANDS` in Rust, kept in step by a test), then
@@ -189,7 +189,13 @@ placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/
   (`ROFI_RETV=1`) plays the pick; a row's icon is the item's `art` when present. Also
   returns before the single-instance plugin.
 - **Arch package:** `packaging/aur/crate-desktop-bin/` (PKGBUILD + .SRCINFO from the
-  release `.deb`; bump the sha256 from the GitHub asset digest, not crate-checksums.txt).
+  release `.deb`). The `arch-package` job in `build-desktop.yml` renders it on every plain
+  `vX.Y.Z` tag (`scripts/arch-package.mjs`: pkgver, pkgrel=1, the `.deb`'s sha256), builds
+  it with makepkg in `archlinux:base-devel`, attaches `crate-desktop-bin-<ver>-1-x86_64.pkg.tar.zst`
+  and `crate-desktop-bin-x86_64.pkg.tar.zst` to the release, and pushes PKGBUILD + .SRCINFO
+  to the AUR only when the `AUR_SSH_PRIVATE_KEY` secret exists (host key pinned; commit
+  identity from the `AUR_COMMIT_NAME`/`AUR_COMMIT_EMAIL` variables). The `!strip` and `!debug`
+  options keep it one package with Crate's binary unchanged. Prereleases are skipped.
 - **Volume caveat:** Listen's player volume is the webview's own gain, not the system
   volume, so desktop widgets do not offer it (the Ryoku bar plugin dropped its slider).
 

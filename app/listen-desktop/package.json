@@ -21,6 +21,7 @@
     "test:version": "node --test scripts/desktop-version.node-test.mjs",
     "test:stable-names": "node --test scripts/stable-artifact-names.node-test.mjs",
     "test:debug-symbols": "node --test scripts/debug-symbol-files.node-test.mjs",
+    "test:arch-package": "node --test scripts/arch-package.node-test.mjs",
     "test": "vitest run --config vite.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

@@ -27,6 +27,8 @@ optdepends=(
 )
 provides=('crate-desktop')
 conflicts=('crate-desktop')
+# the binary is Crate's own release build: ship it as is, as one package
+options=('!strip' '!debug')
 source=("crate-linux-${pkgver}.deb::https://github.com/thecrateapp/crate/releases/download/v${pkgver}/crate-linux-${pkgver}.deb")
 sha256sums=('b9f428ccae269ba006a260049245324e6b9bc0f7204eb509fe11818af2501e72')
 noextract=("crate-linux-${pkgver}.deb")
