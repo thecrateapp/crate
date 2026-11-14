@@ -98,3 +98,18 @@ html[data-crate-linux-window-chrome="true"] #root {
 html[data-crate-linux-window-chrome="true"] body {
   background: transparent;
 }
+
+/* Ambient loops hold their first frame (a static glow). WebKitGTK repaints
+   filter, box-shadow and opacity animations on the main thread every frame,
+   even off screen: a few pulsing liked-hearts and the blinking stats bar kept
+   an idle window at ~20 % of a core. Playback feedback (the play aura while
+   playing) keeps animating. */
+html[data-crate-linux-desktop="true"] .animate-crate-icon-active-pulse,
+html[data-crate-linux-desktop="true"] .animate-pulse-subtle,
+html[data-crate-linux-desktop="true"] .stats-live-dot {
+  animation-play-state: paused;
+}
+
+html[data-crate-linux-desktop="true"] .stats-signal-bar[data-today] {
+  animation: stats-grow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
