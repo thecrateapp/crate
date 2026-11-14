@@ -894,7 +894,6 @@ def test_cast_receiver_is_part_of_release_health_and_rollback_contracts() -> Non
     assert '[CRATE_CAST_RECEIVER_IMAGE]="crate-cast-receiver"' in script
 
 
-
 def test_ryoku_site_is_part_of_release_and_rollback_contracts() -> None:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
 
@@ -903,7 +902,9 @@ def test_ryoku_site_is_part_of_release_and_rollback_contracts() -> None:
             line for line in script.splitlines() if line.startswith(f"{array_name}=(")
         )
         assert "crate-ryoku-site" in assignment
-    release_keys = script[script.index("RELEASE_ENV_KEYS=(") : script.index("SENTRY_RELEASE_ENV_KEYS=(")]
+    release_keys = script[
+        script.index("RELEASE_ENV_KEYS=(") : script.index("SENTRY_RELEASE_ENV_KEYS=(")
+    ]
     assert "CRATE_RYOKU_SITE_IMAGE" in release_keys
     assert '[crate-ryoku-site]="${IMAGE_PREFIX}/crate-ryoku-site"' in script
     assert '[CRATE_RYOKU_SITE_IMAGE]="${IMAGE_PREFIX}/crate-ryoku-site"' in script
@@ -915,8 +916,14 @@ def test_ryoku_site_routes_its_host_and_serves_host_media_read_only() -> None:
     service = project["services"]["crate-ryoku-site"]
 
     assert service["build"]["dockerfile"] == "app/ryoku/Dockerfile"
-    assert service["labels"]["traefik.http.routers.ryoku.rule"] == "Host(`ryoku.cratemusic.app`)"
-    assert service["labels"]["traefik.http.routers.ryoku.tls.certresolver"] == "letsencrypt"
+    assert (
+        service["labels"]["traefik.http.routers.ryoku.rule"]
+        == "Host(`ryoku.cratemusic.app`)"
+    )
+    assert (
+        service["labels"]["traefik.http.routers.ryoku.tls.certresolver"]
+        == "letsencrypt"
+    )
     assert "./media/ryoku:/usr/share/nginx/media:ro" in service["volumes"]
     assert service["healthcheck"]["test"]
 
@@ -927,9 +934,14 @@ def test_ryoku_site_image_is_built_manifested_and_promoted_in_ci() -> None:
     assert "build-ryoku-site:" in images
     assert "file: ./app/ryoku/Dockerfile" in images
     assert "ryoku_site: ${{ steps.filter.outputs.ryoku_site }}" in images
-    assert 'check_result ryoku-site "$CHANGED_RYOKU_SITE" "$RESULT_RYOKU_SITE"' in images
+    assert (
+        'check_result ryoku-site "$CHANGED_RYOKU_SITE" "$RESULT_RYOKU_SITE"' in images
+    )
     assert '--digest "ryoku-site=$DIGEST_RYOKU_SITE"' in images
-    assert 'promote_latest "$CHANGED_RYOKU_SITE" crate-ryoku-site "$DIGEST_RYOKU_SITE"' in images
+    assert (
+        'promote_latest "$CHANGED_RYOKU_SITE" crate-ryoku-site "$DIGEST_RYOKU_SITE"'
+        in images
+    )
 
 
 def test_ryoku_media_sync_never_deletes_server_files() -> None:
@@ -939,6 +951,7 @@ def test_ryoku_media_sync_never_deletes_server_files() -> None:
     assert "/tmp/cuts/" in output
     assert "/home/crate/crate/media/ryoku/" in output
     assert "--delete" not in output
+
 
 def test_cast_receiver_build_and_frontend_gates_are_wired_in_ci() -> None:
     images = (ROOT / ".github/workflows/build-images.yml").read_text()

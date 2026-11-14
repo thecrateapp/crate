@@ -97,7 +97,6 @@ def test_shared_frontend_change_selects_every_shared_consumer() -> None:
     }
 
 
-
 def test_ryoku_site_change_only_selects_the_ryoku_site_image() -> None:
     assert detect_changed_images(["app/ryoku/src/pages/index.astro"]) == {"ryoku-site"}
 
@@ -128,6 +127,7 @@ def test_ryoku_site_release_env_names_its_image() -> None:
         "CRATE_RYOKU_SITE_IMAGE=ghcr.io/thecrateapp/crate-ryoku-site@sha256:"
         in render_release_env(manifest)
     )
+
 
 def test_backend_change_selects_backend_compatibility_group() -> None:
     assert detect_changed_images(["app/crate/api/catalog.py"]) == {
