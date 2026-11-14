@@ -64,9 +64,9 @@ select_running_operator_overlay() {
   exit 1
 }
 select_running_operator_overlay
-PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
+PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs crate-ryoku-site)
 HEALTHY_SERVICES=(crate-redis crate-postgres crate-api crate-cast-receiver)
-RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
+RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs crate-ryoku-site)
 QUIESCE_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker)
 RELEASE_ENV_KEYS=(
   CRATE_RELEASE_SHA
@@ -81,6 +81,7 @@ RELEASE_ENV_KEYS=(
   CRATE_CAST_RECEIVER_IMAGE
   CRATE_SITE_IMAGE
   CRATE_DOCS_IMAGE
+  CRATE_RYOKU_SITE_IMAGE
 )
 SENTRY_RELEASE_ENV_KEYS=(
   CRATE_API_SENTRY_RELEASE
@@ -111,6 +112,7 @@ declare -A SERVICE_IMAGE_REPOS=(
   [crate-cast-receiver]="${IMAGE_PREFIX}/crate-cast-receiver"
   [crate-site]="${IMAGE_PREFIX}/crate-site"
   [crate-docs]="${IMAGE_PREFIX}/crate-docs"
+  [crate-ryoku-site]="${IMAGE_PREFIX}/crate-ryoku-site"
 )
 declare -A RELEASE_ENV_REPOS=(
   [CRATE_API_IMAGE]="${IMAGE_PREFIX}/crate-api"
@@ -124,6 +126,7 @@ declare -A RELEASE_ENV_REPOS=(
   [CRATE_CAST_RECEIVER_IMAGE]="${IMAGE_PREFIX}/crate-cast-receiver"
   [CRATE_SITE_IMAGE]="${IMAGE_PREFIX}/crate-site"
   [CRATE_DOCS_IMAGE]="${IMAGE_PREFIX}/crate-docs"
+  [CRATE_RYOKU_SITE_IMAGE]="${IMAGE_PREFIX}/crate-ryoku-site"
 )
 declare -A RELEASE_ENV_SERVICES=(
   [CRATE_API_IMAGE]="crate-api"
@@ -137,6 +140,7 @@ declare -A RELEASE_ENV_SERVICES=(
   [CRATE_CAST_RECEIVER_IMAGE]="crate-cast-receiver"
   [CRATE_SITE_IMAGE]="crate-site"
   [CRATE_DOCS_IMAGE]="crate-docs"
+  [CRATE_RYOKU_SITE_IMAGE]="crate-ryoku-site"
 )
 
 log() {
@@ -1328,7 +1332,7 @@ cmd_ps() {
 
 cmd_diagnose() {
   dc ps || true
-  dc logs --tail=120 crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs || true
+  dc logs --tail=120 crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs crate-ryoku-site || true
 }
 
 host_lock_acquire() {
