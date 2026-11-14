@@ -12,7 +12,9 @@ export default defineConfig({
   use: { baseURL },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `npx astro preview --port ${port}`,
+    // --ignore-lock keeps the server in the foreground so Playwright owns and stops it
+    // (Astro 7 backgrounds it on its own when an AI agent runs the command).
+    command: `npx astro preview --port ${port} --ignore-lock`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
