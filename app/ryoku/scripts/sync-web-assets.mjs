@@ -9,7 +9,8 @@ const here = fileURLToPath(new URL("../public/", import.meta.url));
 
 for (const dir of ["fonts", "icons"]) {
   const from = `${web}${dir}`;
-  if (!existsSync(from)) throw new Error(`missing ${from}: app/web/public is required`);
+  if (!existsSync(from))
+    throw new Error(`missing ${from}: app/web/public is required`);
   rmSync(`${here}${dir}`, { recursive: true, force: true });
   cpSync(from, `${here}${dir}`, { recursive: true });
 }

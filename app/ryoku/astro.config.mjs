@@ -13,7 +13,11 @@ export default defineConfig({
     // package app/web has no node_modules for here. A fixed config keeps both apps' rules.
     esbuild: {
       tsconfigRaw: JSON.stringify({
-        compilerOptions: { target: "ESNext", verbatimModuleSyntax: true, useDefineForClassFields: true },
+        compilerOptions: {
+          target: "ESNext",
+          verbatimModuleSyntax: true,
+          useDefineForClassFields: true,
+        },
       }),
     },
     resolve: {

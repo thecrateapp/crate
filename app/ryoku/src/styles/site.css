@@ -27,7 +27,9 @@
   font-weight: 500;
   font-size: 15px;
   text-decoration: none;
-  transition: transform 0.55s var(--spring-snappy), background-color 0.3s var(--ease-snap);
+  transition:
+    transform 0.55s var(--spring-snappy),
+    background-color 0.3s var(--ease-snap);
 }
 
 .primary:hover {

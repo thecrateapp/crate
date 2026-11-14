@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-test("missing clips fall back to a poster or a placeholder, never a broken player", async ({ page }) => {
-  await page.route("**/media/**", (route) => route.fulfill({ status: 404, body: "" }));
+test("missing clips fall back to a poster or a placeholder, never a broken player", async ({
+  page,
+}) => {
+  await page.route("**/media/**", (route) =>
+    route.fulfill({ status: 404, body: "" }),
+  );
   await page.goto("/");
   const slots = page.locator("[data-clip]");
   await expect(slots.first()).toBeVisible();
@@ -14,7 +18,10 @@ test("missing clips fall back to a poster or a placeholder, never a broken playe
   }
 });
 
-test("a clip whose video is missing shows its poster", async ({ page, request }) => {
+test("a clip whose video is missing shows its poster", async ({
+  page,
+  request,
+}) => {
   const still = await (await request.get("/icons/icon-192.png")).body();
   await page.route("**/media/**", (route) =>
     route.request().url().endsWith(".jpg")

@@ -20,7 +20,9 @@ export function fallBack(figure: HTMLElement): void {
   const image = document.createElement("img");
   image.alt = label;
   image.decoding = "async";
-  image.addEventListener("load", () => setState(figure, "poster"), { once: true });
+  image.addEventListener("load", () => setState(figure, "poster"), {
+    once: true,
+  });
   image.addEventListener(
     "error",
     () => {
@@ -34,7 +36,10 @@ export function fallBack(figure: HTMLElement): void {
 }
 
 function noSource(video: HTMLVideoElement): boolean {
-  return video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE || video.error !== null;
+  return (
+    video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE ||
+    video.error !== null
+  );
 }
 
 export function mountClips(): () => void {
@@ -57,7 +62,9 @@ export function mountClips(): () => void {
     // A <source> error does not bubble and may fire before this script runs.
     last?.addEventListener("error", () => fallBack(figure), { once: true });
     video.addEventListener("error", () => fallBack(figure), { once: true });
-    video.addEventListener("loadeddata", () => setState(figure, "video"), { once: true });
+    video.addEventListener("loadeddata", () => setState(figure, "video"), {
+      once: true,
+    });
     if (noSource(video)) {
       fallBack(figure);
       continue;

@@ -27,15 +27,23 @@ test("arrow keys move a focused band in 0.5 dB steps", async ({ page }) => {
   await expect(band).toHaveAttribute("aria-valuenow", "0.5");
 });
 
-test("a preset chip sets the bands and drops back to Manual on a drag", async ({ page }) => {
+test("a preset chip sets the bands and drops back to Manual on a drag", async ({
+  page,
+}) => {
   await page.goto("/");
   const chip = page.getByRole("radio", { name: "Bass boost" });
   await chip.click();
   await expect(chip).toHaveAttribute("aria-checked", "true");
-  await expect(page.locator('[data-eq-band="0"]')).toHaveAttribute("aria-valuenow", "6");
+  await expect(page.locator('[data-eq-band="0"]')).toHaveAttribute(
+    "aria-valuenow",
+    "6",
+  );
   await page.locator('[data-eq-band="9"]').focus();
   await page.keyboard.press("ArrowUp");
-  await expect(page.getByRole("radio", { name: "Manual" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: "Manual" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
 });
 
 test("the kit toggle stops the Beam", async ({ page }) => {
@@ -44,7 +52,10 @@ test("the kit toggle stops the Beam", async ({ page }) => {
   await expect(toggle).toHaveAttribute("aria-checked", "true");
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-checked", "false");
-  await expect(page.locator("#play [data-beam]")).toHaveAttribute("data-running", "false");
+  await expect(page.locator("#play [data-beam]")).toHaveAttribute(
+    "data-running",
+    "false",
+  );
 });
 
 test.describe("reduced motion", () => {
@@ -54,8 +65,11 @@ test.describe("reduced motion", () => {
     await page.goto("/");
     const mark = page.locator("#cover [data-mark]");
     await mark.scrollIntoViewIfNeeded();
-    const animations = await mark.evaluate((el) =>
-      el.getAnimations({ subtree: true }).filter((a) => a.playState === "running").length,
+    const animations = await mark.evaluate(
+      (el) =>
+        el
+          .getAnimations({ subtree: true })
+          .filter((a) => a.playState === "running").length,
     );
     expect(animations).toBe(0);
     for (const beam of await page.locator("[data-beam]").all()) {
@@ -65,7 +79,9 @@ test.describe("reduced motion", () => {
         beam.locator("[data-beam-segment]").boundingBox(),
       ]);
       if (!track || !seg) throw new Error("beam has no box");
-      expect(Math.abs(seg.x + seg.width / 2 - (track.x + track.width / 2))).toBeLessThan(1.5);
+      expect(
+        Math.abs(seg.x + seg.width / 2 - (track.x + track.width / 2)),
+      ).toBeLessThan(1.5);
     }
   });
 });

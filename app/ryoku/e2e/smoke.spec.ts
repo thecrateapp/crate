@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-const SECTIONS = ["hero", "cover", "surfaces", "play", "crate", "install", "footer"];
+const SECTIONS = [
+  "hero",
+  "cover",
+  "surfaces",
+  "play",
+  "crate",
+  "install",
+  "footer",
+];
 
 test("the page loads with every section", async ({ page }) => {
   const response = await page.goto("/");
@@ -13,13 +21,17 @@ test("the page loads with every section", async ({ page }) => {
 test("Crate web tokens resolve on :root", async ({ page }) => {
   await page.goto("/");
   const cyan = await page.evaluate(() =>
-    getComputedStyle(document.documentElement).getPropertyValue("--cyan").trim(),
+    getComputedStyle(document.documentElement)
+      .getPropertyValue("--cyan")
+      .trim(),
   );
   expect(cyan).toBe("#06b6d4");
 });
 
 test("the Crate web display font is served", async ({ request }) => {
-  const response = await request.get("/fonts/bricolage-grotesque-latin-opsz-normal.woff2");
+  const response = await request.get(
+    "/fonts/bricolage-grotesque-latin-opsz-normal.woff2",
+  );
   expect(response.status()).toBe(200);
 });
 

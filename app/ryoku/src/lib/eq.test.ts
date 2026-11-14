@@ -15,7 +15,9 @@ describe("curve", () => {
     const gains = Array(10).fill(0);
     gains[3] = 12;
     const points = curve(gains, W, H, 901);
-    const top = points.reduce((best, point) => (point[1] < best[1] ? point : best));
+    const top = points.reduce((best, point) =>
+      point[1] < best[1] ? point : best,
+    );
     expect(top[0]).toBeCloseTo(bandX(3, 10, W), 0);
     expect(top[1]).toBeCloseTo(0);
   });
@@ -24,7 +26,8 @@ describe("curve", () => {
     const points = curve([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], W, H, 50);
     expect(points[0][0]).toBeCloseTo(bandX(0, 10, W));
     expect(points.at(-1)?.[0]).toBeCloseTo(bandX(9, 10, W));
-    for (let i = 1; i < points.length; i++) expect(points[i][0]).toBeGreaterThan(points[i - 1][0]);
+    for (let i = 1; i < points.length; i++)
+      expect(points[i][0]).toBeGreaterThan(points[i - 1][0]);
   });
 
   it("maps +12 dB to the top and -12 dB to the bottom", () => {
