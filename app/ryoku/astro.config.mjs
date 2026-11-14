@@ -9,7 +9,16 @@ export default defineConfig({
   build: { format: "file" },
   server: { allowedHosts: [".dev.cratemusic.app"] },
   vite: {
+    // esbuild would read app/web/tsconfig.json for files under the alias; it extends a
+    // package app/web has no node_modules for here. A fixed config keeps both apps' rules.
+    esbuild: {
+      tsconfigRaw: JSON.stringify({
+        compilerOptions: { target: "ESNext", verbatimModuleSyntax: true, useDefineForClassFields: true },
+      }),
+    },
     resolve: {
+      // app/web's motion scripts import these; resolve them from this app's node_modules.
+      dedupe: ["gsap", "lenis"],
       alias: {
         "@crate-web": webSrc,
         // tokens.css imports this from app/web, which has no node_modules in this build.

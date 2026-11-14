@@ -1,6 +1,7 @@
 ---
 import "@crate-web/styles/tokens.css";
 import "@crate-web/styles/base.css";
+import "../styles/site.css";
 
 interface Props {
   title: string;
@@ -44,6 +45,21 @@ const url = new URL(Astro.url.pathname, Astro.site).href;
     <slot name="after" />
   </body>
 </html>
+
+<script>
+  import { mountOnPage } from "@crate-web/scripts/motion/page";
+  import { initReveals } from "@crate-web/scripts/motion/reveal";
+  import { initSmoothScroll } from "@crate-web/scripts/motion/smooth-scroll";
+
+  mountOnPage("[data-reveal]", () => {
+    const stopReveals = initReveals();
+    const stopScroll = initSmoothScroll();
+    return () => {
+      stopReveals();
+      stopScroll();
+    };
+  });
+</script>
 
 <style>
   .skip {
