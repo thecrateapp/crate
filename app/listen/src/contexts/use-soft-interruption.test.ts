@@ -153,6 +153,49 @@ describe("useSoftInterruption", () => {
     expect(refs.bufferingIntentRef.current).toBe(false);
   });
 
+  it("keeps its controls stable when the caller passes new inline callbacks", () => {
+    // The player passes arrow functions inline on every render. If the
+    // controls followed them, every progress commit would re-create the
+    // player actions and re-render every consumer of the actions context.
+    const refs = createRefs();
+    const firstStallEnded = vi.fn();
+    const latestStall = vi.fn();
+    const latestStallEnded = vi.fn();
+    const { result, rerender } = renderHook(
+      (callbacks: {
+        onPlaybackStall: () => void;
+        onPlaybackStallEnded: (d: number, b: number) => void;
+      }) => useSoftInterruption({ ...refs, ...callbacks }),
+      {
+        initialProps: {
+          onPlaybackStall: vi.fn(),
+          onPlaybackStallEnded: firstStallEnded,
+        },
+      },
+    );
+    const first = result.current;
+
+    rerender({
+      onPlaybackStall: latestStall,
+      onPlaybackStallEnded: latestStallEnded,
+    });
+
+    expect(result.current.beginSoftInterruption).toBe(
+      first.beginSoftInterruption,
+    );
+    expect(result.current.cancelSoftInterruption).toBe(
+      first.cancelSoftInterruption,
+    );
+
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+      result.current.cancelSoftInterruption();
+    });
+    expect(latestStall).toHaveBeenCalledOnce();
+    expect(latestStallEnded).toHaveBeenCalledOnce();
+    expect(firstStallEnded).not.toHaveBeenCalled();
+  });
+
   it("records one quality stall for a single interrupted track", () => {
     const onPlaybackStall = vi.fn();
     const refs = createRefs({ onPlaybackStall });

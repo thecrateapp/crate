@@ -95,6 +95,15 @@ export function useSoftInterruption({
   const maybeResumeRef = useRef<() => Promise<void>>(async () => {});
   const cancelSoftInterruptionRef = useRef<() => void>(() => {});
   const scheduleStallProtectionRef = useRef<() => void>(() => {});
+  // Callers pass these inline. Read the latest through refs so the returned
+  // controls keep their identity: the player actions are built from them,
+  // and new actions on every render re-render every actions consumer.
+  const onPlaybackStallRef = useRef(onPlaybackStall);
+  const onPlaybackStallEndedRef = useRef(onPlaybackStallEnded);
+  useLayoutEffect(() => {
+    onPlaybackStallRef.current = onPlaybackStall;
+    onPlaybackStallEndedRef.current = onPlaybackStallEnded;
+  });
 
   const hasSafeBufferedAhead = useCallback(
     () =>
@@ -148,7 +157,7 @@ export function useSoftInterruption({
 
       softInterruptionReasonRef.current = reason;
       shouldAutoResumeAfterInterruptionRef.current = true;
-      onPlaybackStall?.();
+      onPlaybackStallRef.current?.();
       interruptionStartedAtRef.current = Date.now();
       recoveryWindowStartedAtRef.current = Date.now();
       recoveryProbeInFlightRef.current = false;
@@ -177,14 +186,13 @@ export function useSoftInterruption({
       currentTrackRef,
       hasSafeBufferedAhead,
       isPlayingRef,
-      onPlaybackStall,
       scheduleRecoveryCheck,
     ],
   );
 
   const cancelSoftInterruption = useCallback(() => {
     if (interruptionStartedAtRef.current !== null) {
-      onPlaybackStallEnded?.(
+      onPlaybackStallEndedRef.current?.(
         Math.max(0, Date.now() - interruptionStartedAtRef.current),
         getCurrentBufferedAheadSeconds(),
       );
@@ -196,7 +204,7 @@ export function useSoftInterruption({
     recoveryFailuresRef.current = 0;
     clearStallTimer();
     clearRecoveryTimer();
-  }, [clearRecoveryTimer, clearStallTimer, onPlaybackStallEnded]);
+  }, [clearRecoveryTimer, clearStallTimer]);
 
   const settleAfterAppLifecycle = useCallback(() => {
     // Returning from background should be inert: keep the current
