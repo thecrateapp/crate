@@ -340,8 +340,10 @@ class TransitionContextRequest(SmartMixRequestModel):
         "decks",
     ] = Field(
         description=(
-            "Where the queue comes from. `decks` is Crate Decks' automatic mixing "
-            "(Smart Mix Stems, STEM-D10); it plans like `playlist`."
+            "Where the queue comes from. `decks` is Crate Decks (S5); it plans "
+            "like `playlist`, but its bass handoff follows "
+            "`capabilities.decks.features` (bass_handoff) instead of the Android "
+            "switch."
         )
     )
     automatic: bool

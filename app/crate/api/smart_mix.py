@@ -19,6 +19,7 @@ from crate.api.auth import (
 from crate import smart_mix_ai
 from crate.api.permissions import has_capability
 from crate.api.radio import continuation_radio_tracks
+from crate.api.capabilities import decks_bass_handoff_available
 from crate.config import android_bass_handoff_enabled
 from crate.api.openapi_responses import COMMON_ERROR_RESPONSES
 from crate.api.schemas.smart_mix import (
@@ -776,8 +777,12 @@ def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
 
 
 def _bass_handoff_allowed(payload: TransitionContextRequest) -> bool:
-    # Crate Decks follows the Android flag until its own context (S5) exists.
-    return payload.allow_bass_handoff and android_bass_handoff_enabled()
+    if not payload.allow_bass_handoff:
+        return False
+    if payload.source == "decks":
+        # Crate Decks has its own switch (S5), the one its capabilities advertise.
+        return decks_bass_handoff_available()
+    return android_bass_handoff_enabled()
 
 
 def _local_refinement(payload: TransitionContextRequest) -> bool:

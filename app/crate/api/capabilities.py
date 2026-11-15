@@ -19,6 +19,8 @@ from crate.config import (
     android_bass_handoff_enabled,
     android_beatmatch_enabled,
     android_native_crossfade_enabled,
+    decks_bass_handoff_enabled,
+    decks_beatmatch_enabled,
     listen_smart_mix_v3_enabled,
     smart_mix_enabled,
     vdj_automation_enabled,
@@ -204,13 +206,37 @@ def _ai_assisted(smart_mix_available: bool) -> SmartMixAiAssistedCapabilities:
     )
 
 
+def decks_beatmatch_available() -> bool:
+    """Crate Decks may run Smart Mix beatmatch transitions (S5).
+
+    Smart Mix on and Decks' own switch, never the Android flags. It also advertises
+    long_beatmatch: the long blend is part of the same contract, as on Android.
+    """
+    return smart_mix_enabled() and decks_beatmatch_enabled()
+
+
+def decks_bass_handoff_available() -> bool:
+    """``capabilities.decks.features`` has bass_handoff (S5).
+
+    The transition planner reads the same answer for ``context.source = "decks"``,
+    so the advertised feature and the plans never disagree.
+    """
+    return decks_beatmatch_available() and decks_bass_handoff_enabled()
+
+
 def _decks_features(request: Request) -> list[DecksFeature]:
     # Each feature is added by the server change that serves its contract: S3
     # library_cursor (/api/decks), S4 profiles_batch, S5
-    # beatmatch/bass_handoff/long_beatmatch, S7 cues, Smart Mix Stems ST1
-    # stems/stem_upload and ST3 local_refinement. S5 and S7 are not served yet.
-    # Do not derive them from the Android Smart Mix flags.
-    features: list[DecksFeature] = ["library_cursor", "profiles_batch", "stems"]
+    # beatmatch/bass_handoff/long_beatmatch (the decks planner context), S7 cues,
+    # Smart Mix Stems ST1 stems/stem_upload and ST3 local_refinement. S7 is not
+    # served yet. Do not derive them from the Android Smart Mix flags.
+    features: list[DecksFeature] = ["library_cursor", "profiles_batch"]
+    if decks_beatmatch_available():
+        features.append("beatmatch")
+        if decks_bass_handoff_available():
+            features.append("bass_handoff")
+        features.append("long_beatmatch")
+    features.append("stems")
     if _may_upload_stems(request):
         features.append("stem_upload")
     # smart-mix-v3 serves the candidate menu and policy limits to the decks context.

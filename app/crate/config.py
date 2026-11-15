@@ -66,6 +66,16 @@ def android_bass_handoff_enabled() -> bool:
     return _env_enabled("CRATE_ANDROID_BASS_HANDOFF_ENABLED")
 
 
+def decks_beatmatch_enabled() -> bool:
+    """Crate Decks' Smart Mix beatmatch switch (S5); independent of Android's."""
+    return _env_enabled("CRATE_DECKS_BEATMATCH_ENABLED")
+
+
+def decks_bass_handoff_enabled() -> bool:
+    """Crate Decks' bass handoff switch (S5); independent of Android's."""
+    return _env_enabled("CRATE_DECKS_BASS_HANDOFF_ENABLED")
+
+
 def listen_smart_mix_v3_enabled() -> bool:
     """Whether /api/capabilities recommends smart-mix-v3 to Listen (default v2)."""
     return _env_enabled("CRATE_LISTEN_SMART_MIX_V3_ENABLED")

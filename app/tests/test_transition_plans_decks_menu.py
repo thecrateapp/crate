@@ -103,6 +103,10 @@ def plans(test_app, monkeypatch):
     monkeypatch.setattr(
         "crate.api.smart_mix.android_bass_handoff_enabled", lambda: True
     )
+    # Crate Decks' bass handoff has its own switch (S5).
+    monkeypatch.setattr(
+        "crate.api.smart_mix.decks_bass_handoff_available", lambda: True
+    )
 
     def post(edge: dict, planner: str = "smart-mix-v3") -> dict:
         response = test_app.post(
