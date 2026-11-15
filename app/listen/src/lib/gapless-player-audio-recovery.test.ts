@@ -23,7 +23,13 @@ const gaplessMock = vi.hoisted(() => {
       }),
       createGain: vi.fn(() => ({
         ...createNode(),
-        gain: { value: 1 },
+        // an AudioParam: transport fades schedule on the master gain
+        gain: {
+          value: 1,
+          cancelScheduledValues: vi.fn(),
+          setValueAtTime: vi.fn(),
+          linearRampToValueAtTime: vi.fn(),
+        },
       })),
       createOscillator: vi.fn(() => ({
         ...createNode(),
