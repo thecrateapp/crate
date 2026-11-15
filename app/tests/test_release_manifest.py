@@ -14,6 +14,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
+BUILD_WORKFLOW_PATH = ".github/workflows/build-images.yml"
 SPEC = importlib.util.spec_from_file_location(
     "crate_release_manifest", ROOT / "scripts/release_manifest.py"
 )
@@ -762,6 +763,30 @@ def test_duplicate_job_names_rebuild_everything() -> None:
     assert release_manifest.detect_workflow_images(before, after) == set(
         release_manifest.ALL_IMAGE_SPECS
     )
+
+
+def test_workflow_comparison_without_pyyaml_rebuilds_everything(monkeypatch) -> None:
+    monkeypatch.setitem(sys.modules, "yaml", None)
+    before = "jobs:\n  build-site:\n    steps: []\n"
+    assert release_manifest.detect_workflow_images(before, before) == set(
+        release_manifest.ALL_IMAGE_SPECS
+    )
+
+
+def test_pyyaml_install_cannot_fail_the_change_detection_job() -> None:
+    import yaml
+
+    workflow = yaml.safe_load((ROOT / BUILD_WORKFLOW_PATH).read_text())
+    steps = workflow["jobs"]["changes"]["steps"]
+    install = next(step for step in steps if "PyYAML" in str(step.get("run", "")))
+    assert install.get("continue-on-error") is True
+    assert "PyYAML==" in install["run"]
+    setup = [
+        step
+        for step in steps
+        if str(step.get("uses", "")).startswith("actions/setup-python@")
+    ]
+    assert setup and steps.index(setup[0]) < steps.index(install)
 
 
 def test_shared_settings_aliasing_a_job_anchor_rebuild_everything() -> None:
