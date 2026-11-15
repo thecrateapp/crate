@@ -634,3 +634,55 @@ def test_blog_edit_does_not_rebuild_the_ryoku_site(path: str) -> None:
     assert detect_changed_images([path]) == {"site"}
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "app/web/src/content/blog/a-post.md",
+        "app/web/src/content/install/steps.ts",
+        "app/web/src/components/blog-viz/BlogFigure.astro",
+        "app/web/src/scripts/viz/blog/connect.ts",
+        "app/web/public/blog/cover.webp",
+        "app/web/Dockerfile",
+        "app/web/package.json",
+        "docs/technical/engineering-blog.md",
+    ],
+)
+def test_editorial_and_out_of_context_website_changes_reuse_the_agent(
+    path: str,
+) -> None:
+    assert release_manifest.detect_changed_agent_images([path]) == set()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "app/web/src/lib/blog.ts",
+        "app/web/src/components/Hero.astro",
+        "app/web/src/styles/tokens.css",
+        "app/web/src/scripts/motion/page.ts",
+        "app/web/src/pages/index.astro",
+        "app/web/AGENTS.md",
+    ],
+)
+def test_website_source_in_the_agent_context_rebuilds_the_agent(path: str) -> None:
+    assert release_manifest.detect_changed_agent_images([path]) == {"agent"}
+
+
+def test_agent_context_carries_app_web_only_from_its_source_tree() -> None:
+    # The agent exemption for app/web files outside app/web/src relies on this.
+    spec = importlib.util.spec_from_file_location(
+        "crate_hermes_context", ROOT / "scripts/hermes_context.py"
+    )
+    assert spec is not None and spec.loader is not None
+    hermes_context = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hermes_context)
+    web_roots = [
+        root for root in hermes_context.SOURCE_ROOTS if root.startswith("app/web")
+    ]
+    web_files = [
+        path for path in hermes_context.SOURCE_FILES if path.startswith("app/web")
+    ]
+    assert web_roots == ["app/web/src/"]
+    assert web_files == []
+
+

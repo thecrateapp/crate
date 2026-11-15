@@ -22,7 +22,17 @@ GLOBAL_BUILD_PATTERNS = (
     ".github/actions/**",
 )
 BUILD_WORKFLOW = ".github/workflows/build-images.yml"
-BLOG_BUILD_PATTERNS = ("app/web/**", "docs/technical/engineering-blog*.md")
+# Editorial website changes reuse the agent image. Its baked context keeps the
+# image's source_sha; managed hosts activate the exact release context at deploy.
+# Website code under app/web/src is part of that context and rebuilds the agent.
+EDITORIAL_PATTERNS = (
+    "app/web/src/content/**",
+    "app/web/src/components/blog-viz/**",
+    "app/web/src/scripts/viz/blog/**",
+    "docs/technical/engineering-blog*.md",
+)
+# scripts/hermes_context.py takes nothing from app/web outside these.
+AGENT_CONTEXT_WEB_PATHS = ("app/web/src/**", "app/web/AGENTS.md")
 
 
 @dataclass(frozen=True)
@@ -227,17 +237,19 @@ def detect_changed_images(
     return _detect(IMAGE_SPECS, paths, requested, workflow_images)
 
 
+def _affects_agent(path: str) -> bool:
+    if _matches(path, EDITORIAL_PATTERNS):
+        return False
+    return not path.startswith("app/web/") or _matches(path, AGENT_CONTEXT_WEB_PATHS)
+
+
 def detect_changed_agent_images(
     paths: Iterable[str],
     *,
     requested: str | None = None,
     workflow_images: set[str] | None = None,
 ) -> set[str]:
-    paths = [
-        path
-        for path in paths
-        if not _matches(path.removeprefix("./"), BLOG_BUILD_PATTERNS)
-    ]
+    paths = [path for path in paths if _affects_agent(path.strip().removeprefix("./"))]
     return _detect(AGENT_IMAGE_SPECS, paths, requested, workflow_images)
 
 
