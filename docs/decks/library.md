@@ -25,7 +25,7 @@ sources:
 
 # Library and search
 
-The library fills the lower part of the Crate Decks window: a sidebar on the
+The library fills the lower part of the Decks window: a sidebar on the
 left and a track table on the right. The sidebar has two sections:
 
 - **Crate**, with the library of each Crate server you are signed in to.
@@ -50,9 +50,9 @@ own with the same entries inside. **Genres**, **Moods**, **Recent** and
 | **Recent**    | The tracks you played most recently in Crate, newest first               |
 | **Likes**     | The tracks you liked in Crate, newest first                              |
 
-Crate Decks keeps a copy of the server's library tree and track list on this
+Decks keeps a copy of the server's library tree and track list on this
 computer, so the sidebar and the tables open at once. The first time you open
-a server in a session, Crate Decks checks it and fetches what changed, and
+a server in a session, Decks checks it and fetches what changed, and
 from then on it follows the server's changes by itself. To fetch again by
 hand, right-click the server and choose **Refresh**.
 
@@ -69,7 +69,7 @@ but you cannot load its tracks into a deck yet; that comes with the audio
 cache in a later version. Play your [local music](#local-music) in the
 meantime.
 
-The server must be recent enough to support Crate Decks; see
+The server must be recent enough to support Decks; see
 [Connecting to Crate](user-manual.md#connecting-to-crate).
 
 ## Local music
@@ -78,7 +78,7 @@ The **Local** section is the library of music files on this computer:
 
 - **Tracks** lists every track in your music folders. Add or remove folders
   in **Preferences › Library › Music Directories**, or in the first-start
-  dialog. Crate Decks scans new folders in the background, and
+  dialog. Decks scans new folders in the background, and
   **Library › Rescan Library** (Ctrl+Shift+L) scans them again.
 - **Auto DJ** is the queue that Auto DJ plays; see [AutoDJ](mixing.md#autodj).
 - **Playlists** and **Crates** are your own collections on this computer.
@@ -170,7 +170,7 @@ slider range, set in **Preferences › Library › Track Search**.
   library. **Rescan directories on start-up** and
   **Show scan summary dialog** control scanning.
 - **Audio File Formats:** the formats this build can play.
-- **Track Metadata Synchronization / Playlists:** whether Crate Decks reads
+- **Track Metadata Synchronization / Playlists:** whether Decks reads
   and writes track metadata from and to the file tags (also for Serato
   metadata, experimental), and whether exported playlists use relative paths.
 - **Track Table View:** what a double-click on a track does (load it into
@@ -184,7 +184,7 @@ slider range, set in **Preferences › Library › Track Search**.
 - **Session History:** how far apart a repeated track must be to be logged
   again, and the minimum number of tracks for a history playlist to be kept.
 - **External Libraries:** which other applications' libraries the Local
-  section shows. Restart Crate Decks after changing them.
+  section shows. Restart Decks after changing them.
 - **Preferred Cover Art Fetcher Resolution:** the cover size fetched when you
   import metadata from MusicBrainz.
 - **Settings Directory:** opens the

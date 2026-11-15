@@ -87,7 +87,7 @@ describe("extractHeadings", () => {
   });
 });
 
-// Crate Decks links to these pages and anchors from its Help menu, its
+// Decks links to these pages and anchors from its Help menu, its
 // Preferences pages and its dialogs. Renaming one of these headings breaks a
 // link in a shipped app, so they are a contract.
 const decksAnchors: Record<string, string[]> = {
@@ -134,9 +134,9 @@ const decksAnchors: Record<string, string[]> = {
   ],
 };
 
-describe("Crate Decks section", () => {
-  it("is a section with exactly the pages Crate Decks links to", () => {
-    expect(sectionMeta.decks.label).toBe("Crate Decks");
+describe("Decks section", () => {
+  it("is a section with exactly the pages Decks links to", () => {
+    expect(sectionMeta.decks.label).toBe("Decks");
     expect(docsBySection.decks.map((doc) => doc.slug).sort()).toEqual(
       Object.keys(decksAnchors).sort(),
     );

@@ -486,7 +486,7 @@ export const sectionMeta: Record<
     description: "Focused supporting references and documentation policy.",
   },
   decks: {
-    label: "Crate Decks",
+    label: "Decks",
     description:
       "The desktop DJ app: user manual, sound, controllers and help.",
   },

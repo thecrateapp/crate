@@ -32,14 +32,14 @@ they behave.
 The cue button of each deck stores and returns to the main cue point. How it
 reacts depends on the cue mode in **Preferences › Decks › Cue mode**:
 
-| Cue mode                           | Behavior                                                                                                                                                               |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Crate Decks mode**               | Paused at the cue point: plays while you hold it (preview). Paused elsewhere: sets the cue point. Playing: stops and returns to the cue point.                         |
-| **Crate Decks mode (no blinking)** | The same, without blinking indicators.                                                                                                                                 |
-| **Pioneer mode**                   | Like Crate Decks mode, with a flashing play button.                                                                                                                    |
-| **Denon mode**                     | At the cue point: preview. Elsewhere: stops at the cue point. Pressing play sets the cue point.                                                                        |
-| **Numark mode**                    | Like Denon mode, without a flashing play button.                                                                                                                       |
-| **CUP mode** (cue and play)        | Paused at the cue point: plays when you release it. Paused elsewhere: sets the cue point and plays on release. Playing: returns to the cue point and plays on release. |
+| Cue mode                     | Behavior                                                                                                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Decks mode**               | Paused at the cue point: plays while you hold it (preview). Paused elsewhere: sets the cue point. Playing: stops and returns to the cue point.                         |
+| **Decks mode (no blinking)** | The same, without blinking indicators.                                                                                                                                 |
+| **Pioneer mode**             | Like Decks mode, with a flashing play button.                                                                                                                          |
+| **Denon mode**               | At the cue point: preview. Elsewhere: stops at the cue point. Pressing play sets the cue point.                                                                        |
+| **Numark mode**              | Like Denon mode, without a flashing play button.                                                                                                                       |
+| **CUP mode** (cue and play)  | Paused at the cue point: plays when you release it. Paused elsewhere: sets the cue point and plays on release. Playing: returns to the cue point and plays on release. |
 
 Related options on the same page:
 
@@ -66,13 +66,13 @@ The **Sync** button of each deck matches its tempo to another deck:
   sync lock play at the same tempo, and decks that also have **Quantize** on
   keep their beats lined up. Tap it again to turn sync lock off.
 
-One deck leads the tempo and the others follow it. Crate Decks picks the
+One deck leads the tempo and the others follow it. Decks picks the
 leader by itself; with **Sync Leader** on a deck, that deck leads. This
 matters when the leader plays a track with a changing tempo: the followers
 adopt its tempo as it changes.
 
 **Preferences › Decks › Sync mode (Dynamic tempo tracks)** sets what happens
-when the tempo comes from a track with a changing tempo that Crate Decks
+when the tempo comes from a track with a changing tempo that Decks
 picked as leader (a soft leader), usually the outgoing track of a
 transition:
 

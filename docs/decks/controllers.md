@@ -28,14 +28,14 @@ sources:
 # Controllers
 
 Controllers are physical devices that send MIDI or HID messages to your
-computer, usually over USB. A **mapping** tells Crate Decks what each button,
+computer, usually over USB. A **mapping** tells Decks what each button,
 knob and fader does, and which lights to turn on.
 
 ## Using a controller
 
-1. Connect the controller before you start Crate Decks. If you connect it
-   while Crate Decks is running, restart Crate Decks.
-2. Open **Preferences › Controllers**. Each controller Crate Decks
+1. Connect the controller before you start Decks. If you connect it
+   while Decks is running, restart Decks.
+2. Open **Preferences › Controllers**. Each controller Decks
    recognizes is listed under **Controllers** in the Preferences sidebar.
 3. Select your controller, choose a mapping in **Load Mapping**, make sure
    **Enabled** is checked, and choose **Apply**.
@@ -49,11 +49,11 @@ If your controller has a built-in audio interface, choose it for the main
 and headphone outputs in [Sound hardware](sound.md#output-and-input-devices).
 
 On Linux, **Enable MIDI Through Port** adds a virtual MIDI controller, for
-example for a lighting mapping. Restart Crate Decks after turning it on.
+example for a lighting mapping. Restart Decks after turning it on.
 
 ## Supported controllers
 
-Crate Decks comes with more than 150 mappings for MIDI and HID controllers.
+Decks comes with more than 150 mappings for MIDI and HID controllers.
 The shipped mappings come with the app and are listed in
 **Preferences › Controllers**: select your controller and open
 **Load Mapping**. When a mapping has its own manual, its link on the
@@ -63,7 +63,7 @@ If there is no mapping for your controller:
 
 - **Make one with the MIDI Learning Wizard** (MIDI controllers only): select
   your controller in **Preferences › Controllers** and start the
-  **Learning Wizard**. You pick a control of Crate Decks, move the button or
+  **Learning Wizard**. You pick a control of Decks, move the button or
   knob it should follow, and the wizard adds that to the controller's
   mapping.
 - **Use a mapping someone else made:** put its XML (`.xml`) and JavaScript
@@ -84,7 +84,7 @@ A mapping is an XML file, plus optional JavaScript files:
 | `<name>.bulk.xml`   | USB bulk controller                   |
 | `<name>-scripts.js` | Script used by the mapping (any name) |
 
-Crate Decks reads mappings from two places: the shipped `controllers`
+Decks reads mappings from two places: the shipped `controllers`
 folder of the installation, and the `controllers` folder of your
 [settings directory](user-manual.md#settings-directory), which is your user
 mapping folder. Put your own mappings in the user folder, so that updates do
@@ -189,14 +189,14 @@ mappings may load, such as `common-controller-scripts.js` and
 `midi-components-0.0.js`, and TypeScript declaration files (`.d.ts`) that
 document the whole scripting API.
 
-While you write a mapping, start Crate Decks with `--controller-debug` to
+While you write a mapping, start Decks with `--controller-debug` to
 log every message the controller sends, and with
 `--controller-abort-on-warning` to make scripts fail on API misuse. See
 [Command line options](user-manual.md#command-line-options).
 
 ## Controls
 
-Every part of Crate Decks you can control has a **group** and a **key**,
+Every part of Decks you can control has a **group** and a **key**,
 like `[Channel1]` and `play`. Mappings, scripts and the
 [keyboard mapping](keyboard-shortcuts.md) use the same names. The control
 picker of the **Input Mappings** tab lists all of them with a description.
@@ -246,10 +246,10 @@ The root element of a mapping file carries two attributes:
 - **`schemaVersion`** is the version of the XML format. It is `1`.
 - **`mixxxVersion`** is the version of the controller engine the mapping was
   written for, with `+` for "this version or later", for example `2.1.0+`.
-  The attribute keeps that name in Crate Decks so that existing mappings
+  The attribute keeps that name in Decks so that existing mappings
   load unchanged.
 
-Crate Decks' controller engine is version 2.7. It loads mappings written for
+Decks' controller engine is version 2.7. It loads mappings written for
 2.7 and earlier versions; it does not refuse a mapping because of its
 `mixxxVersion`, so a mapping written for a later engine may load but use
 functions that this one does not have.
