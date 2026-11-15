@@ -318,6 +318,12 @@ def _fake_docker(tmp_path: Path) -> tuple[dict, Path]:
         "  exit 0\n"
         "fi\n"
         'if [[ "$*" == *"config --services"* ]]; then echo crate-agent; fi\n'
+        'if [[ "$1" == inspect ]]; then\n'
+        '  name="${@: -1}"; name="${name#id-}"; var="FAKE_IMAGE_${name//-/_}"\n'
+        '  image="${!var-${FAKE_IMAGE:-}}"\n'
+        '  [[ -n "$image" ]] || exit 1\n'
+        '  echo "$image"\n'
+        "fi\n"
     )
     docker.chmod(0o755)
     log = tmp_path / "docker.log"
@@ -479,33 +485,56 @@ def _agent_tooling(deploy: str) -> list[str]:
     return block[len("AGENT_TOOLING=(") : block.index(")")].split()
 
 
+AGENT_IMAGE = "official@sha256:same"
+
+
 @pytest.mark.parametrize(
-    ("changed", "old_image", "refresh"),
+    ("changed", "running_images", "refresh"),
     [
-        ("crate-site\n", "official@sha256:same", False),
-        ("crate-site\ncrate-docs\n", "official@sha256:same", False),
-        ("crate-site\n", "official@sha256:old", True),
-        ("crate-api\n", "official@sha256:same", True),
+        ("crate-site\n", {}, False),
+        ("crate-site\ncrate-docs\n", {}, False),
+        ("crate-ryoku-site\n", {}, False),
+        # The running containers, not the previous .env, decide.
+        ("crate-site\n", {"crate_operator": "official@sha256:old"}, True),
+        ("crate-site\n", {"crate_agent": "official@sha256:old"}, True),
+        # An image that cannot be inspected fails closed.
+        ("crate-site\n", {"crate_provenance": ""}, True),
+        ("crate-api\n", {}, True),
+        ("crate-site\ncrate-api\n", {}, True),
+        # A same-SHA redeploy (the retry path) changes no service.
+        ("", {}, True),
+        ("\n", {}, True),
     ],
 )
-def test_website_release_skips_operator_refresh_only_with_unchanged_image(
-    tmp_path, changed, old_image, refresh
+def test_website_release_skips_agent_refresh_only_when_running_images_match(
+    tmp_path, changed, running_images, refresh
 ):
     (tmp_path / ".env").write_text(
-        "CRATE_AGENT_IMAGE=official@sha256:same\nCRATE_RELEASE_SHA=new\n"
+        f"CRATE_AGENT_IMAGE={AGENT_IMAGE}\nCRATE_RELEASE_SHA=new\n"
     )
     backup = tmp_path / "backup"
     backup.mkdir()
+    # The previous .env already names the release image, as after a failed
+    # recreation; only the running containers show what is deployed.
     (backup / ".env").write_text(
-        f"CRATE_AGENT_IMAGE={old_image}\nCRATE_RELEASE_SHA=old\n"
+        f"CRATE_AGENT_IMAGE={AGENT_IMAGE}\nCRATE_RELEASE_SHA=old\n"
     )
     (backup / "changed_services").write_text(changed)
     env, log = _fake_docker(tmp_path)
     env.update(
-        FAKE_RUNNING="crate-operator crate-operator-supervisor crate-provenance",
+        FAKE_RUNNING=(
+            "crate-agent crate-operator crate-operator-supervisor crate-provenance"
+        ),
+        FAKE_IMAGE=AGENT_IMAGE,
         BACKUP_DIR=str(backup),
+        **{f"FAKE_IMAGE_{name}": image for name, image in running_images.items()},
     )
-    script = "COMPOSE=(docker compose)\nOPERATOR_OVERLAY=deploy/operator/compose.operator.yaml\n"
+    remote = (ROOT / "scripts/deploy-remote.sh").read_text()
+    arrays = remote[remote.index("PROJECT_SERVICES=(") : remote.index("\nlog() {")]
+    script = (
+        "IMAGE_PREFIX=ghcr.io/thecrateapp\nCOMPOSE=(docker compose)\n"
+        "OPERATOR_OVERLAY=deploy/operator/compose.operator.yaml\n" + arrays
+    )
     script += "\n".join(
         _shell_function(name)
         for name in (
@@ -513,6 +542,8 @@ def test_website_release_skips_operator_refresh_only_with_unchanged_image(
             "dc",
             "env_file_value",
             "env_value",
+            "website_only_release",
+            "running_agent_images_match",
             "refresh_running_agent",
         )
     )
@@ -525,6 +556,21 @@ def test_website_release_skips_operator_refresh_only_with_unchanged_image(
         check=True,
     )
     assert (" up " in log.read_text()) is refresh
+
+
+def test_website_services_match_the_website_images() -> None:
+    spec = importlib.util.spec_from_file_location(
+        "website_services_fixture", ROOT / "scripts/release_manifest.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    remote = (ROOT / "scripts/deploy-remote.sh").read_text()
+    block = remote[remote.index("WEBSITE_RELEASE_ENV_KEYS=(") :]
+    keys = block[len("WEBSITE_RELEASE_ENV_KEYS=(") : block.index(")")].split()
+    assert sorted(keys) == sorted(
+        module.IMAGE_SPECS[name].environment for name in ("site", "docs", "ryoku-site")
+    )
 
 
 @pytest.mark.parametrize("changed", [("site",), ("site", "docs")])

@@ -91,6 +91,13 @@ SENTRY_RELEASE_ENV_KEYS=(
   CRATE_PLAYBACK_WORKER_SENTRY_RELEASE
   CRATE_MEDIA_WORKER_SENTRY_RELEASE
 )
+# Static website images. A release that changes only these keeps the running
+# Crate Agent and Crate Operator containers (see refresh_running_agent).
+WEBSITE_RELEASE_ENV_KEYS=(
+  CRATE_SITE_IMAGE
+  CRATE_DOCS_IMAGE
+  CRATE_RYOKU_SITE_IMAGE
+)
 # Agent images are optional: older manifests do not carry them. A deployment
 # only recreates a Crate Agent that is already running.
 OPTIONAL_RELEASE_ENV_KEYS=(
@@ -1028,6 +1035,42 @@ cmd_agent_context() {
 # context matches the deployed release. Compose recreates only containers whose
 # image or configuration changed; the supervisor, relay and provenance publisher
 # follow only if running.
+# True only when this deploy changed at least one service and every changed
+# service is a static website. An empty list (a same-SHA redeploy, which is
+# also the retry path for a failed agent recreation) is not website-only.
+website_only_release() {
+  local changed="${BACKUP_DIR:-}/changed_services" key service services=() website=() count=0
+  [[ -n "${BACKUP_DIR:-}" && -f "$changed" ]] || return 1
+  for key in "${WEBSITE_RELEASE_ENV_KEYS[@]}"; do
+    read -r -a services <<< "${RELEASE_ENV_SERVICES[$key]}"
+    website+=("${services[@]}")
+  done
+  while IFS= read -r service || [[ -n "$service" ]]; do
+    [[ -n "$service" ]] || continue
+    [[ " ${website[*]} " == *" ${service} "* ]] || return 1
+    count=$((count + 1))
+  done < "$changed"
+  (( count > 0 ))
+}
+
+# True only when every running container built from the agent image runs
+# exactly the expected reference. Anything that cannot be inspected fails closed.
+running_agent_images_match() {
+  local expected="$1" ids=() id image service
+  id="$(docker ps -q -f name='^crate-agent$')" || return 1
+  [[ -z "$id" ]] || ids+=("$id")
+  if [[ -n "$OPERATOR_OVERLAY" ]]; then
+    for service in crate-operator crate-operator-supervisor crate-infra-relay crate-provenance; do
+      id="$(dc --profile crate-operator ps -q --status running "$service" 2>/dev/null)" || return 1
+      [[ -z "$id" ]] || ids+=("$id")
+    done
+  fi
+  for id in "${ids[@]}"; do
+    image="$(docker inspect -f '{{.Config.Image}}' "$id" 2>/dev/null)" || return 1
+    [[ -n "$image" && "$image" == "$expected" ]] || return 1
+  done
+}
+
 refresh_running_agent() {
   local services=() service
   [[ -n "$(env_value CRATE_AGENT_IMAGE)" ]] || return 0
@@ -1035,9 +1078,9 @@ refresh_running_agent() {
   # the gateway would recreate it for that environment value alone, even when
   # its image is unchanged. The source snapshot remains versioned; managed
   # contexts are activated independently above, without restarting processes.
-  if [[ -n "${BACKUP_DIR:-}" && -f "$BACKUP_DIR/.env" && -f "$BACKUP_DIR/changed_services" ]] \
-    && [[ "$(env_file_value "$BACKUP_DIR/.env" CRATE_AGENT_IMAGE)" == "$(env_value CRATE_AGENT_IMAGE)" ]] \
-    && ! grep -qvE '^(crate-site|crate-docs)$' "$BACKUP_DIR/changed_services"; then
+  # Compare against the running containers rather than the previous .env, so a
+  # failed earlier recreation is still repaired.
+  if website_only_release && running_agent_images_match "$(env_value CRATE_AGENT_IMAGE)"; then
     log "Website-only release; keeping the running agent and operator containers"
     return 0
   fi
