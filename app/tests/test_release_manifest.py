@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import fnmatch
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from copy import deepcopy
@@ -549,3 +551,86 @@ def test_agent_image_is_an_optional_entry_outside_the_fleet() -> None:
     unknown["agent_images"]["other"] = entry
     with pytest.raises(ManifestError, match="unknown agent image"):
         validate_manifest(unknown)
+
+
+RYOKU_DOCKERFILE = ROOT / "app/ryoku/Dockerfile"
+CRATE_WEB_IMPORT = re.compile(r"""["']@crate-web/([^"']+)["']""")
+RELATIVE_IMPORT = re.compile(r"""(?:from|import)\s+["'](\.{1,2}/[^"']+)["']""")
+
+
+def _ryoku_web_copies() -> set[str]:
+    """app/web sources the ryoku-site image copies, as change-detection patterns."""
+    copies = set()
+    for line in RYOKU_DOCKERFILE.read_text().splitlines():
+        parts = line.split()
+        if parts[:1] != ["COPY"] or any(part.startswith("--") for part in parts):
+            continue
+        for source in parts[1:-1]:
+            if source.startswith("app/web/"):
+                copies.add(source + "**" if source.endswith("/") else source)
+    return copies
+
+
+def _resolve_web_source(path: Path) -> Path:
+    for candidate in (path, *(path.with_name(path.name + s) for s in (".ts", ".js"))):
+        if candidate.is_file():
+            return candidate
+    raise AssertionError(f"unresolved app/web import: {path}")
+
+
+def _ryoku_web_dependencies() -> set[str]:
+    """Every app/web file app/ryoku reaches through @crate-web, transitively."""
+    web_src = ROOT / "app/web/src"
+    pending = [
+        _resolve_web_source(web_src / match)
+        for source in (ROOT / "app/ryoku/src").rglob("*")
+        if source.is_file()
+        for match in CRATE_WEB_IMPORT.findall(source.read_text(errors="ignore"))
+    ]
+    seen: set[Path] = set()
+    while pending:
+        path = pending.pop()
+        if path in seen:
+            continue
+        seen.add(path)
+        for relative in RELATIVE_IMPORT.findall(path.read_text()):
+            pending.append(_resolve_web_source((path.parent / relative).resolve()))
+    return {str(path.relative_to(ROOT)) for path in seen}
+
+
+def test_ryoku_site_patterns_match_exactly_what_its_image_copies() -> None:
+    web_patterns = {
+        pattern
+        for pattern in IMAGE_SPECS["ryoku-site"].patterns
+        if pattern.startswith("app/web/")
+    }
+    assert web_patterns == _ryoku_web_copies()
+    assert not any(
+        pattern.startswith(("app/web/src/content", "app/web/src/**"))
+        for pattern in web_patterns
+    )
+
+
+def test_ryoku_image_copies_every_app_web_file_the_ryoku_site_imports() -> None:
+    dependencies = _ryoku_web_dependencies()
+    assert dependencies, "app/ryoku no longer imports @crate-web"
+    copies = _ryoku_web_copies()
+    assert {
+        path
+        for path in dependencies
+        if not any(fnmatch.fnmatchcase(path, pattern) for pattern in copies)
+    } == set()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "app/web/src/content/blog/a-post.md",
+        "app/web/src/components/blog-viz/BlogFigure.astro",
+        "app/web/src/lib/blog.ts",
+    ],
+)
+def test_blog_edit_does_not_rebuild_the_ryoku_site(path: str) -> None:
+    assert detect_changed_images([path]) == {"site"}
+
+

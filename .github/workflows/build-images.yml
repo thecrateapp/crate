@@ -445,8 +445,8 @@ jobs:
           tags: |
             type=sha,prefix=,format=long
 
-      # NOTE: repo-root context: the Dockerfile copies app/web/src, fonts and icons
-      # beside app/ryoku for the @crate-web alias.
+      # NOTE: repo-root context: the Dockerfile copies the app/web sources it imports,
+      # fonts and icons beside app/ryoku for the @crate-web alias.
       - uses: docker/build-push-action@v7
         id: build
         with:

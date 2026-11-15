@@ -4,7 +4,11 @@ WORKDIR /repo/app/ryoku
 COPY app/ryoku/package.json app/ryoku/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 # The site builds on app/web's tokens, fonts and motion scripts (the @crate-web alias).
-COPY app/web/src/ /repo/app/web/src/
+# Copy only what it imports, so website content and blog edits do not rebuild it;
+# scripts/release_manifest.py watches exactly these paths.
+COPY app/web/src/styles/ /repo/app/web/src/styles/
+COPY app/web/src/scripts/motion/ /repo/app/web/src/scripts/motion/
+COPY app/web/src/lib/clipboard.ts /repo/app/web/src/lib/clipboard.ts
 COPY app/web/public/fonts/ /repo/app/web/public/fonts/
 COPY app/web/public/icons/ /repo/app/web/public/icons/
 COPY app/ryoku/ .

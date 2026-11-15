@@ -129,14 +129,17 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
         services=("crate-docs",),
         patterns=("app/docs/**", "app/shared/**", "docs/**"),
     ),
-    # ryoku.cratemusic.app builds on app/web's source, fonts and icons (app/ryoku/Dockerfile).
+    # ryoku.cratemusic.app builds on the app/web sources, fonts and icons that
+    # app/ryoku/Dockerfile copies; these patterns must name exactly those copies.
     "ryoku-site": ImageSpec(
         repository="crate-ryoku-site",
         environment="CRATE_RYOKU_SITE_IMAGE",
         services=("crate-ryoku-site",),
         patterns=(
             "app/ryoku/**",
-            "app/web/src/**",
+            "app/web/src/styles/**",
+            "app/web/src/scripts/motion/**",
+            "app/web/src/lib/clipboard.ts",
             "app/web/public/fonts/**",
             "app/web/public/icons/**",
         ),
