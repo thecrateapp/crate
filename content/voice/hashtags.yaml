@@ -1,0 +1,18 @@
+# Instagram hashtags. The social-copy skill only uses `approved`; `proposed` waits for Diego.
+# At most 8 per post. No banned or hype tags.
+# Approved by Diego on 2026-11-03. `mixxx` only on Crate Decks posts.
+
+approved:
+  - selfhosted
+  - homelab
+  - opensource
+  - musiclibrary
+  - flac
+  - djmix
+  - mixxx
+  - ownyourmusic
+
+# bandcamp: only on posts about buying music from artists; pending Diego.
+proposed:
+  - tag: bandcamp
+    audience: fans

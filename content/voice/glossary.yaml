@@ -1,0 +1,82 @@
+# Canonical names and words to avoid. Loaded by the crate-voice and crate-fact-check skills.
+# `terms[].avoid` are wrong spellings or names for that term; `banned` are words Crate never uses.
+
+terms:
+  - canonical: Crate
+    note: The platform. Not "CrateMusic"; the domain is cratemusic.app.
+    avoid: [CrateMusic, Crate Music, crate.app]
+  - canonical: Listen
+    note: The listening app (web, PWA, iOS, Android, desktop). "Crate Listen" on first mention.
+    avoid: [Crate Player, the player app]
+  - canonical: Admin
+    note: The administration app. "Crate Admin" on first mention.
+    avoid: [dashboard, control panel, back office]
+  - canonical: Crate Decks
+    note: The DJ app, based on Mixxx. Always credit Mixxx.
+    avoid: [CrateDecks, Crate DJ, Mixxx fork]
+  - canonical: Smart Mix
+    note: Planned transitions between tracks. Server plans, client plays.
+    avoid: [SmartMix, AI DJ, automix, crossfade]
+  - canonical: Music Paths
+    note: A generated route of tracks from one point to another.
+    avoid: [music path generator, playlist journeys]
+  - canonical: Radio
+    note: The next track chosen by how it sounds. "Discovery Radio" when talking about its weights.
+    avoid: [AI radio, stations]
+  - canonical: bliss
+    note: The audio-similarity library and its 20-number vectors. Lowercase, as the project writes it.
+    avoid: [Bliss, BLISS]
+  - canonical: read plane
+    note: The low-latency read service. "readplane" only for the code path or container name.
+    avoid: [read-plane, cache layer]
+  - canonical: projector
+    note: The service that turns domain events into warmed snapshots.
+    avoid: [projection worker]
+  - canonical: enrichment
+    note: Metadata, artwork and context gathered for the library.
+    avoid: [scraping]
+  - canonical: OpenSubsonic
+    note: The Subsonic-compatible API at /rest.
+    avoid: [Subsonic API]
+  - canonical: federation
+    note: Connecting Crate servers to each other.
+    avoid: [peer to peer, P2P]
+  - canonical: Jams
+    note: Shared rooms with one queue. In development, behind a flag.
+    avoid: [listening parties feature]
+  - canonical: Stack map
+    note: The live drawing of the host in Admin.
+    avoid: [topology view]
+  - canonical: Library health
+    note: Duplicates, orphans and stale files, checked for you.
+    avoid: [library cleaner]
+  - canonical: self-hosted
+    note: Hyphenated in prose. The website eyebrow "self hosted" is a styled exception.
+    avoid: [selfhosted, on-prem, on-premise]
+  - canonical: open source
+    note: Crate is AGPL-3.0. Crate Decks is GPL-2.0-or-later.
+    avoid: [open-core, source-available]
+
+banned:
+  - term: game-changer
+    reason: Hype without content.
+  - term: revolutionary
+    reason: The website says "a tool for revolution" on purpose; do not turn it into a marketing adjective.
+  - term: seamless
+    reason: Vague; describe what actually happens.
+  - term: blazing fast
+    reason: Give the number instead.
+  - term: next-gen
+    reason: Hype.
+  - term: supercharge
+    reason: Hype.
+  - term: unlock
+    reason: Marketing filler.
+  - term: leverage
+    reason: Corporate filler.
+  - term: magic
+    reason: Crate explains how things work.
+  - term: Spotify killer
+    reason: The manifesto's point is making the platforms irrelevant, not competing with them.
+  - term: AI-powered
+    reason: Name the feature and what the model does instead.
