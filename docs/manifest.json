@@ -635,8 +635,8 @@
     "sourcePath": "docs/decks/user-manual.md",
     "route": "/decks/user-manual",
     "section": "decks",
-    "title": "Crate Decks user manual",
-    "summary": "Start Crate Decks, connect it to your Crate server and find your way around the desktop DJ app.",
+    "title": "Decks user manual",
+    "summary": "Start Decks, connect it to your Crate server and find your way around the desktop DJ app.",
     "keywords": [
       "crate decks",
       "manual",
@@ -670,7 +670,7 @@
     "route": "/decks/analysis",
     "section": "decks",
     "title": "Track analysis",
-    "summary": "What Crate's analysis gives Crate Decks, and how the beat and key detectors analyze your local tracks.",
+    "summary": "What Crate's analysis gives Decks, and how the beat and key detectors analyze your local tracks.",
     "keywords": ["crate decks", "bpm", "beatgrid", "key", "camelot"],
     "order": 40
   },
@@ -703,7 +703,7 @@
     "route": "/decks/keyboard-shortcuts",
     "section": "decks",
     "title": "Keyboard shortcuts",
-    "summary": "The default keyboard mapping of Crate Decks for the decks, the mixer, Auto DJ, the library and the menus.",
+    "summary": "The default keyboard mapping of Decks for the decks, the mixer, Auto DJ, the library and the menus.",
     "keywords": ["crate decks", "keyboard", "shortcuts", "keys"],
     "order": 70
   },
@@ -736,7 +736,7 @@
     "route": "/decks/community",
     "section": "decks",
     "title": "Help and community",
-    "summary": "Where to ask questions about Crate Decks, how to report a bug, and how to help with translations and controller mappings.",
+    "summary": "Where to ask questions about Decks, how to report a bug, and how to help with translations and controller mappings.",
     "keywords": ["crate decks", "help", "bugs", "translations", "mappings"],
     "order": 100
   }
