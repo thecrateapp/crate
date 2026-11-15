@@ -223,3 +223,27 @@ def test_read_only_services_take_configs_from_files():
             source = entry["source"] if isinstance(entry, dict) else entry
             assert set(configs[source]) == {"file"}, (name, source)
             assert (ROOT / configs[source]["file"]).is_file(), (name, source)
+
+
+AGENT_COMPOSE_FILES = (
+    "docker-compose.yaml",
+    "docker-compose.home.yaml",
+    "deploy/operator/compose.operator.yaml",
+)
+
+
+def test_agent_image_services_carry_no_per_release_environment():
+    """A new release SHA alone must not change, and so recreate, agent containers.
+
+    The deployed release reaches them through the deployment.json marker.
+    """
+    found = []
+    for name in AGENT_COMPOSE_FILES:
+        services = yaml.safe_load((ROOT / name).read_text())["services"]
+        for service_name, service in services.items():
+            if "CRATE_AGENT_IMAGE" not in str(service.get("image", "")):
+                continue
+            found.append(service_name)
+            environment = service.get("environment") or {}
+            assert "CRATE_RELEASE_SHA" not in str(environment), (name, service_name)
+    assert {"crate-agent", "crate-operator"} <= set(found)

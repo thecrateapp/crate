@@ -236,11 +236,8 @@ def select_context_root(candidates=(HOST_CONTEXT, IMAGE_CONTEXT)) -> Path | None
 
 
 def _context_env(context_root: Path | None) -> dict:
-    env = {"CRATE_CONTEXT_ROOT": str(context_root or HOST_CONTEXT)}
-    release = os.environ.get("CRATE_RELEASE_SHA", "").strip()
-    if release:
-        env["CRATE_RELEASE_SHA"] = release
-    return env
+    # The deployed release comes from the host deployment marker, not the env.
+    return {"CRATE_CONTEXT_ROOT": str(context_root or HOST_CONTEXT)}
 
 
 def _public(config: dict) -> dict:

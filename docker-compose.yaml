@@ -35,7 +35,6 @@ services:
       CRATE_AGENT_PROVIDER: ${CRATE_AGENT_PROVIDER:-}
       CRATE_AGENT_MODEL: ${CRATE_AGENT_MODEL:-}
       CRATE_AGENT_BASE_URL: ${CRATE_AGENT_BASE_URL:-}
-      CRATE_RELEASE_SHA: ${CRATE_RELEASE_SHA:-}
     volumes:
       - ${DATA_DIR}/crate-agent/home:/opt/data
       - ${DATA_DIR}/crate-agent/secrets:/run/crate-hermes-secrets:ro

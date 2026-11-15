@@ -6,10 +6,26 @@ import os
 from pathlib import Path, PurePosixPath
 
 
+# Every deploy records the deployed release here, in the host directory mounted
+# into the container, whether or not a host context has been activated yet.
+HOST_MARKER = Path("/opt/crate-context/deployment.json")
+
+
 class ContextStore:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, host_marker: Path = HOST_MARKER):
         # Keep the lexical active path: each call observes an atomic release switch.
         self.root = root
+        self.host_marker = host_marker
+
+    def _deployment(self, manifest: dict) -> dict:
+        # The marker beside an activated context, else the host marker (an image
+        # context before activation), else the context's own release. The release
+        # SHA is never read from the environment: that would make every release
+        # change, and so recreate, the agent containers.
+        for marker in (self.root.parent / "deployment.json", self.host_marker):
+            if marker.is_file():
+                return json.loads(marker.read_text())
+        return {"release_sha": manifest["release_sha"], "state": "verified"}
 
     def _manifest(self):
         manifest = json.loads((self.root / "context-manifest.json").read_text())
@@ -41,15 +57,7 @@ class ContextStore:
 
     def summary(self) -> dict:
         manifest = self._manifest()
-        marker = self.root.parent / "deployment.json"
-        if marker.is_file():
-            deployment = json.loads(marker.read_text())
-        else:
-            running = os.environ.get("CRATE_RELEASE_SHA", "").strip()
-            deployment = {
-                "release_sha": running or manifest["release_sha"],
-                "state": "verified",
-            }
+        deployment = self._deployment(manifest)
         observed = deployment.get("release_sha")
         current = (
             observed == manifest["release_sha"]
