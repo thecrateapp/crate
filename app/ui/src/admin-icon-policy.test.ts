@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import ts from "typescript";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   analyzeSource,
   buildInventory,
@@ -2201,6 +2201,13 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
 }
 
 describe("Admin icon retirement policy — migrated Admin surfaces", () => {
+  // The repository inventory walks and parses every Admin source: build it
+  // once for the whole block, with a budget for loaded CI runners, instead of
+  // inside each test where it ate most of the 15 s per-test timeout.
+  let repoInventory: ReturnType<typeof buildInventory>;
+  beforeAll(() => {
+    repoInventory = buildInventory(repo);
+  }, 120_000);
   it("does not misclassify the exact shared action wrapper, while still auditing its children", () => {
     const source =
       'import {ActionIconButton} from "@crate/ui/primitives/ActionIconButton"; import {Trash2} from "@crate/ui/icons"; const view=<ActionIconButton title="Delete"><Trash2/></ActionIconButton>;';
@@ -2243,7 +2250,7 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
     ).toBeGreaterThan(0);
   });
   it("rejects direct, passed, mapped, dynamic and wrapped glyphs in the migrated files", () => {
-    const inventory = buildInventory(repo);
+    const inventory = repoInventory;
     const sources = new Map(
       scope.map((path) => [path, readFileSync(join(repo, path), "utf8")]),
     );
@@ -2256,7 +2263,7 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
         readFileSync(join(repo, path), "utf8"),
       ]),
     );
-    expect(violations(sources, buildInventory(repo).entries)).toEqual([]);
+    expect(violations(sources, repoInventory.entries)).toEqual([]);
   }, 15_000);
   it("keeps editor glyph approvals aligned with the current Solar action sites", () => {
     for (const component of ["PlaylistEditor", "PlaylistEditorTrackList"]) {
