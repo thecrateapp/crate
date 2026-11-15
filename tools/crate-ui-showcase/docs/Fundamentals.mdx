@@ -308,3 +308,9 @@ display role. PageHeader and the Admin page titles use it instead of hand-writte
 Text panel tabs scroll without drawing a scrollbar when they overflow, and tighten their gap to 16px at 480px and below so four tabs fit a phone.
 
 `crate-touch-target` gives a compact control an invisible coarse-pointer hit area of at least 44px around its visible box, so touch reach does not change the control's size.
+
+Hidden desktop window (2026-11-14): `animations.css` pauses every animation and drops transitions
+under `:root[data-crate-window="hidden"]`. Only the Tauri desktop shell sets it, from the
+compositor, while its window is on no monitor: WebKitGTK keeps painting filter, box-shadow and
+border-radius animations there (the play-button pulses), so they would otherwise run unseen and
+resume from a stale frame. The web never sets the attribute; no visual change on any surface.

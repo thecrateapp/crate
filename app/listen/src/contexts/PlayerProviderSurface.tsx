@@ -1,5 +1,6 @@
 import { Button } from "@crate/ui/shadcn/button";
 import { PlayerClockProvider } from "./PlayerClock";
+import { PlayerTimeReaderContext } from "./player-time-reader";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -19,6 +20,8 @@ interface PlayerProviderSurfaceProps {
   actionsValue: PlayerActionsValue;
   stateValue: PlayerStateValue;
   progressValue: PlayerProgressValue;
+  /** Exact position between the ~4 Hz progress commits. */
+  readCurrentTime?: () => number;
   playbackNeedsUserGesture: boolean;
   currentTrack: Track | undefined;
   resumeAfterUserGesture: () => void;
@@ -29,23 +32,26 @@ export function PlayerProviderSurface({
   actionsValue,
   stateValue,
   progressValue,
+  readCurrentTime,
   playbackNeedsUserGesture,
   currentTrack,
   resumeAfterUserGesture,
 }: PlayerProviderSurfaceProps) {
   return (
     <PlayerClockProvider value={progressValue}>
-      <PlayerActionsContext.Provider value={actionsValue}>
-        <PlayerStateContext.Provider value={stateValue}>
-          <PlayerProgressContext.Provider value={progressValue}>
-            {children}
-            <ContinuePlaybackPrompt />
-            {playbackNeedsUserGesture && currentTrack ? (
-              <ResumePlaybackPrompt onResume={resumeAfterUserGesture} />
-            ) : null}
-          </PlayerProgressContext.Provider>
-        </PlayerStateContext.Provider>
-      </PlayerActionsContext.Provider>
+      <PlayerTimeReaderContext value={readCurrentTime ?? null}>
+        <PlayerActionsContext.Provider value={actionsValue}>
+          <PlayerStateContext.Provider value={stateValue}>
+            <PlayerProgressContext.Provider value={progressValue}>
+              {children}
+              <ContinuePlaybackPrompt />
+              {playbackNeedsUserGesture && currentTrack ? (
+                <ResumePlaybackPrompt onResume={resumeAfterUserGesture} />
+              ) : null}
+            </PlayerProgressContext.Provider>
+          </PlayerStateContext.Provider>
+        </PlayerActionsContext.Provider>
+      </PlayerTimeReaderContext>
     </PlayerClockProvider>
   );
 }

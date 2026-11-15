@@ -138,6 +138,7 @@ describe("usePlayerEngineCallbacks", () => {
     await Promise.resolve();
 
     expect(options.beginSoftInterruption).toHaveBeenCalledWith("stream");
+    expect(options.commitIsPlaying).toHaveBeenCalledWith(false);
     consoleError.mockRestore();
   });
 
@@ -195,6 +196,20 @@ describe("usePlayerEngineCallbacks", () => {
     expect(options.recordPlaybackQualityProgress).toHaveBeenCalledWith(12);
   });
 
+  it("routes engine ticks through the coalescing tick committer", () => {
+    const options = {
+      ...createOptions(),
+      commitPlaybackTick: vi.fn(),
+    };
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onTimeUpdate?.(12_500, 0);
+
+    expect(options.commitPlaybackTick).toHaveBeenCalledWith(12.5);
+    expect(options.commitCurrentTime).not.toHaveBeenCalled();
+    expect(options.recordPlaybackQualityProgress).toHaveBeenCalledWith(12.5);
+  });
+
   it("marks playback active as soon as the engine accepts a play request", () => {
     const options = createOptions();
     options.isPlayingRef.current = false;
@@ -213,6 +228,23 @@ describe("usePlayerEngineCallbacks", () => {
     options.callbacksRef.current.onPlay?.("/stream/a");
 
     expect(options.onActivePlaybackStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps recovered playback paused until the engine starts the track", () => {
+    const options = createOptions();
+    options.isPlayingRef.current = false;
+    options.isSoftInterrupted.mockReturnValue(true);
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onPlayRequest?.("/stream/a");
+    options.callbacksRef.current.onTimeUpdate?.(0, 0);
+    options.callbacksRef.current.onLoad?.("/stream/a", false, 120_000);
+    expect(options.commitIsPlaying).not.toHaveBeenCalledWith(true);
+    expect(options.commitIsBuffering).not.toHaveBeenCalledWith(false);
+
+    options.callbacksRef.current.onPlay?.("/stream/a");
+    expect(options.commitIsPlaying).toHaveBeenCalledWith(true);
+    expect(options.commitIsBuffering).toHaveBeenCalledWith(false);
   });
 
   it("clears soft interruption before waking refill on recovered playback", () => {

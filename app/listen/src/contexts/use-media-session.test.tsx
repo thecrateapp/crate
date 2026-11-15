@@ -1,12 +1,22 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { NativeMediaControlEvent } from "@/lib/native-media-session-bridge";
+import { syncDesktopMediaSession } from "@/lib/desktop-tray";
+import {
+  clearMediaAccessTickets,
+  setMediaAccessTickets,
+} from "@/lib/media-access";
+import { getCurrentServerId } from "@/lib/server-store";
 
 import type { Track } from "./player-types";
 import { useMediaSession } from "./use-media-session";
 
-const runtime = vi.hoisted(() => ({ isNative: false, isIosBrowser: false }));
+const runtime = vi.hoisted(() => ({
+  isNative: false,
+  isIosBrowser: false,
+  isTauriRuntime: false,
+}));
 const nativeMediaSession = vi.hoisted(() => ({
   cancelPendingResume: vi.fn(async () => {}),
   controlListener: null as ((event: NativeMediaControlEvent) => void) | null,
@@ -51,7 +61,13 @@ vi.mock("@/lib/native-media-session", () => ({
 }));
 
 vi.mock("@/lib/platform", () => ({
-  isTauriRuntime: false,
+  get isTauriRuntime() {
+    return runtime.isTauriRuntime;
+  },
+}));
+
+vi.mock("@/lib/server-store", () => ({
+  getCurrentServerId: vi.fn(),
 }));
 
 const TRACK_A: Track = {
@@ -131,6 +147,7 @@ function getMediaSessionActionHandler(
 beforeEach(() => {
   runtime.isNative = false;
   runtime.isIosBrowser = false;
+  runtime.isTauriRuntime = false;
   nativeMediaSession.controlListener = null;
   nativeMediaSession.resumeAllowed = true;
   vi.clearAllMocks();
@@ -174,6 +191,45 @@ afterEach(() => {
 });
 
 describe("useMediaSession", () => {
+  it("keeps the desktop track identity through ticket and artwork updates", () => {
+    runtime.isTauriRuntime = true;
+    vi.mocked(getCurrentServerId).mockReturnValue("server-a");
+    const { rerender, unmount } = renderSession();
+    const latest = () => vi.mocked(syncDesktopMediaSession).mock.lastCall![0];
+    const firstId = latest().mediaId;
+    expect(firstId).toBeTruthy();
+
+    act(() => {
+      setMediaAccessTickets(
+        [
+          {
+            audience: "artwork",
+            path: "/api/artwork/other",
+            ticket: "new-ticket",
+            expires_at: "2099-01-01T00:00:00Z",
+          },
+        ],
+        "server-a",
+      );
+    });
+    expect(latest().mediaId).toBe(firstId);
+
+    rerender({
+      track: { ...TRACK_A, albumCover: "/new-cover" },
+      time: 1,
+      playing: true,
+    });
+    expect(latest()).toMatchObject({ mediaId: firstId, artwork: "/new-cover" });
+
+    vi.mocked(getCurrentServerId).mockReturnValue("server-b");
+    act(() => clearMediaAccessTickets());
+    const secondServerId = latest().mediaId;
+    expect(secondServerId).not.toBe(firstId);
+    rerender({ track: { ...TRACK_A, id: TRACK_B.id }, time: 0, playing: true });
+    expect(latest().mediaId).not.toBe(secondServerId);
+    unmount();
+  });
+
   it("offers seek and track skipping on non-iOS browsers", () => {
     renderSession();
 

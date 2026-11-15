@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   dispatchOAuthCallbackResult,
   mergeInitialDeepLinkUrls,
+  relayDesktopControlPayload,
   shouldUseTauriHttpPlugin,
 } from "./tauri-init";
 
@@ -250,5 +251,29 @@ describe("desktop appearance bootstrap", () => {
     expect(
       initSource.split("export function startTauriOAuthRuntime")[0],
     ).not.toContain("initDeepLinks()");
+  });
+});
+
+describe("relayDesktopControlPayload", () => {
+  it("relays valid control commands to Listen and drops the rest", () => {
+    const received = vi.fn();
+    vi.stubGlobal(
+      "window",
+      Object.assign(new EventTarget(), { setTimeout: () => 0 }),
+    );
+    window.addEventListener("crate:desktop-control-command", received);
+
+    expect(relayDesktopControlPayload({ cmd: "eq_mode", mode: "genre" })).toBe(
+      true,
+    );
+    expect(received).toHaveBeenCalledTimes(1);
+    expect(received.mock.calls[0]?.[0]).toMatchObject({
+      detail: { cmd: "eq_mode", mode: "genre" },
+    });
+
+    expect(relayDesktopControlPayload({ cmd: "quit" })).toBe(false);
+    expect(relayDesktopControlPayload("eq_mode")).toBe(false);
+    expect(received).toHaveBeenCalledTimes(1);
+    window.removeEventListener("crate:desktop-control-command", received);
   });
 });

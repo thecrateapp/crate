@@ -88,12 +88,22 @@ export function useSoftInterruption({
   const recoveryTimerRef = useRef<number | null>(null);
   const recoveryProbeInFlightRef = useRef(false);
   const recoveryFailuresRef = useRef(0);
+  const webPlaybackAttemptsRef = useRef(0);
   const interruptionStartedAtRef = useRef<number | null>(null);
   const recoveryWindowStartedAtRef = useRef(0);
   // Forward-declared so callbacks can reach the latest implementation.
   const maybeResumeRef = useRef<() => Promise<void>>(async () => {});
   const cancelSoftInterruptionRef = useRef<() => void>(() => {});
   const scheduleStallProtectionRef = useRef<() => void>(() => {});
+  // Callers pass these inline. Read the latest through refs so the returned
+  // controls keep their identity: the player actions are built from them,
+  // and new actions on every render re-render every actions consumer.
+  const onPlaybackStallRef = useRef(onPlaybackStall);
+  const onPlaybackStallEndedRef = useRef(onPlaybackStallEnded);
+  useLayoutEffect(() => {
+    onPlaybackStallRef.current = onPlaybackStall;
+    onPlaybackStallEndedRef.current = onPlaybackStallEnded;
+  });
 
   const hasSafeBufferedAhead = useCallback(
     () =>
@@ -147,11 +157,12 @@ export function useSoftInterruption({
 
       softInterruptionReasonRef.current = reason;
       shouldAutoResumeAfterInterruptionRef.current = true;
-      onPlaybackStall?.();
+      onPlaybackStallRef.current?.();
       interruptionStartedAtRef.current = Date.now();
       recoveryWindowStartedAtRef.current = Date.now();
       recoveryProbeInFlightRef.current = false;
       recoveryFailuresRef.current = 0;
+      webPlaybackAttemptsRef.current = 0;
       clearStallTimer();
       clearRecoveryTimer();
       bufferingIntentRef.current = false;
@@ -175,14 +186,13 @@ export function useSoftInterruption({
       currentTrackRef,
       hasSafeBufferedAhead,
       isPlayingRef,
-      onPlaybackStall,
       scheduleRecoveryCheck,
     ],
   );
 
   const cancelSoftInterruption = useCallback(() => {
     if (interruptionStartedAtRef.current !== null) {
-      onPlaybackStallEnded?.(
+      onPlaybackStallEndedRef.current?.(
         Math.max(0, Date.now() - interruptionStartedAtRef.current),
         getCurrentBufferedAheadSeconds(),
       );
@@ -194,7 +204,7 @@ export function useSoftInterruption({
     recoveryFailuresRef.current = 0;
     clearStallTimer();
     clearRecoveryTimer();
-  }, [clearRecoveryTimer, clearStallTimer, onPlaybackStallEnded]);
+  }, [clearRecoveryTimer, clearStallTimer]);
 
   const settleAfterAppLifecycle = useCallback(() => {
     // Returning from background should be inert: keep the current
@@ -294,6 +304,15 @@ export function useSoftInterruption({
       const nativePlayer = shouldUseAndroidNativePlayer();
       try {
         if (!(await isRuntimeOnline())) return;
+        // A successful range probe does not establish that a WebView can
+        // play the file. A subsequent source error comes back here to retry.
+        if (
+          !nativePlayer &&
+          webPlaybackAttemptsRef.current >= FAST_RECOVERY_ATTEMPTS
+        ) {
+          requireUserGestureToResume();
+          return;
+        }
         const available = await probeTrackAvailability(
           currentTrackRef.current,
           { serverReachableOnly: nativePlayer },
@@ -305,6 +324,7 @@ export function useSoftInterruption({
             recoveryFailuresRef.current <= FAST_RECOVERY_ATTEMPTS &&
             recoverCurrentTrack
           ) {
+            if (!nativePlayer) webPlaybackAttemptsRef.current += 1;
             const refreshed = await recoverCurrentTrack();
             if (refreshed) {
               onPlaybackRecovered?.(recoveryFailuresRef.current);
@@ -335,6 +355,7 @@ export function useSoftInterruption({
           return;
         }
         bufferingIntentRef.current = true;
+        if (!nativePlayer) webPlaybackAttemptsRef.current += 1;
         if (nativePlayer) {
           let reloaded = true;
           if (recoverCurrentTrack) {

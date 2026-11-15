@@ -86,6 +86,10 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     commitIsPlaying,
     commitIsBuffering,
   } = runtimeState;
+  const readCurrentTime = useCallback(
+    () => currentTimeRef.current,
+    [currentTimeRef],
+  );
 
   const refillCallbacksRef = useRef<{
     recover: () => boolean;
@@ -346,6 +350,15 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     prev,
     seek,
     setVolume,
+    shuffle,
+    toggleShuffle,
+    repeat,
+    setRepeatMode,
+    play,
+    playAll,
+    addToQueue,
+    jamQueueLocked,
+    queue,
   });
 
   const { actionsValue, progressValue, stateValue } = usePlayerContextValues({
@@ -407,6 +420,7 @@ export function usePlayerProviderRuntime(children: ReactNode) {
       currentTrack={currentTrack}
       playbackNeedsUserGesture={playbackNeedsUserGesture}
       progressValue={progressValue}
+      readCurrentTime={readCurrentTime}
       resumeAfterUserGesture={resumeAfterUserGesture}
       stateValue={stateValue}
     >

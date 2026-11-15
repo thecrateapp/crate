@@ -6,6 +6,10 @@ import {
 } from "@/lib/capacitor-oauth";
 import { recordDevLog } from "@/lib/dev-logs";
 import {
+  dispatchDesktopControlCommand,
+  parseDesktopControlCommand,
+} from "@/lib/desktop-control";
+import {
   dispatchDesktopTrayCommand,
   type DesktopTrayCommand,
 } from "@/lib/desktop-tray";
@@ -13,6 +17,7 @@ import { recordTauriAuthDiagnostic } from "@/lib/tauri-auth-diagnostic";
 
 import { initLinuxScrollBehavior } from "./linux-scroll";
 import { initLinuxDesktopTheme } from "./linux-theme";
+import { initWindowVisibilityBridge } from "./window-visibility";
 
 let tauriRuntimeInitialized = false;
 let tauriOAuthRuntimeStarted = false;
@@ -31,6 +36,7 @@ export function initTauriRuntime(): void {
   initLinuxDesktopTheme();
   ensureDesktopWindowSize();
   installNativeHttpFetch();
+  void initWindowVisibilityBridge();
   void initTrayBridge();
   void initBandcampCookieBridge();
 }
@@ -242,12 +248,26 @@ export function dispatchOAuthCallbackResult(result: {
   window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
 }
 
+/** Hand a control command from the native shell to Listen, if it is valid. */
+export function relayDesktopControlPayload(payload: unknown): boolean {
+  const command = parseDesktopControlCommand(payload);
+  if (!command) return false;
+  recordDevLog("tauri", "control command", command.cmd, "debug");
+  dispatchDesktopControlCommand(command);
+  return true;
+}
+
 async function initTrayBridge(): Promise<void> {
   try {
     const { listen } = await import("@tauri-apps/api/event");
     await listen<DesktopTrayCommand>("crate:tray-command", (event) => {
       recordDevLog("tauri", "tray command", event.payload, "debug");
       dispatchDesktopTrayCommand(event.payload);
+    });
+    // Volume, shuffle, repeat, seek and equalizer from desktop widgets
+    // (validated in Rust, validated again here).
+    await listen<unknown>("crate:control-command", (event) => {
+      relayDesktopControlPayload(event.payload);
     });
   } catch (err) {
     recordDevLog("tauri", "tray bridge failed", safeErrorCategory(err), "warn");

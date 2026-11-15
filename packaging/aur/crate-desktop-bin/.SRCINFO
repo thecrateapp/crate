@@ -1,0 +1,23 @@
+pkgbase = crate-desktop-bin
+	pkgdesc = Crate: self-hosted music player (desktop app)
+	pkgver = 3.3.1
+	pkgrel = 1
+	url = https://cratemusic.app
+	arch = x86_64
+	license = AGPL-3.0-only
+	depends = webkit2gtk-4.1
+	depends = gtk3
+	depends = libayatana-appindicator
+	depends = gst-plugins-base
+	depends = gst-plugins-good
+	optdepends = gst-libav: AAC/ALAC (m4a) playback
+	optdepends = gst-plugins-bad: extra codecs
+	provides = crate-desktop
+	conflicts = crate-desktop
+	noextract = crate-linux-3.3.1.deb
+	options = !strip
+	options = !debug
+	source = crate-linux-3.3.1.deb::https://github.com/thecrateapp/crate/releases/download/v3.3.1/crate-linux-3.3.1.deb
+	sha256sums = b9f428ccae269ba006a260049245324e6b9bc0f7204eb509fe11818af2501e72
+
+pkgname = crate-desktop-bin

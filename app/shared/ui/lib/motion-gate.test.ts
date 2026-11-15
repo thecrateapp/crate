@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   isMotionBlocked,
+  isWindowHidden,
+  setWindowHidden,
   subscribeToMotionAvailability,
   useMotionAllowed,
 } from "./motion-gate";
@@ -34,6 +36,7 @@ describe("motion-gate", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     delete document.documentElement.dataset.crateMotion;
+    delete document.documentElement.dataset.crateWindow;
   });
 
   it("allows motion when nothing blocks it", () => {
@@ -60,6 +63,49 @@ describe("motion-gate", () => {
     mockVisibility("hidden");
 
     expect(isMotionBlocked()).toBe(true);
+  });
+
+  it("blocks motion while a native shell marks the window hidden", () => {
+    mockReducedMotion(false);
+    mockVisibility("visible");
+
+    setWindowHidden(true);
+    expect(document.documentElement.dataset.crateWindow).toBe("hidden");
+    expect(isWindowHidden()).toBe(true);
+    expect(isMotionBlocked()).toBe(true);
+
+    setWindowHidden(false);
+    expect(document.documentElement.dataset.crateWindow).toBeUndefined();
+    expect(isWindowHidden()).toBe(false);
+    expect(isMotionBlocked()).toBe(false);
+  });
+
+  it("leaves web motion alone when no shell reports window activity", () => {
+    mockReducedMotion(false);
+    mockVisibility("visible");
+
+    expect(document.documentElement.hasAttribute("data-crate-window")).toBe(
+      false,
+    );
+    expect(isMotionBlocked()).toBe(false);
+  });
+
+  it("re-renders useMotionAllowed when the window is hidden and shown", async () => {
+    mockReducedMotion(false);
+    const { result } = renderHook(() => useMotionAllowed());
+    expect(result.current).toBe(true);
+
+    await act(async () => {
+      setWindowHidden(true);
+      await Promise.resolve();
+    });
+    expect(result.current).toBe(false);
+
+    await act(async () => {
+      setWindowHidden(false);
+      await Promise.resolve();
+    });
+    expect(result.current).toBe(true);
   });
 
   it("survives a missing matchMedia", () => {

@@ -1241,6 +1241,53 @@ describe("native (configurable server) mode", () => {
   });
 
   describe("media access refresh", () => {
+    it("renews only expiring tickets so cached artwork URLs stay stable", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+      try {
+        setupServer();
+        mediaAccess.clearMediaAccessTickets();
+        const server = serverStore.getCurrentServer()!;
+        mediaAccess.setMediaAccessTickets(
+          [
+            {
+              audience: "artwork",
+              path: "/api/albums/1/cover",
+              ticket: "long-lived",
+              expires_at: new Date(Date.now() + 12 * 3_600_000).toISOString(),
+            },
+            {
+              audience: "artwork",
+              path: "/api/albums/2/cover",
+              ticket: "expiring",
+              expires_at: new Date(Date.now() + 30_000).toISOString(),
+            },
+          ],
+          server.id,
+        );
+        const fetchMock = vi
+          .spyOn(globalThis, "fetch")
+          .mockResolvedValue(mockJsonResponse({ tickets: [] }));
+        const before = apiMod.apiAssetUrl("/api/albums/1/cover");
+        const stop = apiMod.startMediaAccessTicketRefresh();
+        fetchMock.mockClear();
+
+        await vi.advanceTimersByTimeAsync(45_000);
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const body = JSON.parse(
+          String((fetchMock.mock.calls[0]![1] as RequestInit).body),
+        ) as { targets: Array<{ path: string }> };
+        expect(body.targets.map((target) => target.path)).toEqual([
+          "/api/albums/2/cover",
+        ]);
+        expect(apiMod.apiAssetUrl("/api/albums/1/cover")).toBe(before);
+        expect(before).toContain("media_ticket=long-lived");
+        stop();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("keeps media tickets when only the current access token changes", () => {
       setupServer();
       vi.spyOn(globalThis, "fetch").mockResolvedValue(

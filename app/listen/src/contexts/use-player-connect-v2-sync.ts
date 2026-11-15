@@ -22,6 +22,8 @@ type BuildConnectSnapshotPayload = (
 ) => PlaybackStatePayload;
 type ConnectWsRuntime = ReturnType<typeof useCrateConnectWs>;
 
+const NO_CONNECTED_INSTANCES: ConnectWsRuntime["connectedInstances"] = [];
+
 interface UsePlayerConnectV2SyncOptions {
   applyConnectStateToLocalQueue: (
     state: RemotePlaybackState,
@@ -364,15 +366,34 @@ export function usePlayerConnectV2Sync({
     sendSnapshot,
   ]);
 
-  return {
-    activeInstanceId: connectV2Enabled ? activeInstanceId : null,
-    connectedInstances: connectV2Enabled ? connectedInstances : [],
-    clearTransferPlaybackGuard,
-    isRemoteActive,
-    playbackInstanceId: connectV2Enabled ? playbackInstanceId : null,
-    remoteState: connectV2Enabled ? remoteState : null,
-    requestTransfer,
-    sendRemoteCommand,
-    serverClockOffsetMs: connectV2Enabled ? serverClockOffsetMs : 0,
-  };
+  // The player builds its connect value and actions on this object: keep it
+  // stable while nothing in it changes, or every render re-renders every
+  // consumer of the player actions.
+  return useMemo(
+    () => ({
+      activeInstanceId: connectV2Enabled ? activeInstanceId : null,
+      connectedInstances: connectV2Enabled
+        ? connectedInstances
+        : NO_CONNECTED_INSTANCES,
+      clearTransferPlaybackGuard,
+      isRemoteActive,
+      playbackInstanceId: connectV2Enabled ? playbackInstanceId : null,
+      remoteState: connectV2Enabled ? remoteState : null,
+      requestTransfer,
+      sendRemoteCommand,
+      serverClockOffsetMs: connectV2Enabled ? serverClockOffsetMs : 0,
+    }),
+    [
+      activeInstanceId,
+      clearTransferPlaybackGuard,
+      connectV2Enabled,
+      connectedInstances,
+      isRemoteActive,
+      playbackInstanceId,
+      remoteState,
+      requestTransfer,
+      sendRemoteCommand,
+      serverClockOffsetMs,
+    ],
+  );
 }

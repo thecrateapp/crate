@@ -7,6 +7,7 @@ declare module "@/lib/gapless5/gapless5" {
     startingTrack?: number | "random";
     shuffle?: boolean;
     useHTML5Audio?: boolean;
+    resolveAudioUrl?: (url: string) => Promise<string>;
     useWebAudio?: boolean;
     loadLimit?: number | null;
     deferAdjacentLoadsUntilBufferedSeconds?: number;
@@ -16,6 +17,8 @@ declare module "@/lib/gapless5/gapless5" {
     // Runtime values: None=1, Linear=2, EqualPower=3
     crossfadeShape?: number;
     persistentHTML5Audio?: boolean;
+    releaseHTML5AfterDecode?: boolean;
+    routeHTML5ThroughWebAudio?: boolean;
     playbackRate?: number;
     // Runtime values: Debug=1, Info=2, Warning=3, Error=4, None=5
     logLevel?: number;
@@ -30,6 +33,7 @@ declare module "@/lib/gapless5/gapless5" {
     play(): void;
     pause(): void;
     stop(): void;
+    dispose(): void;
     playpause(): void;
     isPlaying(): boolean;
 

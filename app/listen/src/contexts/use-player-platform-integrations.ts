@@ -3,6 +3,8 @@ import type { MutableRefObject } from "react";
 import type { PlayerActionsValue } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
 
+import { useDesktopControlBridge } from "./use-desktop-control-bridge";
+import { useLauncherArtPrewarm } from "./use-launcher-art-prewarm";
 import {
   useDesktopTrayCommands,
   useDesktopTrayNowPlaying,
@@ -12,7 +14,20 @@ import { usePlayerShortcuts } from "./use-player-shortcuts";
 
 type PlayerPlatformActions = Pick<
   PlayerActionsValue,
-  "next" | "pause" | "prev" | "resume" | "seek" | "setVolume"
+  | "next"
+  | "pause"
+  | "prev"
+  | "resume"
+  | "seek"
+  | "setVolume"
+  | "shuffle"
+  | "toggleShuffle"
+  | "repeat"
+  | "setRepeatMode"
+  | "play"
+  | "playAll"
+  | "addToQueue"
+  | "jamQueueLocked"
 >;
 
 interface PlayerPlatformIntegrationsInput extends PlayerPlatformActions {
@@ -22,15 +37,18 @@ interface PlayerPlatformIntegrationsInput extends PlayerPlatformActions {
   isPlaying: boolean;
   isPlayingRef: MutableRefObject<boolean>;
   lastNonZeroVolume: number;
+  queue: readonly Track[];
   volume: number;
 }
 
 export function usePlayerPlatformIntegrations({
+  addToQueue,
   currentTime,
   currentTrack,
   duration,
   isPlaying,
   isPlayingRef,
+  jamQueueLocked,
   lastNonZeroVolume,
   next,
   pause,
@@ -38,6 +56,13 @@ export function usePlayerPlatformIntegrations({
   resume,
   seek,
   setVolume,
+  shuffle,
+  toggleShuffle,
+  repeat,
+  setRepeatMode,
+  play,
+  playAll,
+  queue,
   volume,
 }: PlayerPlatformIntegrationsInput) {
   usePlayerShortcuts({
@@ -63,6 +88,21 @@ export function usePlayerPlatformIntegrations({
     resume,
   });
   useDesktopTrayNowPlaying({ currentTrack, isPlaying });
+  useDesktopControlBridge({
+    addToQueue,
+    jamQueueLocked,
+    play,
+    playAll,
+    repeat,
+    seek,
+    setRepeatMode,
+    setVolume,
+    shuffle,
+    toggleShuffle,
+    volume,
+  });
+
+  useLauncherArtPrewarm({ currentTrack, queue });
 
   useMediaSession({
     currentTime,

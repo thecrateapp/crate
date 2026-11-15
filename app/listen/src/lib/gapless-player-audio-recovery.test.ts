@@ -74,6 +74,17 @@ const gaplessMock = vi.hoisted(() => {
       this.playlist.sources.push(url);
     }
 
+    dispose(): void {
+      this.stop();
+      this.removeAllTracks();
+      const w = window as Window & {
+        gapless5AudioContext?: ReturnType<typeof createContext>;
+      };
+      if (w.gapless5AudioContext === this.context)
+        w.gapless5AudioContext = undefined;
+      if (this.context.state !== "closed") void this.context.close();
+    }
+
     currentLength(): number {
       return 0;
     }
@@ -288,6 +299,8 @@ describe("gapless player audio recovery", () => {
     expect(gaplessMock.instances).toHaveLength(2);
     expect(gaplessMock.instances[0]!.stopCalls).toBe(1);
 
+    expect(staleContext.close).toHaveBeenCalledOnce();
+    expect(freshContext.close).not.toHaveBeenCalled();
     const recovered = gaplessMock.instances[1]!;
     expect(recovered.context).toBe(freshContext);
     expect(recovered.tracks).toEqual(["/tracks/a.flac", "/tracks/b.flac"]);
