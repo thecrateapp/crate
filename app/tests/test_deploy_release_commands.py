@@ -455,6 +455,8 @@ def test_deploy_recreates_running_agent_or_operator_on_the_release_image(
                 "dc",
                 "env_file_value",
                 "env_value",
+                "website_only_release",
+                "running_agent_images_match",
                 "refresh_running_agent",
             )
         )
