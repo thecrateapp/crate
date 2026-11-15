@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import fnmatch
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from copy import deepcopy
@@ -390,3 +392,179 @@ def test_agent_image_is_an_optional_entry_outside_the_fleet() -> None:
     unknown["agent_images"]["other"] = entry
     with pytest.raises(ManifestError, match="unknown agent image"):
         validate_manifest(unknown)
+
+
+RYOKU_DOCKERFILE = ROOT / "app/ryoku/Dockerfile"
+# Module and stylesheet references: static, re-exported and dynamic imports,
+# CSS @import (quoted or url()) and CSS url().
+WEB_REFERENCE = re.compile(
+    r"""(?:\bfrom|\bimport)\s*\(?\s*["']([^"']+)["']"""
+    r"""|@import\s+(?:url\(\s*)?["']?([^"')\s;]+)"""
+    r"""|\burl\(\s*["']?([^"')\s]+)"""
+)
+WEB_SOURCE_SUFFIXES = (".ts", ".tsx", ".js", ".mjs", ".astro", ".css")
+
+
+def _ryoku_web_copies() -> set[str]:
+    """app/web sources the ryoku-site image copies, as change-detection patterns."""
+    copies = set()
+    for line in RYOKU_DOCKERFILE.read_text().splitlines():
+        parts = line.split()
+        if parts[:1] != ["COPY"] or any(part.startswith("--") for part in parts):
+            continue
+        for source in parts[1:-1]:
+            if source.startswith("app/web/"):
+                copies.add(source + "**" if source.endswith("/") else source)
+    return copies
+
+
+def _web_references(text: str) -> list[str]:
+    return [
+        next(group for group in match if group) for match in WEB_REFERENCE.findall(text)
+    ]
+
+
+def _resolve_web_file(path: Path) -> Path:
+    candidates = [path]
+    candidates += [path.with_name(path.name + suffix) for suffix in WEB_SOURCE_SUFFIXES]
+    candidates += [path / f"index{suffix}" for suffix in WEB_SOURCE_SUFFIXES]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise AssertionError(f"unresolved app/web reference: {path}")
+
+
+def _web_dependencies(
+    entries: Path, web: Path, alias: str = "@crate-web/"
+) -> set[Path]:
+    """Every file under ``web`` that ``entries`` reach through ``alias``, transitively.
+
+    Relative references resolve beside their file and absolute CSS URLs against
+    the served ``public`` directory; package and remote references are skipped.
+    """
+    pending = [
+        _resolve_web_file(web / "src" / reference.removeprefix(alias))
+        for source in entries.rglob("*")
+        if source.is_file() and source.suffix in WEB_SOURCE_SUFFIXES
+        for reference in _web_references(source.read_text(errors="ignore"))
+        if reference.startswith(alias)
+    ]
+    seen: set[Path] = set()
+    while pending:
+        path = pending.pop()
+        if path in seen:
+            continue
+        seen.add(path)
+        if path.suffix not in WEB_SOURCE_SUFFIXES:
+            continue
+        for reference in _web_references(path.read_text()):
+            reference = reference.split("?", 1)[0].split("#", 1)[0]
+            if reference.startswith(alias):
+                target = web / "src" / reference.removeprefix(alias)
+            elif reference.startswith(("./", "../")):
+                target = (path.parent / reference).resolve()
+            elif reference.startswith("/") and not reference.startswith("//"):
+                target = web / "public" / reference.lstrip("/")
+            else:
+                continue
+            pending.append(_resolve_web_file(target))
+    return seen
+
+
+def _ryoku_web_dependencies() -> set[str]:
+    web = ROOT / "app/web"
+    return {
+        str(path.relative_to(ROOT))
+        for path in _web_dependencies(ROOT / "app/ryoku/src", web)
+    }
+
+
+def test_web_dependency_walker_follows_every_reference_form(tmp_path: Path) -> None:
+    entries, web = tmp_path / "ryoku/src", tmp_path / "web"
+    files = {
+        entries / "page.astro": (
+            'import "@crate-web/styles/base.css";\n'
+            'const lazy = await import("@crate-web/scripts/lazy");\n'
+            'export { motion } from "@crate-web/scripts/motion";\n'
+            'import pkg from "gsap";\n'
+        ),
+        web / "src/styles/base.css": (
+            '@import "./tokens.css";\n@import url(./reset.css);\n'
+            '@import "@fontsource/mono/400.css";\n'
+            "body { background: url(/fonts/a.woff2); mask: url('../img/m.svg'); }\n"
+            'p { background: url("data:image/svg+xml;utf8,<svg/>"); }\n'
+        ),
+        web / "src/styles/tokens.css": "",
+        web / "src/styles/reset.css": "",
+        web / "src/img/m.svg": "<svg/>",
+        web / "public/fonts/a.woff2": "",
+        web / "src/scripts/lazy.mjs": 'import { env } from "./env";\n',
+        web / "src/scripts/env.ts": "",
+        web / "src/scripts/motion/index.ts": "export const motion = 1;\n",
+        web / "src/unused.ts": "",
+    }
+    for path, text in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    assert {str(path.relative_to(web)) for path in _web_dependencies(entries, web)} == {
+        "src/styles/base.css",
+        "src/styles/tokens.css",
+        "src/styles/reset.css",
+        "src/img/m.svg",
+        "public/fonts/a.woff2",
+        "src/scripts/lazy.mjs",
+        "src/scripts/env.ts",
+        "src/scripts/motion/index.ts",
+    }
+
+
+def test_ryoku_site_patterns_match_exactly_what_its_image_copies() -> None:
+    web_patterns = {
+        pattern
+        for pattern in IMAGE_SPECS["ryoku-site"].patterns
+        if pattern.startswith("app/web/")
+    }
+    assert web_patterns == _ryoku_web_copies()
+    assert not any(
+        pattern.startswith(("app/web/src/content", "app/web/src/**"))
+        for pattern in web_patterns
+    )
+
+
+def test_ryoku_image_copies_every_app_web_file_the_ryoku_site_imports() -> None:
+    dependencies = _ryoku_web_dependencies()
+    assert dependencies, "app/ryoku no longer imports @crate-web"
+    copies = _ryoku_web_copies()
+    assert {
+        path
+        for path in dependencies
+        if not any(fnmatch.fnmatchcase(path, pattern) for pattern in copies)
+    } == set()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "app/web/src/content/blog/a-post.md",
+        "app/web/src/components/blog-viz/BlogFigure.astro",
+        "app/web/src/lib/blog.ts",
+    ],
+)
+def test_blog_edit_does_not_rebuild_the_ryoku_site(path: str) -> None:
+    assert detect_changed_images([path]) == {"site"}
+
+
+def test_deploy_tooling_ci_runs_when_the_ryoku_web_sources_change() -> None:
+    import yaml
+
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/test-deploy-tooling.yml").read_text()
+    )
+    triggers = workflow.get("on", workflow.get(True))
+    watched = [
+        pattern
+        for pattern in IMAGE_SPECS["ryoku-site"].patterns
+        if pattern.startswith("app/web/src/")
+    ]
+    for event in ("push", "pull_request"):
+        assert set(watched) <= set(triggers[event]["paths"]), event
