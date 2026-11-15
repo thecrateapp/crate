@@ -22,6 +22,7 @@ SERVICES = frozenset(
         "crate-cast-receiver",
         "crate-site",
         "crate-docs",
+        "crate-ryoku-site",
     }
 )
 OPERATIONS = frozenset({"restart", "backup", "deploy", "restore"})

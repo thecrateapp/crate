@@ -8,14 +8,20 @@ from crate.api.schemas.capabilities import (
     CapabilitiesResponse,
     DecksCapabilities,
     DecksFeature,
+    FederationCapabilities,
     SmartMixAiAssistedCapabilities,
     SmartMixCapabilities,
+    SmartMixStemsCapabilities,
     VDJCapabilities,
 )
+from crate.api.permissions import has_capability
 from crate.config import (
     android_bass_handoff_enabled,
     android_beatmatch_enabled,
     android_native_crossfade_enabled,
+    decks_bass_handoff_enabled,
+    decks_beatmatch_enabled,
+    listen_smart_mix_v3_enabled,
     smart_mix_enabled,
     vdj_automation_enabled,
     vdj_enabled,
@@ -24,8 +30,20 @@ from crate.db.queries.smart_mix_admin import (
     get_smart_mix_refinement_latency_ms,
     get_smart_mix_structure_percent,
 )
+from crate.db.repositories.federation import get_local_node, list_peers
+from crate.db.repositories.smart_mix_stems import stem_uploads_enabled
+from crate.federation.results_envelope import RESULTS_CONTRACT
+from crate.federation.search_fanout import DEFAULT_SETTINGS, eligible_search_peers
 from crate.llm.prompts.smart_mix_transition import PROMPT_VERSION
 from crate.smart_mix_ai import gate_reason, provider_kind, refinement_gate
+from crate.db.cache_settings import get_setting
+from crate.smart_mix.policy import PLANNER_POLICY_V3
+from crate.smart_mix.stem_storage import configured_stems_directory
+from crate.smart_mix.stems import (
+    STEM_CONTRIBUTE_PERMISSION,
+    STEM_QUOTA_SETTING,
+    stem_quota_gib,
+)
 from crate.smart_mix.versions import (
     API_CONTRACT_VERSION,
     PLANNER_IDENTIFIER,
@@ -70,11 +88,20 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             planner_version=PLANNER_IDENTIFIER if available else None,
             planner_versions=list(PLANNER_IDENTIFIERS) if available else [],
             structure=available and _structure_available(),
+            listen_planner_version=_listen_planner(available),
             android_native_crossfade=native_crossfade,
             android_beatmatch=beatmatch,
             android_bass_handoff=bass_handoff,
             android_long_beatmatch=beatmatch,
             ai_assisted=_ai_assisted(available),
+            # Smart Mix playlists can be turned on (ST2.PR1); the server keeps
+            # their stem files for Decks (ST2.PR3) unless the quota is 0 or the
+            # API has no stems directory.
+            stems=SmartMixStemsCapabilities(
+                available=available,
+                playlists=available,
+                storage=available and _stem_storage_available(),
+            ),
         ),
         vdj=VDJCapabilities(
             available=vdj_available,
@@ -92,10 +119,49 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             available=True,
             min_client_version=DECKS_MIN_CLIENT_VERSION,
             contract_version=DECKS_CONTRACT_VERSION,
-            features=_decks_features(),
+            features=_decks_features(request),
         ),
+        federation=_federation_capabilities(request),
         access_token=_access_token_capabilities(request, vdj_automation),
     )
+
+
+def _federation_capabilities(request: Request) -> FederationCapabilities:
+    return FederationCapabilities(
+        search_stream=_federated_search_available(request),
+        results_contract=RESULTS_CONTRACT,
+        min_query_length=DEFAULT_SETTINGS.min_query_length,
+        window_ms=int(DEFAULT_SETTINGS.deadline_s * 1000),
+    )
+
+
+def _federated_search_available(request: Request) -> bool:
+    """A local node with at least one direct peer that may be searched."""
+    user = getattr(request.state, "user", None)
+    # Access tokens only search the local library.
+    if user and user.get("auth_type") == "access_token":
+        return False
+    try:
+        if not get_local_node():
+            return False
+        return bool(eligible_search_peers(list_peers(trust_state="approved")))
+    except Exception:
+        # Capabilities bootstrap every client: an unreadable federation state
+        # keeps Listen on the canonical search.
+        log.warning("Federation state unreadable for capabilities", exc_info=True)
+        return False
+
+
+def _listen_planner(available: bool) -> str | None:
+    """The planner Listen asks for: v3 behind its switch, v2 otherwise (LV-D3).
+
+    planner_version and the VirtualDJ contract never move; only this field does.
+    """
+    if not available:
+        return None
+    if listen_smart_mix_v3_enabled():
+        return PLANNER_POLICY_V3.identifier
+    return PLANNER_IDENTIFIER
 
 
 def _structure_available() -> bool:
@@ -140,11 +206,68 @@ def _ai_assisted(smart_mix_available: bool) -> SmartMixAiAssistedCapabilities:
     )
 
 
-def _decks_features() -> list[DecksFeature]:
-    # None of the Decks-specific contracts (S3 library_cursor, S4
-    # profiles_batch, S5 beatmatch/bass_handoff/long_beatmatch, S7 cues) is
+def decks_beatmatch_available() -> bool:
+    """Crate Decks may run Smart Mix beatmatch transitions (S5).
+
+    Smart Mix on and Decks' own switch, never the Android flags. It also advertises
+    long_beatmatch: the long blend is part of the same contract, as on Android.
+    """
+    return smart_mix_enabled() and decks_beatmatch_enabled()
+
+
+def decks_bass_handoff_available() -> bool:
+    """``capabilities.decks.features`` has bass_handoff (S5).
+
+    The transition planner reads the same answer for ``context.source = "decks"``,
+    so the advertised feature and the plans never disagree.
+    """
+    return decks_beatmatch_available() and decks_bass_handoff_enabled()
+
+
+def _decks_features(request: Request) -> list[DecksFeature]:
+    # Each feature is added by the server change that serves its contract: S3
+    # library_cursor (/api/decks), S4 profiles_batch, S5
+    # beatmatch/bass_handoff/long_beatmatch (the decks planner context), S7 cues,
+    # Smart Mix Stems ST1 stems/stem_upload and ST3 local_refinement. S7 is not
     # served yet. Do not derive them from the Android Smart Mix flags.
-    return []
+    features: list[DecksFeature] = ["library_cursor", "profiles_batch"]
+    if decks_beatmatch_available():
+        features.append("beatmatch")
+        if decks_bass_handoff_available():
+            features.append("bass_handoff")
+        features.append("long_beatmatch")
+    features.append("stems")
+    if _may_upload_stems(request):
+        features.append("stem_upload")
+    # smart-mix-v3 serves the candidate menu and policy limits to the decks context.
+    features.append("local_refinement")
+    return features
+
+
+def _stem_storage_available() -> bool:
+    if configured_stems_directory() is None:
+        return False
+    try:
+        return stem_quota_gib(get_setting(STEM_QUOTA_SETTING)) > 0
+    except Exception:
+        log.warning("Could not read the stem quota", exc_info=True)
+        return False
+
+
+def _may_upload_stems(request: Request) -> bool:
+    """PUT /api/decks/tracks/{uid}/stem-analysis would accept this caller's upload."""
+    user = getattr(request.state, "user", None)
+    # Access tokens never reach /api/decks.
+    if not user or user.get("auth_type") == "access_token":
+        return False
+    if not has_capability(user, STEM_CONTRIBUTE_PERMISSION):
+        return False
+    try:
+        return stem_uploads_enabled()
+    except Exception:
+        # Capabilities bootstrap every client: an unreadable setting hides uploads.
+        log.warning("Smart Mix stem upload setting unreadable", exc_info=True)
+        return False
 
 
 def _listen_url() -> str | None:

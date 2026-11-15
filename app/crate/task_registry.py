@@ -56,6 +56,15 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     ),
     "library_sync": TaskTypeInfo("Library Scan", "library"),
     "library_pipeline": TaskTypeInfo("Library Pipeline", "library"),
+    "backup_dump": TaskTypeInfo("Database Backup", "library"),
+    "backup_local_retention": TaskTypeInfo("Backup Retention", "library"),
+    "backup_test_destination": TaskTypeInfo("Backup Destination Test", "library"),
+    "backup_probe_destination": TaskTypeInfo("Backup Settings Test", "library"),
+    "backup_offsite": TaskTypeInfo("Off-site Backup Copy", "library"),
+    "backup_verify": TaskTypeInfo("Backup Verification", "library"),
+    "backup_restore_drill": TaskTypeInfo("Backup Restore Drill", "library"),
+    "backup_policies_tick": TaskTypeInfo("Backup Policies", "library"),
+    "backup_alerts": TaskTypeInfo("Backup Alerts", "library"),
     "scan": TaskTypeInfo("Health Check", "library"),
     "health_check": TaskTypeInfo("Health Check", "library"),
     "quality_check": TaskTypeInfo("Library Quality Check", "library"),
@@ -229,6 +238,7 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
         "Smart Mix Profile Backfill", "analysis"
     ),
     "refresh_smart_mix_coverage": TaskTypeInfo("Smart Mix Coverage", "analysis"),
+    "analyze_playlist_stems": TaskTypeInfo("Smart Mix Playlist Stems", "analysis"),
     "cleanup_smart_mix_refinements": TaskTypeInfo(
         "Smart Mix Refinement Cleanup", "analysis"
     ),

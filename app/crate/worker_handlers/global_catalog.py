@@ -3,23 +3,24 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from crate.db.repositories.global_catalog_state import (
-    get_catalog_state,
-    transition_catalog_state,
-)
 from crate.db.global_catalog_search_projection import (
     begin_global_catalog_search_rebuild,
     fail_global_catalog_search_rebuild,
     rebuild_global_catalog_search_documents_batch,
 )
-from crate.db.repositories.tasks import create_task
+from crate.db.queries.tasks import get_task
+from crate.db.repositories.global_catalog_state import (
+    get_catalog_state,
+    transition_catalog_state,
+)
 from crate.db.repositories.global_user_library import (
     USER_LIBRARY_REFS_BACKFILL_VERSION,
     backfill_legacy_user_library_refs_batch,
     finalize_user_library_refs_backfill,
 )
+from crate.db.repositories.tasks import create_task
 from crate.federation.global_genres import refresh_global_catalog_genre_snapshots
 from crate.federation.global_reconciliation import (
     begin_global_catalog_reconciliation_run,
@@ -27,14 +28,14 @@ from crate.federation.global_reconciliation import (
     fail_global_catalog_reconciliation_run,
     prune_local_catalog_sources_batch,
     prune_remote_catalog_sources_batch,
-    record_global_catalog_reconciliation_batch,
     reconcile_dirty_catalog_sources,
     reconcile_local_catalog_batch,
     reconcile_remote_catalog_batch,
+    record_global_catalog_reconciliation_batch,
 )
 from crate.task_dedup_keys import GLOBAL_CATALOG_FULL_DEDUP_KEY
 from crate.task_progress import TaskProgress, emit_progress
-from crate.worker_handlers import TaskHandler
+from crate.worker_handlers import TaskHandler, is_cancelled, run_again_later
 
 log = logging.getLogger(__name__)
 
@@ -63,11 +64,29 @@ _USER_REF_COUNTERS = (
 
 
 def _handle_reconcile_incremental(task_id: str, params: dict, config: dict) -> dict:
+    if is_cancelled(task_id):
+        return {"status": "cancelled", "mode": "incremental"}
     batch_size = _batch_size(params)
+    saved = TaskProgress.from_json((get_task(task_id) or {}).get("progress"))
     progress = TaskProgress(phase="reconcile_dirty_sources", phase_count=2)
+    if saved.phase in {"reconcile_dirty_sources", "refresh_genre_snapshots"}:
+        progress.done = saved.done
+        progress.errors = saved.errors
+        progress.total = saved.total
     emit_progress(task_id, progress, force=True)
     result = reconcile_dirty_catalog_sources(limit=batch_size)
-    if result["completed"]:
+    progress.done += result["completed"]
+    progress.errors += result["failed"]
+    progress.total = progress.done + result["remaining"]
+    if is_cancelled(task_id):
+        return {"status": "cancelled", "mode": "incremental", **result}
+    if result.get("ready_remaining", result["remaining"]) > 0:
+        # Keep this deduplicated task alive while releasing the worker between
+        # bounded batches. Waiting for the five-minute scheduler per batch makes
+        # an initial peer catalog take hours to become visible.
+        emit_progress(task_id, progress, force=True)
+        return run_again_later(0.001, progress=progress.to_json())
+    if progress.done:
         progress.phase = "refresh_genre_snapshots"
         progress.phase_index = 1
         emit_progress(task_id, progress, force=True)
@@ -294,7 +313,7 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
         raise
 
     complete_global_catalog_reconciliation_run(run_id)
-    completed_at = datetime.now(timezone.utc).isoformat()
+    completed_at = datetime.now(UTC).isoformat()
     transition_catalog_state(
         "ready",
         last_full_reconcile_at=completed_at,

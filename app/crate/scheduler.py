@@ -34,6 +34,10 @@ DEFAULT_SCHEDULES = {
     "sync_error_issues": 300,  # 5min — Sentry issues into the error inbox
     "track_error_fixes": 300,  # 5min — fix runs and their pull requests
     "cleanup_smart_mix_refinements": 86400,  # 24h — AI refinements unread for 180 days
+    "analyze_playlist_stems": 1800,  # 30min — Smart Mix playlist stems: retries, file changes
+    "backup_dump": 86400,  # 24h — local database dump, then its retention (BK1)
+    "backup_policies_tick": 300,  # 5min — start due backup policies, verify, drill (BK3)
+    "backup_alerts": 300,  # 5min — push backup alerts and refresh backup metrics (BK6)
 }
 
 SCHEDULED_TASKS = [
@@ -60,6 +64,18 @@ ERROR_TRACKING_SCHEDULED_TASKS = {"sync_error_issues"}
 # Only scheduled while Launch fix is configured and a fix run is open or has a
 # branch to delete: with Launch fix off, nothing polls GitHub.
 ERROR_FIX_SCHEDULED_TASKS = {"track_error_fixes"}
+
+# The default local backup policy (admin backups, BK1): a nightly dump inside the
+# maintenance window, then its retention. On unless CRATE_LOCAL_BACKUPS_ENABLED is
+# off, which production sets while the crate-postgres-backup sidecar runs (until
+# BK6).
+# Once an enabled scheduled backup policy exists (BK3), the policies make the
+# dumps and the tick starts them; the default nightly dump stands down.
+LOCAL_BACKUP_SCHEDULED_TASKS = {"backup_dump"}
+BACKUP_POLICY_SCHEDULED_TASKS = {"backup_policies_tick"}
+# Backup alerts and metrics (BK6): while backups are in use, that is with the
+# engine on, a destination, or an alert still open (so it can resolve).
+BACKUP_ALERT_SCHEDULED_TASKS = {"backup_alerts"}
 
 
 def get_schedules() -> dict[str, int]:
@@ -134,7 +150,44 @@ def _scheduled_task_enabled(task_type: str) -> bool:
     if task_type in ERROR_FIX_SCHEDULED_TASKS:
         return _has_trackable_error_fixes()
 
+    if task_type in LOCAL_BACKUP_SCHEDULED_TASKS:
+        from crate.backups.settings import local_backups_enabled
+
+        return local_backups_enabled() and not _has_scheduled_backup_policies()
+
+    if task_type in BACKUP_POLICY_SCHEDULED_TASKS:
+        return _has_scheduled_backup_policies()
+
+    if task_type in BACKUP_ALERT_SCHEDULED_TASKS:
+        return _backups_in_use()
+
     return True
+
+
+def _has_scheduled_backup_policies() -> bool:
+    try:
+        from crate.db.queries.backup_policies import list_enabled_scheduled_policies
+
+        return bool(list_enabled_scheduled_policies())
+    except Exception:
+        log.debug("Unable to read the backup policies", exc_info=True)
+        return False
+
+
+def _backups_in_use() -> bool:
+    try:
+        from crate.backups.alerts import has_open_alerts
+        from crate.backups.settings import local_backups_enabled
+        from crate.db.queries.backup_destinations import list_backup_destinations
+
+        return (
+            local_backups_enabled()
+            or bool(list_backup_destinations())
+            or has_open_alerts()
+        )
+    except Exception:
+        log.debug("Unable to read the backup destinations", exc_info=True)
+        return False
 
 
 def _has_due_federation_directories() -> bool:

@@ -70,6 +70,57 @@ def test_application_update_keeps_legacy_monitoring_sentinel(tmp_path, operation
     assert "--remove-orphans" not in starts[0]
 
 
+def test_rollback_skips_and_removes_services_the_restored_compose_lacks(tmp_path):
+    """A release that adds a service fails verify: the restored compose has no such
+    service, so rollback must not ask compose to start it, and must retire its container."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake = fake_bin / "docker"
+    fake.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
+        "with open(os.environ['DOCKER_TEST_LOG'], 'a') as output:\n"
+        "    output.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+    )
+    fake.chmod(0o755)
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / "changed_services").write_text("crate-api\ncrate-ryoku-site\n")
+    (tmp_path / ".deploy").mkdir()
+    log = tmp_path / "docker.jsonl"
+    shell = (
+        "log() { :; }\nrecord_agent_deployment() { :; }\ncmd_verify() { :; }\n"
+        'compose_has_service() { [[ "$1" == crate-api ]]; }\n'
+        "COMPOSE=(docker compose --project-name crate)\n"
+        'dc() { "${COMPOSE[@]}" "$@"; }\n'
+        + _shell_function("cmd_rollback")
+        + "\ncmd_rollback\n"
+    )
+
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", shell],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "BACKUP_DIR": str(backup),
+            "DEPLOY_ID": "fixture",
+            "DOCKER_TEST_LOG": str(log),
+        },
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+
+    assert result.returncode == 0, result.stderr
+    commands = [json.loads(line) for line in log.read_text().splitlines()]
+    starts = [command for command in commands if "up" in command]
+    assert len(starts) == 1
+    assert starts[0][-1] == "crate-api"
+    assert "crate-ryoku-site" not in starts[0]
+    assert ["rm", "-f", "crate-ryoku-site"] in commands
+
+
 def test_state_rollback_never_implicitly_retires_other_project_services():
     assert "--remove-orphans" not in _shell_function("cmd_state_rollback")
 
@@ -575,13 +626,170 @@ def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
     }
     for file in tooling:
         assert (ROOT / file).is_file(), file
-    loop = 'for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do'
+    loop = (
+        'for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}" '
+        '"${BACKUP_TOOLING[@]}"; do'
+    )
     payload = deploy[
         deploy.index("prepare_payload() {") : deploy.index("sync_config() {")
     ]
     assert payload.count(loop) == 2
     sync = deploy[deploy.index("sync_config() {") :]
     assert sync.index(loop) < sync.index("deploy-remote.sh")
+
+
+def test_deploy_ships_the_offsite_backup_build_context() -> None:
+    deploy = (ROOT / "scripts/deploy.sh").read_text()
+    block = deploy[deploy.index("BACKUP_TOOLING=(") :]
+    files = block[len("BACKUP_TOOLING=(") : block.index(")")].split()
+
+    assert files == [
+        "deploy/backup-offsite/Dockerfile",
+        "deploy/backup-offsite/offsite.sh",
+    ]
+    for file in files:
+        assert (ROOT / file).is_file(), file
+    dockerfile = (ROOT / "deploy/backup-offsite/Dockerfile").read_text()
+    copied = {
+        line.split()[1]
+        for line in dockerfile.splitlines()
+        if line.startswith("COPY ") and "--from" not in line
+    }
+    assert copied <= {Path(file).name for file in files}
+
+
+def _before_upgrade(
+    tmp_path: Path,
+    *,
+    running: bool = True,
+    engine: str | None = None,
+    cli_exit: int = 0,
+    skip: str = "0",
+) -> tuple[subprocess.CompletedProcess, list[list[str]]]:
+    """Run cmd_backup_before_upgrade against a fake docker; return its calls."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir(exist_ok=True)
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
+        "args = sys.argv[1:]\n"
+        "with open(os.environ['DOCKER_TEST_LOG'], 'a') as log:\n"
+        "    log.write(json.dumps(args) + '\\n')\n"
+        "if args[0] == 'ps':\n"
+        "    print('abc123' if os.environ['FAKE_RUNNING'] == '1' else '')\n"
+        "elif args[:3] == ['exec', 'crate-maintenance-worker', 'printenv']:\n"
+        "    value = os.environ.get('FAKE_ENGINE')\n"
+        "    if value is None:\n"
+        "        sys.exit(1)\n"
+        "    print(value)\n"
+        "elif 'before-upgrade' in args:\n"
+        "    sys.exit(int(os.environ['FAKE_CLI_EXIT']))\n"
+    )
+    docker.chmod(0o755)
+    log = tmp_path / "docker.jsonl"
+    log.write_text("")
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        "DOCKER_TEST_LOG": str(log),
+        "FAKE_RUNNING": "1" if running else "0",
+        "FAKE_CLI_EXIT": str(cli_exit),
+        "DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE": skip,
+        "DEPLOY_BACKUP_TIMEOUT": "600",
+    }
+    if engine is not None:
+        env["FAKE_ENGINE"] = engine
+    result = subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            "log() { printf '%s\\n' \"$*\"; }\n"
+            + _shell_function("cmd_backup_before_upgrade")
+            + "\ncmd_backup_before_upgrade\n",
+        ],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    return result, calls
+
+
+def _ran_backup(calls: list[list[str]]) -> bool:
+    return any("before-upgrade" in call for call in calls)
+
+
+@pytest.mark.parametrize(
+    ("options", "reason"),
+    [
+        ({"skip": "1"}, "DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE=1"),
+        ({"running": False}, "not running"),
+        ({"engine": "false"}, "engine is off"),
+        ({"engine": " OFF\n"}, "engine is off"),
+        ({"engine": "0"}, "engine is off"),
+    ],
+)
+def test_before_upgrade_backup_is_a_no_op_when_nothing_can_run(
+    tmp_path: Path, options: dict, reason: str
+) -> None:
+    result, calls = _before_upgrade(tmp_path, **options)
+    assert result.returncode == 0, result.stderr
+    assert reason in result.stdout
+    assert not _ran_backup(calls)
+
+
+@pytest.mark.parametrize("engine", [None, "true", "1"])
+def test_before_upgrade_backup_runs_and_waits_while_the_engine_is_on(
+    tmp_path: Path, engine: str | None
+) -> None:
+    result, calls = _before_upgrade(tmp_path, engine=engine)
+    assert result.returncode == 0, result.stderr
+    assert calls[-1] == [
+        "exec",
+        "crate-maintenance-worker",
+        "python",
+        "-m",
+        "crate.backups.cli",
+        "before-upgrade",
+        "--wait",
+        "--timeout",
+        "600",
+    ]
+
+
+def test_a_failed_before_upgrade_backup_stops_the_deploy(tmp_path: Path) -> None:
+    result, calls = _before_upgrade(tmp_path, engine="true", cli_exit=1)
+    assert result.returncode == 1
+    assert _ran_backup(calls)
+
+
+def test_deploy_backs_up_before_anything_changes() -> None:
+    deploy = (ROOT / "scripts/deploy.sh").read_text()
+    remote = (ROOT / "scripts/deploy-remote.sh").read_text()
+    run = deploy[deploy.index("run_deploy() {") :]
+    run = run[: run.index("\n}\n")]
+    hook = run.index("remote_deploy backup-before-upgrade")
+    assert run.index("remote_deploy release-preflight") < hook
+    for later in (
+        "remote_deploy backup\n",
+        "trap rollback_on_error EXIT",
+        "sync_config",
+        "remote_deploy pull",
+        "remote_deploy up",
+    ):
+        assert hook < run.index(later), later
+    forwarded = deploy[deploy.index("remote_deploy() {") :]
+    forwarded = forwarded[: forwarded.index("\n}\n")]
+    assert "DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE='$DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE'" in (
+        forwarded
+    )
+    assert "DEPLOY_BACKUP_TIMEOUT='$DEPLOY_BACKUP_TIMEOUT'" in forwarded
+    assert "  backup-before-upgrade) host_guard cmd_backup_before_upgrade ;;" in remote
 
 
 PROJECTOR_OVERLAY = "deploy/observability/compose.projector-prometheus.yaml"
@@ -855,6 +1063,7 @@ def test_deploy_builds_candidate_from_the_remote_production_environment() -> Non
         ),
         ("docker-compose.project.yaml", "crate-site", "CRATE_SITE_IMAGE"),
         ("docker-compose.project.yaml", "crate-docs", "CRATE_DOCS_IMAGE"),
+        ("docker-compose.project.yaml", "crate-ryoku-site", "CRATE_RYOKU_SITE_IMAGE"),
         (
             "docker-compose.home.yaml",
             "crate-media-worker",
@@ -1002,6 +1211,65 @@ def test_cast_receiver_is_part_of_release_health_and_rollback_contracts() -> Non
 
     assert '[crate-cast-receiver]="${IMAGE_PREFIX}/crate-cast-receiver"' in script
     assert '[CRATE_CAST_RECEIVER_IMAGE]="crate-cast-receiver"' in script
+
+
+def test_ryoku_site_is_part_of_release_and_rollback_contracts() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+
+    for array_name in ("PROJECT_SERVICES", "RUNNING_SERVICES"):
+        assignment = next(
+            line for line in script.splitlines() if line.startswith(f"{array_name}=(")
+        )
+        assert "crate-ryoku-site" in assignment
+    release_keys = script[
+        script.index("RELEASE_ENV_KEYS=(") : script.index("SENTRY_RELEASE_ENV_KEYS=(")
+    ]
+    assert "CRATE_RYOKU_SITE_IMAGE" in release_keys
+    assert '[crate-ryoku-site]="${IMAGE_PREFIX}/crate-ryoku-site"' in script
+    assert '[CRATE_RYOKU_SITE_IMAGE]="${IMAGE_PREFIX}/crate-ryoku-site"' in script
+    assert '[CRATE_RYOKU_SITE_IMAGE]="crate-ryoku-site"' in script
+
+
+def test_ryoku_site_routes_its_host_and_serves_host_media_read_only() -> None:
+    project = yaml.safe_load((ROOT / "docker-compose.project.yaml").read_text())
+    service = project["services"]["crate-ryoku-site"]
+
+    assert service["build"]["dockerfile"] == "app/ryoku/Dockerfile"
+    assert (
+        service["labels"]["traefik.http.routers.ryoku.rule"]
+        == "Host(`ryoku.cratemusic.app`)"
+    )
+    assert (
+        service["labels"]["traefik.http.routers.ryoku.tls.certresolver"]
+        == "letsencrypt"
+    )
+    assert "./media/ryoku:/usr/share/nginx/media:ro" in service["volumes"]
+    assert service["healthcheck"]["test"]
+
+
+def test_ryoku_site_image_is_built_manifested_and_promoted_in_ci() -> None:
+    images = (ROOT / ".github/workflows/build-images.yml").read_text()
+
+    assert "build-ryoku-site:" in images
+    assert "file: ./app/ryoku/Dockerfile" in images
+    assert "ryoku_site: ${{ steps.filter.outputs.ryoku_site }}" in images
+    assert (
+        'check_result ryoku-site "$CHANGED_RYOKU_SITE" "$RESULT_RYOKU_SITE"' in images
+    )
+    assert '--digest "ryoku-site=$DIGEST_RYOKU_SITE"' in images
+    assert (
+        'promote_latest "$CHANGED_RYOKU_SITE" crate-ryoku-site "$DIGEST_RYOKU_SITE"'
+        in images
+    )
+
+
+def test_ryoku_media_sync_never_deletes_server_files() -> None:
+    output = _make_dry_run("ryoku-media-sync", "SRC=/tmp/cuts")
+
+    assert "rsync" in output
+    assert "/tmp/cuts/" in output
+    assert "/home/crate/crate/media/ryoku/" in output
+    assert "--delete" not in output
 
 
 def test_cast_receiver_build_and_frontend_gates_are_wired_in_ci() -> None:
@@ -1234,6 +1502,7 @@ HOST_LOCK_FUNCTIONS = (
 )
 MUTATING_STEPS = {
     "backup",
+    "backup-before-upgrade",
     "recovery-snapshot",
     "config",
     "pull",

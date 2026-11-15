@@ -7,7 +7,11 @@ import {
 } from "@/lib/android-native-engine";
 import { continuationDescriptor } from "@/lib/playback-continuation";
 import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
-import { getSmartMixCapabilities } from "@/lib/smart-mix";
+import {
+  continuationLongBeatmatch,
+  continuationPlanner,
+  getSmartMixCapabilities,
+} from "@/lib/smart-mix";
 
 import { usePlaybackIntelligence } from "@/contexts/use-playback-intelligence";
 import { usePlaybackPersistence } from "@/contexts/use-playback-persistence";
@@ -340,7 +344,8 @@ export function usePlayerPlaybackRuntime({
         preferredDurationMs: effectiveCrossfadeMsRef.current,
         allowBeatmatch: capabilities.androidBeatmatch,
         allowBassHandoff: capabilities.androidBassHandoff,
-        allowLongBeatmatch: capabilities.androidLongBeatmatch,
+        allowLongBeatmatch: continuationLongBeatmatch(capabilities),
+        plannerVersion: continuationPlanner(capabilities),
         delivery: getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy),
         descriptor:
           repeat === "off"

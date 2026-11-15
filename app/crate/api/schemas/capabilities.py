@@ -9,6 +9,9 @@ DecksFeature = Literal[
     "bass_handoff",
     "long_beatmatch",
     "cues",
+    "stems",
+    "stem_upload",
+    "local_refinement",
 ]
 
 
@@ -32,6 +35,19 @@ class SmartMixAiAssistedCapabilities(BaseModel):
     ) = None
 
 
+class SmartMixStemsCapabilities(BaseModel):
+    """Smart Mix Stems (STEM-D4): stem levels per phrase in full profiles.
+
+    playlists: Smart Mix playlists can be turned on (/api/smart-mix/playlists), so the
+    server queues their tracks for separation, and playlist responses carry smartMix.
+    storage: the server keeps stem audio for Crate Decks to download.
+    """
+
+    available: bool
+    playlists: bool
+    storage: bool
+
+
 class SmartMixCapabilities(BaseModel):
     available: bool
     planner_version: str | None
@@ -48,11 +64,20 @@ class SmartMixCapabilities(BaseModel):
             "request."
         )
     )
+    listen_planner_version: str | None = Field(
+        description=(
+            "Planner Listen's native engine asks for, in its plan batches and its "
+            "background continuation: smart-mix-v3 with "
+            "CRATE_LISTEN_SMART_MIX_V3_ENABLED, smart-mix-v2 otherwise. Always one "
+            "of planner_versions; null while Smart Mix is off."
+        )
+    )
     android_native_crossfade: bool
     android_beatmatch: bool
     android_bass_handoff: bool
     android_long_beatmatch: bool
     ai_assisted: SmartMixAiAssistedCapabilities
+    stems: SmartMixStemsCapabilities
 
 
 class VDJCapabilities(BaseModel):
@@ -94,10 +119,30 @@ class AccessTokenCapabilities(BaseModel):
     automation: bool
 
 
+class FederationCapabilities(BaseModel):
+    """Streamed federated search for Listen (FED1.5, FED-D18)."""
+
+    search_stream: bool = Field(
+        description=(
+            "GET /api/catalog/search-stream is offered: local results at once, then "
+            "remote results from direct peers within the window. When false, "
+            "clients keep /api/catalog/search."
+        )
+    )
+    results_contract: str = Field(
+        description="The node-to-node result envelope this server reads and serves."
+    )
+    min_query_length: int = Field(
+        description="Queries with fewer characters (spaces ignored) never fan out."
+    )
+    window_ms: int = Field(description="How long remote results may keep arriving.")
+
+
 class CapabilitiesResponse(BaseModel):
     smart_mix: SmartMixCapabilities
     vdj: VDJCapabilities
     decks: DecksCapabilities
+    federation: FederationCapabilities
     access_token: AccessTokenCapabilities | None = Field(
         default=None, exclude_if=lambda value: value is None
     )

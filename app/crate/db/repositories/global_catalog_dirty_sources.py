@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from sqlalchemy import text
-
 
 EntityType = Literal["artist", "album", "track"]
 Operation = Literal["upsert", "delete"]
@@ -162,7 +161,11 @@ def claim_dirty_sources(
                         claimed_at IS NULL
                         OR claimed_at < NOW() - make_interval(secs => :lease_seconds)
                       )
-                    ORDER BY requested_at, id
+                    ORDER BY CASE entity_type
+                        WHEN 'artist' THEN 0
+                        WHEN 'album' THEN 1
+                        ELSE 2
+                    END, requested_at, id
                     LIMIT :limit
                     FOR UPDATE SKIP LOCKED
                 )
@@ -195,7 +198,16 @@ def claim_dirty_sources(
         .mappings()
         .all()
     )
-    return [dict(row) for row in rows]
+    # UPDATE RETURNING does not retain the dependency order of the claim CTE.
+    priority = {"artist": 0, "album": 1, "track": 2}
+    return sorted(
+        (dict(row) for row in rows),
+        key=lambda row: (
+            priority[row["entity_type"]],
+            row["requested_at"],
+            row["id"],
+        ),
+    )
 
 
 def complete_dirty_source(
@@ -244,7 +256,7 @@ def fail_dirty_source(
 ) -> bool:
     next_attempt_at = None
     if retry_after_seconds is not None:
-        next_attempt_at = datetime.now(timezone.utc) + timedelta(
+        next_attempt_at = datetime.now(UTC) + timedelta(
             seconds=max(1, int(retry_after_seconds))
         )
     result = session.execute(

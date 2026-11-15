@@ -183,10 +183,12 @@ services:
     volumes:
       - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/context/public:/run/crate-provenance:ro
       - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/provenance:/run/crate-provenance-evidence:ro
+    # The probe is cheap (no crate.db or redis-py imports), but the fast worker
+    # runs under a fractional CPU cap, so leave room for cgroup throttling.
     healthcheck: &worker-health
       test: [CMD, python3, -m, crate.role_readiness]
       interval: 15s
-      timeout: 7s
+      timeout: 15s
       start_period: 90s
       retries: 3
 

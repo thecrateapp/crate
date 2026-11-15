@@ -19,6 +19,16 @@ LABEL_VALUES = {
     "artwork_materialize_reason": ("invalid_source", "write_failed"),
     "artwork_queue_result": ("created", "deduplicated", "failed"),
     "artwork_request_result": ("variant", "original", "missing"),
+    # Backups (BK6): where a copy lives, as the destination's provider kind, or
+    # "dumps" for the local dumps; never a destination's own name.
+    "backup_destination": ("dumps", "local", "s3", "b2", "sftp", "gdrive", "dropbox"),
+    "backup_run_kind": (
+        "dump",
+        "local_retention",
+        "offsite",
+        "verify",
+        "restore_drill",
+    ),
     "cast_format_version": ("1",),
     "catalog_serving_mode": (
         "global-ready",
@@ -161,6 +171,7 @@ LABEL_VALUES = {
     "radio_vector_coverage": ("present", "missing"),
     "recommendation_rules_revision": ("1",),
     "recommendation_surface": ("radio", "path"),
+    "sse_pubsub_failure": ("pool_exhausted", "redis_error"),
     "stream_format": (
         "flac",
         "mp3",
@@ -400,6 +411,17 @@ METRIC_SPECS = {
         "1",
         {"kind": "artwork_kind", "result": "artwork_request_result"},
     ),
+    "backup.bytes": ("gauge", "bytes", {"destination": "backup_destination"}),
+    "backup.last_success.timestamp": (
+        "gauge",
+        "seconds",
+        {"destination": "backup_destination", "kind": "backup_run_kind"},
+    ),
+    "backup.run.duration": (
+        "gauge",
+        "seconds",
+        {"destination": "backup_destination", "kind": "backup_run_kind"},
+    ),
     "cast.spectrum.bytes": (
         "distribution",
         "bytes",
@@ -411,6 +433,11 @@ METRIC_SPECS = {
         {"format_version": "cast_format_version"},
     ),
     "catalog.search.serving_mode": (
+        "counter_delta",
+        "1",
+        {"mode": "catalog_serving_mode"},
+    ),
+    "catalog.search_stream.requests": (
         "counter_delta",
         "1",
         {"mode": "catalog_serving_mode"},
@@ -722,6 +749,12 @@ METRIC_SPECS = {
     "shows.import.failed": ("counter_delta", "1", {}),
     "shows.import.invalid": ("counter_delta", "1", {}),
     "shows.import.linked_source": ("counter_delta", "1", {}),
+    "sse.pubsub.open": ("gauge", "1", {}),
+    "sse.pubsub.open_failures": (
+        "counter_delta",
+        "1",
+        {"reason": "sse_pubsub_failure"},
+    ),
     "storage.cache.used_bytes": ("gauge", "bytes", {}),
     "storage.data.used_bytes": ("gauge", "bytes", {}),
     "storage.music.used_bytes": ("gauge", "bytes", {}),

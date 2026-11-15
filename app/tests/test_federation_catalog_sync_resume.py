@@ -30,6 +30,11 @@ def test_delta_items_and_cursor_commit_in_one_transaction(monkeypatch):
         "crate.db.repositories.global_catalog_dirty_sources.enqueue_federated_dirty_source",
         lambda *args, **kwargs: None,
     )
+    fenced = []
+    monkeypatch.setattr(
+        "crate.db.repositories.federation_catalog_fence.fence_catalog_sync_write",
+        lambda *args: fenced.append(args) or {},
+    )
 
     result = jobs.apply_federation_delta_page(
         node_uid="00000000-0000-0000-0000-000000000002",
@@ -52,9 +57,11 @@ def test_delta_items_and_cursor_commit_in_one_transaction(monkeypatch):
             },
         ],
         next_cursor="opaque-next",
+        sync_generation=3,
     )
 
     assert result == {"applied": 2, "last_sequence": 22}
+    assert fenced == [(session, "00000000-0000-0000-0000-000000000002", 3)]
     assert any(
         "INSERT INTO federation_catalog_items" in sql for sql, _ in session.calls
     )
@@ -84,6 +91,10 @@ def test_duplicate_delta_page_is_idempotent(monkeypatch):
         "crate.db.repositories.global_catalog_dirty_sources.enqueue_federated_dirty_source",
         lambda *args, **kwargs: None,
     )
+    monkeypatch.setattr(
+        "crate.db.repositories.federation_catalog_fence.fence_catalog_sync_write",
+        lambda *args: {},
+    )
     item = {
         "sequence": 8,
         "entity_type": "album",
@@ -97,11 +108,13 @@ def test_duplicate_delta_page_is_idempotent(monkeypatch):
         node_uid="00000000-0000-0000-0000-000000000002",
         items=[item],
         next_cursor="cursor-8",
+        sync_generation=1,
     )
     jobs.apply_federation_delta_page(
         node_uid="00000000-0000-0000-0000-000000000002",
         items=[item],
         next_cursor="cursor-8",
+        sync_generation=1,
     )
 
     upserts = [

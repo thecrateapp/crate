@@ -5,6 +5,8 @@ export interface ContextMenuMediaHeader {
   type: "media";
   title: string;
   subtitle?: string;
+  /** A state of the item, between subtitle and detail as an accent MonoLabel. */
+  status?: string;
   detail?: string;
   imageUrl?: string | null;
   imageAlt?: string;

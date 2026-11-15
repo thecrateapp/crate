@@ -126,6 +126,38 @@ func TestFallbackProxyDoesNotApplyInteractiveDeadlineToStreams(t *testing.T) {
 	assert.Equal(t, uint64(0), proxy.Stats().Timeouts)
 }
 
+func TestFallbackProxyRelaysFederatedSearchStreamWithoutInteractiveDeadline(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("event: local\ndata: {}\n\n"))
+		w.(http.Flusher).Flush()
+		// The remote window outlives the interactive fallback deadline.
+		time.Sleep(25 * time.Millisecond)
+		_, _ = w.Write([]byte("event: done\ndata: {}\n\n"))
+	}))
+	defer backend.Close()
+
+	proxy, err := NewFallbackProxyWithConfig(FallbackConfig{
+		Enabled:          true,
+		BaseURL:          backend.URL,
+		RequestTimeout:   5 * time.Millisecond,
+		FailureThreshold: 2,
+		OpenDuration:     time.Second,
+	})
+	assert.NoError(t, err)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/catalog/search-stream?q=joy", nil)
+	assert.True(t, isStreamingFallback(request))
+	recorder := httptest.NewRecorder()
+	proxy.ServeHTTP(recorder, request)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, "text/event-stream", recorder.Header().Get("Content-Type"))
+	assert.Equal(t, "event: local\ndata: {}\n\nevent: done\ndata: {}\n\n", recorder.Body.String())
+	assert.Equal(t, uint64(0), proxy.Stats().Timeouts)
+}
+
 func TestFallbackProxyArtworkFailuresDoNotOpenInteractiveBreaker(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/photo") {

@@ -1,0 +1,79 @@
+---
+import { HERO } from "../data/media";
+import MediaClip from "./MediaClip.astro";
+---
+
+<section id="hero" class="hero" aria-labelledby="hero-title">
+  <div class="stage">
+    <MediaClip clip={HERO} class="hero-clip" />
+  </div>
+  <div class="copy">
+    <p class="eyebrow" data-reveal><b>A Ryoku mod</b> from the Crate project</p>
+    <h1 id="hero-title" class="display" data-reveal>Crate for Ryoku</h1>
+    <p class="line" data-reveal>An opinionated mod of Ryoku based on Crate's visual design.</p>
+    <div class="actions" data-reveal>
+      <a class="primary" href="#install">Install Crate for Ryoku</a>
+      <a class="u-link" href="https://cratemusic.app">What is Crate?</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+  }
+
+  .stage {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+  }
+
+  .stage :global(.hero-clip) {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    border-radius: 0;
+    aspect-ratio: auto;
+  }
+
+  .stage::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(transparent 55%, var(--bg));
+    pointer-events: none;
+  }
+
+  .copy {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    gap: 22px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 clamp(16px, 6vw, 96px) 12vh;
+  }
+
+  h1 {
+    font-size: clamp(48px, 11vw, 148px);
+  }
+
+  .line {
+    margin: 0;
+    max-width: 30ch;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(22px, 3.2vw, 38px);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--fg-2);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 28px;
+  }
+</style>

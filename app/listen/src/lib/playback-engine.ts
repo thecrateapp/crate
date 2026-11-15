@@ -92,6 +92,8 @@ export interface EngineContinuationContext {
   allowLongBeatmatch: boolean;
   delivery: string;
   descriptor: EngineContinuationDescriptor | null;
+  // The planner the native background continuation asks for (LV-D1).
+  plannerVersion: "smart-mix-v2" | "smart-mix-v3";
 }
 
 export interface EngineAppendedTrack {

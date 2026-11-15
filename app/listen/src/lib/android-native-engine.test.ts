@@ -797,6 +797,7 @@ describe("android native engine flags", () => {
       allowLongBeatmatch: false,
       delivery: "balanced",
       descriptor: null,
+      plannerVersion: "smart-mix-v2" as const,
     };
 
     async function loadQueue(crossfadeMs: number) {
@@ -840,6 +841,7 @@ describe("android native engine flags", () => {
           allowLongBeatmatch: false,
           delivery: "balanced",
           refill: false,
+          plannerVersion: "smart-mix-v2",
         }),
       );
       expect(nativePlaybackMock.setQueue.mock.calls[0]![0]).not.toHaveProperty(
@@ -875,6 +877,70 @@ describe("android native engine flags", () => {
         allowBassHandoff: true,
         allowLongBeatmatch: false,
       });
+    });
+
+    it("continuationWithModes follows a planner change", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      const { continuationWithModes } = await import(
+        "@/lib/android-native-engine"
+      );
+      const v3Context = { ...context, plannerVersion: "smart-mix-v3" as const };
+      // Same beatmatch, bass and long modes as the context: only the planner differs.
+      const capabilitiesResolvingV2 = {
+        available: true,
+        androidNativeCrossfade: true,
+        androidBeatmatch: false,
+        androidBassHandoff: false,
+        androidLongBeatmatch: false,
+        plannerVersion: "smart-mix-v2",
+      };
+      const capabilitiesResolvingV3 = {
+        ...capabilitiesResolvingV2,
+        plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+        listenPlannerVersion: "smart-mix-v3",
+      };
+
+      expect(continuationWithModes(v3Context, capabilitiesResolvingV2)).toEqual(
+        {
+          ...v3Context,
+          plannerVersion: "smart-mix-v2",
+        },
+      );
+      expect(
+        continuationWithModes(v3Context, capabilitiesResolvingV3),
+      ).toBeNull();
+    });
+
+    it("configures the native continuation with the planner", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(state);
+      nativePlaybackMock.setQueue.mockResolvedValue(state);
+      nativePlaybackMock.setContinuation.mockResolvedValue(undefined);
+      continuationTokenMock.mockResolvedValue({
+        token: "crv_continuation",
+        expiresAtMs: 1_800_000_000_000,
+        apiBase: "https://api.example",
+      });
+      const nativeEngineModule = await import("@/lib/android-native-engine");
+      const engine = new nativeEngineModule.AndroidNativeEngine();
+
+      await engine.loadQueue({
+        revision: "queue-rev-1",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs: 12000,
+        volume: 1,
+        continuation: { ...context, plannerVersion: "smart-mix-v3" },
+      });
+
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+          expect.objectContaining({ plannerVersion: "smart-mix-v3" }),
+        ),
+      );
     });
 
     it("clears native continuation when the queue does not mix", async () => {

@@ -848,6 +848,9 @@ function responseFor(pathname: string): unknown {
   if (pathname === "/api/auth/config") {
     return { registration_enabled: false, password_login_enabled: true };
   }
+  if (pathname === "/api/capabilities") {
+    return { smart_mix: { available: false, stems: { playlists: false } } };
+  }
   if (pathname === "/api/auth/subsonic-token") {
     return { configured: false };
   }

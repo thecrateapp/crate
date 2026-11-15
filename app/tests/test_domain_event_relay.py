@@ -1,3 +1,36 @@
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def no_real_catalog_database(monkeypatch):
+    monkeypatch.setattr(
+        "crate.domain_event_relay.publish_pending_catalog_changes", lambda **kwargs: 0
+    )
+
+
+def test_relay_publishes_a_bounded_committed_catalog_batch(monkeypatch):
+    import crate.domain_event_relay as relay
+
+    limits = []
+    monkeypatch.setattr(
+        relay, "publish_pending_catalog_changes", lambda *, limit: limits.append(limit)
+    )
+    monkeypatch.setattr(relay, "claim_outbox_events", lambda *args, **kwargs: [])
+    assert relay.relay_domain_events() == {"claimed": 0, "delivered": 0, "failed": 0}
+    assert limits == [1000]
+
+
+def test_catalog_publication_failure_does_not_block_domain_relay(monkeypatch):
+    import crate.domain_event_relay as relay
+
+    def fail(**kwargs):
+        raise RuntimeError("catalog unavailable")
+
+    monkeypatch.setattr(relay, "publish_pending_catalog_changes", fail)
+    monkeypatch.setattr(relay, "claim_outbox_events", lambda *args, **kwargs: [])
+    assert relay.relay_domain_events() == {"claimed": 0, "delivered": 0, "failed": 0}
+
+
 def test_relay_isolates_poison_event_and_continues_batch(monkeypatch):
     import crate.domain_event_relay as relay
 
@@ -89,6 +122,7 @@ def test_show_commit_invalidations_reach_live_caches_before_outbox_ack(monkeypat
 
 def test_committed_cache_dispatch_does_not_persist_a_second_outbox(monkeypatch):
     from types import SimpleNamespace
+
     from crate.api import cache_events
 
     calls = []

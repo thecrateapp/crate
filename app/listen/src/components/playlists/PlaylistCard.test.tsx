@@ -384,3 +384,80 @@ describe("PlaylistCard row", () => {
     expect(onEdit).toHaveBeenCalledOnce();
   });
 });
+
+describe("PlaylistCard row with Smart Mix", () => {
+  function renderSmartMixRow(
+    props: Partial<Parameters<typeof PlaylistCard>[0]> = {},
+  ) {
+    return renderWithRoutes(
+      <PlaylistCard
+        variant="row"
+        playlistId={41}
+        name="Warehouse 03:00"
+        trackCount={48}
+        href="/playlist/41"
+        detailEndpoint="/api/playlists/41"
+        smartMix={{ enabled: true, ready: 41, total: 48 }}
+        {...props}
+      />,
+    );
+  }
+
+  it("marks the row with its Smart Mix progress", () => {
+    renderSmartMixRow();
+    expect(
+      screen.getByText("41/48").closest("[data-smart-mix=chip]"),
+    ).toBeInTheDocument();
+  });
+
+  it("turns Smart Mix off from the menu, after offline, with progress in its header", async () => {
+    const onToggleSmartMix = vi.fn();
+    renderSmartMixRow({ onToggleSmartMix });
+
+    fireEvent.contextMenu(screen.getByRole("article"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu).getByText("Smart Mix · 41 of 48 ready"),
+    ).toBeInTheDocument();
+    const labels = within(menu)
+      .getAllByRole("menuitem")
+      .map((item) => item.getAttribute("aria-label") ?? item.textContent);
+    const offline = labels.findIndex((label) => /offline/i.test(label ?? ""));
+    const toggle = within(menu).getByRole("menuitem", {
+      name: "Turn off Smart Mix",
+    });
+    expect(labels.indexOf("Turn off Smart Mix")).toBe(offline + 1);
+    expect(toggle).toHaveAttribute("data-active", "true");
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(onToggleSmartMix).toHaveBeenCalledOnce());
+  });
+
+  it("offers Turn on Smart Mix to the owner of a playlist that is off", async () => {
+    renderSmartMixRow({
+      smartMix: { enabled: false, ready: 0, total: 0 },
+      onToggleSmartMix: vi.fn(),
+    });
+
+    fireEvent.contextMenu(screen.getByRole("article"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu).getByRole("menuitem", { name: "Turn on Smart Mix" }),
+    ).not.toHaveAttribute("data-active", "true");
+    expect(within(menu).queryByText(/Smart Mix ·/)).toBeNull();
+    expect(screen.queryByText("0/0")).toBeNull();
+  });
+
+  it("gives others no toggle", async () => {
+    renderSmartMixRow();
+
+    fireEvent.contextMenu(screen.getByRole("article"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu).queryByRole("menuitem", { name: /Smart Mix/ }),
+    ).toBeNull();
+    expect(
+      within(menu).getByText("Smart Mix · 41 of 48 ready"),
+    ).toBeInTheDocument();
+  });
+});

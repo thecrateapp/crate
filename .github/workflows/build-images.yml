@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       images:
-        description: "Images to build (comma-separated: backend,api,worker,analysis-worker,playback-worker,media-worker,readplane,ui,listen,cast-receiver,docs,site,agent or all)"
+        description: "Images to build (comma-separated: backend,api,worker,analysis-worker,playback-worker,media-worker,readplane,ui,listen,cast-receiver,docs,site,ryoku-site,agent or all)"
         default: "all"
 
 env:
@@ -36,6 +36,7 @@ jobs:
       cast_receiver: ${{ steps.filter.outputs.cast_receiver }}
       site: ${{ steps.filter.outputs.site }}
       docs: ${{ steps.filter.outputs.docs }}
+      ryoku_site: ${{ steps.filter.outputs.ryoku_site }}
       agent: ${{ steps.filter.outputs.agent }}
     steps:
       - uses: actions/checkout@v6
@@ -417,6 +418,46 @@ jobs:
           cache-from: type=gha,scope=site
           cache-to: type=gha,scope=site,mode=max
 
+  build-ryoku-site:
+    needs: changes
+    if: needs.changes.outputs.ryoku_site == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-ryoku-site
+          tags: |
+            type=sha,prefix=,format=long
+
+      # NOTE: repo-root context: the Dockerfile copies app/web/src, fonts and icons
+      # beside app/ryoku for the @crate-web alias.
+      - uses: docker/build-push-action@v7
+        id: build
+        with:
+          context: .
+          file: ./app/ryoku/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=ryoku-site
+          cache-to: type=gha,scope=ryoku-site,mode=max
+
   build-agent:
     needs: changes
     if: needs.changes.outputs.agent == 'true'
@@ -483,6 +524,7 @@ jobs:
       - build-cast-receiver
       - build-site
       - build-docs
+      - build-ryoku-site
       - build-agent
     if: always() && needs.changes.result == 'success'
     runs-on: ubuntu-latest
@@ -505,6 +547,7 @@ jobs:
       CHANGED_CAST_RECEIVER: ${{ needs.changes.outputs.cast_receiver }}
       CHANGED_SITE: ${{ needs.changes.outputs.site }}
       CHANGED_DOCS: ${{ needs.changes.outputs.docs }}
+      CHANGED_RYOKU_SITE: ${{ needs.changes.outputs.ryoku_site }}
       CHANGED_AGENT: ${{ needs.changes.outputs.agent }}
       RESULT_API: ${{ needs['build-api'].result }}
       RESULT_READPLANE: ${{ needs['build-readplane'].result }}
@@ -517,6 +560,7 @@ jobs:
       RESULT_CAST_RECEIVER: ${{ needs['build-cast-receiver'].result }}
       RESULT_SITE: ${{ needs['build-site'].result }}
       RESULT_DOCS: ${{ needs['build-docs'].result }}
+      RESULT_RYOKU_SITE: ${{ needs['build-ryoku-site'].result }}
       RESULT_AGENT: ${{ needs['build-agent'].result }}
       DIGEST_API: ${{ needs['build-api'].outputs.digest }}
       DIGEST_READPLANE: ${{ needs['build-readplane'].outputs.digest }}
@@ -529,6 +573,7 @@ jobs:
       DIGEST_CAST_RECEIVER: ${{ needs['build-cast-receiver'].outputs.digest }}
       DIGEST_SITE: ${{ needs['build-site'].outputs.digest }}
       DIGEST_DOCS: ${{ needs['build-docs'].outputs.digest }}
+      DIGEST_RYOKU_SITE: ${{ needs['build-ryoku-site'].outputs.digest }}
       DIGEST_AGENT: ${{ needs['build-agent'].outputs.digest }}
     steps:
       - uses: actions/checkout@v6
@@ -564,6 +609,7 @@ jobs:
           check_result cast-receiver "$CHANGED_CAST_RECEIVER" "$RESULT_CAST_RECEIVER"
           check_result site "$CHANGED_SITE" "$RESULT_SITE"
           check_result docs "$CHANGED_DOCS" "$RESULT_DOCS"
+          check_result ryoku-site "$CHANGED_RYOKU_SITE" "$RESULT_RYOKU_SITE"
           check_result agent "$CHANGED_AGENT" "$RESULT_AGENT"
 
       - name: Assemble complete release manifest
@@ -596,6 +642,7 @@ jobs:
           [[ "$CHANGED_CAST_RECEIVER" == "true" ]] && digest_args+=(--digest "cast-receiver=$DIGEST_CAST_RECEIVER")
           [[ "$CHANGED_SITE" == "true" ]] && digest_args+=(--digest "site=$DIGEST_SITE")
           [[ "$CHANGED_DOCS" == "true" ]] && digest_args+=(--digest "docs=$DIGEST_DOCS")
+          [[ "$CHANGED_RYOKU_SITE" == "true" ]] && digest_args+=(--digest "ryoku-site=$DIGEST_RYOKU_SITE")
           [[ "$CHANGED_AGENT" == "true" ]] && digest_args+=(--digest "agent=$DIGEST_AGENT")
 
           python scripts/release_manifest.py assemble \
@@ -664,6 +711,7 @@ jobs:
           promote_latest "$CHANGED_CAST_RECEIVER" crate-cast-receiver "$DIGEST_CAST_RECEIVER"
           promote_latest "$CHANGED_SITE" crate-site "$DIGEST_SITE"
           promote_latest "$CHANGED_DOCS" crate-docs "$DIGEST_DOCS"
+          promote_latest "$CHANGED_RYOKU_SITE" crate-ryoku-site "$DIGEST_RYOKU_SITE"
           promote_latest "$CHANGED_AGENT" crate-agent "$DIGEST_AGENT"
 
       - name: Attest release manifest

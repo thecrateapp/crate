@@ -64,9 +64,9 @@ select_running_operator_overlay() {
   exit 1
 }
 select_running_operator_overlay
-PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
+PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs crate-ryoku-site)
 HEALTHY_SERVICES=(crate-redis crate-postgres crate-api crate-cast-receiver)
-RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
+RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs crate-ryoku-site)
 QUIESCE_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker)
 RELEASE_ENV_KEYS=(
   CRATE_RELEASE_SHA
@@ -81,6 +81,7 @@ RELEASE_ENV_KEYS=(
   CRATE_CAST_RECEIVER_IMAGE
   CRATE_SITE_IMAGE
   CRATE_DOCS_IMAGE
+  CRATE_RYOKU_SITE_IMAGE
 )
 SENTRY_RELEASE_ENV_KEYS=(
   CRATE_API_SENTRY_RELEASE
@@ -111,6 +112,7 @@ declare -A SERVICE_IMAGE_REPOS=(
   [crate-cast-receiver]="${IMAGE_PREFIX}/crate-cast-receiver"
   [crate-site]="${IMAGE_PREFIX}/crate-site"
   [crate-docs]="${IMAGE_PREFIX}/crate-docs"
+  [crate-ryoku-site]="${IMAGE_PREFIX}/crate-ryoku-site"
 )
 declare -A RELEASE_ENV_REPOS=(
   [CRATE_API_IMAGE]="${IMAGE_PREFIX}/crate-api"
@@ -124,6 +126,7 @@ declare -A RELEASE_ENV_REPOS=(
   [CRATE_CAST_RECEIVER_IMAGE]="${IMAGE_PREFIX}/crate-cast-receiver"
   [CRATE_SITE_IMAGE]="${IMAGE_PREFIX}/crate-site"
   [CRATE_DOCS_IMAGE]="${IMAGE_PREFIX}/crate-docs"
+  [CRATE_RYOKU_SITE_IMAGE]="${IMAGE_PREFIX}/crate-ryoku-site"
 )
 declare -A RELEASE_ENV_SERVICES=(
   [CRATE_API_IMAGE]="crate-api"
@@ -137,6 +140,7 @@ declare -A RELEASE_ENV_SERVICES=(
   [CRATE_CAST_RECEIVER_IMAGE]="crate-cast-receiver"
   [CRATE_SITE_IMAGE]="crate-site"
   [CRATE_DOCS_IMAGE]="crate-docs"
+  [CRATE_RYOKU_SITE_IMAGE]="crate-ryoku-site"
 )
 
 log() {
@@ -677,6 +681,38 @@ cmd_backup() {
   done
 }
 
+# The "before upgrades" backup policies (admin backups, BG1-15), run by the
+# maintenance worker that is running now, before the new images start and migrate
+# the database. A no-op while that worker is not running, while the backups
+# engine is off (CRATE_LOCAL_BACKUPS_ENABLED false, 0, no or off, as the engine
+# reads it) or without such a policy (the command itself says so and exits 0).
+# A failed or timed-out backup stops the deploy before anything changed;
+# DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE=1 deploys without it.
+cmd_backup_before_upgrade() {
+  local enabled
+  local timeout="${DEPLOY_BACKUP_TIMEOUT:-10800}"
+
+  if [[ "${DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE:-0}" == "1" ]]; then
+    log "Skipping the before-upgrade backup (DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE=1)"
+    return 0
+  fi
+  if [[ -z "$(docker ps -q --filter 'name=^crate-maintenance-worker$' --filter status=running 2>/dev/null || true)" ]]; then
+    log "crate-maintenance-worker is not running; no before-upgrade backup"
+    return 0
+  fi
+  enabled="$(docker exec crate-maintenance-worker printenv CRATE_LOCAL_BACKUPS_ENABLED 2>/dev/null || true)"
+  enabled="$(printf '%s' "$enabled" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  case "$enabled" in
+    0 | false | no | off)
+      log "The backups engine is off (CRATE_LOCAL_BACKUPS_ENABLED=${enabled}); no before-upgrade backup"
+      return 0
+      ;;
+  esac
+  log "Running the before-upgrade backup policies (timeout ${timeout}s)"
+  docker exec crate-maintenance-worker \
+    python -m crate.backups.cli before-upgrade --wait --timeout "$timeout"
+}
+
 recovery_redis_service() {
   if compose_has_service crate-redis-durable; then
     printf 'crate-redis-durable'
@@ -1112,6 +1148,19 @@ cmd_rollback() {
   record_agent_deployment rollback
   dc config -q
 
+  # A release that added a service is rolled back to a compose file without it:
+  # retire that service's container instead of asking compose to start it.
+  local restorable=()
+  for service in "${rollback_services[@]}"; do
+    if compose_has_service "$service"; then
+      restorable+=("$service")
+    else
+      log "Removing ${service}: the restored release does not define it"
+      docker rm -f "$service" >/dev/null 2>&1 || true
+    fi
+  done
+  rollback_services=("${restorable[@]}")
+
   if (( ${#rollback_services[@]} == 0 )); then
     log "No application service changed; rollback only restored release configuration"
     DEPLOY_PUBLIC_CHECKS=0 cmd_verify
@@ -1338,7 +1387,7 @@ cmd_ps() {
 
 cmd_diagnose() {
   dc ps || true
-  dc logs --tail=120 crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs || true
+  dc logs --tail=120 crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs crate-ryoku-site || true
 }
 
 host_lock_acquire() {
@@ -1397,6 +1446,7 @@ case "${1:-}" in
   release-preflight) cmd_release_preflight ;;
   preflight) cmd_preflight ;;
   backup) host_guard cmd_backup ;;
+  backup-before-upgrade) host_guard cmd_backup_before_upgrade ;;
   recovery-snapshot) host_guard cmd_recovery_snapshot ;;
   config) host_guard cmd_config ;;
   pull) host_guard cmd_pull ;;
@@ -1409,7 +1459,7 @@ case "${1:-}" in
   ps) cmd_ps ;;
   diagnose) cmd_diagnose ;;
   *)
-    printf 'Usage: %s {host-lock|host-unlock|release-preflight|preflight|backup|recovery-snapshot|config|pull|up|verify|agent-context|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
+    printf 'Usage: %s {host-lock|host-unlock|release-preflight|preflight|backup|backup-before-upgrade|recovery-snapshot|config|pull|up|verify|agent-context|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
     exit 2
     ;;
 esac

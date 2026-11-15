@@ -33,11 +33,14 @@ const REFINE_WINDOW_MS: f64 = 2.0;
 const REFINE_RISE_MS: usize = 3;
 const REFINE_MIN_RISE: f64 = 0.5;
 /// Beat This! downbeats (SM3-D14): a model downbeat votes for the bar phase of the grid
-/// beat within this distance, and the winning phase must hold this share of the model
-/// downbeats that fall within the grid. Same constants as the Python analyzer
-/// (`crate.smart_mix.phrase_grid`).
+/// beat within this distance, and the winning phase must hold this share of the votes.
+/// A downbeat that matches no grid beat (where Beat This! slides half a beat off the grid
+/// in a section) votes for no phase, but at least `MODEL_DOWNBEAT_MIN_ON_GRID` of the
+/// model downbeats that fall within the grid must vote. Same constants as the Python
+/// analyzer (`crate.smart_mix.phrase_grid`).
 pub const MODEL_DOWNBEAT_TOLERANCE_MS: u64 = 70;
 pub const MODEL_DOWNBEAT_MIN_SHARE: f64 = 0.6;
+pub const MODEL_DOWNBEAT_MIN_ON_GRID: f64 = 0.5;
 /// Model beats sit on the attack while the onset envelope peaks a frame later: the onset
 /// frame of a model beat is the envelope's peak within this distance, where the tracker's
 /// beats sit, so beat strength and stability read the same envelope values.
@@ -478,9 +481,40 @@ fn nearest_beat_index(beat_grid_ms: &[u64], position: u64) -> usize {
 
 /// Index of the first downbeat in `beat_grid_ms`: the bar phase (index mod 4) that
 /// collects the most model downbeats, each voting for its nearest grid beat within
-/// `MODEL_DOWNBEAT_TOLERANCE_MS`, if it holds `MODEL_DOWNBEAT_MIN_SHARE` of the model
-/// downbeats between the first and the last beat (within the tolerance).
+/// `MODEL_DOWNBEAT_TOLERANCE_MS`, if it holds `MODEL_DOWNBEAT_MIN_SHARE` of the votes and
+/// at least `MODEL_DOWNBEAT_MIN_ON_GRID` of the model downbeats between the first and the
+/// last beat (within the tolerance) voted. A downbeat further from every beat says
+/// nothing about the grid's bar and votes for no phase. Any phase of the former rule
+/// (`cue_downbeat_phase_from_model`) is still the same phase.
 pub fn downbeat_phase_from_model(beat_grid_ms: &[u64], downbeats_ms: &[u64]) -> Option<usize> {
+    let (votes, counted) = model_downbeat_votes(beat_grid_ms, downbeats_ms)?;
+    let on_grid: usize = votes.iter().sum();
+    if on_grid == 0 || (on_grid as f64) < MODEL_DOWNBEAT_MIN_ON_GRID * counted as f64 {
+        return None;
+    }
+    let phase = winning_phase(&votes);
+    (votes[phase] as f64 >= MODEL_DOWNBEAT_MIN_SHARE * on_grid as f64).then_some(phase)
+}
+
+/// The bar phase of a cue's window (`CUE_DOWNBEAT_BEATS` beats), by the former rule: the
+/// phase with the most votes must hold `MODEL_DOWNBEAT_MIN_SHARE` of every model
+/// downbeat inside the window, the ones that miss the grid included. Eight bars are too
+/// few to let those abstain.
+pub fn cue_downbeat_phase_from_model(beat_grid_ms: &[u64], downbeats_ms: &[u64]) -> Option<usize> {
+    let (votes, counted) = model_downbeat_votes(beat_grid_ms, downbeats_ms)?;
+    if counted == 0 {
+        return None;
+    }
+    let phase = winning_phase(&votes);
+    (votes[phase] as f64 >= MODEL_DOWNBEAT_MIN_SHARE * counted as f64).then_some(phase)
+}
+
+/// The votes of the model downbeats for each bar phase of the grid, and how many fell
+/// between its first and last beat (within the tolerance); None without a grid.
+fn model_downbeat_votes(
+    beat_grid_ms: &[u64],
+    downbeats_ms: &[u64],
+) -> Option<([usize; BEATS_PER_BAR], usize)> {
     let (first, last) = (*beat_grid_ms.first()?, *beat_grid_ms.last()?);
     let mut votes = [0_usize; BEATS_PER_BAR];
     let mut counted = 0_usize;
@@ -496,13 +530,15 @@ pub fn downbeat_phase_from_model(beat_grid_ms: &[u64], downbeats_ms: &[u64]) -> 
             votes[index % BEATS_PER_BAR] += 1;
         }
     }
-    if counted == 0 {
-        return None;
-    }
-    // On a tie the earlier phase wins; a tie never reaches a share above one half.
-    let phase = (0..BEATS_PER_BAR)
-        .max_by(|left, right| votes[*left].cmp(&votes[*right]).then(right.cmp(left)))?;
-    (votes[phase] as f64 >= MODEL_DOWNBEAT_MIN_SHARE * counted as f64).then_some(phase)
+    Some((votes, counted))
+}
+
+/// The phase with the most votes; on a tie the earlier phase wins (a tie never reaches a
+/// share above one half).
+fn winning_phase(votes: &[usize; BEATS_PER_BAR]) -> usize {
+    (0..BEATS_PER_BAR)
+        .max_by(|left, right| votes[*left].cmp(&votes[*right]).then(right.cmp(left)))
+        .unwrap_or(0)
 }
 
 /// Onset frame of each model beat: the onset envelope's peak within
@@ -1002,10 +1038,66 @@ mod tests {
             .collect()
     }
 
+    /// Downbeats half a beat after the grid's: where Beat This! slides onto the
+    /// off-beats of a section, its downbeats match no beat of the published grid.
+    fn off_grid(grid: &[u64], phase: usize, beats: std::ops::Range<usize>) -> Vec<u64> {
+        on_phase(grid, phase, beats)
+            .iter()
+            .map(|beat| beat + 250)
+            .collect()
+    }
+
+    fn sorted(parts: &[Vec<u64>]) -> Vec<u64> {
+        let mut all: Vec<u64> = parts.concat();
+        all.sort_unstable();
+        all
+    }
+
     #[test]
     fn model_downbeat_constants_match_the_python_analyzer() {
         assert_eq!(MODEL_DOWNBEAT_TOLERANCE_MS, 70);
         assert_eq!(MODEL_DOWNBEAT_MIN_SHARE, 0.6);
+        assert_eq!(MODEL_DOWNBEAT_MIN_ON_GRID, 0.5);
+    }
+
+    #[test]
+    fn downbeats_off_the_grid_do_not_count_against_its_phase() {
+        let grid = model_grid(64);
+        // Nine bars on the second beat, then seven half a beat off: they vote for no
+        // phase (9 of 16 was below the share and the track lost its bars).
+        let slid = sorted(&[on_phase(&grid, 1, 0..36), off_grid(&grid, 1, 36..64)]);
+        assert_eq!(downbeat_phase_from_model(&grid, &slid), Some(1));
+
+        // The downbeats on the grid still need a clear phase: 6 of 10, not 5 of 9.
+        let split = sorted(&[
+            on_phase(&grid, 0, 0..24),
+            on_phase(&grid, 2, 24..40),
+            off_grid(&grid, 2, 40..64),
+        ]);
+        let unclear = sorted(&[
+            on_phase(&grid, 0, 0..20),
+            on_phase(&grid, 2, 20..36),
+            off_grid(&grid, 2, 36..64),
+        ]);
+        assert_eq!(downbeat_phase_from_model(&grid, &split), Some(0));
+        assert_eq!(downbeat_phase_from_model(&grid, &unclear), None);
+
+        // Seven of sixteen on the grid: the model hears another beat than the grid's.
+        let mostly_off = sorted(&[on_phase(&grid, 1, 0..28), off_grid(&grid, 1, 28..64)]);
+        assert_eq!(downbeat_phase_from_model(&grid, &mostly_off), None);
+    }
+
+    #[test]
+    fn cue_windows_keep_counting_downbeats_off_the_grid() {
+        // A cue's window holds eight bars, too few to let the downbeats that miss the
+        // grid abstain: there the winning phase still needs 60 % of all of them.
+        let grid = model_grid(32);
+        let slid = sorted(&[on_phase(&grid, 1, 0..16), off_grid(&grid, 1, 16..32)]);
+        let clear = sorted(&[on_phase(&grid, 1, 0..20), off_grid(&grid, 1, 20..24)]);
+
+        assert_eq!(cue_downbeat_phase_from_model(&grid, &slid), None);
+        assert_eq!(downbeat_phase_from_model(&grid, &slid), Some(1));
+        assert_eq!(cue_downbeat_phase_from_model(&grid, &clear), Some(1));
     }
 
     #[test]

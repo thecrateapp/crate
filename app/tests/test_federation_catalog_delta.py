@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from fastapi import HTTPException
 
 
 def test_catalog_cursor_is_peer_bound_and_tamper_evident(monkeypatch):
@@ -61,7 +62,7 @@ def test_snapshot_manifest_uses_keyset_cursor_and_high_water_mark(monkeypatch):
     monkeypatch.setattr(federation, "_require_signed_node_request", peer)
     monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
-    monkeypatch.setattr(federation, "_catalog_share_policy", lambda: {})
+    monkeypatch.setattr(federation, "_catalog_share_policy", dict)
     monkeypatch.setattr(
         federation,
         "_catalog_manifest_snapshot",
@@ -73,8 +74,10 @@ def test_snapshot_manifest_uses_keyset_cursor_and_high_water_mark(monkeypatch):
     )
     seen: list[tuple[str, str]] = []
 
-    def items(*, after_entity_type, after_entity_uid, page_size, include_genres):
-        del page_size, include_genres
+    def items(
+        *, after_entity_type, after_entity_uid, page_size, include_genres, policy=None
+    ):
+        del page_size, include_genres, policy
         seen.append((after_entity_type, after_entity_uid))
         if not after_entity_uid:
             return [
@@ -86,13 +89,14 @@ def test_snapshot_manifest_uses_keyset_cursor_and_high_water_mark(monkeypatch):
             ]
         return []
 
-    def compatibility_items(*, page, page_size, include_genres):
+    def compatibility_items(*, page, page_size, include_genres, policy=None):
         del page
         return items(
             after_entity_type="",
             after_entity_uid="",
             page_size=page_size,
             include_genres=include_genres,
+            policy=policy,
         )
 
     monkeypatch.setattr(federation, "_catalog_manifest_items", compatibility_items)
@@ -112,8 +116,6 @@ def test_snapshot_manifest_uses_keyset_cursor_and_high_water_mark(monkeypatch):
 def test_delta_returns_full_tombstones_and_rejects_expired_cursor(monkeypatch):
     import asyncio
 
-    from fastapi import HTTPException
-
     from crate.api import federation
     from crate.federation.catalog import encode_catalog_cursor
 
@@ -125,7 +127,8 @@ def test_delta_returns_full_tombstones_and_rejects_expired_cursor(monkeypatch):
     )
     monkeypatch.setattr(federation, "_require_signed_node_request", peer)
     monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
-    monkeypatch.setattr(federation, "_catalog_share_policy", lambda: {})
+    monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
+    monkeypatch.setattr(federation, "_catalog_share_policy", dict)
     monkeypatch.setattr(federation, "catalog_retention_floor", lambda: 10)
     monkeypatch.setattr(federation, "catalog_high_water_mark", lambda: 12)
     monkeypatch.setattr(

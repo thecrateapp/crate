@@ -75,6 +75,8 @@ services:
 
   crate-postgres:
     mem_limit: 4g
+    # Parallel queries keep dynamic shared memory in /dev/shm; Docker defaults it to 64MB.
+    shm_size: 1g
 
   crate-site:
     image: ${CRATE_SITE_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-site:${CRATE_IMAGE_TAG:-latest}}
@@ -121,6 +123,32 @@ services:
       traefik.http.services.docs.loadbalancer.server.port: 80
       traefik.http.routers.docs.tls: true
       traefik.http.routers.docs.tls.certresolver: letsencrypt
+
+  crate-ryoku-site:
+    image: ${CRATE_RYOKU_SITE_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-ryoku-site:${CRATE_IMAGE_TAG:-latest}}
+    build:
+      context: .
+      dockerfile: app/ryoku/Dockerfile
+    container_name: crate-ryoku-site
+    restart: unless-stopped
+    # Screencast clips stay out of the image and git; `make ryoku-media-sync` uploads them.
+    volumes:
+      - ./media/ryoku:/usr/share/nginx/media:ro
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -O /dev/null -T 3 http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - crate
+    labels:
+      traefik.enable: true
+      traefik.docker.network: crate
+      traefik.http.routers.ryoku.rule: Host(`ryoku.cratemusic.app`)
+      traefik.http.routers.ryoku.entryPoints: websecure
+      traefik.http.services.ryoku.loadbalancer.server.port: 80
+      traefik.http.routers.ryoku.tls: true
+      traefik.http.routers.ryoku.tls.certresolver: letsencrypt
 
 networks:
   crate:

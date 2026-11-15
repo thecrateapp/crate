@@ -125,7 +125,14 @@ _POOL_STATES_SQL = text(
            track.entity_uid::text AS entity_uid,
            profile.analyzer_version,
            profile.quality,
-           profile.phrases IS NOT NULL AS has_phrases,
+           -- The analyzer writes [] when it finds no phrases. CASE: AND does not
+           -- guarantee the order, and jsonb_array_length fails on anything but an
+           -- array.
+           CASE
+               WHEN jsonb_typeof(profile.phrases) = 'array'
+               THEN jsonb_array_length(profile.phrases) > 0
+               ELSE false
+           END AS has_phrases,
            profile.source_stale_at IS NOT NULL AS stale
     FROM library_tracks track
     LEFT JOIN track_mix_profiles profile ON profile.track_id = track.id
@@ -138,8 +145,8 @@ _POOL_STATES_SQL = text(
 def get_pool_profile_states(track_ids: list[int]) -> list[dict[str, Any]]:
     """Each track's profile state for building an evaluation pool, in one query.
 
-    ``analyzer_version`` and ``quality`` are None without a profile. No title or
-    path is read.
+    ``analyzer_version`` and ``quality`` are None without a profile; ``has_phrases``
+    means at least one phrase. No title or path is read.
     """
     ids = sorted({int(track_id) for track_id in track_ids})
     if not ids:

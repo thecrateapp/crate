@@ -247,6 +247,7 @@ export function AudioProfileCard({
   totalTracks,
   presentation = "album",
   smartMixStructure,
+  smartMixStems,
   trackLabels,
 }: {
   analysisData: Record<string, AudioAnalysisTrack>;
@@ -254,6 +255,8 @@ export function AudioProfileCard({
   presentation?: "album" | "track-dialog";
   /** Phrase structure of the single track, shown in the track dialog only. */
   smartMixStructure?: ReactNode;
+  /** Stems of the single track; the dialog offers the tab only when it is given. */
+  smartMixStems?: ReactNode;
   /** Track names by analysisData key, to name the extremes of each sound feature. */
   trackLabels?: Record<string, string>;
 }) {
@@ -590,6 +593,19 @@ export function AudioProfileCard({
                 content: (
                   <div data-slot="smart-mix-structure" className="min-w-0">
                     {smartMixStructure}
+                  </div>
+                ),
+              },
+            ]
+          : []),
+        ...(smartMixStems
+          ? [
+              {
+                value: "stems",
+                label: "Stems",
+                content: (
+                  <div data-slot="smart-mix-stems" className="min-w-0">
+                    {smartMixStems}
                   </div>
                 ),
               },

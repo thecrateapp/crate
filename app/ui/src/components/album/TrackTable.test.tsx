@@ -399,3 +399,82 @@ it("keeps the audio profile dialog the same size on every tab", async () => {
     document.querySelector('[data-slot="audio-profile-scroll"]'),
   ).toHaveClass("[scrollbar-gutter:stable]");
 });
+
+const STEMS_URL = "/api/smart-mix/tracks/44/stems";
+
+function stemsResponse(changes: Record<string, unknown> = {}) {
+  return {
+    trackId: 44,
+    trackEntityUid: "track-uid",
+    durationMs: 79_000,
+    sourceRevision: "a".repeat(64),
+    profileAnalyzedAt: null,
+    sourceStaleAt: null,
+    vocalDetector: null,
+    phrases: [],
+    analyses: [],
+    stems: null,
+    job: null,
+    file: null,
+    playlists: [],
+    ...changes,
+  };
+}
+
+it("the stems tab appears only with stem data", async () => {
+  let response: Record<string, unknown> = stemsResponse();
+  mockApi.mockImplementation(async (url) =>
+    String(url) === STEMS_URL ? response : {},
+  );
+  const user = userEvent.setup();
+  const { unmount } = render(
+    <TrackTable
+      tracks={[track]}
+      artist="Converge"
+      analysisData={{ concubine: profiledTrack }}
+    />,
+  );
+
+  // Read when the dialog opens, for every user: the tab list depends on it.
+  expect(mockApi.mock.calls.some(([url]) => String(url) === STEMS_URL)).toBe(
+    false,
+  );
+  await user.click(screen.getByRole("button", { name: "Show audio profile" }));
+  await waitFor(() =>
+    expect(mockApi.mock.calls.some(([url]) => String(url) === STEMS_URL)).toBe(
+      true,
+    ),
+  );
+  expect(screen.queryByRole("tab", { name: "Stems" })).toBeNull();
+  unmount();
+
+  // A job the server is running is enough.
+  response = stemsResponse({
+    job: {
+      state: "analyzing",
+      attempts: 1,
+      maxAttempts: 3,
+      requestedAt: null,
+      startedAt: null,
+      finishedAt: null,
+      lastError: null,
+      secondsPerTrack: 240,
+    },
+  });
+  render(
+    <TrackTable
+      tracks={[track]}
+      artist="Converge"
+      analysisData={{ concubine: profiledTrack }}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Show audio profile" }));
+  const tab = await screen.findByRole("tab", { name: "Stems" });
+  const names = screen.getAllByRole("tab").map((entry) => entry.textContent);
+  // After the phrases, before provenance.
+  expect(names.indexOf("Stems")).toBe(names.indexOf("Provenance") - 1);
+  await user.click(tab);
+  expect(
+    await screen.findByText("Separating on the server"),
+  ).toBeInTheDocument();
+});

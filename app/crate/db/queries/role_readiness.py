@@ -1,4 +1,8 @@
-"""A bounded database round trip for container role readiness."""
+"""A bounded database round trip for container role readiness.
+
+The compose health check (``crate.role_readiness``) runs the same statements on
+a direct psycopg2 connection so it never imports this facade.
+"""
 
 from sqlalchemy import text
 

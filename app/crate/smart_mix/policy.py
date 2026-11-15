@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, replace
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from crate.smart_mix.models import TransitionContext
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,13 +41,26 @@ SMOOTH_FIT_WEIGHTS = TransitionFitWeights(
 )
 
 
+# The six components of the v3 candidate score, in ``CandidateScore`` order.
+CANDIDATE_COMPONENTS = (
+    "alignment",
+    "energy",
+    "harmonic",
+    "stability",
+    "bass",
+    "position",
+)
+
+
 @dataclass(frozen=True, slots=True)
 class CandidateWeights:
     """Weights of the v3 candidate score (``crate.smart_mix.candidates``).
 
     The first six weigh components in [0, 1] and add up to 1. ``vocal`` weighs the
     penalty for voice over voice, which only applies when both profiles carry the
-    voice per phrase.
+    voice per phrase. ``drums_only_entry`` and ``vocal_free_exit`` weigh two bonuses
+    of the stems layer (Smart Mix Stems, STEM-D5), which only apply when both
+    profiles carry one.
     """
 
     alignment: float = 0.25
@@ -53,13 +70,12 @@ class CandidateWeights:
     bass: float = 0.15
     position: float = 0.15
     vocal: float = 6.0
+    drums_only_entry: float = 0.05
+    vocal_free_exit: float = 0.05
 
     def components(self) -> tuple[tuple[str, float], ...]:
-        return tuple(
-            (item.name, getattr(self, item.name))
-            for item in fields(self)
-            if item.name != "vocal"
-        )
+        """The six component weights, in ``CandidateScore`` order."""
+        return tuple((name, getattr(self, name)) for name in CANDIDATE_COMPONENTS)
 
 
 CANDIDATE_WEIGHTS = CandidateWeights()
@@ -80,6 +96,16 @@ class PlannerPolicy:
     minimum_transition_ms: int = 1_000
     maximum_transition_ms: int = 12_000
     maximum_long_beatmatch_ms: int = 48_000
+    # Crate Decks' assist mode (D8, F6.S-PR1): the long-beatmatch ceiling when a
+    # context of ``assist_sources`` sets ``assist``. G0 approved longer transitions
+    # for the assist mode only; 96 s (twice the AutoDJ ceiling) was decided by
+    # Diego, 2026-11-15.
+    # Durations stay capped in bars: a long blend is still one of
+    # ``long_beatmatch_phrase_bars`` (v2) or ``phrase_lengths`` (v3), so 96 s lets
+    # the longest phrase, 32 bars of 4/4, fit from 80 BPM up (48 s: from 160 BPM).
+    # Tempo, stability, gain and the short-blend maximum do not change.
+    assist_maximum_long_beatmatch_ms: int = 96_000
+    assist_sources: tuple[str, ...] = ("decks",)
     long_beatmatch_phrase_bars: tuple[int, ...] = (32, 16, 8)
     minimum_long_beatmatch_stability: float = 0.90
     minimum_outgoing_body_ratio: float = 0.5
@@ -138,20 +164,72 @@ class PlannerPolicy:
     # Phase offsets this close to a whole beat start the incoming on the beat
     # instead of one beat late (grids are rounded to whole milliseconds).
     candidate_phase_snap_ms: int = 5
+    # Smart Mix Stems (STEM-D5): score v3 candidates with the stems layer when both
+    # profiles of an edge carry one and the edge is of the beatmatch family (STEM-G1).
+    stems_layer: bool = False
+    # STEM-G1: the layer scores an edge only when both tracks' genre beatmatch priors
+    # (crate.smart_mix.transition_fit) are known and at least this. 0.5 is where the
+    # prior table turns from the smooth genres (rock, punk and metal 0.1-0.15, indie
+    # and ambient 0.2, pop and soul 0.4, trip-hop and IDM 0.45) to the beatmatch ones
+    # (dub 0.5, hip-hop and synthwave 0.6, dance 0.75 and up).
+    stems_layer_min_genre_prior: float = 0.5
+    # STEM-G1, rules revision 5 (Diego: "los stems que vayan solo si el cliente es
+    # Decks"): the context sources the layer serves. Listen's short blends measured
+    # worse with it on the industrial set; Android and VirtualDJ never ask for it.
+    stems_layer_sources: tuple[str, ...] = ("decks",)
+    # Listen's caps (LV-D9, LV-G1 2026-11-10: 10 s and 20 s): the most incoming intro a
+    # served v3 plan skips and the most outgoing outro it cuts, measured as
+    # ``evaluation.music_left_out`` does. For a capped source the menu serves its
+    # best candidate within both caps, else v2's own plan. None turns them off (v2).
+    listen_max_skipped_intro_ms: int | None = None
+    listen_max_unplayed_outro_ms: int | None = None
+    # Sources the caps never apply to: Crate Decks keeps v3's own menu.
+    listen_cap_exempt_sources: tuple[str, ...] = ("decks",)
+
+
+def long_beatmatch_ceiling_ms(
+    policy: PlannerPolicy, context: TransitionContext | None
+) -> int:
+    """The longest blend ``policy`` allows ``context``.
+
+    ``maximum_long_beatmatch_ms`` for every client, and
+    ``assist_maximum_long_beatmatch_ms`` for Crate Decks' assist mode (``assist`` on
+    a context of ``assist_sources``). Only the duration ceiling moves: whether a long
+    blend is allowed (``allow_long_beatmatch``, beatmatch, stability) does not.
+    """
+    if (
+        context is not None
+        and context.assist
+        and context.source in policy.assist_sources
+    ):
+        return max(
+            policy.maximum_long_beatmatch_ms, policy.assist_maximum_long_beatmatch_ms
+        )
+    return policy.maximum_long_beatmatch_ms
 
 
 PLANNER_POLICY = PlannerPolicy()
 # Smart Mix 3 planner: the v2 policy with its own identity and rules revision. The
 # safety limits (tempo, gain, true peak, durations) are v2's and must stay so.
+# Revision 2 added the stems layer (Smart Mix Stems, ST3); revision 3 (STEM-G1) keeps
+# it to the beatmatch family and takes voice from the vocal stem or YAMNet; revision 4
+# lets the machine-drum industrial family in (candidates.stems_gate_prior); revision 5
+# serves the layer to Crate Decks only. Without stems on both tracks, outside the family
+# or for any other client, its menus are revision 1's. Revision 6 (LV-G1) serves every
+# source but Crate Decks within Listen's caps, so Decks' menus stay revision 5's.
 PLANNER_POLICY_V3 = replace(
     PLANNER_POLICY,
     identifier="smart-mix-v3",
-    rules_revision=1,
+    rules_revision=6,
+    stems_layer=True,
+    listen_max_skipped_intro_ms=10_000,
+    listen_max_unplayed_outro_ms=20_000,
 )
 
 
 __all__ = [
     "BEATMATCH_FIT_WEIGHTS",
+    "CANDIDATE_COMPONENTS",
     "CANDIDATE_WEIGHTS",
     "CandidateWeights",
     "PLANNER_POLICY",
@@ -159,4 +237,5 @@ __all__ = [
     "PlannerPolicy",
     "SMOOTH_FIT_WEIGHTS",
     "TransitionFitWeights",
+    "long_beatmatch_ceiling_ms",
 ]

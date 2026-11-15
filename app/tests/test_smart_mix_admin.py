@@ -21,16 +21,18 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
                 """
                 INSERT INTO track_mix_profiles (
                     track_id, profile_version, profile_revision, analyzer,
-                    analyzer_version, source_revision, quality, analyzed_at
+                    analyzer_version, source_revision, quality, analyzed_at,
+                    beat_tracker
                 )
                 VALUES
                     (
                         :full_id, 1, 'full-v1', 'crate-rust',
-                        :current_version, 'source-full', 'full', NOW()
+                        :current_version, 'source-full', 'full', NOW(),
+                        'beat-this-small0-dbn'
                     ),
                     (
                         :legacy_id, 0 + 2, 'partial-v2', 'crate-rust',
-                        'future-v2', 'source-partial', 'partial', NOW()
+                        'future-v2', 'source-partial', 'partial', NOW(), NULL
                     )
                 """
             ),
@@ -221,10 +223,13 @@ def test_activity_route_serializes_the_live_snapshot(test_app, monkeypatch) -> N
 
 def test_track_list_classifies_profiles_and_filters_by_status(pg_db) -> None:
     del pg_db
-    current, outdated, changed, missing, failed = _create_tracks(5)
+    current, outdated, changed, missing, failed, own = _create_tracks(6)
     _insert_profile(current, ANALYZER_VERSION)
     _insert_profile(outdated, "smart-mix-audio-v3")
     _insert_profile(changed, ANALYZER_VERSION, source_stale=True)
+    # The analyzer's own beats at the current version: the backfill still owes it
+    # Beat This!'s, so it is not current.
+    _insert_profile(own, ANALYZER_VERSION, beat_tracker=None)
     with transaction_scope() as session:
         session.execute(
             text(
@@ -244,13 +249,14 @@ def test_track_list_classifies_profiles_and_filters_by_status(pg_db) -> None:
 
     assert every[current]["status"] == "current"
     assert every[outdated]["status"] == "outdated"
+    assert every[own]["status"] == "outdated"
     assert every[outdated]["analyzer_version"] == "smart-mix-audio-v3"
     assert every[changed]["status"] == "source_changed"
     assert every[missing]["status"] == "missing"
     assert every[failed]["processing_error"] == "decoder exploded"
     for status, expected in (
         ("current", [current]),
-        ("outdated", [outdated]),
+        ("outdated", [own, outdated]),
         ("source_changed", [changed]),
         ("missing", [failed, missing]),
         ("failed", [failed]),
@@ -261,6 +267,18 @@ def test_track_list_classifies_profiles_and_filters_by_status(pg_db) -> None:
         ), status
     by_version = list_smart_mix_tracks(analyzer_version="smart-mix-audio-v3")
     assert [row["track_id"] for row in by_version] == [outdated]
+    # Where the model cannot run, nothing would ever upgrade the analyzer's own
+    # beats: the profile is current.
+    no_model = {
+        row["track_id"]: row
+        for row in list_smart_mix_tracks(limit=100, awaits_model_beats=False)
+    }
+    assert no_model[own]["status"] == "current"
+    for status, expected in (("current", [own, current]), ("outdated", [outdated])):
+        rows = list_smart_mix_tracks(status=status, limit=100, awaits_model_beats=False)
+        assert [row["track_id"] for row in rows if row["track_id"] in every] == (
+            expected
+        ), status
 
 
 def test_track_list_searches_and_pages_by_track_id(pg_db) -> None:
@@ -300,6 +318,7 @@ def test_track_route_pages_and_rejects_short_searches(test_app, monkeypatch) -> 
         ][: kwargs["limit"]]
 
     monkeypatch.setattr(smart_mix_admin, "list_smart_mix_tracks", fake_list)
+    monkeypatch.setattr(smart_mix_admin, "smart_mix_awaits_model_beats", lambda: False)
 
     page = test_app.get("/api/admin/smart-mix/tracks?status=missing&q=Fazer&limit=2")
     short = test_app.get("/api/admin/smart-mix/tracks?q=ab")
@@ -314,6 +333,7 @@ def test_track_route_pages_and_rejects_short_searches(test_app, monkeypatch) -> 
         "search": "Fazer",
         "before_track_id": None,
         "limit": 3,
+        "awaits_model_beats": False,
     }
     assert short.status_code == 422
     assert unknown.status_code == 422
@@ -698,15 +718,47 @@ def test_pause_cancel_and_resume_drive_the_campaign(test_app, monkeypatch) -> No
 
     assert paused.json()["status"] == "paused"
     assert cancelled.json()["status"] == "cancelled"
+    # A completed campaign can be paused or cancelled too: that stops the automatic
+    # reopening.
     assert transitions == [
-        ("paused", {"running"}),
-        ("cancelled", {"running", "paused"}),
+        ("paused", {"running", "completed"}),
+        ("cancelled", {"running", "paused", "completed"}),
     ]
     assert resumed.json() == {
         "taskId": "task-resumed",
         "status": "resumed",
         "deduplicated": False,
     }
+
+
+@pytest.mark.parametrize("action", ["pause", "cancel"])
+def test_stopping_a_completed_campaign_stops_its_reopening(
+    pg_db, test_app, action
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+        wake_smart_mix_backfill,
+    )
+    from crate.smart_mix.versions import PROFILE_SCHEMA_VERSION
+
+    save_smart_mix_campaign(
+        {
+            **_campaign("completed"),
+            "profile_version": PROFILE_SCHEMA_VERSION,
+            "completed_at": "2026-11-10T08:00:00+00:00",
+            "beat_model_available": True,
+        }
+    )
+
+    response = test_app.post(f"/api/admin/smart-mix/backfill/{action}")
+
+    assert response.status_code == 200
+    expected = {"pause": "paused", "cancel": "cancelled"}[action]
+    assert response.json()["status"] == expected
+    assert get_smart_mix_campaign()["status"] == expected
+    assert wake_smart_mix_backfill() is None
 
 
 def test_pause_without_a_running_campaign_conflicts(test_app, monkeypatch) -> None:
@@ -783,7 +835,11 @@ def _create_tracks(count: int) -> list[int]:
 
 
 def _insert_profile(
-    track_id: int, analyzer_version: str, *, source_stale: bool = False
+    track_id: int,
+    analyzer_version: str,
+    *,
+    source_stale: bool = False,
+    beat_tracker: str | None = "beat-this-small0-dbn",
 ) -> None:
     with transaction_scope() as session:
         session.execute(
@@ -792,11 +848,12 @@ def _insert_profile(
                 INSERT INTO track_mix_profiles (
                     track_id, profile_version, profile_revision, analyzer,
                     analyzer_version, source_revision, quality, analyzed_at,
-                    source_stale_at
+                    source_stale_at, beat_tracker
                 )
                 VALUES (
                     :track_id, 1, :revision, 'crate-rust', :analyzer_version,
-                    'source', 'full', NOW(), CASE WHEN :stale THEN NOW() END
+                    'source', 'full', NOW(), CASE WHEN :stale THEN NOW() END,
+                    :beat_tracker
                 )
                 """
             ),
@@ -805,6 +862,7 @@ def _insert_profile(
                 "revision": f"profile-{track_id}",
                 "analyzer_version": analyzer_version,
                 "stale": source_stale,
+                "beat_tracker": beat_tracker,
             },
         )
 

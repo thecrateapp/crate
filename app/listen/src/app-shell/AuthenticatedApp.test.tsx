@@ -93,6 +93,50 @@ describe("AuthenticatedApp", () => {
       androidBassHandoff: false,
       androidLongBeatmatch: false,
       plannerVersion: "smart-mix-v2",
+      // An older server lists no planners and recommends none for Listen.
+      plannerVersions: [],
+      listenPlannerVersion: null,
+    });
+  });
+
+  it("reads the planners and the one recommended for Listen", async () => {
+    apiMock.mockResolvedValue({
+      smart_mix: {
+        available: true,
+        planner_version: "smart-mix-v2",
+        planner_versions: ["smart-mix-v2", "smart-mix-v3"],
+        listen_planner_version: "smart-mix-v3",
+        android_native_crossfade: true,
+        android_beatmatch: true,
+      },
+    });
+
+    render(<AuthenticatedApp />);
+
+    await waitFor(() => {
+      expect(setSmartMixCapabilities).toHaveBeenCalledWith(
+        expect.objectContaining({
+          plannerVersion: "smart-mix-v2",
+          plannerVersions: ["smart-mix-v2", "smart-mix-v3"],
+          listenPlannerVersion: "smart-mix-v3",
+        }),
+      );
+    });
+  });
+
+  it("has no planners when the capabilities cannot be read", async () => {
+    apiMock.mockRejectedValue(new Error("offline"));
+
+    render(<AuthenticatedApp />);
+
+    await waitFor(() => {
+      expect(setSmartMixCapabilities).toHaveBeenCalledWith(
+        expect.objectContaining({
+          available: false,
+          plannerVersions: [],
+          listenPlannerVersion: null,
+        }),
+      );
     });
   });
 

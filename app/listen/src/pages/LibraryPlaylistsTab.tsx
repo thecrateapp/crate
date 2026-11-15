@@ -9,6 +9,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { EmptyState, ErrorState, LoadingState } from "@crate/ui/domain/states";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
+import { useSmartMixPlaylistsEnabled } from "@/hooks/use-smart-mix-playlists-enabled";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import {
@@ -18,6 +19,11 @@ import {
 import { api } from "@/lib/api";
 import { formatTotalDuration } from "@/lib/utils";
 import { toPlayableTrack } from "@/lib/playable-track";
+import {
+  setPlaylistSmartMix,
+  smartMixLimit,
+  smartMixLimitMessage,
+} from "@/lib/smart-mix-playlists";
 import {
   createPlaylistTrackEditSession,
   persistPlaylistTracks,
@@ -47,6 +53,8 @@ export function LibraryPlaylistsTab() {
     "/api/me/playlists-page",
   );
   const { openCreatePlaylist } = usePlaylistComposer();
+  // Smart Mix playlists show only where the server offers them.
+  const smartMixAvailable = useSmartMixPlaylistsEnabled();
   const [editingPlaylist, setEditingPlaylist] = useState<PlaylistDetail | null>(
     null,
   );
@@ -95,6 +103,32 @@ export function LibraryPlaylistsTab() {
     }
   }
 
+  async function toggleSmartMix(playlist: Playlist) {
+    const enabled = !playlist.smartMix?.enabled;
+    try {
+      await setPlaylistSmartMix(playlist.id, enabled);
+      notify.success(
+        t(
+          enabled
+            ? "actions.playlist.toasts.smartMixOn"
+            : "actions.playlist.toasts.smartMixOff",
+          { name: playlist.name },
+        ),
+      );
+      refetch();
+    } catch (error) {
+      const limit = smartMixLimit(error);
+      if (limit) {
+        const message = smartMixLimitMessage(limit, playlist.name, t);
+        notify.error(message.title, { description: message.description });
+        return;
+      }
+      notify.error(
+        t("actions.playlist.toasts.smartMixFailed", { name: playlist.name }),
+      );
+    }
+  }
+
   function renderReadOnlyRow(playlist: Playlist, followedRow: boolean) {
     return (
       <PlaylistCard
@@ -110,6 +144,7 @@ export function LibraryPlaylistsTab() {
         ownerLabel={playlistOwnerLabel(playlist) ?? undefined}
         href={`/playlist/${playlist.id}`}
         detailEndpoint={`/api/playlists/${playlist.id}`}
+        smartMix={smartMixAvailable ? playlist.smartMix : undefined}
         isFollowed={followedRow || undefined}
         onToggleFollow={
           followedRow ? () => unfollowPlaylist(playlist) : undefined
@@ -216,6 +251,10 @@ export function LibraryPlaylistsTab() {
               href={`/playlist/${pl.id}`}
               detailEndpoint={`/api/playlists/${pl.id}`}
               badge={pl.is_smart ? t("playlist.badges.smart") : undefined}
+              smartMix={smartMixAvailable ? pl.smartMix : undefined}
+              onToggleSmartMix={
+                smartMixAvailable ? () => toggleSmartMix(pl) : undefined
+              }
               extraActions={[
                 {
                   key: "edit",

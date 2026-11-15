@@ -34,6 +34,7 @@ def test_route_manifest_covers_interactive_sse_and_stream_reads():
     assert "/api/search" in by_class["interactive"]
     assert "/api/cache/events" in by_class["sse"]
     assert "/api/me/home/discovery-stream" in by_class["sse"]
+    assert "/api/catalog/search-stream" in by_class["sse"]
     assert "/api/federation/remote/streams/" in by_class["stream"]
     assert "/api/tracks/" in by_class["stream"]
 
@@ -50,6 +51,11 @@ def test_listen_proxy_uses_bounded_route_specific_readplane_locations():
     assert "server crate-api:8585 backup;" in nginx
     assert "location = /api/cache/events" in nginx
     assert "location = /api/me/home/discovery-stream" in nginx
+    search_stream = nginx.split("location = /api/catalog/search-stream {", 1)[1].split(
+        "}", 2
+    )[1]
+    assert "proxy_pass $read_backend;" in search_stream
+    assert "proxy_buffering off;" in search_stream
     assert "location ^~ /api/catalog/" in nginx
     assert "location = /api/me/stats/dashboard" in nginx
     assert "location ^~ /api/federation/remote/streams/" in nginx
@@ -105,3 +111,55 @@ def test_traefik_v3_method_matchers_keep_get_and_head_routers_enabled():
             rule = labels[f"traefik.http.routers.crate-readplane-{router_name}.rule"]
             assert "Method(`GET`, `HEAD`)" not in rule
             assert "(Method(`GET`) || Method(`HEAD`))" in rule
+
+
+_DECKS_PATHS = (
+    "/api/decks/containers",
+    "/api/decks/containers/playlist/1/tracks",
+)
+
+
+def test_decks_library_routes_stay_on_fastapi():
+    # S3 checks audio files and session auth in FastAPI; the read plane has no
+    # handler for /api/decks, so no edge may route it there.
+    import fnmatch
+    import re
+
+    def matched(pattern_matches) -> list[str]:
+        return [path for path in _DECKS_PATHS if pattern_matches(path)]
+
+    for route in _manifest()["routes"]:
+        exact, prefix = route.get("path"), route.get("path_prefix")
+        assert not matched(lambda p: p == exact or (prefix and p.startswith(prefix)))
+
+    for compose_name in ("docker-compose.yaml", "docker-compose.home.yaml"):
+        compose = yaml.safe_load((ROOT / compose_name).read_text())
+        labels = compose["services"]["crate-readplane"]["labels"]
+        for key, rule in labels.items():
+            if not key.endswith(".rule"):
+                continue
+            for kind, value in re.findall(r"(PathPrefix|Path)\(`([^`]+)`\)", rule):
+                assert not matched(
+                    lambda p: (
+                        p.startswith(value) if kind == "PathPrefix" else p == value
+                    )
+                ), (compose_name, key, value)
+
+    nginx = (ROOT / "app/listen/nginx.conf").read_text()
+    for modifier, value in re.findall(r"location\s+(=|\^~|~)\s+(\S+)\s*\{", nginx):
+        if modifier == "~":
+            assert not matched(lambda p: re.search(value, p)), value
+        elif modifier == "^~":
+            assert not matched(lambda p: p.startswith(value)), value
+        else:
+            assert not matched(lambda p: p == value), value
+
+    caddy = (ROOT / "data/caddy/Caddyfile.readplane.dev").read_text()
+    readplane_block = caddy.split("@readplane_listen {", 1)[1].split("}", 1)[0]
+    for line in readplane_block.splitlines():
+        if line.strip().startswith("path "):
+            for pattern in line.split()[1:]:
+                assert not matched(lambda p: fnmatch.fnmatchcase(p, pattern)), pattern
+
+    server = (ROOT / "app/readplane/internal/routes/server.go").read_text()
+    assert '"/api/decks' not in server

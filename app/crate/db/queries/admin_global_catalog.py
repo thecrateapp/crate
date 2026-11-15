@@ -74,15 +74,16 @@ def get_global_catalog_admin_status() -> dict[str, Any]:
                 text(
                     """
                     SELECT
-                        COUNT(*) FILTER (WHERE invalidated_at IS NULL)::integer AS active_assertions,
+                        COUNT(*)::integer AS active_assertions,
                         COUNT(*) FILTER (
-                            WHERE invalidated_at IS NULL AND global_genre_uid IS NULL
+                            WHERE global_genre_uid IS NULL
                         )::integer AS unmapped_assertions,
                         (
                             SELECT COUNT(*)::integer
                             FROM global_catalog_entity_genres
                         ) AS memberships
                     FROM global_catalog_genre_assertions
+                    WHERE invalidated_at IS NULL
                     """
                 )
             )

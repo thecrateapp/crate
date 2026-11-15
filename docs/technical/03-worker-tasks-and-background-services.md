@@ -196,10 +196,18 @@ Priority bands broadly map to:
 expensive background work. Governed tasks can be deferred based on:
 
 - one-minute load ratio
-- sampled iowait
+- sampled iowait (a 50 ms sample of `/proc/stat`), counted only while the
+  kernel's IO pressure confirms it: `/proc/pressure/io` "some avg10" at least
+  `CRATE_RESOURCE_MIN_IO_PRESSURE_PERCENT` (default 10). Without PSI the sample
+  decides alone. A short burst on idle disks no longer defers work
 - swap and available memory pressure
 - active listeners and recent streams
 - configured maintenance windows for destructive or heavy maintenance flows
+
+A deferred task asks again after `CRATE_RESOURCE_DEFER_SECONDS` (default 300).
+The Smart Mix backfill coordinator asks again within 30 s: it only counts free
+slots and its analyses are governed themselves, so a long wait would leave the
+slots empty after a brief spike.
 
 The main knobs are `CRATE_RESOURCE_*` and `CRATE_MAINTENANCE_WINDOW_*`. Manual
 or narrowly scoped tasks can bypass parts of this protection only when the task

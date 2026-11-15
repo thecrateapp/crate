@@ -6,7 +6,7 @@ import base64
 import json
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 
 from cryptography.exceptions import InvalidSignature
@@ -28,7 +28,6 @@ from crate.federation.contracts import (
     NodeDescriptorV1,
 )
 from crate.federation.identity import verify_signed_descriptor
-
 
 EnvelopeT = TypeVar("EnvelopeT", bound=PairingEnvelope)
 PAIRING_TTL = timedelta(minutes=10)
@@ -158,7 +157,11 @@ def build_offer(
             "target_descriptor_digest": target.descriptor_digest,
             "challenge": challenge,
             "outbound_grant": outbound_grant,
-            "expires_at": expires_at or datetime.now(timezone.utc) + PAIRING_TTL,
+            "expires_at": min(
+                expires_at or datetime.now(UTC) + PAIRING_TTL,
+                source.expires_at,
+                target.expires_at,
+            ),
             "key_id": source.active_key_id,
         },
         model=PairingOfferV1,
@@ -172,7 +175,7 @@ def verify_offer(
     local_descriptor: dict,
     now: datetime | None = None,
 ) -> PairingOfferV1:
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     offer = PairingOfferV1.model_validate(payload)
     local, _ = _verify_common(
         offer,
@@ -218,7 +221,10 @@ def build_acceptance(
             "outbound_grant": outbound_grant,
             "expires_at": min(
                 offer.expires_at,
-                (now or datetime.now(timezone.utc)) + PAIRING_TTL,
+                offer.source_descriptor.expires_at,
+                offer.target_descriptor.expires_at,
+                source.expires_at,
+                (now or datetime.now(UTC)) + PAIRING_TTL,
             ),
             "key_id": source.active_key_id,
         },
@@ -234,7 +240,7 @@ def verify_acceptance(
     local_descriptor: dict,
     now: datetime | None = None,
 ) -> PairingAcceptanceV1:
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     offer = PairingOfferV1.model_validate(pairing_offer)
     acceptance = PairingAcceptanceV1.model_validate(payload)
     _verify_common(
@@ -243,6 +249,16 @@ def verify_acceptance(
         local_descriptor=local_descriptor,
         now=current_time,
     )
+    if offer.expires_at < current_time:
+        raise FederationProtocolError(
+            FederationErrorCode.INVALID_DESCRIPTOR,
+            "Pairing offer expired",
+        )
+    if acceptance.expires_at > offer.expires_at:
+        raise FederationProtocolError(
+            FederationErrorCode.INVALID_DESCRIPTOR,
+            "Pairing acceptance expires after its offer",
+        )
     if (
         acceptance.pairing_uid != offer.pairing_uid
         or acceptance.source_node_uid != offer.target_node_uid
@@ -273,7 +289,9 @@ def build_ack(
             "challenge_response": acceptance.challenge,
             "expires_at": min(
                 acceptance.expires_at,
-                (now or datetime.now(timezone.utc)) + PAIRING_TTL,
+                acceptance.source_descriptor.expires_at,
+                source.expires_at,
+                (now or datetime.now(UTC)) + PAIRING_TTL,
             ),
             "key_id": source.active_key_id,
         },
@@ -289,7 +307,7 @@ def verify_ack(
     local_descriptor: dict,
     now: datetime | None = None,
 ) -> PairingAckV1:
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     acceptance = PairingAcceptanceV1.model_validate(pairing_acceptance)
     ack = PairingAckV1.model_validate(payload)
     _verify_common(
@@ -298,6 +316,16 @@ def verify_ack(
         local_descriptor=local_descriptor,
         now=current_time,
     )
+    if acceptance.expires_at < current_time:
+        raise FederationProtocolError(
+            FederationErrorCode.INVALID_DESCRIPTOR,
+            "Pairing acceptance expired",
+        )
+    if ack.expires_at > acceptance.expires_at:
+        raise FederationProtocolError(
+            FederationErrorCode.INVALID_DESCRIPTOR,
+            "Pairing acknowledgement expires after its acceptance",
+        )
     if (
         ack.pairing_uid != acceptance.pairing_uid
         or ack.source_node_uid != acceptance.target_node_uid

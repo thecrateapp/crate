@@ -238,6 +238,8 @@ const fullyLocalizedPlaylistPrefixes = ["playlist."] as const;
 const completedPlaylistFallbackAllowlist = new Set<string>([
   "playlist.badges.smart",
   "playlist.collaborators.collab",
+  // An exact product term (product-terms.ts): every locale keeps "Smart Mix".
+  "playlist.smartMix.label",
 ]);
 const fullyLocalizedUtilityPrefixes = [
   "bandcamp.tasks.",

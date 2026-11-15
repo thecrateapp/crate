@@ -52,3 +52,12 @@ and touch sheets through the shared recipe, with no per-caller state selectors.
 <DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
 
 Clamped labels retain their full accessible name and use a custom Tooltip for overflow detail. Resize/pointer measurements never assign an imperative native title; unclamped labels add no tooltip text.
+
+<DocHeading as="h2">Header status</DocHeading>
+
+The media header takes an optional `status`: a state of the item, drawn as an accent MonoLabel
+between the subtitle and the detail; it wraps instead of truncating. Listen's playlist menu shows a Smart Mix playlist's
+progress there ("Smart Mix · 41 of 48 ready"), as in the approved Smart Mix stems mockups
+(2026-11-09). Without it the header is unchanged.
+
+<Canvas of={Stories.HeaderStatus} />

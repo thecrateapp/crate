@@ -13,11 +13,13 @@ import pytest
 from listen_metrics import (
     LOWER_IS_BETTER,
     PlanSelector,
+    bass_on_bass_ms,
     beat_agreement,
     compare_variants,
     full_level_mask,
     ibi_cv,
     loudness_jumps,
+    low_band_db,
     measure_plan,
     parse_ebur128,
     parse_selector,
@@ -107,7 +109,7 @@ def test_ibi_cv_grows_with_irregular_beats() -> None:
     regular = list(range(0, 20_000, 500))
     flam = sorted([*regular, *[b + 60 for b in regular[10:20]]])
     assert ibi_cv(regular, 2_000, 15_000) == pytest.approx(0.0)
-    assert ibi_cv(flam, 2_000, 15_000) > 0.3
+    assert (ibi_cv(flam, 2_000, 15_000) or 0.0) > 0.3
     assert ibi_cv(regular[:2], 0, 20_000) is None
 
 
@@ -125,6 +127,38 @@ def test_voice_on_voice_counts_full_level_time_with_voice_on_both_decks() -> Non
     assert voice_on_voice_ms((centres, voiced), (centres, half), full) == pytest.approx(
         2_000, abs=250
     )
+
+
+def test_low_band_db_reads_the_level_below_the_cutoff() -> None:
+    rate = 22_050
+    time = np.arange(rate * 2) / rate
+    bass = 0.5 * np.sin(2 * np.pi * 60 * time)
+    treble = 0.5 * np.sin(2 * np.pi * 1_000 * time)
+
+    bass_levels = low_band_db(bass, rate, 150)
+    treble_levels = low_band_db(treble, rate, 150)
+
+    # A sine of amplitude 0.5 is -9.03 dBFS RMS.
+    assert np.median(bass_levels[10:-10]) == pytest.approx(-9.03, abs=0.5)
+    assert np.max(treble_levels[10:-10]) < -40.0
+
+
+def test_bass_on_bass_counts_full_level_time_with_low_end_on_both_decks() -> None:
+    steps = 3_600  # 36 s of render; the 12 s mix starts at 12 s.
+    loud = np.full(steps, -12.0)
+    quiet = np.full(steps, -12.0)
+    quiet[1_200:2_400] = -40.0  # the incoming has no low end during the mix
+    plan = _plan()
+
+    # Equal power keeps both decks at full level for the middle third.
+    assert bass_on_bass_ms(loud, loud, plan, start_ms=12_000) == pytest.approx(
+        4_000, abs=20
+    )
+    assert bass_on_bass_ms(loud, quiet, plan, start_ms=12_000) == 0
+    # The bass handoff never leaves both basses at full level.
+    handoff = _plan(bass_handoff="balanced")
+    assert bass_on_bass_ms(loud, loud, handoff, start_ms=12_000) == 0
+    assert "bassOnBassMs" in LOWER_IS_BETTER
 
 
 EBUR128_LOG = """\
@@ -282,6 +316,8 @@ def test_measure_plan_renders_and_scores_one_transition(tmp_path: Path) -> None:
     assert metrics["comparedBeats"] > 10
     assert metrics["lockedShare"] == 1.0
     assert metrics["voiceOnVoiceMs"] == pytest.approx(4_000, abs=500)
+    # Both decks hold a 110 Hz tone: low end on low end for the middle third.
+    assert metrics["bassOnBassMs"] == pytest.approx(4_000, abs=500)
     assert metrics["levelStepLu"] == pytest.approx(0.0, abs=1.0)
     assert metrics["mixIbiCv"] is not None
     # The audio is deleted unless asked to keep it.

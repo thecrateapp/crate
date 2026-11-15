@@ -5,15 +5,14 @@ Each actor:
 2. Updates status to 'running' + starts heartbeat thread
 3. Calls the existing handler function
 4. Updates status to 'completed' or 'failed'
-5. Checks memory and exits if RSS > limit (dramatiq restarts the process)
+5. Checks memory and retires the process if its current RSS stays over the limit
+   (crate.process_recycle; crate.worker starts a new process in its place)
 
 Actors are registered dynamically from TASK_POOL_CONFIG to avoid 44 copy-paste blocks.
 """
 
 import logging
 import os
-import resource
-import signal
 import threading
 import time
 from typing import Any, NamedTuple, cast
@@ -31,11 +30,10 @@ from crate.ai.requeue import (
     requeue_delay_ms,
 )
 from crate.db.repositories.tasks_shared import DB_HEAVY_TASKS
+from crate.process_recycle import recycle_if_over
 from crate.worker_handlers import RUN_AGAIN_AFTER_KEY
 
 log = logging.getLogger(__name__)
-
-MAX_RSS_MB = 1500  # 1.5 GB — matches previous worker recycling limit
 
 # ── Timing constants ──────────────────────────────────────────────
 HEARTBEAT_INTERVAL_SECONDS = 15
@@ -239,10 +237,32 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     ),  # just resets state for background daemon
     "compute_smart_mix_profile": TaskPoolConfig("heavy", 2, 900, 2),
     "backfill_smart_mix_profiles": TaskPoolConfig("heavy", 3, 1800, 0),
+    # Smart Mix playlists' stems (Smart Mix Stems ST2.PR3): one track per run, ahead
+    # of the backfill (3) and behind interactive work; the handler retries tracks.
+    "analyze_playlist_stems": TaskPoolConfig("heavy", 2, 7200, 0),
     "refresh_smart_mix_coverage": TaskPoolConfig("maintenance", 3, 300, 0),
     # Daily retention of AI refinements (SM3-D5): records queued reads, then
     # deletes rows unread for 180 days. No model call.
     "cleanup_smart_mix_refinements": TaskPoolConfig("maintenance", 3, 600, 0),
+    # Backups engine (admin backups, BK1): pg_dump of the database and the
+    # grandfather-father-son pruning of the local dumps. Scheduled work, priority 2;
+    # no retries, a failed run waits for the next schedule or a manual run.
+    "backup_dump": TaskPoolConfig("maintenance", 2, 14400, 0),
+    "backup_local_retention": TaskPoolConfig("maintenance", 2, 600, 0),
+    # Test connection of a backup destination (BK2): asked from Admin, so priority 0
+    # on the default queue; restic init plus a probe stay well under 15 minutes.
+    "backup_test_destination": TaskPoolConfig("default", 0, 900, 0),
+    # Test of unsaved settings (BK4): the rclone probe only.
+    "backup_probe_destination": TaskPoolConfig("default", 0, 300, 0),
+    # Backup policies (BK3): copies, verification and drills hold one destination's
+    # lock each; the tick only reads and queues.
+    "backup_offsite": TaskPoolConfig("maintenance", 2, 21600, 0),
+    "backup_verify": TaskPoolConfig("maintenance", 3, 21600, 0),
+    "backup_restore_drill": TaskPoolConfig("maintenance", 3, 14400, 0),
+    "backup_policies_tick": TaskPoolConfig("maintenance", 1, 300, 0),
+    # Backup alerts and metrics (BK6): a few small reads, then the alert state and
+    # the gauges; scheduled every 5 minutes while backups are in use.
+    "backup_alerts": TaskPoolConfig("maintenance", 1, 120, 0),
     "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
     "index_genres": TaskPoolConfig("maintenance", 3, 600, 0),
     "infer_genre_taxonomy": TaskPoolConfig("ai_bulk", 3, 3600, 0),
@@ -320,16 +340,12 @@ def _heartbeat_loop(task_id: str, stop_event: threading.Event):
 
 
 def _check_memory():
-    """Exit if RSS exceeds limit. Dramatiq will restart the process."""
-    rss_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    if os.uname().sysname == "Darwin":
-        rss_mb = rss_bytes / (1024 * 1024)
-    else:
-        rss_mb = rss_bytes / 1024
-    if rss_mb > MAX_RSS_MB:
-        log.warning("Recycling: RSS=%dMB > %dMB limit", int(rss_mb), MAX_RSS_MB)
-        # SIGTERM ourselves — dramatiq handles graceful restart
-        os.kill(os.getpid(), signal.SIGUSR1)
+    """Retire this process when its current RSS stays over the limit.
+
+    The task has finished; the process stops taking messages and exits cleanly
+    once Dramatiq acknowledges it (``crate.process_recycle``).
+    """
+    recycle_if_over()
 
 
 # ── DB-heavy mutex ────────────────────────────────────────────────

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -29,6 +31,30 @@ describe("InfoBadge", () => {
     );
     expect(container.querySelector("svg")).toHaveClass(
       "text-state-danger-text",
+    );
+  });
+  it("draws an icon-only variant as a named round mark of the badge height", () => {
+    render(
+      <InfoBadge
+        variant="icon"
+        icon={Sparkles}
+        tone="accent"
+        aria-label="Smart Mix: all 118 tracks have stems"
+      />,
+    );
+    const badge = screen.getByRole("img", {
+      name: "Smart Mix: all 118 tracks have stems",
+    });
+    expect(badge).toHaveAttribute("data-variant", "icon");
+    expect(badge).toHaveClass("crate-info-badge", "rounded-full");
+    expect(badge.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    // The recipe, not the caller, makes it a circle: as wide as the badge is high.
+    const recipes = readFileSync(
+      resolve(__dirname, "../tokens/recipes.css"),
+      "utf8",
+    ).replace(/\s+/g, " ");
+    expect(recipes).toContain(
+      '.crate-info-badge[data-variant="icon"] { width: var(--info-badge-height); min-width: var(--info-badge-height); padding: 0; }',
     );
   });
   it("uses an explicit counter variant for balanced numeral spacing", () => {

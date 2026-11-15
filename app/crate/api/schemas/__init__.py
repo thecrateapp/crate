@@ -9,7 +9,18 @@ from crate.api.schemas.metrics import (
 )
 
 from crate.api.schemas import ai_agents as ai_agents
+from crate.api.schemas import backups as backups
 from crate.api.schemas import error_inbox as error_inbox
+from crate.api.schemas.decks import (
+    DecksContainerNodeResponse,
+    DecksContainerRefResponse,
+    DecksContainersResponse,
+    DecksLibraryResponse,
+    DecksMixProfilesRequest,
+    DecksMixProfilesResponse,
+    DecksTrackResponse,
+    DecksTracksPageResponse,
+)
 from crate.api.schemas.sonic_insights import SonicNeighborsResponse, SonicReport
 from crate.api.schemas.agent_telegram import (
     NativeCallback,
@@ -309,6 +320,7 @@ from crate.api.schemas.playlists import (
     PlaylistInviteResponse,
     PlaylistMemberResponse,
     PlaylistMembersMutationResponse,
+    PlaylistSmartMixResponse,
     PlaylistSummaryResponse,
     PlaylistTrackResponse,
     PlaylistTracksAddedResponse,
@@ -468,7 +480,16 @@ __all__ = [
     "NativePoll",
     "TelegramBindingInput",
     "ai_agents",
+    "backups",
     "error_inbox",
+    "DecksContainerNodeResponse",
+    "DecksContainerRefResponse",
+    "DecksContainersResponse",
+    "DecksLibraryResponse",
+    "DecksMixProfilesRequest",
+    "DecksMixProfilesResponse",
+    "DecksTrackResponse",
+    "DecksTracksPageResponse",
     "ShowCandidate",
     "ShowConsolidationInput",
     "ShowExtractionInput",
@@ -668,6 +689,7 @@ __all__ = [
     "PlaylistInviteResponse",
     "PlaylistMemberResponse",
     "PlaylistMembersMutationResponse",
+    "PlaylistSmartMixResponse",
     "PlaylistSummaryResponse",
     "PlaylistTrackResponse",
     "PlaylistTracksAddedResponse",

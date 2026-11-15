@@ -235,20 +235,14 @@ def test_overlay_health_and_authority_are_explicit_and_independent():
 def test_role_health_requires_fresh_own_consumer_progress_and_dependencies(
     tmp_path, monkeypatch
 ):
-    import redis
     from crate import role_readiness
-    from crate.db.queries import role_readiness as database
 
     monkeypatch.setattr(role_readiness, "ROOT", tmp_path)
     monkeypatch.setenv("CRATE_READINESS_ROLE", "worker")
     monkeypatch.setenv("CRATE_READINESS_QUEUES", "fast")
-    monkeypatch.setattr(database, "database_ready", lambda: True)
+    monkeypatch.setattr(role_readiness, "database_ready", lambda: True)
     ready = [True]
-    monkeypatch.setattr(
-        redis.Redis,
-        "from_url",
-        lambda *args, **kw: SimpleNamespace(ping=lambda: ready[0], close=lambda: None),
-    )
+    monkeypatch.setattr(role_readiness, "redis_ready", lambda: ready[0])
     assert not role_readiness.healthy()
     role_readiness.progress("queue_default")
     assert not role_readiness.healthy()

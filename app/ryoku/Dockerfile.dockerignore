@@ -1,0 +1,8 @@
+**/node_modules
+app/ryoku/dist
+app/ryoku/.astro
+app/ryoku/public/fonts
+app/ryoku/public/icons
+app/ryoku/test-results
+app/web/dist
+app/web/prototypes

@@ -4,6 +4,7 @@ import { EyeIcon as SolarEyeOutline } from "@solar-icons/react/outline/eye";
 import { ArchiveDownIcon as SolarArchiveDownOutline } from "@solar-icons/react/outline/archive-down";
 import { Cassette2Icon as SolarCassette2Outline } from "@solar-icons/react/outline/cassette-2";
 import { HeartIcon as SolarHeartOutline } from "@solar-icons/react/outline/heart";
+import { LayersMinimalisticIcon as SolarLayersMinimalisticOutline } from "@solar-icons/react/outline/layers-minimalistic";
 import { MicrophoneIcon as SolarMicrophoneOutline } from "@solar-icons/react/outline/microphone";
 import { MinusSquareIcon as SolarMinusSquareOutline } from "@solar-icons/react/outline/minus-square";
 import { PulseIcon as SolarPulseOutline } from "@solar-icons/react/outline/pulse";
@@ -11,6 +12,10 @@ import { Radar2Icon as SolarRadar2Outline } from "@solar-icons/react/outline/rad
 import { ArchiveDownIcon as SolarArchiveDownBold } from "@solar-icons/react/bold/archive-down";
 import { HeartIcon as SolarHeartBold } from "@solar-icons/react/bold/heart";
 import { PauseIcon as SolarPauseBold } from "@solar-icons/react/bold/pause";
+import { CloudStorageIcon as SolarCloudStorageOutline } from "@solar-icons/react/outline/cloud-storage";
+import { FolderCloudIcon as SolarFolderCloudOutline } from "@solar-icons/react/outline/folder-cloud";
+import { ServerPathIcon as SolarServerPathOutline } from "@solar-icons/react/outline/server-path";
+import { SsdRoundIcon as SolarSsdRoundOutline } from "@solar-icons/react/outline/ssd-round";
 
 import {
   Eye,
@@ -19,15 +24,20 @@ import {
   ArrowDownToLine,
   ArrowDownToLineBold,
   BarChart3,
+  CloudStorage,
   Collection,
+  FolderCloud,
   Heart,
   HeartBold,
+  Layers,
   Loader2,
   Minus,
   Pause,
   Play,
   Radio,
   Radar,
+  ServerPath,
+  SsdRound,
 } from "./index";
 
 function renderSvgInner(ui: React.ReactElement) {
@@ -38,6 +48,25 @@ function renderSvgInner(ui: React.ReactElement) {
 describe("@crate/ui/icons", () => {
   it("exports the Solar Eye outline for preview actions", () => {
     expect(renderSvgInner(<Eye />)).toBe(renderSvgInner(<SolarEyeOutline />));
+  });
+  it("exports the Solar Layers Minimalistic outline for stems and Smart Mix", () => {
+    expect(renderSvgInner(<Layers />)).toBe(
+      renderSvgInner(<SolarLayersMinimalisticOutline />),
+    );
+  });
+  it("exports the Solar outlines for the backup destination kinds", () => {
+    expect(renderSvgInner(<SsdRound />)).toBe(
+      renderSvgInner(<SolarSsdRoundOutline />),
+    );
+    expect(renderSvgInner(<CloudStorage />)).toBe(
+      renderSvgInner(<SolarCloudStorageOutline />),
+    );
+    expect(renderSvgInner(<ServerPath />)).toBe(
+      renderSvgInner(<SolarServerPathOutline />),
+    );
+    expect(renderSvgInner(<FolderCloud />)).toBe(
+      renderSvgInner(<SolarFolderCloudOutline />),
+    );
   });
   it("renders the official Bot Outline paths with the normal icon contract", () => {
     const { container } = render(

@@ -22,6 +22,7 @@ export const EXACT_PRODUCT_TERM_KEYS = [
   ["stats.scope.yourDna", PRODUCT_TERMS.crateDna],
   ["stats.signal.playReplay", PRODUCT_TERMS.replay],
   ["settings.playback.smartMix", PRODUCT_TERMS.smartMix],
+  ["playlist.smartMix.label", PRODUCT_TERMS.smartMix],
 ] as const;
 
 export const CONTAINED_PRODUCT_TERM_KEYS = [

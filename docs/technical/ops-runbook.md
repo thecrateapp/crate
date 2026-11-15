@@ -5,9 +5,14 @@ section: operations
 audience: [operator]
 status: canonical
 order: 130
-verified: 2026-07-21
+verified: 2026-11-10
 sources:
-  [docker-compose.yaml, docker-compose.home.yaml, scripts/deploy-remote.sh]
+  [
+    docker-compose.yaml,
+    docker-compose.home.yaml,
+    .env.example,
+    scripts/deploy-remote.sh,
+  ]
 ---
 
 # Backup and recovery
@@ -31,6 +36,53 @@ For the project-hosted profile, inspect and trigger the configured sidecar:
 docker compose ps crate-postgres-backup
 docker compose exec crate-postgres-backup /backup.sh
 ```
+
+The sidecar writes one gzip-compressed plain SQL dump a day and hard-links it
+into `daily/`, `weekly/` and `monthly/`, so a dump shared by several sets is
+stored once. `last/` keeps the dumps of the past 24 hours and every set has a
+`crate-latest.sql.gz` symlink. Its settings come from `.env`:
+
+| Variable                      | Default                        | Meaning                                                   |
+| ----------------------------- | ------------------------------ | --------------------------------------------------------- |
+| `POSTGRES_BACKUP_DIR`         | `${DATA_DIR}/backups/postgres` | Host path, or the compose volume `crate_postgres_backups` |
+| `POSTGRES_BACKUP_KEEP_DAYS`   | `3`                            | Daily dumps kept                                          |
+| `POSTGRES_BACKUP_KEEP_WEEKS`  | `4`                            | Weekly dumps kept                                         |
+| `POSTGRES_BACKUP_KEEP_MONTHS` | `3`                            | Monthly dumps kept                                        |
+| `POSTGRES_BACKUP_EXTRA_OPTS`  | `-Z6`                          | Extra `pg_dump` options; `-Z` is the gzip level           |
+
+Retention is age-based (`find -mtime`): a set keeps dumps younger than N days,
+N weeks plus a day, or N months of 31 days plus a day, so the monthly set can
+hold one more file than the count while the oldest ages out.
+
+Keep dumps off the root filesystem when it is small: the named volume
+`crate_postgres_backups` lives in Docker's data root (on production, `/var`).
+Never point `POSTGRES_BACKUP_DIR` below `MUSIC_DIR`: dumps contain credentials
+and the library is shared with other services such as slskd.
+
+To move existing dumps from the host path into the volume, create the volume
+through compose, copy with hard links preserved, verify, and only then remove
+the old directory:
+
+```bash
+POSTGRES_BACKUP_DIR=crate_postgres_backups \
+  docker compose run --rm --no-deps --entrypoint true crate-postgres-backup
+docker run --rm -v "$PWD/data/backups/postgres:/old:ro" \
+  -v crate_crate_postgres_backups:/new debian:bookworm-slim \
+  sh -ec 'cp -a /old/. /new/ && chown -R 1000:1000 /new'
+# compare file counts, sizes and `gzip -t /new/last/crate-latest.sql.gz`
+```
+
+Then set `POSTGRES_BACKUP_DIR=crate_postgres_backups` in `.env` and recreate
+the sidecar with `docker compose up -d --no-deps crate-postgres-backup`. The
+volume name carries the compose project prefix (`crate_` on production); use
+the `PUID`/`PGID` of the deployment in `chown`.
+
+These dumps live on the same server as the database. To survive the loss of
+the host, the opt-in `crate-backup-offsite` service (compose profile
+`offsite-backup`) copies the weekly and monthly dumps with restic to Cloudflare
+R2 and Google Drive, prunes them, and runs a monthly check and restore drill.
+Setup, credential rotation and restores from each destination are in
+`docs/operators/postgres-offsite-backups.md`.
 
 For home hosting, use a host-managed `pg_dump` schedule or an equivalent backup
 service. Record the exact database credentials and test restoring a copy on a
@@ -62,6 +114,21 @@ backup.
      --clean --if-exists < backup.dump
    ```
 
+   The sidecar's dumps are gzip-compressed plain SQL. Check the file, then
+   load it into an empty database (rehearse into a scratch name such as
+   `crate_restore` first):
+
+   ```bash
+   docker compose exec -T crate-postgres-backup \
+     gzip -t /backups/daily/crate-YYYYMMDD.sql.gz
+   docker compose exec -T crate-postgres \
+     createdb -U "$POSTGRES_SUPERUSER_USER" -O "$CRATE_POSTGRES_USER" crate_restore
+   docker compose exec -T crate-postgres-backup \
+     cat /backups/daily/crate-YYYYMMDD.sql.gz | gunzip \
+     | docker compose exec -T crate-postgres psql -v ON_ERROR_STOP=1 \
+       -U "$CRATE_POSTGRES_USER" -d crate_restore
+   ```
+
 4. Start the stack with `docker compose up -d`. Let Alembic finish before
    treating API startup as healthy. Do not flush durable Redis as part of a
    database restore: it contains broker/stream/lease state that needs an
@@ -80,6 +147,93 @@ backup.
    freshness, projector catch-up, worker queue progress and SSE reconnection.
    If federation is enabled, also inspect peer/grant state and verify no import
    or stream operation resumed with stale authorization.
+
+## Local dumps from the backups engine
+
+The backups engine managed from Admin (plan:
+`docs/plans/2026-11-10-admin-backups-plan.md`) is replacing the
+`crate-postgres-backup` sidecar. Its first phase makes local dumps:
+
+- `backup_dump` runs every 24 hours on the maintenance queue, inside the
+  maintenance window and under the resource governor. It writes
+  `pg_dump -Fc` to `dumps/crate-<UTC stamp>.dump` in the backup directory, next
+  to a `sha256sum` file, and records the run in `backup_runs`. A failed or
+  cancelled dump leaves no file. Check a dump with `sha256sum -c` and
+  `pg_restore --list`.
+- `backup_local_retention` follows each good dump and keeps the newest dump of
+  each of the last 3 days, 4 ISO weeks and 3 months (UTC), and always the newest.
+- One backup job runs at a time (a PostgreSQL advisory lock).
+
+Settings, on `crate-worker` (the scheduler) and `crate-maintenance-worker`:
+
+- `CRATE_LOCAL_BACKUPS_ENABLED`: on by default, `false` in `docker-compose.yaml`.
+  Off, the scheduler skips the dump and both tasks do nothing even when queued by
+  hand. Production keeps it off while the sidecar makes its dumps, so the two
+  never dump side by side; BK6 turns it on and retires the sidecar.
+- `CRATE_BACKUP_DIR`: the backup directory inside the maintenance worker, by
+  default `$DATA_DIR/backups`. A configured directory must exist (a mounted
+  volume); the default is created inside `$DATA_DIR`.
+- `CRATE_BACKUP_KEEP_DAILY`, `CRATE_BACKUP_KEEP_WEEKLY` and
+  `CRATE_BACKUP_KEEP_MONTHLY`: the retention counts, by default 3, 4 and 3.
+  Counts set from Admin (stored in `settings` as `backups.local_keep_*`) win
+  over these. They are the local dumps' own counts, apart from the off-site
+  policies.
+
+## Backup policies and off-site copies
+
+Policies say when the engine copies the database, to which destinations, and
+how long each destination keeps the copies.
+
+- `backup_policies_tick` runs every 5 minutes while an enabled scheduled policy
+  exists; then the default nightly `backup_dump` stands down, because each
+  policy run makes its own dump. A due policy queues `backup_dump` with its id;
+  after a good dump, one `backup_offsite` goes to each enabled destination that
+  passed a test and whose tiers are due.
+- Tiers: every scheduled run is a daily copy. It is also the weekly copy when no
+  weekly copy went to that destination since the start of the last Sunday, and
+  the monthly copy when none went this calendar month. A destination receives a
+  run only for its own tiers.
+- `backup_offsite` runs `restic backup --stdin` of the dump as `/crate.dump`,
+  host `crate`, tagged with the tiers and `dump:<file>`, then
+  `restic forget --host crate --group-by host --keep-last 1` plus the policy's
+  counts for that destination's tiers, then `prune` when something was
+  forgotten. The off-site sidecar's snapshots share the host, so they are pruned
+  with the engine's. Manual policies back up as host `crate-manual` and prune
+  only their own snapshots.
+- `backup_verify` runs `restic check --read-data-subset=<n>%` on each
+  destination every `verify_every_days`.
+- `backup_restore_drill` runs every `drill_every_days` per policy, from the
+  destination whose last drill is the oldest (or a fixed one). It restores the
+  newest `/crate.dump` into `crate_restore_drill_<hex>` on the same PostgreSQL
+  server, with `pg_restore --no-owner --no-privileges --exit-on-error`, counts
+  rows of a few tables, reads the Alembic revision and drops the database. It
+  never names the production database. The database user needs `CREATEDB`
+  (the compose `POSTGRES_USER` is a superuser).
+- Each copy, verification and drill holds its destination's advisory lock;
+  drills also hold one drill lock. After a worker restart the next job closes
+  that destination's interrupted runs, runs `restic unlock` (stale locks only)
+  and drops leftover drill databases.
+- An optional window bounds when copies, verifications and drills start; a copy
+  already uploading at the end finishes.
+
+### Before upgrades
+
+A policy marked "run before upgrades" (manual schedule) is the deploy's safety
+copy. Run it and wait:
+
+```bash
+make backup-before-upgrade                     # docker compose in this directory
+make backup-before-upgrade BACKUP_DC="docker compose -f docker-compose.home.yaml"
+```
+
+It runs `python -m crate.backups.cli before-upgrade --wait` inside
+`crate-maintenance-worker`: one dump per policy and its copies. It exits 0 when
+every copy succeeded, no policy is marked or `CRATE_LOCAL_BACKUPS_ENABLED` is
+off, 1 when one failed, 2 on timeout (`BACKUP_TIMEOUT`, 3 hours by default).
+`make deploy` runs it before the new images start; see
+[Managed backups](admin-backups.md#before-upgrades), which also covers the
+providers, the recovery kit, alerts, metrics, the command-line restore and the
+move from the off-site sidecars.
 
 ## Redis credential rotation
 

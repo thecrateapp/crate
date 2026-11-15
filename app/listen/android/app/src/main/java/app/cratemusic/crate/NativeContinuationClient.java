@@ -20,7 +20,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 final class NativeContinuationClient {
-    static final String PLANNER_VERSION = "smart-mix-v2";
+    // The planner native background planning asks for when setContinuation names none
+    // (older Listen builds) or names one this client does not know (LV-D1).
+    static final String DEFAULT_PLANNER_VERSION = "smart-mix-v2";
+    private static final String PLANNER_V3 = "smart-mix-v3";
     private static final String PLANS_PATH = "/api/playback/transition-plans";
     private static final String CONTINUATION_PATH = "/api/playback/continuation";
     static final int MAX_RECENT_ENTITY_UIDS = 200;
@@ -41,6 +44,7 @@ final class NativeContinuationClient {
         final boolean authoritativeCursor;
         final String sessionId;
         final int batchIndex;
+        final String plannerVersion;
 
         Config(
             String apiBase,
@@ -91,15 +95,18 @@ final class NativeContinuationClient {
             boolean refill
         ) {
             this(apiBase, token, expiresAtMs, source, preferredDurationMs, allowBeatmatch,
-                allowBassHandoff, allowLongBeatmatch, delivery, refill, "", 0, false);
+                allowBassHandoff, allowLongBeatmatch, delivery, refill, "", 0, false,
+                DEFAULT_PLANNER_VERSION);
         }
 
         private Config(
             String apiBase, String token, long expiresAtMs, String source,
             long preferredDurationMs, boolean allowBeatmatch, boolean allowBassHandoff,
             boolean allowLongBeatmatch, String delivery, boolean refill,
-            String sessionId, int batchIndex, boolean authoritativeCursor
+            String sessionId, int batchIndex, boolean authoritativeCursor,
+            String plannerVersion
         ) {
+            this.plannerVersion = supportedPlanner(plannerVersion);
             this.authoritativeCursor = authoritativeCursor;
             this.sessionId = sessionId;
             this.batchIndex = Math.max(0, batchIndex);
@@ -132,7 +139,8 @@ final class NativeContinuationClient {
                 payload.optBoolean("refill", false),
                 payload.optString("sessionId", ""),
                 payload.optInt("batchIndex", 0),
-                payload.optBoolean("authoritativeCursor", false)
+                payload.optBoolean("authoritativeCursor", false),
+                payload.has("plannerVersion") ? payload.optString("plannerVersion") : null
             );
         }
 
@@ -144,6 +152,10 @@ final class NativeContinuationClient {
         boolean isUsable(long nowWallMs) {
             return !apiBase.isEmpty() && !token.isEmpty() && nowWallMs < expiresAtMs;
         }
+    }
+
+    static String supportedPlanner(@Nullable String requested) {
+        return PLANNER_V3.equals(requested) ? PLANNER_V3 : DEFAULT_PLANNER_VERSION;
     }
 
     interface Transport {
@@ -252,7 +264,7 @@ final class NativeContinuationClient {
             }
             return new Result(
                 Outcome.PLANNED,
-                parsePlans(response.body, tracks, fromIndex, edgeCount)
+                parsePlans(response.body, config.plannerVersion, tracks, fromIndex, edgeCount)
             );
         } catch (IOException | JSONException error) {
             return new Result(Outcome.FAILED, Collections.emptyList());
@@ -309,7 +321,7 @@ final class NativeContinuationClient {
             recent.put(entityUid);
         }
         JSONObject body = new JSONObject()
-            .put("plannerVersion", PLANNER_VERSION)
+            .put("plannerVersion", config.plannerVersion)
             .put("recentEntityUids", recent)
             .put("limit", limit)
             .put("delivery", config.delivery)
@@ -366,12 +378,13 @@ final class NativeContinuationClient {
         extended.addAll(tracks);
         int fromIndex = Math.max(0, queue.size() - 1);
         JSONObject planResponse = new JSONObject()
-            .put("plannerVersion", PLANNER_VERSION)
+            .put("plannerVersion", config.plannerVersion)
             .put("plans", response.optJSONArray("plans") == null
                 ? new JSONArray()
                 : response.optJSONArray("plans"));
         List<JSONObject> plans = parsePlans(
             planResponse.toString(),
+            config.plannerVersion,
             extended,
             fromIndex,
             extended.size() - 1 - fromIndex
@@ -425,18 +438,19 @@ final class NativeContinuationClient {
             );
         }
         return new JSONObject()
-            .put("plannerVersion", PLANNER_VERSION)
+            .put("plannerVersion", config.plannerVersion)
             .put("edges", edges);
     }
 
     static List<JSONObject> parsePlans(
         String body,
+        String plannerVersion,
         List<NativeTrack> tracks,
         int fromIndex,
         int edgeCount
     ) throws JSONException {
         JSONObject response = new JSONObject(body);
-        if (!PLANNER_VERSION.equals(response.optString("plannerVersion"))) {
+        if (!plannerVersion.equals(response.optString("plannerVersion"))) {
             return Collections.emptyList();
         }
         JSONArray serverPlans = response.optJSONArray("plans");

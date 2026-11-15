@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from starlette.datastructures import URL
 
 from crate.api.auth import _require_auth as _require_authenticated_user
@@ -92,6 +92,7 @@ from crate.federation.global_playback import (
     resolve_global_track_playback,
 )
 from crate.federation.global_remote_facets import get_or_fetch_remote_json_facet
+from crate.federation.search_stream import federated_search_events, sse_frame
 from crate.federation.global_source_resolver import (
     GlobalEntityNotFound,
     NoGlobalSource,
@@ -199,6 +200,51 @@ def catalog_search(
         q,
         limit=capped_limit,
         include_sources=include_debug_sources,
+    )
+
+
+@router.get(
+    "/api/catalog/search-stream",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Search the catalog, then the network, as server-sent events",
+)
+def catalog_search_stream(
+    request: Request,
+    q: str = "",
+    limit: int = 20,
+):
+    """Local results at once, then remote results within the window (FED1.4).
+
+    Events: ``local``, ``coverage``, ``remote`` and a final ``done``. Clients
+    use it only when /api/capabilities offers ``federation.search_stream``;
+    everyone else keeps /api/catalog/search (FED-D18).
+    """
+    user = _require_auth(request)
+    query = q.strip()
+    capped_limit = max(1, min(limit, 50))
+    mode_headers = Response()
+    mode = _catalog_mode(mode_headers)
+    record_later("catalog.search_stream.requests", 1, tags={"mode": mode})
+
+    def local_search() -> dict:
+        if mode == "local-fallback":
+            return search_local_library(query, capped_limit)
+        return search_global_catalog(query, limit=capped_limit)
+
+    async def events():
+        async for name, payload in federated_search_events(
+            query, limit=capped_limit, user=user, local_search=local_search
+        ):
+            yield sse_frame(name, payload)
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "X-Crate-Catalog-Mode": mode,
+        },
     )
 
 

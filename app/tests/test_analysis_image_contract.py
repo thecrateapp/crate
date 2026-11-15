@@ -149,3 +149,55 @@ def test_madmom_licence_ships_only_with_madmom() -> None:
     # Copied by the install under the torch condition, never by a COPY of its own.
     assert not re.search(r"^COPY --from=madmom", DOCKERFILE, re.M)
     assert "cp /tmp/madmom-wheels/madmom.LICENSE /app/models/madmom.LICENSE" in install
+
+
+# Smart Mix Stems (STEM-D3): the htdemucs ONNX graph the separation runs.
+HTDEMUCS_ONNX_SHA256 = (
+    "808790c0f71069e6fa42572bc5b97752add35a49b4c40559098d92bc342d6a08"
+)
+HTDEMUCS_ONNX_URL = (
+    "https://github.com/thecrateapp/crate-decks/releases/download/"
+    "models-htdemucs-onnx-1/htdemucs-onnx-1.onnx"
+)
+ANALYSIS_REQUIREMENTS = (APP_ROOT / "requirements-worker-analysis.txt").read_text()
+
+
+def test_the_htdemucs_graph_is_pinned_and_checked_from_either_source() -> None:
+    assert _global_args()["HTDEMUCS_ONNX_SHA256"] == HTDEMUCS_ONNX_SHA256
+    assert _global_args()["HTDEMUCS_ONNX_SOURCE"] == "release"
+    release = _stage("htdemucs-onnx-release")
+    context = _stage("htdemucs-onnx-context")
+
+    assert f"ARG HTDEMUCS_ONNX_URL={HTDEMUCS_ONNX_URL}" in release
+    for body in (release, context):
+        assert "ARG HTDEMUCS_ONNX_SHA256\n" in body
+        assert (
+            'echo "$HTDEMUCS_ONNX_SHA256  htdemucs-onnx-1.onnx" | sha256sum -c -'
+            in body
+        )
+    # Local builds take the file from a named build context, never the app context.
+    assert "COPY --from=htdemucs-onnx htdemucs-onnx-1.onnx ./" in context
+
+
+def test_the_analysis_image_carries_the_graph_from_the_chosen_source() -> None:
+    for source, other in (("release", "context"), ("context", "release")):
+        for panns in ("on", "off"):
+            stages = _reachable(
+                "worker-analysis",
+                {
+                    "PANNS": panns,
+                    "TARGETARCH": "amd64",
+                    "HTDEMUCS_ONNX_SOURCE": source,
+                },
+            )
+            assert f"htdemucs-onnx-{source}" in stages, (source, panns)
+            assert f"htdemucs-onnx-{other}" not in stages, (source, panns)
+    deps = _stage("worker-analysis-deps")
+    assert "COPY --from=htdemucs-onnx-weights /htdemucs/ /app/models/" in deps
+    # The attribution travels with the weights (design section 7).
+    assert "> htdemucs-onnx-1.NOTICE" in _stage("htdemucs-onnx-weights")
+
+
+def test_onnxruntime_is_pinned_and_separation_needs_no_torch() -> None:
+    assert re.search(r"^onnxruntime==\d+\.\d+\.\d+$", ANALYSIS_REQUIREMENTS, re.M)
+    assert "onnxruntime" not in BEAT_THIS_REQUIREMENTS

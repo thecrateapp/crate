@@ -214,7 +214,11 @@ services:
     ports:
       - "18686:8686"
     networks:
-      - fed-net
+      fed-net:
+        aliases:
+          - node-a-readplane
+          # The Listen nginx image sends reads to http://crate-readplane:8686.
+          - crate-readplane
     depends_on:
       node-a-postgres:
         condition: service_healthy

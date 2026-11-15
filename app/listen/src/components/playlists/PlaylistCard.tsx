@@ -25,6 +25,8 @@ import { IconButton } from "@crate/ui/primitives/IconButton";
 
 import { action } from "@/components/actions/shared";
 import { usePlaylistActionMenu } from "@/components/actions/playlist-actions";
+import { SmartMixChip } from "@/components/playlists/SmartMixChip";
+import type { PlaylistSmartMix } from "@/lib/smart-mix-playlists";
 import {
   PlaylistArtwork,
   type PlaylistArtworkTrack,
@@ -82,6 +84,10 @@ export interface PlaylistCardProps {
   trackCount?: number;
   detailEndpoint?: string;
   extraActions?: PlaylistCardExtraAction[];
+  /** Row only: the playlist's Smart Mix state, marked while it is on. */
+  smartMix?: PlaylistSmartMix | null;
+  /** Row only: the owner's Smart Mix toggle in the menu. */
+  onToggleSmartMix?: Handler;
   className?: string;
   onClick?: () => void;
   onPlay?: Handler;
@@ -450,6 +456,8 @@ function PlaylistRow(props: PlaylistCardProps) {
     trackCount = 0,
     detailEndpoint,
     extraActions,
+    smartMix,
+    onToggleSmartMix,
   } = props;
   const base = usePlaylistCardBase(props);
   const { t, offlineState, offlineMeta } = base;
@@ -494,11 +502,20 @@ function PlaylistRow(props: PlaylistCardProps) {
       onToggleFollow: props.onToggleFollow,
       onStartRadio: props.onStartRadio,
       extraEntries,
+      smartMix: onToggleSmartMix
+        ? { enabled: Boolean(smartMix?.enabled), onToggle: onToggleSmartMix }
+        : undefined,
       ...playHandlers,
     },
     {
       title: name,
       subtitle: subtitleText,
+      status: smartMix?.enabled
+        ? t("playlist.smartMix.menuStatus", {
+            ready: smartMix.ready,
+            total: smartMix.total,
+          })
+        : undefined,
       detail: description,
       artwork: menuArtwork,
     },
@@ -510,6 +527,7 @@ function PlaylistRow(props: PlaylistCardProps) {
       titleAccessory={
         <>
           {badge ? <InfoBadge icon={Sparkles}>{badge}</InfoBadge> : null}
+          {smartMix ? <SmartMixChip smartMix={smartMix} /> : null}
           <OfflineBadge state={offlineState} compact />
         </>
       }

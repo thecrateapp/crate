@@ -1,0 +1,8 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "paths": { "@crate-web/*": ["../web/src/*"] }
+  },
+  "include": [".astro/types.d.ts", "src/**/*", "e2e/**/*", "scripts/**/*"],
+  "exclude": ["dist"]
+}

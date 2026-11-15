@@ -136,6 +136,7 @@ def context_from_payload(payload: Mapping[str, Any]) -> TransitionContext:
         allow_tempo_adjustment=bool(payload["allowTempoAdjustment"]),
         allow_bass_handoff=bool(payload.get("allowBassHandoff", False)),
         allow_long_beatmatch=bool(payload.get("allowLongBeatmatch", False)),
+        assist=bool(payload.get("assist", False)),
     )
 
 

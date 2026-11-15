@@ -21,6 +21,8 @@ ALL_CAPABILITIES: tuple[str, ...] = (
     "ops.logs.view",
     "ops.tasks.manage",
     "ops.runtime.manage",
+    # Admin backups (BK4): destinations, policies, runs and the recovery kit.
+    "system.backups.manage",
     "ops.errors.view",
     "ops.errors.manage",
     "settings.manage",
@@ -39,6 +41,9 @@ ALL_CAPABILITIES: tuple[str, ...] = (
     "library.view",
     # Smart Mix AI refinement (SM3-D10): granted with library.view by default.
     "smart_mix.ai",
+    # Smart Mix Stems (STEM-D8): upload a stem analysis from Crate Decks. Admins only
+    # by default; an upload changes what every client's plans read.
+    "smart_mix.stems.contribute",
     "library.metadata.write",
     "library.analysis.manage",
     "library.maintenance.manage",

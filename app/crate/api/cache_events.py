@@ -489,6 +489,8 @@ _INVALIDATION_RULES: list[tuple[re.Pattern[str], list[str]]] = [
     (re.compile(r"^/api/me/location$"), ["shows", "upcoming"]),
     (re.compile(r"^/api/playlists$"), ["playlists"]),
     (re.compile(r"^/api/playlists/(\d+)"), ["playlists", "playlist:{1}"]),
+    # Playlist responses carry the smartMix summary.
+    (re.compile(r"^/api/smart-mix/playlists/(\d+)$"), ["playlists", "playlist:{1}"]),
     (re.compile(r"^/api/crates/invites/[^/]+/accept$"), ["crates", "library"]),
     (re.compile(r"^/api/crates$"), ["crates", "library"]),
     (

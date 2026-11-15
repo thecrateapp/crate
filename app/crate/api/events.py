@@ -117,41 +117,59 @@ def _event_name(event_type: str, generic: bool) -> str:
     return "task_event" if generic and event_type != "task_done" else event_type
 
 
+_TERMINAL_TASK_STATUSES = ("completed", "failed", "cancelled")
+
+
+def _task_event_frame(event: dict, generic: bool) -> str:
+    payload = {
+        "id": event["id"],
+        "type": event["event_type"],
+        "data": event["data"],
+        "timestamp": event["created_at"],
+    }
+    event_payload = (
+        _task_done_payload(payload["data"])
+        if event["event_type"] == "task_done"
+        else payload
+    )
+    return f"event: {_event_name(event['event_type'], generic)}\ndata: {json_dumps(event_payload)}\n\n"
+
+
+def _finished_task_frame(task: dict | None) -> str | None:
+    if not task or task["status"] not in _TERMINAL_TASK_STATUSES:
+        return None
+    return f"event: task_done\ndata: {json_dumps({'status': task['status'], 'label': task.get('label', ''), 'result': task.get('result'), 'error': task.get('error')})}\n\n"
+
+
 async def _task_stream_pubsub(
     task_id: str, *, generic: bool = False
 ) -> AsyncIterator[str]:
     """Subscribe to Redis channel for a specific task. Falls back to polling."""
     last_event_id = 0
-    pubsub = None
     channel = f"{REDIS_CHANNEL_TASK_PREFIX}{task_id}"
 
     try:
         pubsub = await open_pubsub(channel)
+    except Exception:
+        pubsub = None
 
-        # Send any existing events first
-        events = get_task_events(task_id, after_id=0, limit=50, tail=True)
-        for event in events:
-            payload = {
-                "id": event["id"],
-                "type": event["event_type"],
-                "data": event["data"],
-                "timestamp": event["created_at"],
-            }
-            event_payload = (
-                _task_done_payload(payload["data"])
-                if event["event_type"] == "task_done"
-                else payload
-            )
-            yield f"event: {_event_name(event['event_type'], generic)}\ndata: {json_dumps(event_payload)}\n\n"
-            last_event_id = event["id"]
-
-        # Check if already done
-        task = get_task(task_id)
-        if task and task["status"] in ("completed", "failed", "cancelled"):
-            yield f"event: task_done\ndata: {json_dumps({'status': task['status'], 'label': task.get('label', ''), 'result': task.get('result'), 'error': task.get('error')})}\n\n"
-            return
-
+    if pubsub is not None:
+        # Close the subscription on every path: the replay, the early return
+        # for a task that already finished, a client that leaves mid-replay
+        # and an error that drops to polling. A pubsub left open keeps its
+        # connection out of the shared pool for the life of the process.
         try:
+            # Send any existing events first
+            for event in get_task_events(task_id, after_id=0, limit=50, tail=True):
+                yield _task_event_frame(event, generic)
+                last_event_id = event["id"]
+
+            # Check if already done
+            done_frame = _finished_task_frame(get_task(task_id))
+            if done_frame is not None:
+                yield done_frame
+                return
+
             # Listen for new events via pub/sub
             async for message in pubsub.listen():
                 if message["type"] != "message":
@@ -166,38 +184,26 @@ async def _task_stream_pubsub(
                     or data.get("type") == "task_done"
                 ):
                     yield f"event: task_done\ndata: {json_dumps(_task_done_payload(data))}\n\n"
-                    break
-                else:
-                    event_type = data.get("event_type", "info")
-                    yield f"event: {_event_name(event_type, generic)}\ndata: {json_dumps(data)}\n\n"
+                    return
+                event_type = data.get("event_type", "info")
+                yield f"event: {_event_name(event_type, generic)}\ndata: {json_dumps(data)}\n\n"
+            return
+        except Exception:
+            pass
         finally:
-            if pubsub is not None:
-                await close_pubsub(pubsub, channel)
+            await close_pubsub(pubsub, channel)
 
-    except Exception:
-        # Fallback: poll DB (original behavior)
-        while True:
-            events = get_task_events(task_id, after_id=last_event_id)
-            for event in events:
-                payload = {
-                    "id": event["id"],
-                    "type": event["event_type"],
-                    "data": event["data"],
-                    "timestamp": event["created_at"],
-                }
-                event_payload = (
-                    _task_done_payload(payload["data"])
-                    if event["event_type"] == "task_done"
-                    else payload
-                )
-                yield f"event: {_event_name(event['event_type'], generic)}\ndata: {json_dumps(event_payload)}\n\n"
-                last_event_id = event["id"]
+    # Fallback: poll DB (original behavior)
+    while True:
+        for event in get_task_events(task_id, after_id=last_event_id):
+            yield _task_event_frame(event, generic)
+            last_event_id = event["id"]
 
-            task = get_task(task_id)
-            if task and task["status"] in ("completed", "failed", "cancelled"):
-                yield f"event: task_done\ndata: {json_dumps({'status': task['status'], 'label': task.get('label', ''), 'result': task.get('result'), 'error': task.get('error')})}\n\n"
-                break
-            await asyncio.sleep(1)
+        done_frame = _finished_task_frame(get_task(task_id))
+        if done_frame is not None:
+            yield done_frame
+            break
+        await asyncio.sleep(1)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────

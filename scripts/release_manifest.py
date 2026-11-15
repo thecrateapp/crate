@@ -129,6 +129,18 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
         services=("crate-docs",),
         patterns=("app/docs/**", "app/shared/**", "docs/**"),
     ),
+    # ryoku.cratemusic.app builds on app/web's source, fonts and icons (app/ryoku/Dockerfile).
+    "ryoku-site": ImageSpec(
+        repository="crate-ryoku-site",
+        environment="CRATE_RYOKU_SITE_IMAGE",
+        services=("crate-ryoku-site",),
+        patterns=(
+            "app/ryoku/**",
+            "app/web/src/**",
+            "app/web/public/fonts/**",
+            "app/web/public/icons/**",
+        ),
+    ),
 }
 
 # Agent images are optional manifest entries outside the provenance-bound fleet.

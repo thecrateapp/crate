@@ -26,3 +26,13 @@ Diego approved this visual reference at 1AQ. Consumer adoption and platform QA r
 <DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
 
 Full metadata and explicit title detail use the shared custom Tooltip hint. They never emit a browser title or turn a static badge into a toggle. Visible values, icon colors and the 24px frame stay unchanged.
+
+<DocHeading as="h2">Icon-only variant</DocHeading>
+
+`variant="icon"` draws only the icon in a circle as wide as the badge is high (24 px, no
+padding), with the tone's border and fill. Name it with `aria-label`, which also gives it the
+`img` role; the tooltip shows `title`. Listen's Smart Mix mark uses it on phones once every track
+of the playlist has stems, beside the `ready/total` label variant while it separates (approved
+Smart Mix stems mockups, 2026-11-09).
+
+<Canvas of={Stories.IconOnly} />

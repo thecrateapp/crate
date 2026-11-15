@@ -113,6 +113,12 @@ export type { AudioAnalysisTrack } from "./audio-analysis";
 import { analysisForTrack, type AudioAnalysisTrack } from "./audio-analysis";
 import { AudioProfileCard } from "./AudioProfileCard";
 import { SmartMixTrackStructure } from "@/components/SmartMixStructure";
+import { useApi } from "@/hooks/use-api";
+import { SmartMixTrackStems } from "./StemsTab";
+import {
+  hasStemData,
+  type SmartMixTrackStems as TrackStems,
+} from "./stems-model";
 import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { ActionButton, ActionLink } from "@crate/ui/primitives/ActionGroup";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
@@ -475,6 +481,11 @@ function TrackAudioInfo({
   const [open, setOpen] = useState(false);
   const { hasCapability } = useAuth();
   const trackId = track.track_id;
+  const canManage = hasCapability("library.analysis.manage");
+  // Read with the dialog: like Phrases, the Stems tab exists only with stem data.
+  const stems = useApi<TrackStems>(
+    open && trackId != null ? `/api/smart-mix/tracks/${trackId}/stems` : null,
+  );
   return (
     <>
       <ActionButton label="Show audio profile" onClick={() => setOpen(true)}>
@@ -500,8 +511,17 @@ function TrackAudioInfo({
             totalTracks={1}
             presentation="track-dialog"
             smartMixStructure={
-              trackId != null && hasCapability("library.analysis.manage") ? (
+              trackId != null && canManage ? (
                 <SmartMixTrackStructure trackId={trackId} />
+              ) : null
+            }
+            smartMixStems={
+              hasStemData(stems.data) ? (
+                <SmartMixTrackStems
+                  data={stems.data}
+                  loading={stems.loading}
+                  canManage={canManage}
+                />
               ) : null
             }
           />

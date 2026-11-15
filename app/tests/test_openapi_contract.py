@@ -1896,6 +1896,79 @@ def test_openapi_types_error_inbox_routes_and_marks_them_authenticated(test_app)
     assert "/api/admin/errors/summary" in admin["paths"]
 
 
+def test_openapi_types_decks_library_routes_and_marks_them_authenticated(test_app):
+    schema = test_app.get("/openapi.json").json()
+    expected = {
+        "/api/decks/containers": "DecksContainersResponse",
+        "/api/decks/containers/{kind}/{container_id}/tracks": (
+            "DecksTracksPageResponse"
+        ),
+    }
+    for path, model in expected.items():
+        operation = schema["paths"][path]["get"]
+        assert operation["tags"] == ["browse"]
+        assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+        assert (
+            operation["responses"]["200"]["content"]["application/json"]["schema"][
+                "$ref"
+            ]
+            == f"#/components/schemas/{model}"
+        )
+        assert "304" in operation["responses"]
+    tracks = schema["paths"]["/api/decks/containers/{kind}/{container_id}/tracks"]
+    kind = next(p for p in tracks["get"]["parameters"] if p["name"] == "kind")
+    assert kind["schema"]["enum"] == [
+        "playlist",
+        "crate",
+        "genre",
+        "mood",
+        "recent",
+        "likes",
+    ]
+    for status in ("400", "403", "404", "422"):
+        assert status in tracks["get"]["responses"]
+    components = schema["components"]["schemas"]
+    tree = components["DecksContainersResponse"]
+    assert set(tree["required"]) == {"library", "containers"}
+    assert tree["properties"]["library"]["$ref"] == (
+        "#/components/schemas/DecksLibraryResponse"
+    )
+    assert components["DecksLibraryResponse"]["required"] == ["track_count"]
+    track = components["DecksTrackResponse"]["properties"]
+    assert "stream" in track["playable"]["description"]
+    app_spec = test_app.get("/openapi-app.json").json()
+    assert "/api/decks/containers" in app_spec["paths"]
+
+
+def test_openapi_types_decks_mix_profiles_batch(test_app):
+    schema = test_app.get("/openapi.json").json()
+    operation = schema["paths"]["/api/decks/mix-profiles"]["post"]
+    assert operation["tags"] == ["browse"]
+    assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+    assert (
+        operation["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/DecksMixProfilesRequest"
+    )
+    assert (
+        operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/DecksMixProfilesResponse"
+    )
+    for status in ("401", "403", "422"):
+        assert status in operation["responses"]
+    components = schema["components"]["schemas"]
+    request = components["DecksMixProfilesRequest"]
+    assert request["required"] == ["entity_uids"]
+    assert request["properties"]["entity_uids"]["maxItems"] == 200
+    assert request["properties"]["entity_uids"]["minItems"] == 1
+    response = components["DecksMixProfilesResponse"]
+    assert set(response["required"]) == {"profiles", "missing"}
+    assert response["properties"]["profiles"]["additionalProperties"]["$ref"] == (
+        "#/components/schemas/MixProfileResponse"
+    )
+    app_spec = test_app.get("/openapi-app.json").json()
+    assert "/api/decks/mix-profiles" in app_spec["paths"]
+
+
 def test_openapi_native_confirmation_uses_independent_hmac_security(test_app):
     data = test_app.get("/openapi.json").json()
     native = data["paths"]["/api/internal/agent-telegram/events"]["post"]

@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, RootModel, StrictInt, model_validator
 
 from crate.api.schemas.common import OkResponse
+from crate.smart_mix.stems import MAX_STEM_QUOTA_GIB
 
 
 class WorkerSettingsRequest(BaseModel):
@@ -53,10 +54,28 @@ class PathsSettingsUpdateRequest(BaseModel):
 
 
 class SmartMixSettingsUpdateRequest(BaseModel):
+    """Only the keys sent change. ``stem_max_tracks_per_user: null`` turns that limit
+    off; the per-playlist limit is always on."""
+
     model_config = ConfigDict(extra="forbid")
 
     ai_enabled: bool | None = None
     ai_send_genre: bool | None = None
+    stem_uploads_enabled: bool | None = None
+    stem_max_tracks_per_playlist: int | None = Field(default=None, ge=1)
+    stem_max_tracks_per_user: int | None = Field(default=None, ge=1)
+    stem_quota_gib: int | None = Field(default=None, ge=0, le=MAX_STEM_QUOTA_GIB)
+
+    @model_validator(mode="after")
+    def _per_playlist_limit_stays_on(self) -> "SmartMixSettingsUpdateRequest":
+        if (
+            "stem_max_tracks_per_playlist" in self.model_fields_set
+            and self.stem_max_tracks_per_playlist is None
+        ):
+            raise ValueError("stem_max_tracks_per_playlist cannot be turned off")
+        if "stem_quota_gib" in self.model_fields_set and self.stem_quota_gib is None:
+            raise ValueError("stem_quota_gib is a size; 0 keeps no stem files")
+        return self
 
 
 class SoulseekSettingsUpdateRequest(BaseModel):
@@ -96,6 +115,17 @@ class SmartMixSettingsResponse(BaseModel):
     # model only while ai_send_genre is on (SM3-D6).
     ai_enabled: bool
     ai_send_genre: bool
+    # Smart Mix Stems (STEM-D8): Crate Decks users with smart_mix.stems.contribute
+    # may upload stem analyses while this is on (the default).
+    stem_uploads_enabled: bool
+    # Smart Mix playlists (STEM-D2): distinct local tracks the server separates per
+    # Smart Mix playlist (300 by default) and across a user's Smart Mix playlists
+    # (null: no limit, the default).
+    stem_max_tracks_per_playlist: int
+    stem_max_tracks_per_user: int | None
+    # Stem files kept for Crate Decks (STEM-D6): their total size in GiB, 50 by
+    # default; 0 keeps none.
+    stem_quota_gib: int
 
 
 class ShowsActiveCityResponse(BaseModel):

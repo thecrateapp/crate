@@ -8,6 +8,11 @@ import {
   GripVertical,
   ArrowDownToLineBold,
   CRATE_ICON_SIZE,
+  Layers,
+  SsdRound,
+  CloudStorage,
+  ServerPath,
+  FolderCloud,
 } from "@crate/ui/icons";
 import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -179,6 +184,13 @@ export const Icons: Story = {
         <Bot aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
         <ArrowLeft aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
         <Play aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
+        <Layers aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
+      </div>
+      <div className="showcase-line" aria-label="Backup destination kinds">
+        <SsdRound aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
+        <CloudStorage aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
+        <ServerPath aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
+        <FolderCloud aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
       </div>
       <ActionGroup label="Catalogue action glyphs">
         <ActionButton label="Mark as facet">
@@ -194,6 +206,9 @@ export const Icons: Story = {
       <p>
         Tag, GripVertical and ArrowDownToLineBold expose the actual Solar
         aliases used for taxonomy, reorder and available-download actions.
+        Layers (Solar Layers Minimalistic) marks stems and Smart Mix playlists.
+        SsdRound, CloudStorage, ServerPath and FolderCloud mark the kinds of
+        backup destination in Admin.
         Import from @crate/ui/icons. Decorative glyphs are aria-hidden; controls
         retain accessible names. Use conventional action and UX glyphs, with
         recorded domain exceptions.

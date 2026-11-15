@@ -8,6 +8,7 @@ import pytest
 from crate.smart_mix.beat_grid import (
     BeatGridCodecError,
     MAX_BEAT_COUNT,
+    MAX_GRID_DURATION_MS,
     decode_beat_grid,
     encode_beat_grid,
 )
@@ -46,9 +47,32 @@ def test_rejects_invalid_or_non_monotonic_grids(positions: list[float]) -> None:
         encode_beat_grid(positions)
 
 
+def _varint(value: int) -> bytes:
+    encoded = bytearray()
+    while value > 0x7F:
+        encoded.append(value & 0x7F | 0x80)
+        value >>= 7
+    encoded.append(value)
+    return bytes(encoded)
+
+
 @pytest.mark.parametrize(
     "payload",
-    [b"", b"\x02\x00", b"\x01", b"\x01\x01\x80", b"\x01\x01\x00"],
+    [
+        b"",
+        b"\x02\x00",
+        b"\x01",
+        b"\x01\x01\x80",
+        b"\x01\x01\x00",
+        # Fewer beats than the count, trailing bytes, an empty grid with bytes.
+        b"\x01\x02\x05",
+        b"\x01\x01\x05\x05",
+        b"\x01\x00\x05",
+        # A varint longer than ten bytes.
+        b"\x01\x01" + b"\x80" * 10 + b"\x01",
+        # A position past the duration budget.
+        b"\x01\x01" + _varint(MAX_GRID_DURATION_MS + 1),
+    ],
 )
 def test_rejects_malformed_payloads(payload: bytes) -> None:
     with pytest.raises(BeatGridCodecError):

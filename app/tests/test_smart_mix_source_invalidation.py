@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from pathlib import Path
 
 from sqlalchemy import text
@@ -100,8 +102,10 @@ def test_compatible_queries_ignore_stale_profiles() -> None:
 
 def _published_track(tmp_path: Path, name: str) -> tuple[Path, int]:
     path, track_id = _track(tmp_path, name)
+    # Built on Beat This!'s beats, so the profile is current until its file changes.
     outcome = publish_smart_mix_profile(
-        capture_smart_mix_source(track_id, path), _draft()
+        capture_smart_mix_source(track_id, path),
+        replace(_draft(), beat_tracker="beat-this-small0-dbn"),
     )
     assert outcome is SmartMixPublication.PUBLISHED
     return path, track_id

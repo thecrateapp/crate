@@ -22,12 +22,14 @@ log = logging.getLogger(__name__)
 EXPORTED_PREFIXES = (
     "api.request.",
     "artwork.",
+    "backup.",
     "catalog.search.",
     "federation.playback.",
     "home.",
     "media_worker.",
     "opensubsonic.",
     "playback.",
+    "sse.",
     "storage.",
     "stream.",
     "worker.",
@@ -36,7 +38,7 @@ EXCLUDED_FAMILIES = frozenset({"api.route.latency"})
 DROPPED_LABELS = frozenset({"route", "service"})
 OPTIONAL_LABELS = ("task_type",)
 LABEL_BUDGET = 4000
-PER_PROCESS_GAUGES = frozenset({"stream.concurrent"})
+PER_PROCESS_GAUGES = frozenset({"sse.pubsub.open", "stream.concurrent"})
 BUCKETS = MappingProxyType(
     {
         "seconds": (

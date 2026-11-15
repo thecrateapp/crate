@@ -1,2 +1,5 @@
 librosa>=0.10
 essentia-tensorflow>=2.1b5; platform_machine == "x86_64"
+# Smart Mix Stems (STEM-D3): the htdemucs ONNX graph on the CPU, the same runtime and
+# version Crate Decks checked the export with. No PyTorch for separation.
+onnxruntime==1.31.1

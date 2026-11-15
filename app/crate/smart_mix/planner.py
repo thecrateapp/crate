@@ -14,7 +14,12 @@ from crate.smart_mix.models import (
     TransitionPlan,
 )
 from crate.smart_mix import transition_fit
-from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3, PlannerPolicy
+from crate.smart_mix.policy import (
+    PLANNER_POLICY,
+    PLANNER_POLICY_V3,
+    PlannerPolicy,
+    long_beatmatch_ceiling_ms,
+)
 from crate.smart_mix.transition_fit import (
     TransitionEdges,
     normalized_tempo,
@@ -204,7 +209,13 @@ def plan_transition(
     if fallback_reason is None:
         tempo_ratio = round(_cue_tempo_ratio(outgoing, incoming), 6)
         window = (
-            _long_beatmatch_window(outgoing, incoming, tempo_ratio, policy)
+            _long_beatmatch_window(
+                outgoing,
+                incoming,
+                tempo_ratio,
+                policy,
+                long_beatmatch_ceiling_ms(policy, context),
+            )
             if context.allow_long_beatmatch
             else None
         )
@@ -535,6 +546,7 @@ def _long_beatmatch_window(
     incoming: TrackMixProfile,
     tempo_ratio: float,
     policy: PlannerPolicy,
+    ceiling_ms: int,
 ) -> _TransitionWindow | None:
     bpm = _outro_beat(outgoing)[0]
     if not bpm:
@@ -548,7 +560,7 @@ def _long_beatmatch_window(
     beats_per_bar = outgoing.time_signature or 4
     for bars in policy.long_beatmatch_phrase_bars:
         phrase_ms = math.floor(bars * beats_per_bar * 60_000.0 / bpm)
-        if phrase_ms > policy.maximum_long_beatmatch_ms:
+        if phrase_ms > ceiling_ms:
             continue
         if phrase_ms <= policy.maximum_transition_ms:
             return None
@@ -711,12 +723,14 @@ def _round_score(value: float) -> float:
 
 @dataclass(frozen=True, slots=True)
 class PlannedTransition:
-    """A v3 plan: the first candidate of the menu, the menu itself (for SM4) and
-    whether the menu came from the stored phrases (``structureUsed`` in the API)."""
+    """A v3 plan: the first candidate of the menu, the menu itself (for SM4),
+    whether the menu came from the stored phrases (``structureUsed`` in the API) and
+    whether the stems layer of both tracks scored it (``stemsUsed``, STEM-D5)."""
 
     plan: TransitionPlan
     candidates: tuple[TransitionCandidate, ...]
     structure_used: bool
+    stems_used: bool = False
 
 
 def plan_transition_v3(
@@ -727,8 +741,13 @@ def plan_transition_v3(
     outgoing_track_entity_uid: str | None = None,
     incoming_track_entity_uid: str | None = None,
     policy: PlannerPolicy = PLANNER_POLICY_V3,
+    outgoing_genre_prior: float | None = None,
+    incoming_genre_prior: float | None = None,
 ) -> PlannedTransition:
-    """Plan an edge with ``smart-mix-v3`` (SM3-D3). ``plan_transition`` is v2."""
+    """Plan an edge with ``smart-mix-v3`` (SM3-D3). ``plan_transition`` is v2.
+
+    The genre priors (``genre_beatmatch_prior`` of each track) gate the stems layer
+    to the beatmatch family (STEM-G1); unknown keeps it off."""
     # The candidate generator builds on this module's v2 helpers.
     from crate.smart_mix.candidates import plan_transition_candidates
 
@@ -739,6 +758,8 @@ def plan_transition_v3(
         policy,
         outgoing_track_entity_uid=outgoing_track_entity_uid,
         incoming_track_entity_uid=incoming_track_entity_uid,
+        outgoing_genre_prior=outgoing_genre_prior,
+        incoming_genre_prior=incoming_genre_prior,
     )
     return PlannedTransition(
         plan=candidates[0].to_plan(),
@@ -746,6 +767,7 @@ def plan_transition_v3(
         # The menu was placed and ranked on the stored phrases, even when v2's own
         # window (also on the menu) wins on them.
         structure_used=any(candidate.structure_used for candidate in candidates),
+        stems_used=any(candidate.stems_used for candidate in candidates),
     )
 
 

@@ -18,6 +18,10 @@ DEPLOY_PUBLIC_CHECKS="${DEPLOY_PUBLIC_CHECKS:-1}"
 DEPLOY_SKIP_IMAGE_CHECK="${DEPLOY_SKIP_IMAGE_CHECK:-0}"
 DEPLOY_IMAGE_WAIT_SECONDS="${DEPLOY_IMAGE_WAIT_SECONDS:-900}"
 DEPLOY_IMAGE_WAIT_INTERVAL="${DEPLOY_IMAGE_WAIT_INTERVAL:-20}"
+# The "before upgrades" backup policies (admin backups, BG1-15) run before anything
+# changes; 1 skips them for this deploy. The timeout covers the dump and its copies.
+DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE="${DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE:-0}"
+DEPLOY_BACKUP_TIMEOUT="${DEPLOY_BACKUP_TIMEOUT:-10800}"
 REMOTE_SCRIPT_PATH="${SERVER_PATH}/.deploy/deploy-remote.sh"
 DEPLOY_CANDIDATE_DIR=""
 TMP_DIR=""
@@ -52,7 +56,7 @@ ssh_remote() {
 
 remote_deploy() {
   ssh_remote \
-    "SERVER_PATH='$SERVER_PATH' DEPLOY_ID='$DEPLOY_ID' DEPLOY_CANDIDATE_DIR='$DEPLOY_CANDIDATE_DIR' DEPLOY_IMAGE_TAG='$DEPLOY_IMAGE_TAG' DEPLOY_RELEASE_SHA='${DEPLOY_IMAGE_SHA:-}' DEPLOY_IMAGE_OWNER='$DEPLOY_IMAGE_OWNER' DEPLOY_IMAGE_REGISTRY='$DEPLOY_IMAGE_REGISTRY' DEPLOY_CONFIRM='$DEPLOY_CONFIRM' DEPLOY_PUBLIC_CHECKS='$DEPLOY_PUBLIC_CHECKS' DEPLOY_IMAGE_WAIT_SECONDS='$DEPLOY_IMAGE_WAIT_SECONDS' DEPLOY_IMAGE_WAIT_INTERVAL='$DEPLOY_IMAGE_WAIT_INTERVAL' DEPLOY_HEALTH_WAIT_SECONDS='${DEPLOY_HEALTH_WAIT_SECONDS:-420}' '$REMOTE_SCRIPT_PATH' '$1'"
+    "SERVER_PATH='$SERVER_PATH' DEPLOY_ID='$DEPLOY_ID' DEPLOY_CANDIDATE_DIR='$DEPLOY_CANDIDATE_DIR' DEPLOY_IMAGE_TAG='$DEPLOY_IMAGE_TAG' DEPLOY_RELEASE_SHA='${DEPLOY_IMAGE_SHA:-}' DEPLOY_IMAGE_OWNER='$DEPLOY_IMAGE_OWNER' DEPLOY_IMAGE_REGISTRY='$DEPLOY_IMAGE_REGISTRY' DEPLOY_CONFIRM='$DEPLOY_CONFIRM' DEPLOY_PUBLIC_CHECKS='$DEPLOY_PUBLIC_CHECKS' DEPLOY_IMAGE_WAIT_SECONDS='$DEPLOY_IMAGE_WAIT_SECONDS' DEPLOY_IMAGE_WAIT_INTERVAL='$DEPLOY_IMAGE_WAIT_INTERVAL' DEPLOY_HEALTH_WAIT_SECONDS='${DEPLOY_HEALTH_WAIT_SECONDS:-420}' DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE='$DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE' DEPLOY_BACKUP_TIMEOUT='$DEPLOY_BACKUP_TIMEOUT' '$REMOTE_SCRIPT_PATH' '$1'"
 }
 
 env_file_value() {
@@ -216,6 +220,12 @@ MONITORING_OVERLAYS=(
   deploy/observability/compose.supervisor-prometheus.yaml
 )
 
+# Build context of the opt-in crate-backup-offsite service (profile offsite-backup).
+BACKUP_TOOLING=(
+  deploy/backup-offsite/Dockerfile
+  deploy/backup-offsite/offsite.sh
+)
+
 prepare_payload() {
   TMP_DIR="$(mktemp -d)"
   mkdir -p "$TMP_DIR/deploy/traefik" "$TMP_DIR/deploy/hermes"
@@ -229,7 +239,7 @@ prepare_payload() {
       cp -a "$ROOT_DIR/deploy/hermes/." "$TMP_DIR/deploy/hermes/"
     fi
     local file
-    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do
+    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}" "${BACKUP_TOOLING[@]}"; do
       if [[ -f "$ROOT_DIR/$file" ]]; then
         mkdir -p "$TMP_DIR/$(dirname "$file")"
         cp "$ROOT_DIR/$file" "$TMP_DIR/$file"
@@ -243,7 +253,7 @@ prepare_payload() {
       git -C "$ROOT_DIR" archive "$DEPLOY_REF" deploy/hermes | tar -x -C "$TMP_DIR"
     fi
     local file
-    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do
+    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}" "${BACKUP_TOOLING[@]}"; do
       if git -C "$ROOT_DIR" cat-file -e "${DEPLOY_REF}:${file}" 2>/dev/null; then
         git -C "$ROOT_DIR" archive "$DEPLOY_REF" "$file" | tar -x -C "$TMP_DIR"
       fi
@@ -369,7 +379,7 @@ sync_config() {
     scp -r "$TMP_DIR/deploy/hermes/." "$REMOTE:$SERVER_PATH/deploy/hermes/"
   fi
   local file
-  for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do
+  for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}" "${BACKUP_TOOLING[@]}"; do
     if [[ -f "$TMP_DIR/$file" ]]; then
       ssh_remote "mkdir -p '$SERVER_PATH/$(dirname "$file")'"
       scp "$TMP_DIR/$file" "$REMOTE:$SERVER_PATH/$file"
@@ -466,6 +476,10 @@ run_deploy() {
   stage_remote_preflight_payload
   remote_deploy release-preflight
   ssh_remote "rm -rf '$DEPLOY_CANDIDATE_DIR'"
+
+  # Before the new images start (they run alembic upgrade on start) and before
+  # anything changes: a failure stops the deploy with production untouched.
+  remote_deploy backup-before-upgrade
 
   remote_deploy backup
   trap rollback_on_error EXIT

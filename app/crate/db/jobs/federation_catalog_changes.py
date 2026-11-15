@@ -1,16 +1,26 @@
-"""Transactional producer and reads for the local federation change log."""
+"""Commit-ordered publication of the local federation catalog state feed.
+
+Library transactions only stage durable intents. A separate bounded publisher
+assigns public sequence numbers after those transactions commit. Repeated states
+move their existing feed row forward: this is a convergent state feed, not an
+audit history. Numeric cursors and the legacy producer's unique key stay valid.
+"""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import text
 
 from crate.db.tx import read_scope, transaction_scope
+
+
+class CatalogHistoryExpired(ValueError):
+    """The requested cursor precedes changes actually pruned from the feed."""
 
 
 def _retention_days() -> int:
@@ -167,11 +177,11 @@ def append_catalog_change(
         "deleted": operation in {"delete", "hide"},
     }
     revision = payload_revision or _payload_revision(effective_payload)
-    retention_until = datetime.now(timezone.utc) + timedelta(days=_retention_days())
+    retention_until = datetime.now(UTC) + timedelta(days=_retention_days())
     session.execute(
         text(
             """
-            INSERT INTO federation_catalog_changes (
+            INSERT INTO federation_catalog_change_outbox (
                 entity_type, entity_uid, operation, payload_revision,
                 payload_json, retention_until
             )
@@ -179,8 +189,6 @@ def append_catalog_change(
                 :entity_type, :entity_uid, :operation, :payload_revision,
                 CAST(:payload_json AS jsonb), :retention_until
             )
-            ON CONFLICT (entity_type, entity_uid, payload_revision, operation)
-            DO NOTHING
             """
         ),
         {
@@ -193,6 +201,78 @@ def append_catalog_change(
         },
     )
     return revision
+
+
+def publish_pending_catalog_changes(*, limit: int = 1000) -> int:
+    """Publish one committed intent page atomically, without library row locks.
+
+    The singleton row serializes only these short publisher/pruner transactions.
+    Outbox IDs are scan positions, never public cursors: an earlier uncommitted
+    intent remains eligible on the next pass and receives a later public sequence.
+    """
+    capped = max(1, min(int(limit), 10_000))
+    # Release the outbox read lock before waiting for the publisher state lock.
+    # Schema downgrade takes state -> feed -> outbox in that order.
+    with read_scope() as session:
+        if not session.execute(
+            text("""
+            SELECT EXISTS (SELECT 1 FROM federation_catalog_change_outbox)
+        """)
+        ).scalar_one():
+            return 0
+    with transaction_scope() as session:
+        session.execute(
+            text("""
+            SELECT last_published_sequence,
+                   set_config('crate.federation_catalog_publisher', 'on', true)
+            FROM federation_catalog_feed_state WHERE singleton
+            FOR UPDATE
+        """)
+        )
+        retention_until = datetime.now(UTC) + timedelta(days=_retention_days())
+        published_count = session.execute(
+            text("""
+            WITH intents AS MATERIALIZED (
+                SELECT * FROM federation_catalog_change_outbox ORDER BY id LIMIT :limit
+            ), sequenced AS MATERIALIZED (
+                SELECT intents.*, nextval('federation_catalog_changes_sequence_seq')
+                           AS published_sequence
+                FROM intents ORDER BY id
+            ), latest_occurrences AS (
+                SELECT DISTINCT ON (entity_type, entity_uid, payload_revision, operation)
+                       * FROM sequenced
+                ORDER BY entity_type, entity_uid, payload_revision, operation, id DESC
+            ), published AS (
+                INSERT INTO federation_catalog_changes (
+                    sequence, entity_type, entity_uid, operation, payload_revision,
+                    payload_json, occurred_at, retention_until
+                )
+                SELECT published_sequence, entity_type, entity_uid, operation,
+                       payload_revision, payload_json, occurred_at, :retention_until
+                FROM latest_occurrences ORDER BY published_sequence
+                ON CONFLICT (entity_type, entity_uid, payload_revision, operation)
+                DO UPDATE SET sequence = EXCLUDED.sequence,
+                              payload_json = EXCLUDED.payload_json,
+                              occurred_at = EXCLUDED.occurred_at,
+                              retention_until = EXCLUDED.retention_until
+                RETURNING sequence
+            ), removed AS (
+                DELETE FROM federation_catalog_change_outbox
+                WHERE id IN (SELECT id FROM intents)
+                  AND (SELECT COUNT(*) FROM published) >= 0
+                RETURNING id
+            )
+            UPDATE federation_catalog_feed_state
+            SET last_published_sequence = GREATEST(
+                last_published_sequence,
+                COALESCE((SELECT MAX(sequence) FROM published), 0)
+            )
+            WHERE singleton AND EXISTS (SELECT 1 FROM intents)
+            RETURNING (SELECT COUNT(*) FROM removed) AS published_count
+        """),
+            {"limit": capped, "retention_until": retention_until},
+        ).scalar_one_or_none()
+    return int(published_count or 0)
 
 
 def append_local_catalog_change(
@@ -221,7 +301,13 @@ def append_local_catalog_change(
 def catalog_high_water_mark() -> int:
     with read_scope() as session:
         value = session.execute(
-            text("SELECT COALESCE(MAX(sequence), 0) FROM federation_catalog_changes")
+            text("""
+                SELECT GREATEST(
+                    last_published_sequence,
+                    COALESCE((SELECT MAX(sequence) FROM federation_catalog_changes), 0)
+                )
+                FROM federation_catalog_feed_state WHERE singleton
+            """)
         ).scalar_one()
     return int(value or 0)
 
@@ -230,8 +316,8 @@ def catalog_retention_floor() -> int:
     with read_scope() as session:
         value = session.execute(
             text(
-                "SELECT COALESCE(MIN(sequence), 0) "
-                "FROM federation_catalog_changes WHERE retention_until > NOW()"
+                "SELECT last_pruned_sequence + 1 "
+                "FROM federation_catalog_feed_state WHERE singleton"
             )
         ).scalar_one()
     return int(value or 0)
@@ -244,13 +330,18 @@ def list_catalog_changes(*, after_sequence: int, limit: int) -> list[dict[str, A
             session.execute(
                 text(
                     """
-                    SELECT sequence, entity_type, entity_uid, operation,
-                           payload_revision, payload_json, occurred_at
-                    FROM federation_catalog_changes
-                    WHERE sequence > :after_sequence
-                      AND retention_until > NOW()
-                    ORDER BY sequence
-                    LIMIT :limit
+                    SELECT state.last_pruned_sequence, changes.*
+                    FROM federation_catalog_feed_state state
+                    LEFT JOIN LATERAL (
+                        SELECT sequence, entity_type, entity_uid, operation,
+                               payload_revision, payload_json, occurred_at
+                        FROM federation_catalog_changes
+                        WHERE sequence > :after_sequence
+                        ORDER BY sequence
+                        LIMIT :limit
+                    ) changes ON TRUE
+                    WHERE state.singleton
+                    ORDER BY changes.sequence
                     """
                 ),
                 {"after_sequence": max(0, after_sequence), "limit": capped},
@@ -258,20 +349,61 @@ def list_catalog_changes(*, after_sequence: int, limit: int) -> list[dict[str, A
             .mappings()
             .all()
         )
-    return [dict(row) for row in rows]
+    if rows and int(rows[0]["last_pruned_sequence"]) > max(0, after_sequence):
+        raise CatalogHistoryExpired("Catalog cursor predates pruned changes")
+    return [
+        {key: value for key, value in row.items() if key != "last_pruned_sequence"}
+        for row in rows
+        if row["sequence"] is not None
+    ]
 
 
-def cleanup_expired_catalog_changes() -> int:
+def cleanup_expired_catalog_changes(*, limit: int = 10_000) -> int:
+    """Prune a bounded expired prefix and persist its exact cursor boundary."""
     with transaction_scope() as session:
-        result = session.execute(
-            text(
-                "DELETE FROM federation_catalog_changes WHERE retention_until <= NOW()"
-            )
+        session.execute(
+            text("""
+            SELECT last_pruned_sequence
+            FROM federation_catalog_feed_state WHERE singleton FOR UPDATE
+        """)
         )
-        return int(getattr(result, "rowcount", 0) or 0)
+        row = (
+            session.execute(
+                text("""
+            WITH expired_prefix AS (
+                SELECT sequence FROM federation_catalog_changes
+                WHERE retention_until <= NOW()
+                  AND sequence < COALESCE((
+                      SELECT MIN(sequence) FROM federation_catalog_changes
+                      WHERE retention_until > NOW()
+                  ), 9223372036854775807)
+                ORDER BY sequence LIMIT :limit
+            ), removed AS (
+                DELETE FROM federation_catalog_changes
+                WHERE sequence IN (SELECT sequence FROM expired_prefix)
+                RETURNING sequence
+            )
+            SELECT COUNT(*) AS removed, MAX(sequence) AS last_pruned FROM removed
+        """),
+                {"limit": max(1, min(int(limit), 100_000))},
+            )
+            .mappings()
+            .one()
+        )
+        if row["last_pruned"] is not None:
+            session.execute(
+                text("""
+                UPDATE federation_catalog_feed_state
+                SET last_pruned_sequence = GREATEST(last_pruned_sequence, :sequence)
+                WHERE singleton
+            """),
+                {"sequence": row["last_pruned"]},
+            )
+        return int(row["removed"])
 
 
 __all__ = [
+    "CatalogHistoryExpired",
     "append_catalog_change",
     "append_local_catalog_change",
     "catalog_high_water_mark",
@@ -279,4 +411,5 @@ __all__ = [
     "cleanup_expired_catalog_changes",
     "list_catalog_changes",
     "load_local_catalog_payload",
+    "publish_pending_catalog_changes",
 ]

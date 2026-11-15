@@ -6,7 +6,7 @@ import json
 import logging
 import uuid
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from itertools import islice
 from typing import Any
 
@@ -20,18 +20,6 @@ from crate.db.jobs.global_catalog_routes import (
     claim_album_public_slug,
     claim_artist_public_slug,
 )
-from crate.db.tx import read_scope, transaction_scope
-from crate.db.repositories.global_catalog_decisions import (
-    force_merge_target_for_source,
-    merge_blocked_for_source,
-)
-from crate.federation.global_matching import (
-    MatchScore,
-    normalize_name,
-    score_album_match,
-    score_artist_match,
-    score_track_match,
-)
 from crate.db.queries.global_catalog_sources import (
     get_local_source,
     get_remote_source,
@@ -39,6 +27,18 @@ from crate.db.queries.global_catalog_sources import (
     iter_local_artist_sources,
     iter_local_track_sources,
     iter_remote_sources,
+)
+from crate.db.repositories.global_catalog_decisions import (
+    force_merge_target_for_source,
+    merge_blocked_for_source,
+)
+from crate.db.tx import read_scope, transaction_scope
+from crate.federation.global_matching import (
+    MatchScore,
+    normalize_name,
+    score_album_match,
+    score_artist_match,
+    score_track_match,
 )
 from crate.slugs import build_artist_slug, build_public_album_slug
 
@@ -54,8 +54,17 @@ def apply_federation_delta_page(
     items: list[dict[str, Any]],
     next_cursor: str,
     last_sequence: int | None = None,
+    sync_generation: int,
 ) -> dict[str, int]:
-    """Apply a remote delta page and advance its checkpoint atomically."""
+    """Apply a remote delta page and advance its checkpoint atomically.
+
+    Fenced like every catalog sync write (FED-D11): a superseded session
+    raises ``CatalogSyncFenced`` without writing. The cursor only moves
+    forward: a page whose sequence is behind the stored one keeps it.
+    """
+    from crate.db.repositories.federation_catalog_fence import (
+        fence_catalog_sync_write,
+    )
     from crate.db.repositories.global_catalog_dirty_sources import (
         enqueue_federated_dirty_source,
     )
@@ -65,6 +74,7 @@ def apply_federation_delta_page(
         [int(item.get("sequence") or 0) for item in items] + [int(last_sequence or 0)]
     )
     with transaction_scope() as session:
+        fence_catalog_sync_write(session, node_uid, sync_generation)
         for item in items:
             entity_type = str(item.get("entity_type") or "")
             entity_uid = str(item.get("remote_entity_uid") or "")
@@ -164,7 +174,12 @@ def apply_federation_delta_page(
                     0, NULL, NULL, NOW()
                 )
                 ON CONFLICT (node_uid) DO UPDATE SET
-                    cursor = EXCLUDED.cursor,
+                    cursor = CASE
+                        WHEN EXCLUDED.last_applied_cursor >= COALESCE(
+                            federation_catalog_cursors.last_applied_cursor, 0
+                        ) THEN EXCLUDED.cursor
+                        ELSE federation_catalog_cursors.cursor
+                    END,
                     last_applied_cursor = GREATEST(
                         COALESCE(federation_catalog_cursors.last_applied_cursor, 0),
                         EXCLUDED.last_applied_cursor
@@ -211,6 +226,7 @@ def reconcile_dirty_catalog_sources(*, limit: int = 500) -> dict[str, int]:
                 )
             completed += 1
         except Exception as exc:
+            log.exception("Catalog source %s reconciliation failed", source_id)
             with transaction_scope() as session:
                 fail_dirty_source(
                     source_id,
@@ -227,22 +243,33 @@ def reconcile_dirty_catalog_sources(*, limit: int = 500) -> dict[str, int]:
             failed += 1
 
     with read_scope() as session:
-        remaining = session.execute(
-            text(
-                """
-                SELECT COUNT(*)
+        backlog = (
+            session.execute(
+                text(
+                    """
+                SELECT COUNT(*) AS remaining,
+                       COUNT(*) FILTER (
+                           WHERE next_attempt_at IS NULL OR next_attempt_at <= NOW()
+                       ) AS ready_remaining
                 FROM global_catalog_dirty_sources
                 WHERE completed_at IS NULL
-                  AND claimed_at IS NULL
+                  AND (
+                      claimed_at IS NULL
+                      OR claimed_at < NOW() - INTERVAL '900 seconds'
+                  )
                 """
+                )
             )
-        ).scalar_one()
+            .mappings()
+            .one()
+        )
 
     return {
         "claimed": len(claimed),
         "completed": completed,
         "failed": failed,
-        "remaining": int(remaining),
+        "remaining": int(backlog["remaining"]),
+        "ready_remaining": int(backlog["ready_remaining"]),
     }
 
 
@@ -741,7 +768,7 @@ def _reconcile_catalog_until_complete(
 ) -> dict[str, Any]:
     mode = "local" if kind == "local" else ("peer" if node_uid else "incremental")
     run_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     _emit_reconcile_event("started", run_id=run_id, mode=mode, node_uid=node_uid)
     result = _new_batch_result(mode, 0)
     result.update({"run_id": run_id, "status": "completed"})
@@ -1104,7 +1131,7 @@ def _insert_run(session, *, run_id: str, mode: str, started_at: datetime) -> Non
 
 def begin_global_catalog_reconciliation_run(*, mode: str) -> str:
     run_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     with transaction_scope() as session:
         _insert_run(session, run_id=run_id, mode=mode, started_at=started_at)
     _emit_reconcile_event("started", run_id=run_id, mode=mode)
@@ -1158,7 +1185,7 @@ def complete_global_catalog_reconciliation_run(run_id: str) -> None:
             ),
             {
                 "run_id": run_id,
-                "completed_at": datetime.now(timezone.utc),
+                "completed_at": datetime.now(UTC),
             },
         )
         _emit_reconcile_event(
@@ -1198,7 +1225,7 @@ def _complete_run(session, *, run_id: str, result: dict[str, Any]) -> None:
         ),
         {
             "run_id": run_id,
-            "completed_at": datetime.now(timezone.utc),
+            "completed_at": datetime.now(UTC),
             "source_rows_seen": result["source_rows_seen"],
             "sources_upserted": result["sources_upserted"],
             "canonical_created": result["canonical_created"],
@@ -1221,7 +1248,7 @@ def _fail_run(session, *, run_id: str, error: str) -> None:
         ),
         {
             "run_id": run_id,
-            "completed_at": datetime.now(timezone.utc),
+            "completed_at": datetime.now(UTC),
             "error": error[:4000],
         },
     )

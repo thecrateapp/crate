@@ -2,8 +2,32 @@ import pytest
 
 from tests.conftest import PG_AVAILABLE
 
-
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+
+
+def test_claims_parent_entities_before_earlier_children(pg_db):
+    from crate.db.repositories.global_catalog_dirty_sources import (
+        claim_dirty_sources,
+        enqueue_federated_dirty_source,
+    )
+    from crate.db.tx import transaction_scope
+
+    node_uid = "714d7d4c-8810-4784-8725-ee3d0217291b"
+    with transaction_scope() as session:
+        for entity_type in ("track", "album", "artist"):
+            enqueue_federated_dirty_source(
+                entity_type,
+                node_uid,
+                f"remote-{entity_type}",
+                "upsert",
+                session=session,
+            )
+    with transaction_scope() as session:
+        first = claim_dirty_sources(1, session=session)
+    with transaction_scope() as session:
+        rest = claim_dirty_sources(10, session=session)
+
+    assert [row["entity_type"] for row in first + rest] == ["artist", "album", "track"]
 
 
 def test_local_dirty_source_coalesces_then_reopens_after_completion(pg_db):
@@ -147,13 +171,12 @@ def test_mutation_arriving_during_claim_is_not_completed_by_stale_worker(pg_db):
 
 
 def test_stale_claim_lease_is_recovered(pg_db):
-    from sqlalchemy import text
-
     from crate.db.repositories.global_catalog_dirty_sources import (
         claim_dirty_sources,
         enqueue_local_dirty_source,
     )
     from crate.db.tx import transaction_scope
+    from sqlalchemy import text
 
     entity_uid = "7f487f37-f725-4cb6-b548-b7ef88f7fe79"
     with transaction_scope() as session:

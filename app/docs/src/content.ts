@@ -10,7 +10,8 @@ export type DocSection =
   | "developer"
   | "operations"
   | "federation"
-  | "reference";
+  | "reference"
+  | "decks";
 
 const sections: DocSection[] = [
   "start",
@@ -19,6 +20,7 @@ const sections: DocSection[] = [
   "operations",
   "federation",
   "reference",
+  "decks",
 ];
 
 export interface DocHeading {
@@ -270,12 +272,54 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/listen-design-system-visual-qa.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/admin-backups.md": () =>
+    import("../../../docs/technical/admin-backups.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/ops-runbook.md": () =>
     import("../../../docs/technical/ops-runbook.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/storage-retention.md": () =>
     import("../../../docs/technical/storage-retention.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/decks/user-manual.md": () =>
+    import("../../../docs/decks/user-manual.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/decks/library.md": () =>
+    import("../../../docs/decks/library.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/decks/mixing.md": () =>
+    import("../../../docs/decks/mixing.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/decks/analysis.md": () =>
+    import("../../../docs/decks/analysis.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/decks/sound.md": () =>
+    import("../../../docs/decks/sound.md?raw").then((module) => module.default),
+  "docs/decks/controllers.md": () =>
+    import("../../../docs/decks/controllers.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/decks/keyboard-shortcuts.md": () =>
+    import("../../../docs/decks/keyboard-shortcuts.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/decks/recording-and-broadcasting.md": () =>
+    import("../../../docs/decks/recording-and-broadcasting.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/decks/vinyl-control.md": () =>
+    import("../../../docs/decks/vinyl-control.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/decks/community.md": () =>
+    import("../../../docs/decks/community.md?raw").then(
       (module) => module.default,
     ),
 };
@@ -440,6 +484,11 @@ export const sectionMeta: Record<
   reference: {
     label: "Reference",
     description: "Focused supporting references and documentation policy.",
+  },
+  decks: {
+    label: "Crate Decks",
+    description:
+      "The desktop DJ app: user manual, sound, controllers and help.",
   },
 };
 

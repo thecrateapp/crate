@@ -51,6 +51,20 @@ def test_smart_mix_ai_is_granted_with_library_view():
         ), role
 
 
+def test_stem_contribution_is_granted_to_admins_only():
+    from crate.api.permissions import (
+        ALL_CAPABILITIES,
+        ROLE_CAPABILITIES,
+        has_capability,
+    )
+
+    assert "smart_mix.stems.contribute" in ALL_CAPABILITIES
+    for role in ROLE_CAPABILITIES:
+        assert has_capability({"role": role}, "smart_mix.stems.contribute") == (
+            role in {"owner", "admin"}
+        ), role
+
+
 def test_roles_are_checked_through_casbin_policy():
     from crate.api.permissions import has_capability
 

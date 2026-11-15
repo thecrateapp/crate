@@ -6,6 +6,7 @@ import {
   ArrowDownToLineBold,
   Heart,
   HeartBold,
+  Layers,
   ListPlus,
   Loader2,
   Pencil,
@@ -41,6 +42,8 @@ type MenuHandler = () => void | Promise<void>;
 
 export interface PlaylistItemMenuData extends PlaylistMenuData {
   extraEntries?: ItemActionMenuEntry[];
+  /** The owner's Smart Mix toggle (STEM-D2). */
+  smartMix?: { enabled: boolean; onToggle: MenuHandler };
 }
 
 export interface PlaylistMenuItemsInput {
@@ -59,6 +62,10 @@ export interface PlaylistMenuItemsInput {
     icon: CrateIcon;
     active: boolean;
     disabled: boolean;
+    onToggle: MenuHandler;
+  };
+  smartMix?: {
+    enabled: boolean;
     onToggle: MenuHandler;
   };
   onCopy?: MenuHandler;
@@ -90,6 +97,7 @@ export function buildPlaylistMenuItems({
   onStartRadio,
   follow,
   offline,
+  smartMix,
   onCopy,
   onCollaborators,
   onEdit,
@@ -167,6 +175,20 @@ export function buildPlaylistMenuItems({
         active: offline.active,
         disabled: offline.disabled,
         onSelect: offline.onToggle,
+      }),
+    );
+  }
+  if (smartMix) {
+    // In the grammar of offline: active (accent, status dot) while it is on.
+    library.push(
+      action({
+        key: "smart-mix",
+        label: smartMix.enabled
+          ? t("actions.playlist.smartMixOff")
+          : t("actions.playlist.smartMixOn"),
+        icon: Layers,
+        active: smartMix.enabled,
+        onSelect: smartMix.onToggle,
       }),
     );
   }
@@ -335,6 +357,7 @@ function buildPlaylistItemEntries(
         }
       },
     },
+    smartMix: input.smartMix,
     onShare: input.href
       ? sharePath(input.href, input.name, {
           kind: "playlist",
@@ -382,13 +405,15 @@ export function usePlaylistActionEntries(
 export interface PlaylistActionMenuHeader {
   title: string;
   subtitle?: string;
+  /** A state of the playlist, such as its Smart Mix progress. */
+  status?: string;
   detail?: string;
   artwork?: ReactNode;
 }
 
 export function usePlaylistActionMenu(
   input: PlaylistItemMenuData,
-  { title, subtitle, detail, artwork }: PlaylistActionMenuHeader,
+  { title, subtitle, status, detail, artwork }: PlaylistActionMenuHeader,
 ): EntityActionMenu {
   const context = usePlaylistMenuContext(input.playlistId);
   const latest = useRef({ input, context });
@@ -406,12 +431,13 @@ export function usePlaylistActionMenu(
       type: "media",
       title,
       subtitle,
+      status,
       detail,
       imageShape: "square",
       fallbackIcon: Sparkles,
       artwork,
     }),
-    [artwork, detail, subtitle, title],
+    [artwork, detail, status, subtitle, title],
   );
 
   return useListenEntityMenu(getActions, header);

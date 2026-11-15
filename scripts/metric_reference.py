@@ -39,6 +39,11 @@ FAMILIES = (
         "Artwork requests and queueing, materialisation time, size and errors, and the work left in the artwork backfill.",
     ),
     (
+        "backup.",
+        "Backups",
+        "Per destination kind and run kind, from the backups engine every 5 minutes: when the last good run finished, how long it took, and how much a repository or the latest local dump holds. Several destinations of one kind report the oldest success, the longest run and the summed size.",
+    ),
+    (
         "cast.spectrum.",
         "Cast spectrum",
         "Spectrum files generated for the Cast receiver and their size.",
@@ -47,6 +52,11 @@ FAMILIES = (
         "catalog.search.",
         "Catalog search",
         "Which serving mode answered a catalog search.",
+    ),
+    (
+        "catalog.search_stream.",
+        "Federated search stream",
+        "Searches that asked for local and network results as one stream (FED1).",
     ),
     (
         "federation.playback.",
@@ -117,6 +127,11 @@ FAMILIES = (
         "shows.import.",
         "Show imports",
         "Show imports: candidates, created, linked, already present, conflicts, invalid and failed.",
+    ),
+    (
+        "sse.",
+        "SSE pub/sub",
+        "Redis pub/sub subscriptions held by each API process for its SSE and Jam streams, and the subscriptions that could not be opened, either because the shared async pool was full or because Redis failed. The open count rises and falls with connected clients; a count that only climbs means a stream is not closing its subscription.",
     ),
     (
         "storage.",

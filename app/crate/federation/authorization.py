@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -17,7 +17,9 @@ class GrantConstraints(BaseModel):
     max_results: int | None = Field(default=None, ge=1, le=500)
     allowed_entity_types: frozenset[Literal["artist", "album", "track"]] = frozenset()
     allowed_entity_uids: frozenset[str] = frozenset()
-    delivery: frozenset[Literal["balanced", "original", "transcoded"]] = frozenset()
+    delivery: frozenset[Literal["balanced", "data_saver", "original", "transcoded"]] = (
+        frozenset()
+    )
     allow_original: bool = False
     max_concurrent_streams: int | None = Field(default=None, ge=1, le=100)
     daily_stream_bytes: int | None = Field(default=None, ge=1)
@@ -113,7 +115,7 @@ def authorize(
     if subject_blocked:
         return _deny("subject_blocked", peer_uid=peer_uid, subject_hash=subject_hash)
 
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     peer_uid = str(peer["node_uid"])
     matching = [
         grant

@@ -3,6 +3,7 @@ import { DislikeIcon as SolarDislike } from "@solar-icons/react/outline/dislike"
 import { HeadphonesRoundSoundIcon as SolarHeadphonesRoundSound } from "@solar-icons/react/outline/headphones-round-sound";
 import { HeartIcon as SolarHeart } from "@solar-icons/react/outline/heart";
 import { InboxArchiveIcon as SolarInboxArchive } from "@solar-icons/react/outline/inbox-archive";
+import { LayersMinimalisticIcon as SolarLayersMinimalistic } from "@solar-icons/react/outline/layers-minimalistic";
 import { LikeIcon as SolarLike } from "@solar-icons/react/outline/like";
 import { MicrophoneIcon as SolarMicrophone } from "@solar-icons/react/outline/microphone";
 import { Microphone2Icon as SolarMicrophone2 } from "@solar-icons/react/outline/microphone-2";
@@ -41,6 +42,8 @@ export const Disc = createIcon(SolarVinylRecord, "Disc");
 export const Disc3 = createIcon(SolarVinylRecord, "Disc3");
 export const Heart = createIcon(SolarHeart, "Heart");
 export const HeartBold = createIcon(SolarHeartBold, "HeartBold");
+// Stems are layers of a track: the Smart Mix stems mark and actions.
+export const Layers = createIcon(SolarLayersMinimalistic, "Layers");
 export const Library = createIcon(SolarMusicLibrary, "Library");
 export const ListMusic = createIcon(SolarMusicLibrary2, "ListMusic");
 export const ListPlus = createIcon(SolarPlaylist2, "ListPlus");

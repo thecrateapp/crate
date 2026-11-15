@@ -20,3 +20,6 @@ export const Base: StoryObj<typeof meta> = {};
 export const LongContent: StoryObj<typeof meta> = {
   args: { longLabels: true },
 };
+export const HeaderStatus: StoryObj<typeof meta> = {
+  args: { status: "Smart Mix · 41 of 48 ready" },
+};

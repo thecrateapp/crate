@@ -16,6 +16,14 @@ export interface Peer {
   disabled_at: string | null;
 }
 
+export interface FederationPairing {
+  pairing_uid: string;
+  remote_node_uid: string;
+  direction: "inbound" | "outbound";
+  state: string;
+  expires_at: string;
+}
+
 export interface FederationStatus {
   local_node: LocalNode | null;
   peer_count: number;
@@ -23,6 +31,8 @@ export interface FederationStatus {
   pending_pairing_count: number;
   key_health?: Record<string, unknown>;
   peers: Peer[];
+  /** Latest pairing per peer/direction, ordered newest first. Optional for older APIs. */
+  pairings?: FederationPairing[];
 }
 
 export interface StreamingPeerStat {

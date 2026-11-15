@@ -1,4 +1,5 @@
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
+import type { PlaylistSmartMix } from "@/lib/smart-mix-playlists";
 
 export interface Playlist {
   id: number;
@@ -15,6 +16,8 @@ export interface Playlist {
   owner_name?: string | null;
   total_duration: number;
   created_at: string;
+  /** Smart Mix state, for the owner and collaborators (null for other viewers). */
+  smartMix?: PlaylistSmartMix | null;
 }
 
 export interface PlaylistTrack {

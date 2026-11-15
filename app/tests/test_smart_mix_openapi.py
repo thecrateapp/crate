@@ -22,6 +22,7 @@ def test_smart_mix_openapi_exposes_typed_bounded_contracts(test_app) -> None:
         "shuffle",
         "infinite",
         "manual",
+        "decks",
     ]
 
     plan = schema["components"]["schemas"]["TransitionPlanResponse"]
@@ -52,8 +53,16 @@ def test_smart_mix_openapi_offers_planner_v3(test_app, spec: str) -> None:
         "smart-mix-v2",
         "smart-mix-v3",
     ]
+    continuation = components["PlaybackContinuationRequest"]
+    assert continuation["properties"]["plannerVersion"]["enum"] == [
+        "smart-mix-v2",
+        "smart-mix-v3",
+    ]
+    assert "plannerVersion" in continuation["required"]
     plan = components["TransitionPlanResponse"]["properties"]
     assert "structureUsed" in plan
+    # Smart Mix Stems ST3: optional, absent unless the stems layer scored the plan.
+    assert "stemsUsed" in plan
     context = components["TransitionContextRequest"]["properties"]
     history = context["setHistory"]["anyOf"][0]
     assert history["maxItems"] == 3
@@ -94,3 +103,100 @@ def test_smart_mix_openapi_offers_ai_refinement(test_app, spec: str) -> None:
     # The refined plan has the plan fields, without a nested refinement.
     refined = components["RefinedTransitionPlanResponse"]["properties"]
     assert "durationMs" in refined and "refinement" not in refined
+
+
+@pytest.mark.parametrize("spec", ["/openapi.json", "/openapi-crate.json"])
+def test_smart_mix_openapi_types_the_decks_stem_analysis_routes(
+    test_app, spec: str
+) -> None:
+    schema = test_app.get(spec).json()
+    components = schema["components"]["schemas"]
+    path = schema["paths"]["/api/decks/tracks/{entity_uid}/stem-analysis"]
+    read, upload = path["get"], path["put"]
+
+    for operation in (read, upload):
+        assert operation["tags"] == ["smart-mix"]
+        assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+    assert read["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/StemAnalysis"
+    }
+    assert upload["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/StemAnalysis"
+    }
+    assert upload["requestBody"]["required"] is True
+    assert upload["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/StemAnalysisUploadResponse"
+    }
+    assert {"401", "403", "404", "409", "413", "422"} <= set(upload["responses"])
+
+    analysis = components["StemAnalysis"]
+    assert analysis["additionalProperties"] is False
+    assert set(analysis["required"]) == {
+        "schema",
+        "producer",
+        "separator",
+        "sourceRevision",
+        "hopMs",
+        "levels",
+        "durationMs",
+    }
+    assert components["StemLevels"]["properties"]["drums"]["format"] == "byte"
+    assert components["StemAnalysisUploadResponse"]["properties"]["result"]["enum"] == [
+        "stored",
+        "replaced",
+        "kept_stronger",
+    ]
+    profile = components["MixProfileResponse"]["properties"]
+    assert profile["stems"]["anyOf"][0] == {
+        "$ref": "#/components/schemas/StemsLayerResponse"
+    }
+    assert "stems" not in components["MixProfileResponse"].get("required", [])
+
+
+@pytest.mark.parametrize("spec", ["/openapi.json", "/openapi-crate.json"])
+def test_smart_mix_openapi_types_the_decks_stem_file_download(
+    test_app, spec: str
+) -> None:
+    schema = test_app.get(spec).json()
+    operation = schema["paths"]["/api/decks/tracks/{entity_uid}/stems"]["get"]
+
+    assert operation["tags"] == ["smart-mix"]
+    assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+    for status in ("200", "206"):
+        assert operation["responses"][status]["content"]["audio/mp4"]["schema"] == {
+            "type": "string",
+            "format": "binary",
+        }
+    assert {"401", "404"} <= set(operation["responses"])
+
+
+@pytest.mark.parametrize("spec", ["/openapi.json", "/openapi-crate.json"])
+def test_smart_mix_openapi_offers_the_decks_menu(test_app, spec: str) -> None:
+    components = test_app.get(spec).json()["components"]["schemas"]
+
+    context = components["TransitionContextRequest"]
+    assert context["properties"]["localRefinement"]["default"] is False
+    assert "localRefinement" not in context.get("required", [])
+    plan = components["TransitionPlanResponse"]["properties"]
+    assert {"candidates", "policyLimits"} <= set(plan)
+    assert "candidates" not in components["TransitionPlanResponse"].get("required", [])
+    candidate = components["TransitionCandidateResponse"]
+    assert {"index", "score", "breakdown", "plan", "structureUsed"} <= set(
+        candidate["required"]
+    )
+    stems = components["StemScoreResponse"]["properties"]
+    assert set(stems) == {
+        "vocalOverlapMs",
+        "bassOverlapMs",
+        "drumsOnlyEntry",
+        "vocalFreeExit",
+    }
+    limits = components["PolicyLimitsResponse"]
+    assert set(limits["required"]) == set(limits["properties"])
+    assert {
+        "maximumTempoAdjustment",
+        "maximumBoostDb",
+        "outgoingLatestEndMs",
+        "incomingLatestEndMs",
+        "phraseLengths",
+    } <= set(limits["properties"])

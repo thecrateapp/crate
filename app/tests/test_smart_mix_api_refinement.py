@@ -135,6 +135,8 @@ def env(test_app, monkeypatch):
         return max(0, min(count, state.limit - used))
 
     monkeypatch.setattr(smart_mix, "get_track_mix_profiles_by_entity_uids", profiles)
+    # No stem analyses: these edges plan without the stems layer.
+    monkeypatch.setattr(smart_mix, "get_stem_analyses_by_entity_uids", lambda _uids: {})
     monkeypatch.setattr(
         smart_mix,
         "get_smart_mix_plan_caches",
@@ -401,7 +403,8 @@ def test_v2_ignores_ai_flag(env):
 
 
 def test_hot_path_query_count(pg_db, test_app, monkeypatch):
-    """Cached: no PostgreSQL beyond the plan's own profile read; a Redis miss: one."""
+    """Cached: no PostgreSQL beyond the plan's own read (the profile revisions behind
+    the keys; a playlist batch reads no stem analyses); a Redis miss: one."""
     from crate.db.repositories.smart_mix import upsert_track_mix_profile
     from crate.db.repositories.smart_mix_refinements import save
     from tests.sql_statements import recorded_statements
@@ -496,7 +499,11 @@ def test_hot_path_query_count(pg_db, test_app, monkeypatch):
     hit, from_cache = post(flagged)
 
     assert missed["refinement"]["status"] == hit["refinement"]["status"] == "ready"
-    assert len(baseline) == 1  # the profile revisions behind the plan keys
+    # The profile revisions behind the plan keys. The stems layer serves only Crate
+    # Decks, so this playlist batch reads no stem analyses.
+    assert len(baseline) == 1
+    assert "track_mix_profiles" in baseline[0]
+    assert not any("track_stem_signals" in statement for statement in baseline)
     assert len(from_cache) == len(baseline)
     assert len(from_table) == len(baseline) + 1
     assert "smart_mix_refined_plans" in from_table[-1]

@@ -11,6 +11,7 @@ from crate.db.domain_event_outbox import (
     mark_outbox_failed,
 )
 from crate.db.domain_events import publish_outbox_event
+from crate.db.jobs.federation_catalog_changes import publish_pending_catalog_changes
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,12 @@ def relay_domain_events(
     worker_id: str | None = None,
 ) -> dict[str, int]:
     relay_id = worker_id or f"{socket.gethostname()}:{id(relay_domain_events)}"
+    try:
+        publish_pending_catalog_changes(limit=1000)
+    except Exception:
+        # A failed catalog batch stays in its own durable outbox. It must not
+        # prevent unrelated domain events from reaching the projector.
+        log.warning("Federation catalog publication failed", exc_info=True)
     events = claim_outbox_events(relay_id, limit=limit)
     delivered = 0
     failed = 0

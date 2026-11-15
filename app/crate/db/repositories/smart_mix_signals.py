@@ -41,9 +41,19 @@ class TrackMixSignals:
     vocal_detector: str | None = None
     voice_hop_ms: int | None = None
     voice_scores: bytes | None = None
+    # How the bar length was chosen (``crate.smart_mix.meter_arbiter``).
+    meter_margin: float | None = None
+    meter_arbiter: str | None = None
 
 
-_BEAT_COLUMNS = ("beat_tracker", "beats_ms", "downbeats_ms", "beats_per_bar")
+_BEAT_COLUMNS = (
+    "beat_tracker",
+    "beats_ms",
+    "downbeats_ms",
+    "beats_per_bar",
+    "meter_margin",
+    "meter_arbiter",
+)
 _VOICE_COLUMNS = ("vocal_detector", "voice_hop_ms", "voice_scores")
 
 
@@ -65,6 +75,8 @@ def get_track_mix_signals(
             vocal_detector=row.vocal_detector,
             voice_hop_ms=row.voice_hop_ms,
             voice_scores=None if row.voice_scores is None else bytes(row.voice_scores),
+            meter_margin=None if row.meter_margin is None else float(row.meter_margin),
+            meter_arbiter=row.meter_arbiter,
         )
 
     if session is not None:
@@ -81,10 +93,15 @@ def store_track_mix_beats(
     beats_ms: Sequence[int],
     downbeats_ms: Sequence[int],
     beats_per_bar: int | None,
+    meter_margin: float | None = None,
+    meter_arbiter: str | None = None,
     updated_at: datetime | None = None,
     session: Session | None = None,
 ) -> None:
     """Keep the model beats of ``source_revision``; its voice windows stay.
+
+    ``meter_margin`` and ``meter_arbiter`` say how the bar length was chosen; beats
+    stored without them clear them.
 
     ``updated_at`` is when the task read the file (default: now); it needs a time zone.
     """
@@ -97,6 +114,8 @@ def store_track_mix_beats(
             "beats_ms": [int(beat) for beat in beats_ms],
             "downbeats_ms": [int(beat) for beat in downbeats_ms],
             "beats_per_bar": beats_per_bar,
+            "meter_margin": meter_margin,
+            "meter_arbiter": meter_arbiter,
         },
         kept=_VOICE_COLUMNS,
         updated_at=updated_at,

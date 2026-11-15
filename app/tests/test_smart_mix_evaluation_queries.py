@@ -205,9 +205,20 @@ def test_pool_profile_states_report_each_track_once(pg_db) -> None:
         session.execute(
             text(
                 "UPDATE track_mix_profiles SET analyzer_version = 'smart-mix-audio-v7',"
-                " phrases = CAST('[]' AS jsonb) WHERE track_id = :track_id"
+                " phrases = CAST(:phrases AS jsonb) WHERE track_id = :track_id"
             ),
-            {"track_id": ids[uids["track_genre"]]},
+            {
+                "track_id": ids[uids["track_genre"]],
+                "phrases": '[{"start_ms": 1000, "start_beat": 2, "bars": 8}]',
+            },
+        )
+        # The analyzer writes an empty list for a track without phrases.
+        session.execute(
+            text(
+                "UPDATE track_mix_profiles SET phrases = CAST('[]' AS jsonb)"
+                " WHERE track_id = :track_id"
+            ),
+            {"track_id": ids[uids["stale_profile"]]},
         )
         orphan = session.execute(
             text(
@@ -238,6 +249,7 @@ def test_pool_profile_states_report_each_track_once(pg_db) -> None:
         "stale": False,
     }
     assert rows[ids[uids["stale_profile"]]]["stale"] is True
+    assert rows[ids[uids["stale_profile"]]]["has_phrases"] is False
     assert rows[ids[uids["unavailable_profile"]]]["quality"] == "unavailable"
     assert rows[orphan]["analyzer_version"] is None
     assert rows[orphan]["has_phrases"] is False

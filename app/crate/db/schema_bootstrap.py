@@ -164,3 +164,38 @@ def create_schema(cur):
     )
 
     create_smart_mix_backfill_candidates_v155_schema(cur)
+    from crate.db.schema_sections.smart_mix_stems_v156 import (
+        create_smart_mix_stems_v156_schema,
+    )
+
+    create_smart_mix_stems_v156_schema(cur)
+    from crate.db.schema_sections.smart_mix_playlists_v157 import (
+        create_smart_mix_playlists_v157_schema,
+    )
+
+    create_smart_mix_playlists_v157_schema(cur)
+    from crate.db.schema_sections.smart_mix_stem_files_v158 import (
+        create_smart_mix_stem_files_v158_schema,
+    )
+
+    create_smart_mix_stem_files_v158_schema(cur)
+    from crate.db.schema_sections.backup_runs_v162 import (
+        create_backup_runs_v162_schema,
+    )
+
+    create_backup_runs_v162_schema(cur)
+    from crate.db.schema_sections.backup_destinations_v163 import (
+        create_backup_destinations_v163_schema,
+    )
+
+    create_backup_destinations_v163_schema(cur)
+    from crate.db.schema_sections.backup_policies_v164 import (
+        create_backup_policies_v164_schema,
+    )
+
+    create_backup_policies_v164_schema(cur)
+    from crate.db.schema_sections.backup_destination_snapshots_v165 import (
+        create_backup_destination_snapshots_v165_schema,
+    )
+
+    create_backup_destination_snapshots_v165_schema(cur)

@@ -321,6 +321,17 @@ def test_jam_mutations_invalidate_jam_scope():
     assert cache_events._match_invalidation_scopes("/api/jam/rooms/abc/end") == ["jam"]
 
 
+def test_smart_mix_playlist_toggles_invalidate_playlists():
+    from crate.api import cache_events
+
+    # Playlist responses carry smartMix, so clients refetch them after a toggle.
+    assert cache_events._match_invalidation_scopes("/api/smart-mix/playlists/42") == [
+        "playlists",
+        "playlist:42",
+    ]
+    assert cache_events._match_invalidation_scopes("/api/smart-mix/playlists") == []
+
+
 def test_crate_mutations_invalidate_collection_and_crate_detail():
     from crate.api import cache_events
     from crate.db.cache_invalidation import cache_prefixes_for_scopes

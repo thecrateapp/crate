@@ -331,6 +331,11 @@ export const test = base.extend<AdminFixtures>({
         });
         return;
       }
+      if (url.pathname === "/api/admin/backups/overview") {
+        // The sidebar counts failing backup destinations on every page.
+        await route.fulfill({ json: { failing_count: 0 } });
+        return;
+      }
       throw new Error(`Unhandled Admin API fixture: ${url.pathname}`);
     });
 

@@ -41,6 +41,23 @@ public class NativeTransitionPlanTest {
     }
 
     @Test
+    public void acceptsAV3LongBlendWithExtraFields() throws Exception {
+        // smart-mix-v3 plans keep plannerVersion 2 and add fields the engine ignores.
+        JSONObject json = planJson("outgoing", "incoming");
+        json.put("mode", "beatmatch");
+        json.put("durationMs", 32000);
+        json.put("curve", "dj-blend");
+        json.put("structureUsed", true);
+        json.put("stemsUsed", true);
+
+        NativeTransitionPlan plan = NativeTransitionPlan.fromJson(json, "outgoing", "incoming", 3000);
+
+        assertEquals(NativeTransitionPlan.Mode.BEATMATCH, plan.mode);
+        assertEquals(32000L, plan.durationMs);
+        assertTrue(plan.isDjBlend());
+    }
+
+    @Test
     public void rejectsAnUnknownCurve() throws Exception {
         JSONObject json = planJson("outgoing", "incoming");
         json.put("curve", "linear");

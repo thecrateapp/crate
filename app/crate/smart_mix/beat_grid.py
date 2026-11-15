@@ -45,18 +45,32 @@ def decode_beat_grid(payload: bytes) -> list[int]:
     if count > MAX_BEAT_COUNT:
         raise BeatGridCodecError(f"beat grid exceeds {MAX_BEAT_COUNT} positions")
 
+    # One pass over the bytes, without a call per varint: profile reads decode a
+    # grid per track, and batches of 200 full profiles spend most of their time here.
     positions: list[int] = []
-    position = 0
-    for _ in range(count):
-        delta, offset = _decode_varint(payload, offset)
+    append = positions.append
+    position = delta = shift = 0
+    remaining = count
+    for index in range(offset, len(payload)):
+        if not remaining:
+            raise BeatGridCodecError("beat grid payload contains trailing bytes")
+        current = payload[index]
+        delta |= (current & 0x7F) << shift
+        if current & 0x80:
+            shift += 7
+            if shift >= 7 * _MAX_VARINT_BYTES:
+                raise BeatGridCodecError("beat grid varint is too large")
+            continue
         if delta <= 0:
             raise BeatGridCodecError("beat deltas must be positive")
         position += delta
         if position > MAX_GRID_DURATION_MS:
             raise BeatGridCodecError("beat grid exceeds the duration budget")
-        positions.append(position)
-    if offset != len(payload):
-        raise BeatGridCodecError("beat grid payload contains trailing bytes")
+        append(position)
+        delta = shift = 0
+        remaining -= 1
+    if remaining:
+        raise BeatGridCodecError("truncated beat grid varint")
     return positions
 
 
