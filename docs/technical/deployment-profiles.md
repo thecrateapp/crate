@@ -66,6 +66,19 @@ The remote deploy snapshots the previous release, pulls only changed images
 and recreates only services whose digest or Compose configuration changed.
 Images not rebuilt for a commit remain pinned to their last promoted digest.
 
+Images are selected from the paths changed since the last promoted release
+(`git diff --no-renames`, so moving a file out of a watched path still selects
+its image). Edits to `build-images.yml` are scoped by job: changing only
+`build-site` rebuilds only the site. Each job is compared by both its parsed value
+and its raw text, so differences YAML 1.1 parsing hides (`yes`/`on` booleans,
+duplicate keys) still count. Changes to shared workflow settings, change
+detection, promotion, the reusable `build-image.yml` or shared actions rebuild
+every image, as do unreadable workflow history, a missing PyYAML or an
+unavailable release baseline. The agent image bakes the release context and is
+rebuilt for every change. `crate-ryoku-site` copies only the `app/web` sources it
+imports (styles, motion scripts, the clipboard helper, fonts and icons), so other
+website changes, such as blog posts, do not rebuild it.
+
 The remote profile combines `docker-compose.yaml` and
 `docker-compose.project.yaml`; it includes API, readplane, worker families,
 projector, media worker, Admin, Listen, Site, Docs, PostgreSQL, cache Redis,

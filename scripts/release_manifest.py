@@ -18,8 +18,10 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 GLOBAL_BUILD_PATTERNS = (
     ".github/workflows/build-images.yml",
+    ".github/workflows/build-image.yml",
     ".github/actions/**",
 )
+BUILD_WORKFLOW = ".github/workflows/build-images.yml"
 
 
 @dataclass(frozen=True)
@@ -126,14 +128,17 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
         services=("crate-docs",),
         patterns=("app/docs/**", "app/shared/**", "docs/**"),
     ),
-    # ryoku.cratemusic.app builds on app/web's source, fonts and icons (app/ryoku/Dockerfile).
+    # ryoku.cratemusic.app builds on the app/web sources, fonts and icons that
+    # app/ryoku/Dockerfile copies; these patterns must name exactly those copies.
     "ryoku-site": ImageSpec(
         repository="crate-ryoku-site",
         environment="CRATE_RYOKU_SITE_IMAGE",
         services=("crate-ryoku-site",),
         patterns=(
             "app/ryoku/**",
-            "app/web/src/**",
+            "app/web/src/styles/**",
+            "app/web/src/scripts/motion/**",
+            "app/web/src/lib/clipboard.ts",
             "app/web/public/fonts/**",
             "app/web/public/icons/**",
         ),
@@ -182,7 +187,10 @@ def _requested_images(requested: str) -> set[str]:
 
 
 def _detect(
-    specs: dict[str, ImageSpec], paths: Iterable[str], requested: str | None
+    specs: dict[str, ImageSpec],
+    paths: Iterable[str],
+    requested: str | None,
+    workflow_images: set[str] | None = None,
 ) -> set[str]:
     if requested:
         return _requested_images(requested) & set(specs)
@@ -191,27 +199,151 @@ def _detect(
         for path in paths
         if path.strip()
     ]
+    scoped_workflow = workflow_images is not None and BUILD_WORKFLOW in normalized_paths
+    if scoped_workflow:
+        normalized_paths.remove(BUILD_WORKFLOW)
     if any(_matches(path, GLOBAL_BUILD_PATTERNS) for path in normalized_paths):
         return set(specs)
-    return {
+    selected = {
         name
         for name, spec in specs.items()
         if any(_matches(path, spec.patterns) for path in normalized_paths)
     }
+    if scoped_workflow:
+        selected.update(workflow_images & set(specs))
+    return selected
 
 
 def detect_changed_images(
-    paths: Iterable[str], *, requested: str | None = None
+    paths: Iterable[str],
+    *,
+    requested: str | None = None,
+    workflow_images: set[str] | None = None,
 ) -> set[str]:
     if requested:
         _requested_images(requested)
-    return _detect(IMAGE_SPECS, paths, requested)
+    return _detect(IMAGE_SPECS, paths, requested, workflow_images)
 
 
 def detect_changed_agent_images(
-    paths: Iterable[str], *, requested: str | None = None
+    paths: Iterable[str],
+    *,
+    requested: str | None = None,
+    workflow_images: set[str] | None = None,
 ) -> set[str]:
-    return _detect(AGENT_IMAGE_SPECS, paths, requested)
+    return _detect(AGENT_IMAGE_SPECS, paths, requested, workflow_images)
+
+
+@dataclass(frozen=True)
+class _WorkflowSections:
+    jobs: dict
+    common_text: str
+    job_texts: dict[str, str]
+
+
+def _nodes(node, seen: dict[int, object] | None = None) -> list:
+    seen = {} if seen is None else seen
+    if id(node) not in seen:
+        seen[id(node)] = node
+        if isinstance(node.value, list):
+            for item in node.value:
+                for child in item if isinstance(item, tuple) else (item,):
+                    _nodes(child, seen)
+    return list(seen.values())
+
+
+def _workflow_sections(text: str) -> _WorkflowSections:
+    # Only workflow comparison needs YAML; manifest validation on production
+    # hosts remains stdlib-only. Constructing from the composed node graph
+    # expands aliases, so an edited shared step selects every job that uses it.
+    import yaml
+
+    loader = yaml.SafeLoader(text)
+    try:
+        root = loader.get_single_node()
+        if not isinstance(root, yaml.MappingNode):
+            raise ValueError("No workflow mapping")
+        jobs_nodes = [
+            value
+            for key, value in root.value
+            if isinstance(key, yaml.ScalarNode) and key.value == "jobs"
+        ]
+        if len(jobs_nodes) != 1 or not isinstance(jobs_nodes[0], yaml.MappingNode):
+            raise ValueError("No jobs mapping")
+        jobs_node = jobs_nodes[0]
+        jobs = loader.construct_document(jobs_node)
+    except yaml.YAMLError as error:
+        raise ValueError("Unreadable workflow") from error
+    finally:
+        loader.dispose()
+    if not isinstance(jobs, dict) or not jobs:
+        raise ValueError("No jobs mapping")
+    if any(
+        not isinstance(name, str) or not isinstance(job, dict)
+        for name, job in jobs.items()
+    ):
+        raise ValueError("Unrecognized job")
+    # Shared settings are compared as raw text, which is only complete if they
+    # do not alias an anchor defined inside the jobs.
+    start, end = jobs_node.start_mark.index, jobs_node.end_mark.index
+    for key, value in root.value:
+        if value is not jobs_node and any(
+            start <= node.start_mark.index < end
+            for part in (key, value)
+            for node in _nodes(part)
+        ):
+            raise ValueError("Shared settings alias a job")
+    # PyYAML reads YAML 1.1 (yes/on become booleans) and keeps the last of
+    # duplicate keys, while Actions reads YAML 1.2. Comparing raw text as well
+    # counts a difference the parser hides as a change.
+    job_texts: dict[str, str] = {}
+    for key, value in jobs_node.value:
+        if key.value in job_texts:
+            raise ValueError(f"Duplicate job: {key.value}")
+        job_texts[key.value] = text[key.start_mark.index : value.end_mark.index]
+    if set(job_texts) != set(jobs):
+        raise ValueError("Unrecognized job")
+    common_text = text[: jobs_node.start_mark.index] + text[jobs_node.end_mark.index :]
+    return _WorkflowSections(jobs, common_text, job_texts)
+
+
+def detect_workflow_images(before: str, after: str) -> set[str]:
+    """Scope build-job edits; shared/unknown changes still rebuild everything."""
+    all_images = set(ALL_IMAGE_SPECS)
+    try:
+        old = _workflow_sections(before)
+        new = _workflow_sections(after)
+    except (ImportError, ValueError):
+        return all_images
+    if old.common_text != new.common_text:
+        return all_images
+    selected = set()
+    for job in old.jobs.keys() | new.jobs.keys():
+        # Parsed values catch an edited anchor that another job aliases.
+        if old.job_texts.get(job) == new.job_texts.get(job) and old.jobs.get(
+            job
+        ) == new.jobs.get(job):
+            continue
+        image = job.removeprefix("build-")
+        if not job.startswith("build-") or image not in ALL_IMAGE_SPECS:
+            return all_images
+        selected.add(image)
+    return selected
+
+
+def _git_workflow_images(base: str, head: str) -> set[str]:
+    try:
+        versions = [
+            subprocess.check_output(
+                ["git", "show", f"{revision}:{BUILD_WORKFLOW}"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+            for revision in (base, head)
+        ]
+    except subprocess.CalledProcessError:
+        return set(ALL_IMAGE_SPECS)
+    return detect_workflow_images(*versions)
 
 
 def _expected_repository(registry: str, owner: str, spec: ImageSpec) -> str:
@@ -445,7 +577,7 @@ def _git_changed_paths(base: str | None, head: str) -> list[str]:
     if not base:
         return []
     result = subprocess.run(
-        ["git", "diff", "--name-only", base, head],
+        ["git", "diff", "--name-only", "--no-renames", base, head],
         check=True,
         capture_output=True,
         text=True,
@@ -524,7 +656,14 @@ def main() -> int:
             ) | detect_changed_agent_images([], requested=args.requested)
         elif args.base:
             paths = _git_changed_paths(args.base, args.head)
-            selected = detect_changed_images(paths) | detect_changed_agent_images(paths)
+            workflow_images = (
+                _git_workflow_images(args.base, args.head)
+                if BUILD_WORKFLOW in paths
+                else None
+            )
+            selected = detect_changed_images(
+                paths, workflow_images=workflow_images
+            ) | detect_changed_agent_images(paths, workflow_images=workflow_images)
         else:
             selected = set(ALL_IMAGE_SPECS)
         for name in ALL_IMAGE_SPECS:

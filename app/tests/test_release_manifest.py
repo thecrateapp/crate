@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import fnmatch
 import importlib.util
 import json
+import os
+import re
 import subprocess
 import sys
 from copy import deepcopy
@@ -11,6 +14,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
+BUILD_WORKFLOW_PATH = ".github/workflows/build-images.yml"
 SPEC = importlib.util.spec_from_file_location(
     "crate_release_manifest", ROOT / "scripts/release_manifest.py"
 )
@@ -51,6 +55,177 @@ def _previous_manifest() -> dict:
 
 def test_listen_change_only_selects_listen_image() -> None:
     assert detect_changed_images(["app/listen/src/App.tsx"]) == {"listen"}
+
+
+def test_blog_edit_rebuilds_only_the_site_and_the_agent() -> None:
+    previous = assemble_manifest(
+        release_sha=PREVIOUS_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=_previous_manifest(),
+        changed_digests={"agent": "sha256:" + "e" * 64},
+    )
+    paths = ["app/web/src/content/blog/a-post.md"]
+    selected = detect_changed_images(
+        paths
+    ) | release_manifest.detect_changed_agent_images(paths)
+    # The agent image bakes the release context, so it follows every change.
+    assert selected == {"site", "agent"}
+    manifest = assemble_manifest(
+        release_sha=RELEASE_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=previous,
+        changed_digests={name: "sha256:" + "f" * 64 for name in selected},
+    )
+    assert manifest["agent_images"]["agent"]["source_sha"] == RELEASE_SHA
+    assert {
+        name
+        for name in IMAGE_SPECS
+        if manifest["images"][name] != previous["images"][name]
+    } == {"site"}
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "expected"),
+    [
+        (
+            "jobs:\n  build-site:\n    steps:\n      - run: build old\n",
+            "jobs:\n  build-site:\n    steps:\n      - run: build new\n",
+            {"site"},
+        ),
+        (
+            "jobs:\n  build-worker:\n    uses: old\n",
+            "jobs:\n  build-worker:\n    uses: new\n",
+            {"worker"},
+        ),
+        (
+            "env:\n  REGISTRY: old\njobs:\n  build-site:\n    steps: []\n",
+            "env:\n  REGISTRY: new\njobs:\n  build-site:\n    steps: []\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        (
+            "jobs:\n  changes:\n    steps: []\n",
+            "jobs:\n  changes:\n    steps: [new]\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        (
+            "jobs:\n  promote-release:\n    steps: []\n",
+            "jobs:\n  promote-release:\n    steps: [new]\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        (
+            "jobs:\n  unknown:\n    steps: []\n",
+            "jobs:\n  unknown:\n    steps: [new]\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        ("", "jobs: {}\n", set(release_manifest.ALL_IMAGE_SPECS)),
+    ],
+)
+def test_workflow_changes_rebuild_only_affected_jobs_or_fail_closed(
+    before, after, expected
+):
+    assert release_manifest.detect_workflow_images(before, after) == expected
+
+
+def test_scoped_site_workflow_change_does_not_rebuild_other_images():
+    detect_agent = release_manifest.detect_changed_agent_images
+    workflow = [".github/workflows/build-images.yml"]
+    assert detect_changed_images(workflow, workflow_images={"site"}) == {"site"}
+    assert detect_agent(workflow, workflow_images={"site"}) == set()
+    # Source changes still follow their own patterns; the agent follows all.
+    paths = [*workflow, "app/web/Dockerfile"]
+    assert detect_changed_images(paths, workflow_images={"site"}) == {"site"}
+    assert detect_agent(paths, workflow_images={"site"}) == {"agent"}
+
+
+def test_shared_workflow_alias_rebuilds_all_its_consumers():
+    before = "jobs:\n  build-site:\n    steps: &shared\n      - run: old\n  build-docs:\n    steps: *shared\n"
+    assert release_manifest.detect_workflow_images(
+        before, before.replace("run: old", "run: new")
+    ) == {"site", "docs"}
+    assert release_manifest.detect_workflow_images(before, before) == set()
+
+
+# Isolate fixture repositories from the developer's Git configuration (commit
+# signing, templates, hooks).
+GIT_ENV = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+
+
+def _git_commit(repo: Path) -> str:
+    if not (repo / ".git").exists():
+        subprocess.run(["git", "init", "-q", str(repo)], check=True, env=GIT_ENV)
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, env=GIT_ENV)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.test",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+        env=GIT_ENV,
+    )
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=repo, text=True, env=GIT_ENV
+    ).strip()
+
+
+def _detect_cli(repo: Path, base: str, head: str) -> set[str]:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/release_manifest.py"),
+            "detect",
+            "--base",
+            base,
+            "--head",
+            head,
+        ],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+        env=GIT_ENV,
+    )
+    outputs = dict(line.split("=", 1) for line in result.stdout.splitlines())
+    return {name for name, value in outputs.items() if value == "true"}
+
+
+def test_detect_cli_scopes_git_workflow_diff_and_blog_changes(tmp_path):
+    workflow = tmp_path / ".github/workflows/build-images.yml"
+    workflow.parent.mkdir(parents=True)
+    before = "jobs:\n  changes:\n    steps: []\n  build-site:\n    steps:\n      - run: old\n"
+    workflow.write_text(before)
+    base = _git_commit(tmp_path)
+    workflow.write_text(before.replace("run: old", "run: new"))
+    post = tmp_path / "app/web/src/content/blog/post.md"
+    post.parent.mkdir(parents=True)
+    post.write_text("A new post")
+    head = _git_commit(tmp_path)
+    assert _detect_cli(tmp_path, base, head) == {"site", "agent", "any"}
+
+
+def test_detect_cli_selects_the_image_a_file_moves_out_of(tmp_path):
+    source = tmp_path / "app/web/src/styles/tokens.css"
+    source.parent.mkdir(parents=True)
+    source.write_text(":root { --accent: #f60; }\n" * 20)
+    base = _git_commit(tmp_path)
+    target = tmp_path / "app/web/src/legacy/tokens.css"
+    target.parent.mkdir(parents=True)
+    source.rename(target)
+    head = _git_commit(tmp_path)
+    # A rename-aware diff names only the destination, which ryoku-site does not watch.
+    assert "ryoku_site" in _detect_cli(tmp_path, base, head)
 
 
 def test_cast_receiver_change_only_selects_receiver_image() -> None:
@@ -172,6 +347,7 @@ def test_backend_change_selects_backend_compatibility_group() -> None:
         ("app/ryoku/Dockerfile.dockerignore", {"ryoku-site"}),
         ("app/web/README.md", {"site"}),
         (".github/workflows/build-images.yml", set(IMAGE_SPECS)),
+        (".github/workflows/build-image.yml", set(IMAGE_SPECS)),
     ],
 )
 def test_change_classifier_covers_independent_build_inputs(
@@ -390,3 +566,262 @@ def test_agent_image_is_an_optional_entry_outside_the_fleet() -> None:
     unknown["agent_images"]["other"] = entry
     with pytest.raises(ManifestError, match="unknown agent image"):
         validate_manifest(unknown)
+
+
+RYOKU_DOCKERFILE = ROOT / "app/ryoku/Dockerfile"
+# Module and stylesheet references: static, re-exported and dynamic imports,
+# CSS @import (quoted or url()) and CSS url().
+WEB_REFERENCE = re.compile(
+    r"""(?:\bfrom|\bimport)\s*\(?\s*["']([^"']+)["']"""
+    r"""|@import\s+(?:url\(\s*)?["']?([^"')\s;]+)"""
+    r"""|\burl\(\s*["']?([^"')\s]+)"""
+)
+WEB_SOURCE_SUFFIXES = (".ts", ".tsx", ".js", ".mjs", ".astro", ".css")
+
+
+def _ryoku_web_copies() -> set[str]:
+    """app/web sources the ryoku-site image copies, as change-detection patterns."""
+    copies = set()
+    for line in RYOKU_DOCKERFILE.read_text().splitlines():
+        parts = line.split()
+        if parts[:1] != ["COPY"] or any(part.startswith("--") for part in parts):
+            continue
+        for source in parts[1:-1]:
+            if source.startswith("app/web/"):
+                copies.add(source + "**" if source.endswith("/") else source)
+    return copies
+
+
+def _web_references(text: str) -> list[str]:
+    return [
+        next(group for group in match if group) for match in WEB_REFERENCE.findall(text)
+    ]
+
+
+def _resolve_web_file(path: Path) -> Path:
+    candidates = [path]
+    candidates += [path.with_name(path.name + suffix) for suffix in WEB_SOURCE_SUFFIXES]
+    candidates += [path / f"index{suffix}" for suffix in WEB_SOURCE_SUFFIXES]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise AssertionError(f"unresolved app/web reference: {path}")
+
+
+def _web_dependencies(
+    entries: Path, web: Path, alias: str = "@crate-web/"
+) -> set[Path]:
+    """Every file under ``web`` that ``entries`` reach through ``alias``, transitively.
+
+    Relative references resolve beside their file and absolute CSS URLs against
+    the served ``public`` directory; package and remote references are skipped.
+    """
+    pending = [
+        _resolve_web_file(web / "src" / reference.removeprefix(alias))
+        for source in entries.rglob("*")
+        if source.is_file() and source.suffix in WEB_SOURCE_SUFFIXES
+        for reference in _web_references(source.read_text(errors="ignore"))
+        if reference.startswith(alias)
+    ]
+    seen: set[Path] = set()
+    while pending:
+        path = pending.pop()
+        if path in seen:
+            continue
+        seen.add(path)
+        if path.suffix not in WEB_SOURCE_SUFFIXES:
+            continue
+        for reference in _web_references(path.read_text()):
+            reference = reference.split("?", 1)[0].split("#", 1)[0]
+            if reference.startswith(alias):
+                target = web / "src" / reference.removeprefix(alias)
+            elif reference.startswith(("./", "../")):
+                target = (path.parent / reference).resolve()
+            elif reference.startswith("/") and not reference.startswith("//"):
+                target = web / "public" / reference.lstrip("/")
+            else:
+                continue
+            pending.append(_resolve_web_file(target))
+    return seen
+
+
+def _ryoku_web_dependencies() -> set[str]:
+    web = ROOT / "app/web"
+    return {
+        str(path.relative_to(ROOT))
+        for path in _web_dependencies(ROOT / "app/ryoku/src", web)
+    }
+
+
+def test_web_dependency_walker_follows_every_reference_form(tmp_path: Path) -> None:
+    entries, web = tmp_path / "ryoku/src", tmp_path / "web"
+    files = {
+        entries / "page.astro": (
+            'import "@crate-web/styles/base.css";\n'
+            'const lazy = await import("@crate-web/scripts/lazy");\n'
+            'export { motion } from "@crate-web/scripts/motion";\n'
+            'import pkg from "gsap";\n'
+        ),
+        web / "src/styles/base.css": (
+            '@import "./tokens.css";\n@import url(./reset.css);\n'
+            '@import "@fontsource/mono/400.css";\n'
+            "body { background: url(/fonts/a.woff2); mask: url('../img/m.svg'); }\n"
+            'p { background: url("data:image/svg+xml;utf8,<svg/>"); }\n'
+        ),
+        web / "src/styles/tokens.css": "",
+        web / "src/styles/reset.css": "",
+        web / "src/img/m.svg": "<svg/>",
+        web / "public/fonts/a.woff2": "",
+        web / "src/scripts/lazy.mjs": 'import { env } from "./env";\n',
+        web / "src/scripts/env.ts": "",
+        web / "src/scripts/motion/index.ts": "export const motion = 1;\n",
+        web / "src/unused.ts": "",
+    }
+    for path, text in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    assert {str(path.relative_to(web)) for path in _web_dependencies(entries, web)} == {
+        "src/styles/base.css",
+        "src/styles/tokens.css",
+        "src/styles/reset.css",
+        "src/img/m.svg",
+        "public/fonts/a.woff2",
+        "src/scripts/lazy.mjs",
+        "src/scripts/env.ts",
+        "src/scripts/motion/index.ts",
+    }
+
+
+def test_ryoku_site_patterns_match_exactly_what_its_image_copies() -> None:
+    web_patterns = {
+        pattern
+        for pattern in IMAGE_SPECS["ryoku-site"].patterns
+        if pattern.startswith("app/web/")
+    }
+    assert web_patterns == _ryoku_web_copies()
+    assert not any(
+        pattern.startswith(("app/web/src/content", "app/web/src/**"))
+        for pattern in web_patterns
+    )
+
+
+def test_ryoku_image_copies_every_app_web_file_the_ryoku_site_imports() -> None:
+    dependencies = _ryoku_web_dependencies()
+    assert dependencies, "app/ryoku no longer imports @crate-web"
+    copies = _ryoku_web_copies()
+    assert {
+        path
+        for path in dependencies
+        if not any(fnmatch.fnmatchcase(path, pattern) for pattern in copies)
+    } == set()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "app/web/src/content/blog/a-post.md",
+        "app/web/src/components/blog-viz/BlogFigure.astro",
+        "app/web/src/lib/blog.ts",
+    ],
+)
+def test_blog_edit_does_not_rebuild_the_ryoku_site(path: str) -> None:
+    assert detect_changed_images([path]) == {"site"}
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        # YAML 1.1 reads yes/no as booleans; Actions (YAML 1.2) reads strings.
+        (
+            "jobs:\n  build-site:\n    with:\n      flag: true\n",
+            "jobs:\n  build-site:\n    with:\n      flag: yes\n",
+        ),
+        # Duplicate keys collapse to the last one when parsed.
+        (
+            "jobs:\n  build-site:\n    with:\n      flag: a\n",
+            "jobs:\n  build-site:\n    with:\n      flag: b\n      flag: a\n",
+        ),
+    ],
+)
+def test_job_text_change_hidden_by_yaml_parsing_still_selects_the_job(
+    before: str, after: str
+) -> None:
+    assert release_manifest.detect_workflow_images(before, after) == {"site"}
+
+
+def test_shared_text_change_hidden_by_yaml_parsing_rebuilds_everything() -> None:
+    before = "env:\n  FLAG: true\njobs:\n  build-site:\n    steps: []\n"
+    after = before.replace("FLAG: true", "FLAG: on")
+    assert release_manifest.detect_workflow_images(before, after) == set(
+        release_manifest.ALL_IMAGE_SPECS
+    )
+
+
+def test_duplicate_job_names_rebuild_everything() -> None:
+    before = "jobs:\n  build-site:\n    steps: []\n  build-docs:\n    steps: []\n"
+    after = before + "  build-site:\n    steps: []\n"
+    assert release_manifest.detect_workflow_images(before, after) == set(
+        release_manifest.ALL_IMAGE_SPECS
+    )
+
+
+def test_workflow_comparison_without_pyyaml_rebuilds_everything(monkeypatch) -> None:
+    monkeypatch.setitem(sys.modules, "yaml", None)
+    before = "jobs:\n  build-site:\n    steps: []\n"
+    assert release_manifest.detect_workflow_images(before, before) == set(
+        release_manifest.ALL_IMAGE_SPECS
+    )
+
+
+def test_pyyaml_install_cannot_fail_the_change_detection_job() -> None:
+    import yaml
+
+    workflow = yaml.safe_load((ROOT / BUILD_WORKFLOW_PATH).read_text())
+    steps = workflow["jobs"]["changes"]["steps"]
+    install = next(step for step in steps if "PyYAML" in str(step.get("run", "")))
+    assert install.get("continue-on-error") is True
+    assert "PyYAML==" in install["run"]
+    setup = [
+        step
+        for step in steps
+        if str(step.get("uses", "")).startswith("actions/setup-python@")
+    ]
+    assert setup and steps.index(setup[0]) < steps.index(install)
+
+
+def test_shared_settings_aliasing_a_job_anchor_rebuild_everything() -> None:
+    workflow = (
+        "jobs:\n  build-site:\n    env: &site\n      MODE: {mode}\n"
+        "    steps: []\nenv: *site\n"
+    )
+    assert release_manifest.detect_workflow_images(
+        workflow.format(mode="a"), workflow.format(mode="b")
+    ) == set(release_manifest.ALL_IMAGE_SPECS)
+
+
+def test_job_aliasing_a_shared_anchor_is_unchanged_until_that_anchor_changes() -> None:
+    workflow = (
+        "env: &shared\n  MODE: {mode}\njobs:\n  build-site:\n    env: *shared\n"
+        "    steps: []\n"
+    )
+    before = workflow.format(mode="a")
+    assert release_manifest.detect_workflow_images(before, before) == set()
+    assert release_manifest.detect_workflow_images(
+        before, workflow.format(mode="b")
+    ) == set(release_manifest.ALL_IMAGE_SPECS)
+
+
+def test_deploy_tooling_ci_runs_when_the_ryoku_web_sources_change() -> None:
+    import yaml
+
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/test-deploy-tooling.yml").read_text()
+    )
+    triggers = workflow.get("on", workflow.get(True))
+    watched = [
+        pattern
+        for pattern in IMAGE_SPECS["ryoku-site"].patterns
+        if pattern.startswith("app/web/src/")
+    ]
+    for event in ("push", "pull_request"):
+        assert set(watched) <= set(triggers[event]["paths"]), event
