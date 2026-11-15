@@ -128,8 +128,9 @@ Rules:
   caller's session holds `smart_mix.stems.contribute` and an admin has not
   turned uploads off, so it depends on who asks. `beatmatch` and `long_beatmatch`
   need `CRATE_SMART_MIX_ENABLED` and `CRATE_DECKS_BEATMATCH_ENABLED`;
-  `bass_handoff` also needs `CRATE_DECKS_BASS_HANDOFF_ENABLED` (all default to
-  false). Decks features never follow the Android Smart Mix flags
+  `bass_handoff` also needs `CRATE_DECKS_BASS_HANDOFF_ENABLED` (both Decks
+  switches default to true; `CRATE_SMART_MIX_ENABLED` defaults to false). Every
+  plan for `source = "decks"` carries the `policyLimits` applied to it. Decks features never follow the Android Smart Mix flags
   (`CRATE_ANDROID_*`); `smart_mix.android_*` remains the Android contract. The
   `decks` planner context, its bass handoff and the assist mode's longer blends
   are described in [the Smart Mix design](smart-mix-design.md#8-crate-decks-consumer).

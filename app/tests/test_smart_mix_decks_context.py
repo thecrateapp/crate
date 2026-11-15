@@ -101,10 +101,8 @@ def _switches(monkeypatch, *, decks: bool, decks_bass: bool, android_bass: bool)
         ("CRATE_DECKS_BASS_HANDOFF_ENABLED", decks_bass),
         (ANDROID_BASS_SWITCH, android_bass),
     ):
-        if on:
-            monkeypatch.setenv(name, "true")
-        else:
-            monkeypatch.delenv(name, raising=False)
+        # Explicit: the Decks switches default to on.
+        monkeypatch.setenv(name, "true" if on else "false")
 
 
 @pytest.fixture
@@ -147,10 +145,13 @@ def _without_nulls(payload: dict) -> dict:
     return {key: value for key, value in payload.items() if value is not None}
 
 
-def _old_cache_key(edge: dict, policy, *, bass_allowed: bool) -> str:
+def _old_cache_key(
+    edge: dict, policy, *, bass_allowed: bool, limits: bool = False
+) -> str:
     """The plan cache key before S5, for profiles that are missing.
 
-    The key keeps ``allowBassHandoff`` only when the server allows it.
+    The key keeps ``allowBassHandoff`` only when the server allows it. ``limits``
+    adds the marker of decks plans, which carry ``policyLimits`` since S5.
     """
     ctx = dict(edge["context"])
     if not bass_allowed:
@@ -164,6 +165,8 @@ def _old_cache_key(edge: dict, policy, *, bass_allowed: bool) -> str:
         "incomingProfileRevision": "missing",
         "context": ctx,
     }
+    if limits:
+        identity["policyLimits"] = True
     canonical = json.dumps(identity, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -255,7 +258,7 @@ def test_android_behaviour_unchanged(post, monkeypatch, source, android_bass) ->
 
 
 @pytest.mark.parametrize("decks_bass", [True, False], ids=["bass", "no_bass"])
-def test_decks_without_assist_keeps_its_cache_key(monkeypatch, decks_bass) -> None:
+def test_decks_cache_key_splits_only_on_assist(monkeypatch, decks_bass) -> None:
     _switches(monkeypatch, decks=True, decks_bass=decks_bass, android_bass=False)
     edge = _edge(DECKS_CONTEXT)
     request = TransitionEdgeRequest.model_validate(edge)
@@ -265,10 +268,12 @@ def test_decks_without_assist_keeps_its_cache_key(monkeypatch, decks_bass) -> No
     assisted = TransitionEdgeRequest.model_validate(_edge(DECKS_CONTEXT, assist=True))
 
     for policy in (PLANNER_POLICY, PLANNER_POLICY_V3):
-        old = _old_cache_key(edge, policy, bass_allowed=decks_bass)
-        assert smart_mix._plan_cache_key(request, None, None, policy) == old
-        assert smart_mix._plan_cache_key(explicit_off, None, None, policy) == old
-        assert smart_mix._plan_cache_key(assisted, None, None, policy) != old
+        # Decks plans cached before they carried policyLimits are never served.
+        expected = _old_cache_key(edge, policy, bass_allowed=decks_bass, limits=True)
+        assert expected != _old_cache_key(edge, policy, bass_allowed=decks_bass)
+        assert smart_mix._plan_cache_key(request, None, None, policy) == expected
+        assert smart_mix._plan_cache_key(explicit_off, None, None, policy) == expected
+        assert smart_mix._plan_cache_key(assisted, None, None, policy) != expected
     # The refinement worker rebuilds the planner context from the cache context.
     assert context_from_payload(smart_mix._cache_context(assisted.context)).assist
     assert not context_from_payload(smart_mix._cache_context(request.context)).assist
@@ -407,6 +412,64 @@ def test_assist_reaches_the_planner_through_the_api(post) -> None:
     )
 
 
+# --- policy limits on every decks plan -------------------------------------------------
+
+
+@pytest.mark.parametrize("assist", [False, True], ids=["autodj", "assist"])
+@pytest.mark.parametrize("local_refinement", [False, True], ids=["plain", "local"])
+@pytest.mark.parametrize("planner", ["smart-mix-v2", "smart-mix-v3"])
+def test_every_decks_plan_carries_policy_limits(
+    post, tracks, planner, local_refinement, assist
+) -> None:
+    edge = _edge(DECKS_CONTEXT, assist=assist, localRefinement=local_refinement)
+    plan = _plan(post(edge, planner))
+    policy = PLANNER_POLICY_V3 if planner == "smart-mix-v3" else PLANNER_POLICY
+    request = TransitionEdgeRequest.model_validate(edge)
+
+    limits = plan["policyLimits"]
+    assert limits["maximumLongBeatmatchMs"] == (96_000 if assist else 48_000)
+    # The same limits localRefinement served before, from the same ceiling.
+    assert (
+        limits
+        == policy_limits(
+            tracks[OUTGOING_UID],
+            tracks[INCOMING_UID],
+            smart_mix._transition_context(request.context),
+            policy,
+        ).to_dict()
+    )
+    assert ("candidates" in plan) is (planner == "smart-mix-v3" and local_refinement)
+
+
+@pytest.mark.parametrize("planner", ["smart-mix-v2", "smart-mix-v3"])
+def test_no_decks_limits_without_both_profiles(post, tracks, planner) -> None:
+    del tracks[INCOMING_UID]
+
+    plan = _plan(post(_edge(DECKS_CONTEXT, assist=True), planner))
+
+    assert plan["fallbackReason"] == "missing_profile"
+    assert "policyLimits" not in plan
+
+
+@pytest.mark.parametrize("planner", ["smart-mix-v2", "smart-mix-v3"])
+@pytest.mark.parametrize(
+    "source", ["playlist", "radio", "shuffle", "infinite", "album", "manual"]
+)
+def test_other_sources_carry_no_policy_limits(post, source, planner) -> None:
+    edge = _edge({**ANDROID_CONTEXT, "source": source})
+    policy = PLANNER_POLICY_V3 if planner == "smart-mix-v3" else PLANNER_POLICY
+    served = post(edge, planner).content
+    flagged = _edge(edge["context"], assist=True, localRefinement=True)
+
+    assert "policyLimits" not in json.loads(served)["plans"][0]
+    # The flags only decks reads change neither the bytes nor the cache key.
+    assert post(flagged, planner).content == served
+    for request in (edge, flagged):
+        assert smart_mix._plan_cache_key(
+            TransitionEdgeRequest.model_validate(request), None, None, policy
+        ) == _old_cache_key(edge, policy, bass_allowed=False)
+
+
 # --- plan format ----------------------------------------------------------------------
 
 _V2_PLAN_FIELDS = {
@@ -438,10 +501,13 @@ def test_plan_schema_unchanged(test_app, post, monkeypatch) -> None:
     )
     v3_assist = _plan(post(_edge(DECKS_CONTEXT, assist=True), "smart-mix-v3"))
 
-    for plan in (android, decks, assist):
-        assert set(plan) == _V2_PLAN_FIELDS
+    assert set(android) == _V2_PLAN_FIELDS
+    # Decks plans add only the limits applied to them (2026-11-15).
+    for plan in (decks, assist):
+        assert set(plan) == _V2_PLAN_FIELDS | {"policyLimits"}
+    for plan in (android, decks, assist, v3_android, v3_assist):
         TransitionPlanResponse.model_validate(plan)
-    assert set(v3_assist) == set(v3_android)
+    assert set(v3_assist) == set(v3_android) | {"policyLimits"}
     assert assist["plannerVersion"] == v3_assist["plannerVersion"] == 2
 
     schema = test_app.get("/openapi.json").json()["components"]["schemas"]
@@ -485,8 +551,10 @@ def test_transition_context_serializes_assist_only_when_on() -> None:
     assert not context_from_payload(_decks_context().to_dict()).assist
 
 
-@pytest.mark.parametrize("value", ["true", "1", None])
-def test_decks_switches_read_their_own_environment(monkeypatch, value) -> None:
+@pytest.mark.parametrize(
+    ("value", "on"), [("true", True), ("1", True), ("false", False), (None, True)]
+)
+def test_decks_switches_read_their_own_environment(monkeypatch, value, on) -> None:
     for name in (
         *DECKS_SWITCHES,
         "CRATE_ANDROID_BEATMATCH_ENABLED",
@@ -499,7 +567,7 @@ def test_decks_switches_read_their_own_environment(monkeypatch, value) -> None:
         else:
             monkeypatch.setenv(name, value)
 
-    on = value is not None
+    # Unset means on (Diego, 2026-11-15).
     assert decks_beatmatch_enabled() is on
     assert decks_bass_handoff_enabled() is on
 
@@ -515,10 +583,7 @@ def test_decks_switches_read_their_own_environment(monkeypatch, value) -> None:
 )
 def test_decks_capability_chain(monkeypatch, smart_mix_on, beatmatch, bass, expected):
     for name, on in zip(DECKS_SWITCHES, (smart_mix_on, beatmatch, bass), strict=True):
-        if on:
-            monkeypatch.setenv(name, "true")
-        else:
-            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv(name, "true" if on else "false")
 
     assert (
         capabilities.decks_beatmatch_available(),

@@ -97,9 +97,9 @@ class PlannerPolicy:
     maximum_transition_ms: int = 12_000
     maximum_long_beatmatch_ms: int = 48_000
     # Crate Decks' assist mode (D8, F6.S-PR1): the long-beatmatch ceiling when a
-    # context of ``assist_sources`` sets ``assist``. Diego approved longer
-    # transitions for the assist mode only at G0 and fixes the figure in F6 by ear;
-    # until then 96 s (twice the AutoDJ ceiling) is a proposal, pending his figure.
+    # context of ``assist_sources`` sets ``assist``. G0 approved longer transitions
+    # for the assist mode only; 96 s (twice the AutoDJ ceiling) was decided by
+    # Diego, 2026-11-15.
     # Durations stay capped in bars: a long blend is still one of
     # ``long_beatmatch_phrase_bars`` (v2) or ``phrase_lengths`` (v3), so 96 s lets
     # the longest phrase, 32 bars of 4/4, fit from 80 BPM up (48 s: from 160 BPM).

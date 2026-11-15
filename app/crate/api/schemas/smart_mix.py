@@ -396,9 +396,9 @@ class TransitionContextRequest(SmartMixRequestModel):
         default=False,
         alias="localRefinement",
         description=(
-            "smart-mix-v3 with source `decks` only: also return `candidates` and "
-            "`policyLimits`, so Crate Decks can refine the plan locally (STEM-D10). "
-            "Ignored otherwise; it does not change the plan."
+            "smart-mix-v3 with source `decks` only: also return `candidates`, so "
+            "Crate Decks can refine the plan locally (STEM-D10). Ignored "
+            "otherwise; it does not change the plan."
         ),
     )
 
@@ -673,8 +673,11 @@ class TransitionPlanResponse(_TransitionPlanFields):
         default=None,
         alias="policyLimits",
         description=(
-            "With `candidates`, when both tracks have a profile: the limits a "
-            "locally refined plan must keep."
+            "Source `decks` only (smart-mix-v2 and v3, with or without "
+            "`localRefinement`), when both tracks have a profile: the limits "
+            "applied to the plan, which a plan Crate Decks runs or refines "
+            "locally must keep (`maximumLongBeatmatchMs` is the assist ceiling "
+            "with `assist`). Absent otherwise."
         ),
     )
 

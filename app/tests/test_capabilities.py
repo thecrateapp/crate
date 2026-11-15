@@ -13,6 +13,20 @@ _DECKS_CAPABILITIES = {
         "local_refinement",
     ],
 }
+# With Smart Mix on, the Decks switches (on by default since 2026-11-15) add S5.
+_DECKS_CAPABILITIES_WITH_SMART_MIX = {
+    **_DECKS_CAPABILITIES,
+    "features": [
+        "library_cursor",
+        "profiles_batch",
+        "beatmatch",
+        "bass_handoff",
+        "long_beatmatch",
+        "stems",
+        "stem_upload",
+        "local_refinement",
+    ],
+}
 # The test database has no local federation node, so search stays canonical.
 _FEDERATION_CAPABILITIES = {
     "search_stream": False,
@@ -88,6 +102,8 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
     monkeypatch.setenv("CRATE_ANDROID_BEATMATCH_ENABLED", "true")
     monkeypatch.setenv("CRATE_ANDROID_BASS_HANDOFF_ENABLED", "true")
     monkeypatch.delenv("CRATE_LISTEN_SMART_MIX_V3_ENABLED", raising=False)
+    monkeypatch.delenv("CRATE_DECKS_BEATMATCH_ENABLED", raising=False)
+    monkeypatch.delenv("CRATE_DECKS_BASS_HANDOFF_ENABLED", raising=False)
     monkeypatch.setattr("crate.api.capabilities.stem_uploads_enabled", lambda: True)
 
     response = test_app.get("/api/capabilities")
@@ -125,7 +141,7 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
             "smart_mix_assistant": False,
             "automation": False,
         },
-        "decks": _DECKS_CAPABILITIES,
+        "decks": _DECKS_CAPABILITIES_WITH_SMART_MIX,
         "federation": _FEDERATION_CAPABILITIES,
     }
 

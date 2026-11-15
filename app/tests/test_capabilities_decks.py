@@ -62,7 +62,7 @@ def test_decks_features_reflect_settings(test_app, monkeypatch, enabled):
     # local_refinement). S5 has switches of its own (below): Decks never inherits
     # the Android Smart Mix flags.
     for flag in _DECKS_SMART_MIX_FLAGS:
-        monkeypatch.delenv(flag, raising=False)
+        monkeypatch.setenv(flag, "false")
     for flag in _ANDROID_AND_SMART_MIX_FLAGS:
         if enabled:
             monkeypatch.setenv(flag, "true")
@@ -102,10 +102,7 @@ def test_decks_smart_mix_features_follow_their_own_switches(
         ("CRATE_DECKS_BEATMATCH_ENABLED", beatmatch),
         ("CRATE_DECKS_BASS_HANDOFF_ENABLED", bass_handoff),
     ):
-        if on:
-            monkeypatch.setenv(flag, "true")
-        else:
-            monkeypatch.delenv(flag, raising=False)
+        monkeypatch.setenv(flag, "true" if on else "false")
 
     features = test_app.get("/api/capabilities").json()["decks"]["features"]
 
@@ -117,6 +114,30 @@ def test_decks_smart_mix_features_follow_their_own_switches(
         "stem_upload",
         "local_refinement",
     ]
+
+
+@pytest.mark.parametrize("smart_mix", [True, False])
+def test_decks_smart_mix_switches_default_to_on(test_app, monkeypatch, smart_mix):
+    # Decided by Diego, 2026-11-15: Decks gets S5 wherever Smart Mix is on, while
+    # the Android switches stay off by default.
+    for flag in (*_ANDROID_AND_SMART_MIX_FLAGS, *_DECKS_SMART_MIX_FLAGS):
+        monkeypatch.delenv(flag, raising=False)
+    if smart_mix:
+        monkeypatch.setenv("CRATE_SMART_MIX_ENABLED", "true")
+
+    payload = test_app.get("/api/capabilities").json()
+    s5 = ["beatmatch", "bass_handoff", "long_beatmatch"] if smart_mix else []
+
+    assert payload["decks"]["features"] == [
+        "library_cursor",
+        "profiles_batch",
+        *s5,
+        "stems",
+        "stem_upload",
+        "local_refinement",
+    ]
+    assert payload["smart_mix"]["android_beatmatch"] is False
+    assert payload["smart_mix"]["android_bass_handoff"] is False
 
 
 def test_decks_capabilities_schema_documents_the_feature_vocabulary(test_app):

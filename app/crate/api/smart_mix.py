@@ -747,19 +747,26 @@ def _plan_edge(
             serialized["candidates"] = [
                 candidate.to_dict() for candidate in planned.candidates
             ]
-            if outgoing is not None and incoming is not None:
-                serialized["policyLimits"] = policy_limits(
-                    outgoing, incoming, context, policy
-                ).to_dict()
-        return serialized
-    return plan_transition(
-        outgoing,
-        incoming,
-        context,
-        outgoing_track_entity_uid=outgoing_uid,
-        incoming_track_entity_uid=incoming_uid,
-        policy=policy,
-    ).to_dict()
+    else:
+        serialized = plan_transition(
+            outgoing,
+            incoming,
+            context,
+            outgoing_track_entity_uid=outgoing_uid,
+            incoming_track_entity_uid=incoming_uid,
+            policy=policy,
+        ).to_dict()
+    if (
+        _serves_policy_limits(edge.context)
+        and outgoing is not None
+        and incoming is not None
+    ):
+        # Crate Decks validates every plan it runs within the limits applied to it,
+        # the assist mode's long-blend ceiling included (S5).
+        serialized["policyLimits"] = policy_limits(
+            outgoing, incoming, context, policy
+        ).to_dict()
+    return serialized
 
 
 def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
@@ -789,6 +796,11 @@ def _bass_handoff_allowed(payload: TransitionContextRequest) -> bool:
 def _assist(payload: TransitionContextRequest) -> bool:
     """Crate Decks' assist mode asked for its longer long blends (S5)."""
     return payload.source == "decks" and payload.assist
+
+
+def _serves_policy_limits(payload: TransitionContextRequest) -> bool:
+    """Every decks plan carries the policy limits applied to it (S5)."""
+    return payload.source == "decks"
 
 
 def _local_refinement(payload: TransitionContextRequest) -> bool:
@@ -842,6 +854,10 @@ def _plan_cache_key(
         ),
         "context": _cache_context(edge.context),
     }
+    if _serves_policy_limits(edge.context):
+        # Decks plans gained policyLimits (S5): plans cached without them must not
+        # be served again. Other sources keep their keys.
+        cache_identity["policyLimits"] = True
     stems = stems if stems and policy.stems_layer else {}
     outgoing_uid = str(edge.outgoing_track_entity_uid)
     incoming_uid = str(edge.incoming_track_entity_uid)
