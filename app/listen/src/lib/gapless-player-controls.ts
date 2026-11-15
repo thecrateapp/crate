@@ -1,5 +1,6 @@
 import { Gapless5 } from "@/lib/gapless5/gapless5";
 import type { AudioRecoveryController } from "./gapless-player-audio-recovery";
+import { rampOutputGain, resetOutputGain } from "./gapless-player-output-fade";
 import {
   animateVolume,
   applyVolume,
@@ -67,8 +68,30 @@ export function createGaplessPlayerControls(
     intentGeneration += 1;
     pendingRecoveryIntent = null;
     stopFade();
+    resetOutputGain(host.getPlayer());
     return intentGeneration;
   };
+
+  // Settles an audio-clock fade once its ramp has run; a later intent turns
+  // the result into "cancelled" (its own beginIntent already reset the gain).
+  const settleAfter = (
+    durationMs: number,
+    intent: number,
+    onApplied?: () => void,
+  ): Promise<PlaybackIntentResult> =>
+    new Promise((resolve) => {
+      window.setTimeout(
+        () => {
+          if (!isCurrentIntent(intent)) {
+            resolve("cancelled");
+            return;
+          }
+          onApplied?.();
+          resolve("applied");
+        },
+        Math.max(0, durationMs),
+      );
+    });
 
   const isCurrentIntent = (intent: number): boolean =>
     intent === intentGeneration;
@@ -256,7 +279,16 @@ export function createGaplessPlayerControls(
     durationMs = DEFAULT_FADE_MS,
   ): Promise<PlaybackIntentResult> => {
     const intent = beginIntent();
-    if (!host.getPlayer()) return Promise.resolve("applied");
+    const player = host.getPlayer();
+    if (!player) return Promise.resolve("applied");
+    if (rampOutputGain(player, "current", 0, durationMs)) {
+      return settleAfter(durationMs, intent, () => {
+        const current = host.getPlayer();
+        current?.pause();
+        host.setPlaybackActive(false);
+        resetOutputGain(current);
+      });
+    }
     const startVolume = getAppliedVolume();
     return new Promise((resolve) => {
       animateVolume(startVolume, 0, durationMs, () => {
@@ -277,10 +309,15 @@ export function createGaplessPlayerControls(
   ): Promise<PlaybackIntentResult> => {
     const intent = beginIntent();
     if (!host.getPlayer()) return "applied";
+    let onAudioClock = false;
     const startPlayback = (): void => {
-      applyVolume(0);
+      const player = host.getPlayer();
+      // The ramp is scheduled before play(), so the first audible sample is
+      // already on it, however long recovery or the page takes afterwards.
+      onAudioClock = rampOutputGain(player, 0, 1, durationMs);
+      applyVolume(onAudioClock ? getLastVolume() : 0);
       host.setPlaybackActive(true);
-      host.getPlayer()?.play();
+      player?.play();
     };
     const result = await startPlaybackWithRecovery(
       "fadeInAndPlay",
@@ -288,6 +325,7 @@ export function createGaplessPlayerControls(
       intent,
     );
     if (result === "cancelled") return result;
+    if (onAudioClock) return settleAfter(durationMs, intent);
     return new Promise((resolve) => {
       animateVolume(0, getLastVolume(), durationMs, () => {
         resolve(isCurrentIntent(intent) ? "applied" : "cancelled");
