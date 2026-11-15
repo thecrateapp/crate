@@ -435,3 +435,42 @@ The following values are acceptance targets; the review has not measured them ye
 Delivery is organized into releases R1–R4 of the [plan](smart-mix-implementation-plan.md) §1.1: correct Android adaptive, VDJ A on macOS arm64, VDJ B and platforms, and advanced execution. Each release closes with its gate and its evidence, without waiting for the following ones. The extensions that the plan leaves in the backlog (private cues, radio and presence in VDJ, encrypted audio cache, summary federation) do not block any closure. A failed gate keeps its release open; moving work between release and backlog requires editing the plan, not renaming incomplete work as optional.
 
 Rollout keeps separate switches: Smart Mix backend, Android adaptive, beatmatch, bass, VDJ source and C. The affected mode is disabled first; a rollback of compatible binaries does not automatically run a destructive downgrade of profiles/tokens/cues. Users and operators must be able to disable it from Settings/flags and keep ordinary playback. The operational details and the decision changelog live in the plan.
+
+## 8. Crate Decks consumer
+
+Crate Decks (the desktop DJ client) is a third executor of the same transition plans. It runs them in its AutoDJ mode ("Crate Smart Mix") and in an assist mode, where a DJ mixing by hand sees the suggested plan and runs it with a button or a controller mapping. It uses `POST /api/playback/transition-plans` like Android, with `context.source = "decks"` (Decks contract S5). The plan format does not change: a Decks plan is a `plannerVersion: 2` plan with the same fields, modes and bounds as Android's, and smart-mix-v2 and smart-mix-v3 both accept the context.
+
+### 8.1 The `decks` context
+
+`source = "decks"` plans like `playlist`, with four differences:
+
+- **Bass handoff.** A Decks request gets `bassHandoff: "balanced"` only when it sends `allowBassHandoff` and the server advertises `bass_handoff` in `capabilities.decks.features`; the planner reads the same answer (`decks_bass_handoff_available()` in `app/crate/api/capabilities.py`), so the feature and the plans never disagree. The Android switch (`CRATE_ANDROID_BASS_HANDOFF_ENABLED`) does not govern Decks, and Decks' switches do not govern Android: Android plans and their cache keys are byte-for-byte those before S5.
+- **Assist mode.** `context.assist = true` raises the long-beatmatch ceiling (below). Other sources ignore the flag, and it only enters the plan cache key when it is on in the decks context.
+- **Policy limits on every plan.** Every decks plan carries `policyLimits` (decided by Diego, 2026-11-15), with smart-mix-v2 and smart-mix-v3 and with or without `localRefinement`, when both tracks have a profile. They are the limits applied to that plan, `maximumLongBeatmatchMs` included (48 000 for AutoDJ, 96 000 with `assist`), so Decks validates every plan it runs against them. Decks plan cache keys carry a `policyLimits` marker, so plans cached without the limits are not served again; other sources keep their plans, bytes and keys.
+- **Stems and the candidate menu.** smart-mix-v3 scores Decks' menus with the stems layer and serves `candidates` on `localRefinement`; Listen's intro and outro caps do not apply (Smart Mix Stems, STEM-D5 and STEM-D10).
+
+### 8.2 Capability flags
+
+`capabilities.decks.features` advertises the S5 features from switches of their own, never from `CRATE_ANDROID_*`:
+
+| Feature          | Present when                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| `beatmatch`      | `CRATE_SMART_MIX_ENABLED` and `CRATE_DECKS_BEATMATCH_ENABLED`                                           |
+| `bass_handoff`   | `beatmatch` and `CRATE_DECKS_BASS_HANDOFF_ENABLED`; the planner allows the Decks bass handoff only then |
+| `long_beatmatch` | `beatmatch` (the long blend is part of the same contract, as `android_long_beatmatch` is on Android)    |
+
+Both switches default to true (decided by Diego, 2026-11-15), so Decks gets beatmatch and the bass handoff wherever `CRATE_SMART_MIX_ENABLED` is on; an operator sets either to `false` to turn it off. The Android switches keep their false defaults. Decks shows its "Crate Smart Mix" AutoDJ mode only with `beatmatch`, sends `allowBassHandoff` only with `bass_handoff` and `allowLongBeatmatch` only with `long_beatmatch`. As on Android, the planner itself serves beatmatch to any client that asks; only the bass handoff is enforced on the server.
+
+### 8.3 Durations and the assist ceiling
+
+Decks' AutoDJ keeps Android's limits (D8, decided at G0): `incomingTempoRatio` from 0.94 to 1.06 with at most 4% tempo adjustment by policy, transitions from 1 to 12 s (`preferredDurationMs` stays capped at 12 s), and up to 48 s in a long beatmatch.
+
+The assist mode only allows longer long blends. With `assist` and `allowLongBeatmatch`, a long beatmatch may last up to `PlannerPolicy.assist_maximum_long_beatmatch_ms` instead of `maximum_long_beatmatch_ms`; `policy.long_beatmatch_ceiling_ms(policy, context)` resolves the ceiling, and the v2 window, the v3 menu, `policy_violations` and `policyLimits.maximumLongBeatmatchMs` all read it. Nothing else moves: the tempo limits, the long-blend stability floor (0.90), gains, true peak, the minimum bodies, the short-blend maximum and the v3 scores are the AutoDJ ones.
+
+The ceiling is one named policy setting, 96 s, decided by Diego, 2026-11-15: G0 approved longer transitions for the assist mode and left the figure to F6. The reasoning behind the figure:
+
+- Durations stay capped in bars. A long blend is still one of the planner's phrase lengths (32, 16 or 8 bars), so the ceiling only decides from which tempo the longest one fits.
+- At 48 s, 32 bars of 4/4 only fit from 160 BPM up (drum and bass); at 125 BPM the longest blend is 16 bars (30.7 s). At 96 s, twice the AutoDJ ceiling, 32 bars fit from 80 BPM up, so a house track at 125 BPM gets a 32-bar blend (61.4 s), which is how DJs commonly blend by hand.
+- Nothing longer than 32 bars is planned, so the ceiling never produces a blend of several minutes, and a DJ in the assist mode can cut any blend short.
+
+Changing the figure only changes that setting; the cache keys already separate assist plans, so no rules revision is needed for the change itself.

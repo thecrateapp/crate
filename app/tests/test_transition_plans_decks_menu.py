@@ -103,6 +103,10 @@ def plans(test_app, monkeypatch):
     monkeypatch.setattr(
         "crate.api.smart_mix.android_bass_handoff_enabled", lambda: True
     )
+    # Crate Decks' bass handoff has its own switch (S5).
+    monkeypatch.setattr(
+        "crate.api.smart_mix.decks_bass_handoff_available", lambda: True
+    )
 
     def post(edge: dict, planner: str = "smart-mix-v3") -> dict:
         response = test_app.post(
@@ -124,8 +128,11 @@ def test_menu_only_for_the_decks_context(plans) -> None:
     v2 = plans(_edge(DECKS_CONTEXT, localRefinement=True), planner="smart-mix-v2")
 
     for plan in (unflagged, playlist, v2):
-        assert "candidates" not in plan and "policyLimits" not in plan
-    assert "policyLimits" in flagged
+        assert "candidates" not in plan
+    # Every decks plan carries its limits (S5, 2026-11-15); the playlist one does not.
+    assert "policyLimits" not in playlist
+    for plan in (flagged, unflagged, v2):
+        assert "policyLimits" in plan
     menu = flagged["candidates"]
     assert 2 <= len(menu) <= PLANNER_POLICY_V3.max_candidates
     assert [candidate["index"] for candidate in menu] == list(range(len(menu)))

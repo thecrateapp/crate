@@ -66,11 +66,17 @@ def test_decks_reads_stems_and_a_contributor_may_upload(
     else:
         monkeypatch.delenv("CRATE_SMART_MIX_ENABLED", raising=False)
 
+    # Decks' own switches default to on, so Smart Mix also brings S5 (2026-11-15).
+    monkeypatch.delenv("CRATE_DECKS_BEATMATCH_ENABLED", raising=False)
+    monkeypatch.delenv("CRATE_DECKS_BASS_HANDOFF_ENABLED", raising=False)
+    s5 = ["beatmatch", "bass_handoff", "long_beatmatch"] if smart_mix else []
+
     features = _capabilities(test_app)["decks"]["features"]
 
     assert features == [
         "library_cursor",
         "profiles_batch",
+        *s5,
         "stems",
         "stem_upload",
         "local_refinement",

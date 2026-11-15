@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, replace
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from crate.smart_mix.models import TransitionContext
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +96,16 @@ class PlannerPolicy:
     minimum_transition_ms: int = 1_000
     maximum_transition_ms: int = 12_000
     maximum_long_beatmatch_ms: int = 48_000
+    # Crate Decks' assist mode (D8, F6.S-PR1): the long-beatmatch ceiling when a
+    # context of ``assist_sources`` sets ``assist``. G0 approved longer transitions
+    # for the assist mode only; 96 s (twice the AutoDJ ceiling) was decided by
+    # Diego, 2026-11-15.
+    # Durations stay capped in bars: a long blend is still one of
+    # ``long_beatmatch_phrase_bars`` (v2) or ``phrase_lengths`` (v3), so 96 s lets
+    # the longest phrase, 32 bars of 4/4, fit from 80 BPM up (48 s: from 160 BPM).
+    # Tempo, stability, gain and the short-blend maximum do not change.
+    assist_maximum_long_beatmatch_ms: int = 96_000
+    assist_sources: tuple[str, ...] = ("decks",)
     long_beatmatch_phrase_bars: tuple[int, ...] = (32, 16, 8)
     minimum_long_beatmatch_stability: float = 0.90
     minimum_outgoing_body_ratio: float = 0.5
@@ -173,6 +187,27 @@ class PlannerPolicy:
     listen_cap_exempt_sources: tuple[str, ...] = ("decks",)
 
 
+def long_beatmatch_ceiling_ms(
+    policy: PlannerPolicy, context: TransitionContext | None
+) -> int:
+    """The longest blend ``policy`` allows ``context``.
+
+    ``maximum_long_beatmatch_ms`` for every client, and
+    ``assist_maximum_long_beatmatch_ms`` for Crate Decks' assist mode (``assist`` on
+    a context of ``assist_sources``). Only the duration ceiling moves: whether a long
+    blend is allowed (``allow_long_beatmatch``, beatmatch, stability) does not.
+    """
+    if (
+        context is not None
+        and context.assist
+        and context.source in policy.assist_sources
+    ):
+        return max(
+            policy.maximum_long_beatmatch_ms, policy.assist_maximum_long_beatmatch_ms
+        )
+    return policy.maximum_long_beatmatch_ms
+
+
 PLANNER_POLICY = PlannerPolicy()
 # Smart Mix 3 planner: the v2 policy with its own identity and rules revision. The
 # safety limits (tempo, gain, true peak, durations) are v2's and must stay so.
@@ -202,4 +237,5 @@ __all__ = [
     "PlannerPolicy",
     "SMOOTH_FIT_WEIGHTS",
     "TransitionFitWeights",
+    "long_beatmatch_ceiling_ms",
 ]
