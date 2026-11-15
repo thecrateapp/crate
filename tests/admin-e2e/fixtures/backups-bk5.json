@@ -1,0 +1,1374 @@
+{
+  "now": "2026-11-10T16:50:00.000Z",
+  "/api/admin/backups/overview": {
+    "generated_at": "2026-11-10T16:50:00Z",
+    "destinations": [
+      {
+        "provider": "Backup volume",
+        "config": {
+          "path": "restic"
+        },
+        "secrets_set": [],
+        "missing_secrets": [],
+        "oauth": false,
+        "enabled": true,
+        "status": "ok",
+        "last_checked_at": "2026-11-10T03:32:00Z",
+        "last_error": null,
+        "repository_initialized_at": "2026-08-12T03:30:00Z",
+        "snapshot_count": 13,
+        "repository_bytes": 18897856102,
+        "recovery_kit_downloaded_at": null,
+        "recovery_kit_confirmed_at": "2026-08-12T04:00:00Z",
+        "created_at": "2026-08-12T03:00:00Z",
+        "updated_at": "2026-11-10T03:37:00Z",
+        "last_copy_at": "2026-11-10T03:32:00Z",
+        "last_copy_snapshot": null,
+        "late_after_hours": 36,
+        "tiers": ["daily", "weekly"],
+        "policy_ids": ["11111111-1111-4111-8111-111111111111"],
+        "last_verify": {
+          "status": "succeeded",
+          "started_at": "2026-11-07T04:00:00Z",
+          "finished_at": "2026-11-07T04:02:00Z"
+        },
+        "last_drill": {
+          "status": "succeeded",
+          "started_at": "2026-10-29T04:05:00Z",
+          "finished_at": "2026-10-29T04:14:00Z"
+        },
+        "kit_covered": true,
+        "id": "dest-local",
+        "kind": "local",
+        "name": "Backup volume",
+        "location": "/backups/restic",
+        "health": "healthy"
+      },
+      {
+        "provider": "S3-compatible (Cloudflare R2, Wasabi, MinIO, Hetzner, AWS)",
+        "config": {
+          "endpoint": "https://5f0c2a9e1b7d4c3a8e6f2b1d9c4a7e30.r2.cloudflarestorage.com",
+          "bucket": "crate-backups",
+          "prefix": "db",
+          "region": "auto",
+          "bucket_lookup": "auto"
+        },
+        "secrets_set": ["access_key_id", "secret_access_key"],
+        "missing_secrets": [],
+        "oauth": false,
+        "enabled": true,
+        "status": "ok",
+        "last_checked_at": "2026-11-10T03:37:00Z",
+        "last_error": null,
+        "repository_initialized_at": "2026-08-12T03:30:00Z",
+        "snapshot_count": 13,
+        "repository_bytes": 19219978650,
+        "recovery_kit_downloaded_at": null,
+        "recovery_kit_confirmed_at": null,
+        "created_at": "2026-08-12T03:00:00Z",
+        "updated_at": "2026-11-10T03:37:00Z",
+        "last_copy_at": "2026-11-10T03:37:00Z",
+        "last_copy_snapshot": null,
+        "late_after_hours": 36,
+        "tiers": ["daily", "weekly", "monthly"],
+        "policy_ids": ["11111111-1111-4111-8111-111111111111"],
+        "last_verify": {
+          "status": "running",
+          "started_at": "2026-11-10T16:42:00Z"
+        },
+        "last_drill": {
+          "status": "succeeded",
+          "started_at": "2026-10-29T04:05:00Z",
+          "finished_at": "2026-10-29T04:14:00Z"
+        },
+        "kit_covered": false,
+        "id": "dest-r2",
+        "kind": "s3",
+        "name": "Cloudflare R2",
+        "location": "5f0c2a9e1b7d4c3a8e6f2b1d9c4a7e30.r2.cloudflarestorage.com/crate-backups/db",
+        "health": "healthy"
+      },
+      {
+        "provider": "Google Drive",
+        "config": {
+          "path": "crate-backups/db",
+          "root_folder_id": "",
+          "client_id": "418530221944-q2n8s1m0v7c4k9e3h6t5b0a2d1f8g7j.apps.googleusercontent.com"
+        },
+        "secrets_set": ["client_secret", "token"],
+        "missing_secrets": [],
+        "oauth": true,
+        "enabled": true,
+        "status": "ok",
+        "last_checked_at": "2026-11-09T03:41:00Z",
+        "last_error": null,
+        "repository_initialized_at": "2026-08-12T03:30:00Z",
+        "snapshot_count": 12,
+        "repository_bytes": 17609365914,
+        "recovery_kit_downloaded_at": null,
+        "recovery_kit_confirmed_at": null,
+        "created_at": "2026-08-12T03:00:00Z",
+        "updated_at": "2026-11-10T03:37:00Z",
+        "last_copy_at": "2026-11-09T03:41:00Z",
+        "last_copy_snapshot": null,
+        "late_after_hours": 36,
+        "tiers": ["daily", "weekly", "monthly"],
+        "policy_ids": ["11111111-1111-4111-8111-111111111111"],
+        "last_verify": {
+          "status": "succeeded",
+          "started_at": "2026-11-08T05:12:00Z",
+          "finished_at": "2026-11-08T05:23:00Z"
+        },
+        "last_drill": {
+          "status": "succeeded",
+          "started_at": "2026-10-01T04:00:00Z",
+          "finished_at": "2026-10-01T04:09:00Z"
+        },
+        "kit_covered": false,
+        "id": "dest-gdrive",
+        "kind": "gdrive",
+        "name": "Google Drive",
+        "location": "Google Drive: crate-backups/db",
+        "health": "late"
+      },
+      {
+        "provider": "SFTP (Hetzner Storage Box, rsync.net, a home server)",
+        "config": {
+          "host": "u412345.your-storagebox.de",
+          "port": 23,
+          "user": "u412345",
+          "path": "crate/restic",
+          "known_hosts": "[u412345.your-storagebox.de]:23 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIICf9svRenC/PLKIL9nk6K/pxQgoiFC41wTNvoIncOxs",
+          "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK7v3cQ9yLw2mXn0aR8tP4sJ1fH6dB5eZqU0oN2kV9gT crate-backups@Hetzner Storage Box"
+        },
+        "secrets_set": ["private_key"],
+        "missing_secrets": [],
+        "oauth": false,
+        "enabled": true,
+        "status": "failing",
+        "last_checked_at": "2026-11-10T16:34:00Z",
+        "last_error": "Permission denied (publickey) since 9 Nov 03:40.",
+        "repository_initialized_at": "2026-08-12T03:30:00Z",
+        "snapshot_count": 6,
+        "repository_bytes": 8697308774,
+        "recovery_kit_downloaded_at": null,
+        "recovery_kit_confirmed_at": null,
+        "created_at": "2026-08-12T03:00:00Z",
+        "updated_at": "2026-11-10T03:37:00Z",
+        "last_copy_at": "2026-11-02T03:44:00Z",
+        "last_copy_snapshot": null,
+        "late_after_hours": 252,
+        "tiers": ["weekly", "monthly"],
+        "policy_ids": ["11111111-1111-4111-8111-111111111111"],
+        "last_verify": {
+          "status": "succeeded",
+          "started_at": "2026-10-26T04:00:00Z",
+          "finished_at": "2026-10-26T04:05:00Z"
+        },
+        "last_drill": null,
+        "kit_covered": false,
+        "id": "dest-hetzner",
+        "kind": "sftp",
+        "name": "Hetzner Storage Box",
+        "location": "u412345@u412345.your-storagebox.de:23/crate/restic",
+        "health": "failing"
+      },
+      {
+        "provider": "Dropbox",
+        "config": {
+          "path": "crate-backups",
+          "client_id": "k3x9w2pq7m4t1zr"
+        },
+        "secrets_set": ["client_secret"],
+        "missing_secrets": ["token"],
+        "oauth": true,
+        "enabled": false,
+        "status": "untested",
+        "last_checked_at": null,
+        "last_error": null,
+        "repository_initialized_at": null,
+        "snapshot_count": null,
+        "repository_bytes": null,
+        "recovery_kit_downloaded_at": null,
+        "recovery_kit_confirmed_at": null,
+        "created_at": "2026-08-12T03:00:00Z",
+        "updated_at": "2026-11-10T03:37:00Z",
+        "last_copy_at": null,
+        "last_copy_snapshot": null,
+        "late_after_hours": 36,
+        "tiers": [],
+        "policy_ids": [],
+        "last_verify": null,
+        "last_drill": null,
+        "kit_covered": false,
+        "id": "dest-dropbox",
+        "kind": "dropbox",
+        "name": "Dropbox",
+        "location": "Dropbox: crate-backups",
+        "health": "disabled"
+      },
+      {
+        "provider": "S3-compatible (Cloudflare R2, Wasabi, MinIO, Hetzner, AWS)",
+        "config": {
+          "endpoint": "https://minio.home.arpa:9000",
+          "bucket": "crate",
+          "prefix": "",
+          "region": "",
+          "bucket_lookup": "path"
+        },
+        "secrets_set": ["access_key_id", "secret_access_key"],
+        "missing_secrets": [],
+        "oauth": false,
+        "enabled": false,
+        "status": "ok",
+        "last_checked_at": "2026-10-07T03:36:00Z",
+        "last_error": null,
+        "repository_initialized_at": "2026-08-12T03:30:00Z",
+        "snapshot_count": 9,
+        "repository_bytes": 12025908429,
+        "recovery_kit_downloaded_at": null,
+        "recovery_kit_confirmed_at": "2026-08-12T04:00:00Z",
+        "created_at": "2026-08-12T03:00:00Z",
+        "updated_at": "2026-11-10T03:37:00Z",
+        "last_copy_at": "2026-10-07T03:36:00Z",
+        "last_copy_snapshot": null,
+        "late_after_hours": 36,
+        "tiers": [],
+        "policy_ids": [],
+        "last_verify": {
+          "status": "succeeded",
+          "started_at": "2026-10-06T04:00:00Z",
+          "finished_at": "2026-10-06T04:03:00Z"
+        },
+        "last_drill": null,
+        "kit_covered": true,
+        "id": "dest-minio",
+        "kind": "s3",
+        "name": "MinIO at home",
+        "location": "minio.home.arpa:9000/crate",
+        "health": "disabled"
+      }
+    ],
+    "failing_count": 1,
+    "late_count": 1,
+    "kit": {
+      "saved": false,
+      "uncovered": 4,
+      "total": 6,
+      "downloaded_at": null
+    },
+    "stats": {
+      "last_copy_at": "2026-11-10T03:37:00Z",
+      "last_copy_destination": "Cloudflare R2",
+      "stored_bytes": 64424509440,
+      "repositories": 4,
+      "snapshots": 44,
+      "latest_dump": {
+        "status": "succeeded",
+        "started_at": "2026-11-10T03:30:00Z",
+        "finished_at": "2026-11-10T03:31:52Z",
+        "bytes": 1481763717,
+        "checksum": "sha256:2f1c…"
+      },
+      "last_verify": {
+        "at": "2026-11-08T05:23:00Z",
+        "destination_id": "dest-gdrive",
+        "destination": "Google Drive",
+        "status": "succeeded",
+        "details": {
+          "read_percent": 5,
+          "snapshot_count": 12
+        }
+      },
+      "last_drill": {
+        "at": "2026-10-29T04:14:00Z",
+        "destination_id": "dest-r2",
+        "destination": "Cloudflare R2",
+        "status": "succeeded",
+        "details": {}
+      }
+    },
+    "alerts": [
+      {
+        "level": "danger",
+        "kind": "destination_failing",
+        "destination_id": "dest-hetzner",
+        "title": "Hetzner Storage Box is failing",
+        "text": "The server refuses Crate's SSH key since 9 Nov 03:40. Its last good copy is 8 days old.",
+        "at": "2026-11-09T03:44:00Z",
+        "action": "test"
+      },
+      {
+        "level": "warning",
+        "kind": "copy_late",
+        "destination_id": "dest-gdrive",
+        "title": "No recent copy on Google Drive",
+        "text": "No good copy within 36 hours, 1.5 times its schedule.",
+        "at": "2026-11-09T03:41:00Z",
+        "action": "run"
+      }
+    ],
+    "size_series": [
+      {
+        "destination_id": "dest-r2",
+        "name": "Cloudflare R2",
+        "points": [
+          {
+            "day": "2026-08-12",
+            "bytes": 1717986918
+          },
+          {
+            "day": "2026-08-15",
+            "bytes": 4080218931
+          },
+          {
+            "day": "2026-08-18",
+            "bytes": 6012954214
+          },
+          {
+            "day": "2026-08-21",
+            "bytes": 7623566950
+          },
+          {
+            "day": "2026-08-24",
+            "bytes": 8912057139
+          },
+          {
+            "day": "2026-08-27",
+            "bytes": 10093173146
+          },
+          {
+            "day": "2026-08-30",
+            "bytes": 11059540787
+          },
+          {
+            "day": "2026-09-02",
+            "bytes": 12133282611
+          },
+          {
+            "day": "2026-09-05",
+            "bytes": 13099650253
+          },
+          {
+            "day": "2026-09-08",
+            "bytes": 14173392077
+          },
+          {
+            "day": "2026-09-11",
+            "bytes": 15032385536
+          },
+          {
+            "day": "2026-09-14",
+            "bytes": 15784004813
+          },
+          {
+            "day": "2026-09-17",
+            "bytes": 16320875725
+          },
+          {
+            "day": "2026-09-20",
+            "bytes": 16642998272
+          },
+          {
+            "day": "2026-09-23",
+            "bytes": 16857746637
+          },
+          {
+            "day": "2026-09-26",
+            "bytes": 16965120819
+          },
+          {
+            "day": "2026-09-29",
+            "bytes": 17072495002
+          },
+          {
+            "day": "2026-10-02",
+            "bytes": 17287243366
+          },
+          {
+            "day": "2026-10-05",
+            "bytes": 17609365914
+          },
+          {
+            "day": "2026-10-08",
+            "bytes": 17931488461
+          },
+          {
+            "day": "2026-10-11",
+            "bytes": 18360985190
+          },
+          {
+            "day": "2026-10-14",
+            "bytes": 18683107738
+          },
+          {
+            "day": "2026-10-17",
+            "bytes": 18897856102
+          },
+          {
+            "day": "2026-10-20",
+            "bytes": 19005230285
+          },
+          {
+            "day": "2026-10-23",
+            "bytes": 18897856102
+          },
+          {
+            "day": "2026-10-26",
+            "bytes": 18790481920
+          },
+          {
+            "day": "2026-10-29",
+            "bytes": 18683107738
+          },
+          {
+            "day": "2026-11-01",
+            "bytes": 18575733555
+          },
+          {
+            "day": "2026-11-04",
+            "bytes": 18683107738
+          },
+          {
+            "day": "2026-11-07",
+            "bytes": 18897856102
+          },
+          {
+            "day": "2026-11-10",
+            "bytes": 19112604467
+          }
+        ]
+      },
+      {
+        "destination_id": "dest-gdrive",
+        "name": "Google Drive",
+        "points": [
+          {
+            "day": "2026-08-18",
+            "bytes": 1717986918
+          },
+          {
+            "day": "2026-08-21",
+            "bytes": 3650722202
+          },
+          {
+            "day": "2026-08-24",
+            "bytes": 5368709120
+          },
+          {
+            "day": "2026-08-27",
+            "bytes": 6764573491
+          },
+          {
+            "day": "2026-08-30",
+            "bytes": 8053063680
+          },
+          {
+            "day": "2026-09-02",
+            "bytes": 9234179686
+          },
+          {
+            "day": "2026-09-05",
+            "bytes": 10522669875
+          },
+          {
+            "day": "2026-09-08",
+            "bytes": 11596411699
+          },
+          {
+            "day": "2026-09-11",
+            "bytes": 12670153523
+          },
+          {
+            "day": "2026-09-14",
+            "bytes": 13529146982
+          },
+          {
+            "day": "2026-09-17",
+            "bytes": 14173392077
+          },
+          {
+            "day": "2026-09-20",
+            "bytes": 14602888806
+          },
+          {
+            "day": "2026-09-23",
+            "bytes": 14817637171
+          },
+          {
+            "day": "2026-09-26",
+            "bytes": 15032385536
+          },
+          {
+            "day": "2026-09-29",
+            "bytes": 15247133901
+          },
+          {
+            "day": "2026-10-02",
+            "bytes": 15461882266
+          },
+          {
+            "day": "2026-10-05",
+            "bytes": 15891378995
+          },
+          {
+            "day": "2026-10-08",
+            "bytes": 16320875725
+          },
+          {
+            "day": "2026-10-11",
+            "bytes": 16750372454
+          },
+          {
+            "day": "2026-10-14",
+            "bytes": 17072495002
+          },
+          {
+            "day": "2026-10-17",
+            "bytes": 17287243366
+          },
+          {
+            "day": "2026-10-20",
+            "bytes": 17394617549
+          },
+          {
+            "day": "2026-10-23",
+            "bytes": 17394617549
+          },
+          {
+            "day": "2026-10-26",
+            "bytes": 17287243366
+          },
+          {
+            "day": "2026-10-29",
+            "bytes": 17179869184
+          },
+          {
+            "day": "2026-11-01",
+            "bytes": 17072495002
+          },
+          {
+            "day": "2026-11-04",
+            "bytes": 17179869184
+          },
+          {
+            "day": "2026-11-07",
+            "bytes": 17394617549
+          },
+          {
+            "day": "2026-11-10",
+            "bytes": 17716740096
+          }
+        ]
+      },
+      {
+        "destination_id": "dest-local",
+        "name": "Backup volume",
+        "points": [
+          {
+            "day": "2026-08-12",
+            "bytes": 1717986918
+          },
+          {
+            "day": "2026-08-15",
+            "bytes": 3972844749
+          },
+          {
+            "day": "2026-08-18",
+            "bytes": 5905580032
+          },
+          {
+            "day": "2026-08-21",
+            "bytes": 7516192768
+          },
+          {
+            "day": "2026-08-24",
+            "bytes": 8804682957
+          },
+          {
+            "day": "2026-08-27",
+            "bytes": 9878424781
+          },
+          {
+            "day": "2026-08-30",
+            "bytes": 10844792422
+          },
+          {
+            "day": "2026-09-02",
+            "bytes": 11918534246
+          },
+          {
+            "day": "2026-09-05",
+            "bytes": 12884901888
+          },
+          {
+            "day": "2026-09-08",
+            "bytes": 13851269530
+          },
+          {
+            "day": "2026-09-11",
+            "bytes": 14710262989
+          },
+          {
+            "day": "2026-09-14",
+            "bytes": 15461882266
+          },
+          {
+            "day": "2026-09-17",
+            "bytes": 15998753178
+          },
+          {
+            "day": "2026-09-20",
+            "bytes": 16320875725
+          },
+          {
+            "day": "2026-09-23",
+            "bytes": 16428249907
+          },
+          {
+            "day": "2026-09-26",
+            "bytes": 16535624090
+          },
+          {
+            "day": "2026-09-29",
+            "bytes": 16750372454
+          },
+          {
+            "day": "2026-10-02",
+            "bytes": 16857746637
+          },
+          {
+            "day": "2026-10-05",
+            "bytes": 17179869184
+          },
+          {
+            "day": "2026-10-08",
+            "bytes": 17609365914
+          },
+          {
+            "day": "2026-10-11",
+            "bytes": 17931488461
+          },
+          {
+            "day": "2026-10-14",
+            "bytes": 18253611008
+          },
+          {
+            "day": "2026-10-17",
+            "bytes": 18468359373
+          },
+          {
+            "day": "2026-10-20",
+            "bytes": 18575733555
+          },
+          {
+            "day": "2026-10-23",
+            "bytes": 18468359373
+          },
+          {
+            "day": "2026-10-26",
+            "bytes": 18360985190
+          },
+          {
+            "day": "2026-10-29",
+            "bytes": 18253611008
+          },
+          {
+            "day": "2026-11-01",
+            "bytes": 18146236826
+          },
+          {
+            "day": "2026-11-04",
+            "bytes": 18253611008
+          },
+          {
+            "day": "2026-11-07",
+            "bytes": 18468359373
+          },
+          {
+            "day": "2026-11-10",
+            "bytes": 18683107738
+          }
+        ]
+      },
+      {
+        "destination_id": "dest-hetzner",
+        "name": "Hetzner Storage Box",
+        "points": [
+          {
+            "day": "2026-09-05",
+            "bytes": 1181116006
+          },
+          {
+            "day": "2026-09-08",
+            "bytes": 2469606195
+          },
+          {
+            "day": "2026-09-11",
+            "bytes": 3758096384
+          },
+          {
+            "day": "2026-09-14",
+            "bytes": 4724464026
+          },
+          {
+            "day": "2026-09-17",
+            "bytes": 5476083302
+          },
+          {
+            "day": "2026-09-20",
+            "bytes": 6012954214
+          },
+          {
+            "day": "2026-09-23",
+            "bytes": 6442450944
+          },
+          {
+            "day": "2026-09-26",
+            "bytes": 6764573491
+          },
+          {
+            "day": "2026-09-29",
+            "bytes": 6979321856
+          },
+          {
+            "day": "2026-10-02",
+            "bytes": 7301444403
+          },
+          {
+            "day": "2026-10-05",
+            "bytes": 7730941133
+          },
+          {
+            "day": "2026-10-08",
+            "bytes": 8160437862
+          },
+          {
+            "day": "2026-10-11",
+            "bytes": 8697308774
+          },
+          {
+            "day": "2026-10-14",
+            "bytes": 9126805504
+          },
+          {
+            "day": "2026-10-17",
+            "bytes": 9341553869
+          },
+          {
+            "day": "2026-10-20",
+            "bytes": 9448928051
+          },
+          {
+            "day": "2026-10-23",
+            "bytes": 9448928051
+          },
+          {
+            "day": "2026-10-26",
+            "bytes": 9341553869
+          },
+          {
+            "day": "2026-10-29",
+            "bytes": 9341553869
+          },
+          {
+            "day": "2026-11-01",
+            "bytes": 9234179686
+          },
+          {
+            "day": "2026-11-04",
+            "bytes": 9234179686
+          },
+          {
+            "day": "2026-11-07",
+            "bytes": 9234179686
+          },
+          {
+            "day": "2026-11-10",
+            "bytes": 9234179686
+          }
+        ]
+      }
+    ],
+    "policies": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "name": "Nightly",
+        "enabled": true,
+        "schedule_kind": "daily",
+        "next_run": "2026-11-11T03:30:00Z",
+        "destination_count": 4
+      },
+      {
+        "id": "22222222-2222-4222-8222-222222222222",
+        "name": "Before upgrades",
+        "enabled": true,
+        "schedule_kind": "manual",
+        "next_run": null,
+        "destination_count": 2
+      }
+    ],
+    "local_retention": {
+      "keep_daily": 3,
+      "keep_weekly": 4,
+      "keep_monthly": 3
+    },
+    "local_backups_enabled": true
+  },
+  "/api/admin/backups/policies": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "Nightly",
+      "enabled": true,
+      "schedule_kind": "daily",
+      "daily_at": "03:30",
+      "interval_hours": null,
+      "window_start": "02:00",
+      "window_end": "06:00",
+      "keep_daily": 7,
+      "keep_weekly": 4,
+      "keep_monthly": 3,
+      "compression": "auto",
+      "verify_every_days": 7,
+      "verify_read_percent": 5,
+      "drill_every_days": 30,
+      "drill_destination_id": null,
+      "run_before_upgrade": false,
+      "next_run": "2026-11-11T03:30:00Z",
+      "destinations": {
+        "dest-local": ["daily", "weekly"],
+        "dest-r2": ["daily", "weekly", "monthly"],
+        "dest-gdrive": ["daily", "weekly", "monthly"],
+        "dest-hetzner": ["weekly", "monthly"]
+      }
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "Before upgrades",
+      "enabled": true,
+      "schedule_kind": "manual",
+      "daily_at": null,
+      "interval_hours": null,
+      "window_start": null,
+      "window_end": null,
+      "keep_daily": 0,
+      "keep_weekly": 0,
+      "keep_monthly": 3,
+      "compression": "auto",
+      "verify_every_days": 0,
+      "verify_read_percent": 5,
+      "drill_every_days": 0,
+      "drill_destination_id": null,
+      "run_before_upgrade": true,
+      "next_run": null,
+      "destinations": {
+        "dest-local": ["monthly"],
+        "dest-r2": ["monthly"]
+      }
+    }
+  ],
+  "/api/admin/backups/providers": [
+    {
+      "kind": "local",
+      "label": "Backup volume",
+      "oauth": false,
+      "config_fields": [
+        {
+          "name": "path",
+          "label": "Folder in the backup directory",
+          "required": true,
+          "system": false
+        }
+      ],
+      "secret_fields": []
+    },
+    {
+      "kind": "s3",
+      "label": "S3-compatible (Cloudflare R2, Wasabi, MinIO, Hetzner, AWS)",
+      "oauth": false,
+      "config_fields": [
+        {
+          "name": "endpoint",
+          "label": "Endpoint URL",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "bucket",
+          "label": "Bucket",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "prefix",
+          "label": "Folder in the bucket",
+          "required": false,
+          "system": false,
+          "default": ""
+        },
+        {
+          "name": "region",
+          "label": "Region",
+          "required": false,
+          "system": false,
+          "default": ""
+        },
+        {
+          "name": "bucket_lookup",
+          "label": "Bucket lookup",
+          "required": false,
+          "system": false,
+          "default": "auto"
+        }
+      ],
+      "secret_fields": [
+        {
+          "name": "access_key_id",
+          "label": "Access key ID",
+          "required": true,
+          "system": false,
+          "secret": true
+        },
+        {
+          "name": "secret_access_key",
+          "label": "Secret access key",
+          "required": true,
+          "system": false,
+          "secret": true
+        }
+      ]
+    },
+    {
+      "kind": "b2",
+      "label": "Backblaze B2",
+      "oauth": false,
+      "config_fields": [
+        {
+          "name": "bucket",
+          "label": "Bucket",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "prefix",
+          "label": "Folder in the bucket",
+          "required": false,
+          "system": false,
+          "default": ""
+        }
+      ],
+      "secret_fields": [
+        {
+          "name": "key_id",
+          "label": "Application key ID",
+          "required": true,
+          "system": false,
+          "secret": true
+        },
+        {
+          "name": "application_key",
+          "label": "Application key",
+          "required": true,
+          "system": false,
+          "secret": true
+        }
+      ]
+    },
+    {
+      "kind": "sftp",
+      "label": "SFTP (Hetzner Storage Box, rsync.net, a home server)",
+      "oauth": false,
+      "config_fields": [
+        {
+          "name": "host",
+          "label": "Host",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "port",
+          "label": "Port",
+          "required": false,
+          "system": false,
+          "default": 22
+        },
+        {
+          "name": "user",
+          "label": "User",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "path",
+          "label": "Folder on the server",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "known_hosts",
+          "label": "Pinned host key",
+          "required": false,
+          "system": false,
+          "default": ""
+        },
+        {
+          "name": "public_key",
+          "label": "Public key",
+          "required": false,
+          "system": true
+        }
+      ],
+      "secret_fields": [
+        {
+          "name": "private_key",
+          "label": "Private key",
+          "required": false,
+          "system": true,
+          "secret": true
+        }
+      ]
+    },
+    {
+      "kind": "gdrive",
+      "label": "Google Drive",
+      "oauth": true,
+      "config_fields": [
+        {
+          "name": "path",
+          "label": "Folder",
+          "required": false,
+          "system": false,
+          "default": "crate-backups"
+        },
+        {
+          "name": "root_folder_id",
+          "label": "Root folder ID",
+          "required": false,
+          "system": false,
+          "default": ""
+        },
+        {
+          "name": "client_id",
+          "label": "OAuth client ID",
+          "required": false,
+          "system": false,
+          "default": ""
+        }
+      ],
+      "secret_fields": [
+        {
+          "name": "client_secret",
+          "label": "OAuth client secret",
+          "required": false,
+          "system": false,
+          "secret": true
+        },
+        {
+          "name": "token",
+          "label": "OAuth token",
+          "required": false,
+          "system": false,
+          "secret": true
+        }
+      ]
+    },
+    {
+      "kind": "dropbox",
+      "label": "Dropbox",
+      "oauth": true,
+      "config_fields": [
+        {
+          "name": "path",
+          "label": "Folder",
+          "required": false,
+          "system": false,
+          "default": "crate-backups"
+        },
+        {
+          "name": "client_id",
+          "label": "App key",
+          "required": false,
+          "system": false,
+          "default": ""
+        }
+      ],
+      "secret_fields": [
+        {
+          "name": "client_secret",
+          "label": "App secret",
+          "required": false,
+          "system": false,
+          "secret": true
+        },
+        {
+          "name": "token",
+          "label": "OAuth token",
+          "required": false,
+          "system": false,
+          "secret": true
+        }
+      ]
+    }
+  ],
+  "/api/admin/backups/runs": {
+    "items": [
+      {
+        "task_id": "task-r1",
+        "policy_id": null,
+        "policy_name": null,
+        "destination_id": "dest-r2",
+        "destination_name": "Cloudflare R2",
+        "finished_at": null,
+        "duration_seconds": null,
+        "bytes": null,
+        "snapshot_id": null,
+        "error": null,
+        "details": {},
+        "id": "r1",
+        "kind": "verify",
+        "status": "running",
+        "started_at": "2026-11-10T16:42:00Z"
+      },
+      {
+        "task_id": "task-r2",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": "dest-r2",
+        "destination_name": "Cloudflare R2",
+        "finished_at": null,
+        "duration_seconds": 221,
+        "bytes": 1406601789,
+        "snapshot_id": "a91f03c2d4e5f6a7",
+        "error": null,
+        "details": {},
+        "id": "r2",
+        "kind": "offsite",
+        "status": "succeeded",
+        "started_at": "2026-11-10T03:37:00Z"
+      },
+      {
+        "task_id": "task-r3",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": "dest-local",
+        "destination_name": "Backup volume",
+        "finished_at": null,
+        "duration_seconds": 38,
+        "bytes": 1406601789,
+        "snapshot_id": "7c2e91fa00112233",
+        "error": null,
+        "details": {},
+        "id": "r3",
+        "kind": "offsite",
+        "status": "succeeded",
+        "started_at": "2026-11-10T03:32:00Z"
+      },
+      {
+        "task_id": "task-r4",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": null,
+        "destination_name": null,
+        "finished_at": null,
+        "duration_seconds": 2,
+        "bytes": null,
+        "snapshot_id": null,
+        "error": null,
+        "details": {
+          "deleted": ["crate-20261103-0330.dump"]
+        },
+        "id": "r4",
+        "kind": "local_retention",
+        "status": "succeeded",
+        "started_at": "2026-11-10T03:32:00Z"
+      },
+      {
+        "task_id": "task-r5",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": null,
+        "destination_name": null,
+        "finished_at": null,
+        "duration_seconds": 112,
+        "bytes": 1481763717,
+        "snapshot_id": null,
+        "error": null,
+        "details": {},
+        "id": "r5",
+        "kind": "dump",
+        "status": "succeeded",
+        "started_at": "2026-11-10T03:30:00Z",
+        "path": "/backups/dumps/crate-20261110-0330.dump"
+      },
+      {
+        "task_id": "7d2e5b1c9a41c",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": "dest-hetzner",
+        "destination_name": "Hetzner Storage Box",
+        "finished_at": null,
+        "duration_seconds": 4,
+        "bytes": null,
+        "snapshot_id": null,
+        "error": "subprocess ssh: u412345@u412345.your-storagebox.de: Permission denied (publickey).\nFatal: unable to open repository at sftp:u412345@u412345.your-storagebox.de:23/crate/restic: unable to start the sftp session, error: EOF",
+        "details": {
+          "tags": ["weekly"]
+        },
+        "id": "6f1c0b9e-0000-4000-8000-000000000006",
+        "kind": "offsite",
+        "status": "failed",
+        "started_at": "2026-11-09T03:44:00Z"
+      },
+      {
+        "task_id": "task-r7",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": "dest-gdrive",
+        "destination_name": "Google Drive",
+        "finished_at": null,
+        "duration_seconds": 363,
+        "bytes": 1395864371,
+        "snapshot_id": "e04d6b1700000000",
+        "error": null,
+        "details": {},
+        "id": "r7",
+        "kind": "offsite",
+        "status": "succeeded",
+        "started_at": "2026-11-09T03:41:00Z"
+      },
+      {
+        "task_id": "task-r8",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": "dest-r2",
+        "destination_name": "Cloudflare R2",
+        "finished_at": null,
+        "duration_seconds": 218,
+        "bytes": 1395864371,
+        "snapshot_id": "3b8c55e000000000",
+        "error": null,
+        "details": {},
+        "id": "r8",
+        "kind": "offsite",
+        "status": "succeeded",
+        "started_at": "2026-11-09T03:36:00Z"
+      },
+      {
+        "task_id": "task-r9",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": "dest-local",
+        "destination_name": "Backup volume",
+        "finished_at": null,
+        "duration_seconds": 36,
+        "bytes": 1395864371,
+        "snapshot_id": "c61a2d9400000000",
+        "error": null,
+        "details": {},
+        "id": "r9",
+        "kind": "offsite",
+        "status": "succeeded",
+        "started_at": "2026-11-09T03:32:00Z"
+      },
+      {
+        "task_id": "task-r10",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": null,
+        "destination_name": null,
+        "finished_at": null,
+        "duration_seconds": 110,
+        "bytes": 1471026299,
+        "snapshot_id": null,
+        "error": null,
+        "details": {},
+        "id": "r10",
+        "kind": "dump",
+        "status": "succeeded",
+        "started_at": "2026-11-09T03:30:00Z"
+      },
+      {
+        "task_id": "task-r11",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": "dest-gdrive",
+        "destination_name": "Google Drive",
+        "finished_at": null,
+        "duration_seconds": 680,
+        "bytes": null,
+        "snapshot_id": null,
+        "error": null,
+        "details": {
+          "read_percent": 5
+        },
+        "id": "r11",
+        "kind": "verify",
+        "status": "succeeded",
+        "started_at": "2026-11-08T05:12:00Z"
+      },
+      {
+        "task_id": "task-r12",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": "dest-local",
+        "destination_name": "Backup volume",
+        "finished_at": null,
+        "duration_seconds": 37,
+        "bytes": 1385126953,
+        "snapshot_id": "5e7f10ab00000000",
+        "error": null,
+        "details": {},
+        "id": "r12",
+        "kind": "offsite",
+        "status": "succeeded",
+        "started_at": "2026-11-07T03:30:00Z"
+      },
+      {
+        "task_id": "task-r13",
+        "policy_id": "11111111-1111-4111-8111-111111111111",
+        "policy_name": "Nightly",
+        "destination_id": "dest-r2",
+        "destination_name": "Cloudflare R2",
+        "finished_at": null,
+        "duration_seconds": 554,
+        "bytes": null,
+        "snapshot_id": "0d4c7a3e00000000",
+        "error": null,
+        "details": {
+          "rows": {
+            "library_tracks": 48212
+          }
+        },
+        "id": "r13",
+        "kind": "restore_drill",
+        "status": "succeeded",
+        "started_at": "2026-10-29T04:05:00Z"
+      }
+    ],
+    "total": 13,
+    "limit": 50,
+    "offset": 0,
+    "has_more": false
+  },
+  "/api/admin/backups/destinations/dest-r2/snapshots": {
+    "destination_id": "dest-r2",
+    "listed_at": "2026-11-10T03:37:00Z",
+    "snapshot_count": 2,
+    "snapshots": [
+      {
+        "id": "a91f03c2d4e5f6a7b8c9d0e1f2a3b4c5",
+        "time": "2026-11-10T03:37:12Z",
+        "host": "crate-scheduled",
+        "tags": ["daily", "weekly"],
+        "paths": ["/backups/dumps/crate-20261110-0330.dump"]
+      },
+      {
+        "id": "3b8c55e0aa11bb22cc33dd44ee55ff66",
+        "time": "2026-11-09T03:36:40Z",
+        "host": "crate-scheduled",
+        "tags": ["daily"],
+        "paths": ["/backups/dumps/crate-20261109-0330.dump"]
+      }
+    ]
+  }
+}

@@ -19,6 +19,7 @@ from crate.api.auth import (
 from crate import smart_mix_ai
 from crate.api.permissions import has_capability
 from crate.api.radio import continuation_radio_tracks
+from crate.api.capabilities import decks_bass_handoff_available
 from crate.config import android_bass_handoff_enabled
 from crate.api.openapi_responses import COMMON_ERROR_RESPONSES
 from crate.api.schemas.smart_mix import (
@@ -746,19 +747,26 @@ def _plan_edge(
             serialized["candidates"] = [
                 candidate.to_dict() for candidate in planned.candidates
             ]
-            if outgoing is not None and incoming is not None:
-                serialized["policyLimits"] = policy_limits(
-                    outgoing, incoming, context, policy
-                ).to_dict()
-        return serialized
-    return plan_transition(
-        outgoing,
-        incoming,
-        context,
-        outgoing_track_entity_uid=outgoing_uid,
-        incoming_track_entity_uid=incoming_uid,
-        policy=policy,
-    ).to_dict()
+    else:
+        serialized = plan_transition(
+            outgoing,
+            incoming,
+            context,
+            outgoing_track_entity_uid=outgoing_uid,
+            incoming_track_entity_uid=incoming_uid,
+            policy=policy,
+        ).to_dict()
+    if (
+        _serves_policy_limits(edge.context)
+        and outgoing is not None
+        and incoming is not None
+    ):
+        # Crate Decks validates every plan it runs within the limits applied to it,
+        # the assist mode's long-blend ceiling included (S5).
+        serialized["policyLimits"] = policy_limits(
+            outgoing, incoming, context, policy
+        ).to_dict()
+    return serialized
 
 
 def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
@@ -772,12 +780,27 @@ def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
         allow_tempo_adjustment=payload.allow_tempo_adjustment,
         allow_bass_handoff=_bass_handoff_allowed(payload),
         allow_long_beatmatch=payload.allow_long_beatmatch,
+        assist=_assist(payload),
     )
 
 
 def _bass_handoff_allowed(payload: TransitionContextRequest) -> bool:
-    # Crate Decks follows the Android flag until its own context (S5) exists.
-    return payload.allow_bass_handoff and android_bass_handoff_enabled()
+    if not payload.allow_bass_handoff:
+        return False
+    if payload.source == "decks":
+        # Crate Decks has its own switch (S5), the one its capabilities advertise.
+        return decks_bass_handoff_available()
+    return android_bass_handoff_enabled()
+
+
+def _assist(payload: TransitionContextRequest) -> bool:
+    """Crate Decks' assist mode asked for its longer long blends (S5)."""
+    return payload.source == "decks" and payload.assist
+
+
+def _serves_policy_limits(payload: TransitionContextRequest) -> bool:
+    """Every decks plan carries the policy limits applied to it (S5)."""
+    return payload.source == "decks"
 
 
 def _local_refinement(payload: TransitionContextRequest) -> bool:
@@ -793,6 +816,10 @@ def _cache_context(payload: TransitionContextRequest) -> dict:
         context.pop("allowBassHandoff", None)
     if not payload.allow_long_beatmatch:
         context.pop("allowLongBeatmatch", None)
+    # Only the decks context reads assist; elsewhere, or off, it must not split the
+    # cache (Android, VirtualDJ and Decks' AutoDJ keep their keys).
+    if not _assist(payload):
+        context.pop("assist", None)
     # No deterministic planner reads the set history or the AI flag: they must
     # not split the cache.
     context.pop("setHistory", None)
@@ -827,6 +854,10 @@ def _plan_cache_key(
         ),
         "context": _cache_context(edge.context),
     }
+    if _serves_policy_limits(edge.context):
+        # Decks plans gained policyLimits (S5): plans cached without them must not
+        # be served again. Other sources keep their keys.
+        cache_identity["policyLimits"] = True
     stems = stems if stems and policy.stems_layer else {}
     outgoing_uid = str(edge.outgoing_track_entity_uid)
     incoming_uid = str(edge.incoming_track_entity_uid)

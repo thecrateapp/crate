@@ -81,7 +81,7 @@ def read_observation_evidence(
                     CASE WHEN octet_length(payload_json::text) <= 32768 THEN payload_json END AS payload
                 FROM (SELECT key,updated_at,(SELECT jsonb_object_agg(k,v) FROM jsonb_each(payload_json) AS fields(k,v) WHERE k=ANY(:fields)) AS payload_json FROM ops_runtime_state) projected WHERE key IN (
                     'worker_live','analysis_status','imports_pending','health',
-                    'smart_mix:coverage','smart_mix:backfill_campaign')
+                    'smart_mix:coverage','smart_mix:backfill_campaign','backup_alerts')
             ), snapshots AS (
                 SELECT scope AS source, built_at AS observed_at, invalidated_at,
                     version, source_seq,
@@ -143,6 +143,7 @@ def read_observation_evidence(
                     "types": task_types,
                     "alerts": bool(alerts),
                     "fields": [
+                        "open",
                         "engine",
                         "running_count",
                         "pending_count",

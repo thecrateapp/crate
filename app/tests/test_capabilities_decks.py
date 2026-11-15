@@ -10,6 +10,10 @@ _ANDROID_AND_SMART_MIX_FLAGS = (
     "CRATE_ANDROID_BEATMATCH_ENABLED",
     "CRATE_ANDROID_BASS_HANDOFF_ENABLED",
 )
+_DECKS_SMART_MIX_FLAGS = (
+    "CRATE_DECKS_BEATMATCH_ENABLED",
+    "CRATE_DECKS_BASS_HANDOFF_ENABLED",
+)
 _FEATURE_VOCABULARY = {
     "library_cursor",
     "profiles_batch",
@@ -55,8 +59,10 @@ def test_decks_features_reflect_settings(test_app, monkeypatch, enabled):
     # Each Decks feature is advertised by the phase that implements its server
     # contract (S3 library_cursor, S4 profiles_batch, S5 beatmatch/bass_handoff/
     # long_beatmatch, S7 cues, Smart Mix Stems ST1 stems/stem_upload, ST3
-    # local_refinement); S3, S4 and the Smart Mix Stems features ship so far. In
-    # particular, Decks never inherits the Android Smart Mix flags.
+    # local_refinement). S5 has switches of its own (below): Decks never inherits
+    # the Android Smart Mix flags.
+    for flag in _DECKS_SMART_MIX_FLAGS:
+        monkeypatch.setenv(flag, "false")
     for flag in _ANDROID_AND_SMART_MIX_FLAGS:
         if enabled:
             monkeypatch.setenv(flag, "true")
@@ -73,6 +79,65 @@ def test_decks_features_reflect_settings(test_app, monkeypatch, enabled):
         "stem_upload",
         "local_refinement",
     ]
+
+
+@pytest.mark.parametrize(
+    ("smart_mix", "beatmatch", "bass_handoff", "expected"),
+    [
+        (True, True, True, ["beatmatch", "bass_handoff", "long_beatmatch"]),
+        (True, True, False, ["beatmatch", "long_beatmatch"]),
+        (True, False, True, []),
+        (False, True, True, []),
+    ],
+    ids=["all", "no_bass_handoff", "no_beatmatch", "smart_mix_off"],
+)
+def test_decks_smart_mix_features_follow_their_own_switches(
+    test_app, monkeypatch, smart_mix, beatmatch, bass_handoff, expected
+):
+    # S5: the decks planner context. The Android flags are on and change nothing.
+    for flag in _ANDROID_AND_SMART_MIX_FLAGS:
+        monkeypatch.setenv(flag, "true")
+    for flag, on in (
+        ("CRATE_SMART_MIX_ENABLED", smart_mix),
+        ("CRATE_DECKS_BEATMATCH_ENABLED", beatmatch),
+        ("CRATE_DECKS_BASS_HANDOFF_ENABLED", bass_handoff),
+    ):
+        monkeypatch.setenv(flag, "true" if on else "false")
+
+    features = test_app.get("/api/capabilities").json()["decks"]["features"]
+
+    assert features == [
+        "library_cursor",
+        "profiles_batch",
+        *expected,
+        "stems",
+        "stem_upload",
+        "local_refinement",
+    ]
+
+
+@pytest.mark.parametrize("smart_mix", [True, False])
+def test_decks_smart_mix_switches_default_to_on(test_app, monkeypatch, smart_mix):
+    # Decided by Diego, 2026-11-15: Decks gets S5 wherever Smart Mix is on, while
+    # the Android switches stay off by default.
+    for flag in (*_ANDROID_AND_SMART_MIX_FLAGS, *_DECKS_SMART_MIX_FLAGS):
+        monkeypatch.delenv(flag, raising=False)
+    if smart_mix:
+        monkeypatch.setenv("CRATE_SMART_MIX_ENABLED", "true")
+
+    payload = test_app.get("/api/capabilities").json()
+    s5 = ["beatmatch", "bass_handoff", "long_beatmatch"] if smart_mix else []
+
+    assert payload["decks"]["features"] == [
+        "library_cursor",
+        "profiles_batch",
+        *s5,
+        "stems",
+        "stem_upload",
+        "local_refinement",
+    ]
+    assert payload["smart_mix"]["android_beatmatch"] is False
+    assert payload["smart_mix"]["android_bass_handoff"] is False
 
 
 def test_decks_capabilities_schema_documents_the_feature_vocabulary(test_app):

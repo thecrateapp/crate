@@ -6,6 +6,9 @@ import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 vi.mock("@/hooks/use-pending-approvals", () => ({
   usePendingApprovals: () => 4,
 }));
+vi.mock("@/hooks/use-backups-failing", () => ({
+  useBackupsFailingCount: () => 2,
+}));
 vi.mock("@/contexts/OpsSnapshotContext", () => ({
   useOpsSnapshot: () => ({
     data: { status: { issue_count: 3, running_tasks: 12 } },
@@ -189,4 +192,20 @@ it("hides Errors from people without the inbox capability", () => {
   expect(
     screen.queryByRole("link", { name: "Errors" }),
   ).not.toBeInTheDocument();
+});
+describe("Backups navigation", () => {
+  it("shows Backups under System with the failing destinations counter", () => {
+    renderWithAdminProviders(<Sidebar />, {
+      auth: only("system.backups.manage"),
+    });
+    const nav = screen.getByRole("navigation", { name: "Admin navigation" });
+    const link = within(nav).getByRole("link", { name: /Backups/ });
+    expect(link).toHaveAttribute("href", "/backups");
+    expect(link).toHaveTextContent("Backups2");
+    expect(within(nav).getByText("System")).toBeInTheDocument();
+  });
+  it("hides Backups without system.backups.manage", () => {
+    renderWithAdminProviders(<Sidebar />, { auth: only("settings.manage") });
+    expect(screen.queryByRole("link", { name: /Backups/ })).toBeNull();
+  });
 });

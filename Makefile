@@ -908,6 +908,23 @@ agent-smoke: _agent-profile ## Check MCP discovery and one real model reply from
 	@$(AGENT_SETUP) smoke $(AGENT_ARGS)
 
 # ===========================================================================
+# BACKUPS
+# ===========================================================================
+
+# The "before upgrades" backup policies (admin backups, BG1-15): one dump each and
+# its copies, waited for. Exit 1 if a copy fails, 2 on timeout. Runs where the
+# compose stack runs; BACKUP_DC picks the compose files (home installs:
+# BACKUP_DC="docker compose -f docker-compose.home.yaml"). `make deploy` runs the
+# same command before the new images start, unless the engine is off or
+# DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE=1 (scripts/deploy-remote.sh).
+BACKUP_DC      ?= $(DC)
+BACKUP_TIMEOUT ?= 10800
+
+.PHONY: backup-before-upgrade
+backup-before-upgrade: ## Run the "before upgrades" backup policies and wait (BACKUP_DC=, BACKUP_TIMEOUT=)
+	@$(BACKUP_DC) exec -T crate-maintenance-worker python -m crate.backups.cli before-upgrade --wait --timeout $(BACKUP_TIMEOUT)
+
+# ===========================================================================
 # DEPLOY (production)
 # ===========================================================================
 
@@ -915,6 +932,8 @@ agent-smoke: _agent-profile ## Check MCP discovery and one real model reply from
 # VERSION=<full-main-sha> pins compose and every application image by OCI digest.
 # Lower-level overrides remain available for development and incident recovery:
 # DEPLOY_IMAGE_TAG=<tag>, DEPLOY_REF=<git-ref>, DEPLOY_IMAGE_OWNER=<owner>, DEPLOY_PUBLIC_CHECKS=0.
+# The "before upgrades" backup policies run first (DEPLOY_BACKUP_TIMEOUT=<seconds>,
+# default 10800; DEPLOY_SKIP_BACKUP_BEFORE_UPGRADE=1 skips them for one deploy).
 .PHONY: deploy
 deploy: ## Deploy a release (usage: make deploy VERSION=<full-main-sha>)
 	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_VERSION='$(strip $(VERSION))' DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_ID="$(DEPLOY_ID)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh deploy

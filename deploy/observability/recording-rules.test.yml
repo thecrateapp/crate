@@ -90,3 +90,32 @@ tests:
       - expr: crate:worker_queue_depth:last2m
         eval_time: 8m
         exp_samples: []
+
+  - name: backup gauges read as age, size and duration until their collector is lost
+    interval: 30s
+    input_series:
+      - series: 'crate_backup_last_success_timestamp_seconds{job="crate-app",service="crate-maintenance-worker",instance="10.0.0.4:9200",destination="s3",kind="offsite"}'
+        values: "60x10 _x10"
+      - series: 'crate_backup_bytes{job="crate-app",service="crate-maintenance-worker",instance="10.0.0.4:9200",destination="s3"}'
+        values: "4200000x10 _x10"
+      - series: 'crate_backup_run_duration_seconds{job="crate-app",service="crate-maintenance-worker",instance="10.0.0.4:9200",destination="s3",kind="offsite"}'
+        values: "90x10 _x10"
+    promql_expr_test:
+      - expr: crate:backup_last_success_age_seconds:last2m
+        eval_time: 5m
+        exp_samples:
+          - labels: 'crate:backup_last_success_age_seconds:last2m{destination="s3",kind="offsite"}'
+            value: 240
+      - expr: crate:backup_bytes:last2m
+        eval_time: 5m
+        exp_samples:
+          - labels: 'crate:backup_bytes:last2m{destination="s3"}'
+            value: 4200000
+      - expr: crate:backup_run_duration_seconds:last2m
+        eval_time: 5m
+        exp_samples:
+          - labels: 'crate:backup_run_duration_seconds:last2m{destination="s3",kind="offsite"}'
+            value: 90
+      - expr: crate:backup_last_success_age_seconds:last2m
+        eval_time: 10m
+        exp_samples: []

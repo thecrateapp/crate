@@ -12,6 +12,10 @@
   disk. The default is created inside ``$DATA_DIR``, which must exist.
 - ``CRATE_BACKUP_KEEP_DAILY``, ``_WEEKLY`` and ``_MONTHLY`` (default 3, 4 and 3):
   how many days, ISO weeks and months of dumps retention keeps.
+- Since BK3 the local counts can be set from Admin (``set_local_retention``,
+  stored in ``settings`` as ``backups.local_keep_*``). They are the local dumps'
+  own counts, apart from the off-site policies (BG1-5); when set, they win over
+  the environment.
 """
 
 from __future__ import annotations
@@ -76,19 +80,59 @@ def _param_count(value: Any) -> int:
     return value
 
 
+LOCAL_RETENTION_SETTING = "backups.local_keep_{field}"
+MAX_LOCAL_KEEP = 1000
+
+
+def _stored_count(field: str) -> int | None:
+    from crate.db.repositories.settings import get_setting
+
+    try:
+        raw = get_setting(LOCAL_RETENTION_SETTING.format(field=field))
+    except Exception:  # pragma: no cover - the database is down: use the environment
+        return None
+    try:
+        value = int(raw) if raw is not None else None
+    except ValueError:
+        return None
+    return value if value is not None and value >= 0 else None
+
+
+def set_local_retention(*, daily: int, weekly: int, monthly: int) -> RetentionPolicy:
+    """Store the local dumps' retention counts (Admin, BG1-5)."""
+    counts = {"daily": daily, "weekly": weekly, "monthly": monthly}
+    for value in counts.values():
+        if type(value) is not int or not 0 <= value <= MAX_LOCAL_KEEP:
+            raise ValueError(
+                f"A retention count is a whole number from 0 to {MAX_LOCAL_KEEP}"
+            )
+    if not any(counts.values()):
+        raise ValueError("Local retention must keep at least one dump")
+    from crate.db.repositories.settings import set_setting
+
+    for field, value in counts.items():
+        set_setting(LOCAL_RETENTION_SETTING.format(field=field), str(value))
+    return RetentionPolicy(**counts)
+
+
 def retention_policy(params: Mapping[str, Any] | None = None) -> RetentionPolicy:
-    """The environment's policy, with a task's ``keep_*`` params on top."""
+    """The local counts: a task's ``keep_*`` params, else Admin's, else the env."""
     params = params or {}
     counts = {}
     for field in ("daily", "weekly", "monthly"):
         key = f"keep_{field}"
         if key in params:
             counts[field] = _param_count(params[key])
-        else:
-            counts[field] = _env_count(
+            continue
+        stored = _stored_count(field)
+        counts[field] = (
+            stored
+            if stored is not None
+            else _env_count(
                 f"CRATE_BACKUP_KEEP_{field.upper()}",
                 getattr(DEFAULT_RETENTION, field),
             )
+        )
     return RetentionPolicy(**counts)
 
 
@@ -102,4 +146,5 @@ __all__ = [
     "local_backups_enabled",
     "prepare_dumps_dir",
     "retention_policy",
+    "set_local_retention",
 ]

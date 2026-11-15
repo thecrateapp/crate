@@ -97,6 +97,7 @@ FROM worker-core-deps AS worker-core
 # (fingerprint B97B 0AFC AA1A 47F0 44F2 44A0 7FCC 7D46 ACCC 4CF8) and the package
 # version is pinned; apt checks every package against the signed index. Bump
 # PG_CLIENT_VERSION when PGDG drops it from the pool (the build fails loudly).
+# openssh-client gives restic's sftp backend its ssh (BK2).
 ARG PGDG_ACCC4CF8_ASC_SHA256=0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76
 ARG PG_CLIENT_VERSION=15.19-1.pgdg13+2
 RUN set -eu; \
@@ -109,14 +110,15 @@ RUN set -eu; \
     echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
         > /etc/apt/sources.list.d/pgdg.list; \
     apt-get update; \
-    apt-get install -y --no-install-recommends "postgresql-client-15=${PG_CLIENT_VERSION}"; \
+    apt-get install -y --no-install-recommends "postgresql-client-15=${PG_CLIENT_VERSION}" \
+        openssh-client; \
     apt-get purge -y --auto-remove curl; \
     rm -rf /var/lib/apt/lists/*
 ENV PATH="/usr/lib/postgresql/15/bin:${PATH}"
 COPY --from=backup-tools /usr/local/bin/restic /usr/local/bin/rclone /usr/local/bin/
 RUN pg_dump --version | grep -q "^pg_dump (PostgreSQL) 15\." && \
     pg_restore --version | grep -q "^pg_restore (PostgreSQL) 15\." && \
-    restic version && rclone version | head -n 1
+    restic version && rclone version | head -n 1 && ssh -V
 
 COPY alembic.ini .
 COPY crate ./crate

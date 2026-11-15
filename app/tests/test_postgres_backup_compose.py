@@ -200,3 +200,30 @@ def test_offsite_service_resolves_only_with_its_profile(tmp_path):
     assert backups["source"] == "crate_postgres_backups"
     assert backups["read_only"] is True
     assert list(service["networks"]) == ["backup-offsite"]
+
+
+@pytest.mark.parametrize("name", ["crate-worker", "crate-maintenance-worker"])
+def test_workers_mount_the_backup_directory_without_moving_the_engine(name):
+    """BK6: the engine can write into crate-postgres-backup's volume once
+    CRATE_BACKUP_DIR=/backups is set; the default keeps it in DATA_DIR."""
+    compose, sidecar = _service()
+    worker = compose["services"][name]
+    source = sidecar["volumes"][0].rsplit(":", 1)[0]
+
+    assert f"{source}:/backups" in worker["volumes"]
+    assert _environment(worker)["CRATE_BACKUP_DIR"] == "${CRATE_BACKUP_DIR:-}"
+    assert re.search(
+        r"^# CRATE_BACKUP_DIR=/backups$",
+        (ROOT / ".env.example").read_text(),
+        re.MULTILINE,
+    )
+
+
+def test_an_empty_backup_dir_setting_keeps_the_default(monkeypatch):
+    from crate.backups.settings import backup_dir
+
+    monkeypatch.setenv("CRATE_BACKUP_DIR", "")
+    monkeypatch.setenv("DATA_DIR", "/data")
+    assert str(backup_dir()) == "/data/backups"
+    monkeypatch.setenv("CRATE_BACKUP_DIR", "/backups")
+    assert str(backup_dir()) == "/backups"

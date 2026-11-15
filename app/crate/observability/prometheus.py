@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 EXPORTED_PREFIXES = (
     "api.request.",
     "artwork.",
+    "backup.",
     "catalog.search.",
     "federation.playback.",
     "home.",

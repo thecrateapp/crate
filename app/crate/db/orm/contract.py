@@ -21,7 +21,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.engine.reflection import Inspector
 from sqlalchemy.exc import SAWarning
 
-from crate.db.orm.backups import BackupRun
+from crate.db.orm.backups import (
+    BackupDestination,
+    BackupPolicy,
+    BackupPolicyDestination,
+    BackupRun,
+)
 from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
 from crate.db.orm.metrics import MetricMinuteSnapshot
 from crate.db.orm.playlist import (
@@ -36,6 +41,9 @@ from crate.db.orm.user import AuthInvite, Session, User, UserExternalIdentity
 
 ACTIVE_ORM_MODELS = (
     AuthInvite,
+    BackupDestination,
+    BackupPolicy,
+    BackupPolicyDestination,
     BackupRun,
     LibraryAlbum,
     LibraryArtist,

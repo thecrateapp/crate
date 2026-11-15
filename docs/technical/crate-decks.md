@@ -87,6 +87,9 @@ need them.
     "features": [
       "library_cursor",
       "profiles_batch",
+      "beatmatch",
+      "bass_handoff",
+      "long_beatmatch",
       "stems",
       "stem_upload",
       "local_refinement"
@@ -120,13 +123,17 @@ Rules:
   | `stem_upload`                                 | Smart Mix Stems ST1, stem analysis uploads (only for a caller who may) |
   | `local_refinement`                            | Smart Mix Stems ST3, candidate menu for local refinement               |
 
-  `library_cursor`, `profiles_batch`, `stems`, `stem_upload` and
-  `local_refinement` ship so far. `library_cursor`, `profiles_batch`, `stems`
+  Everything but `cues` ships so far. `library_cursor`, `profiles_batch`, `stems`
   and `local_refinement` are always present. `stem_upload` is present only when the
   caller's session holds `smart_mix.stems.contribute` and an admin has not
-  turned uploads off, so it depends on who asks. Decks features never follow
-  the Android Smart Mix flags (`CRATE_ANDROID_*`); `smart_mix.android_*`
-  remains the Android contract.
+  turned uploads off, so it depends on who asks. `beatmatch` and `long_beatmatch`
+  need `CRATE_SMART_MIX_ENABLED` and `CRATE_DECKS_BEATMATCH_ENABLED`;
+  `bass_handoff` also needs `CRATE_DECKS_BASS_HANDOFF_ENABLED` (both Decks
+  switches default to true; `CRATE_SMART_MIX_ENABLED` defaults to false). Every
+  plan for `source = "decks"` carries the `policyLimits` applied to it. Decks features never follow the Android Smart Mix flags
+  (`CRATE_ANDROID_*`); `smart_mix.android_*` remains the Android contract. The
+  `decks` planner context, its bass handoff and the assist mode's longer blends
+  are described in [the Smart Mix design](smart-mix-design.md#8-crate-decks-consumer).
 
 The constants live in `app/crate/api/capabilities.py`
 (`DECKS_CONTRACT_VERSION`, `DECKS_MIN_CLIENT_VERSION`, `_decks_features`), and

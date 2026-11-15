@@ -203,6 +203,11 @@ _TAG_METADATA = [
         "description": "Application errors synced from Sentry, their status and the connection. Reads PostgreSQL only.",
     },
     {
+        "name": "backups",
+        "x-displayName": "Backups",
+        "description": "Backup destinations, policies, runs, verification, restore drills and the recovery kit. Secrets are write-only; work runs in worker tasks.",
+    },
+    {
         "name": "agents",
         "x-displayName": "Agent Integrations",
         "description": "Human administration of service and delegated access, activity and exact plan decisions.",
@@ -265,6 +270,7 @@ _TAG_GROUPS = [
             "admin",
             "agents",
             "errors",
+            "backups",
         ],
     },
     {"name": "Compatibility", "tags": ["subsonic"]},

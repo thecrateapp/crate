@@ -72,6 +72,14 @@ def test_worker_core_installs_the_postgresql_15_client_pinned() -> None:
     assert 'grep -q "^pg_restore (PostgreSQL) 15\\."' in core
 
 
+def test_worker_core_has_an_ssh_client_for_sftp_destinations() -> None:
+    # restic's sftp backend runs ssh (admin backups, BK2).
+    core = _stage("worker-core")
+
+    assert "openssh-client" in core
+    assert "ssh -V" in core
+
+
 def test_only_the_core_worker_image_carries_the_backup_tools() -> None:
     core = _stage("worker-core")
 
@@ -99,7 +107,10 @@ def _image_under_test() -> str:
 def test_built_worker_image_reports_the_pinned_versions() -> None:
     image = _image_under_test()
     tools, core = _args(_stage("backup-tools")), _args(_stage("worker-core"))
-    script = "pg_dump --version; pg_restore --version; restic version; rclone version"
+    script = (
+        "pg_dump --version; pg_restore --version; restic version; rclone version; "
+        "ssh -V 2>&1"
+    )
     result = subprocess.run(
         ["docker", "run", "--rm", "--entrypoint", "sh", image, "-c", script],
         capture_output=True,
@@ -113,3 +124,4 @@ def test_built_worker_image_reports_the_pinned_versions() -> None:
     assert f"pg_restore (PostgreSQL) {pg_version}" in result.stdout
     assert f"restic {tools['CRATE_RESTIC_VERSION']} " in result.stdout
     assert f"rclone v{tools['CRATE_RCLONE_VERSION']}\n" in result.stdout
+    assert "OpenSSH_" in result.stdout

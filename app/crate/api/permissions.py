@@ -21,6 +21,8 @@ ALL_CAPABILITIES: tuple[str, ...] = (
     "ops.logs.view",
     "ops.tasks.manage",
     "ops.runtime.manage",
+    # Admin backups (BK4): destinations, policies, runs and the recovery kit.
+    "system.backups.manage",
     "ops.errors.view",
     "ops.errors.manage",
     "settings.manage",

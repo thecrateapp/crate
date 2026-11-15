@@ -9,6 +9,7 @@ from crate.api.schemas.metrics import (
 )
 
 from crate.api.schemas import ai_agents as ai_agents
+from crate.api.schemas import backups as backups
 from crate.api.schemas import error_inbox as error_inbox
 from crate.api.schemas.decks import (
     DecksContainerNodeResponse,
@@ -479,6 +480,7 @@ __all__ = [
     "NativePoll",
     "TelegramBindingInput",
     "ai_agents",
+    "backups",
     "error_inbox",
     "DecksContainerNodeResponse",
     "DecksContainerRefResponse",

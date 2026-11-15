@@ -1789,7 +1789,13 @@ authentication.
 `CRATE_SMART_MIX_ENABLED` controls the base capability. Native crossfade also depends on
 `CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED`; beatmatch depends on both and on
 `CRATE_ANDROID_BEATMATCH_ENABLED`; bass handoff adds `CRATE_ANDROID_BASS_HANDOFF_ENABLED`.
-The configuration helpers default to false. VirtualDJ also uses `CRATE_VDJ_ENABLED` and, for
+Crate Decks has switches of its own, never the Android ones: `CRATE_DECKS_BEATMATCH_ENABLED`
+(with `CRATE_SMART_MIX_ENABLED`) advertises `beatmatch` and `long_beatmatch` in
+`capabilities.decks.features`, and `CRATE_DECKS_BASS_HANDOFF_ENABLED` adds `bass_handoff`, which
+also lets the planner give `source=decks` plans a bass handoff
+([design §8](smart-mix-design.md#8-crate-decks-consumer)). Both Decks switches default to true,
+so they only need `CRATE_SMART_MIX_ENABLED`; set either to `false` to turn it off. The other
+configuration helpers default to false. VirtualDJ also uses `CRATE_VDJ_ENABLED` and, for
 automation, `CRATE_VDJ_AUTOMATION_ENABLED`.
 `CRATE_LISTEN_SMART_MIX_V3_ENABLED` (default false) moves only Listen to `smart-mix-v3`: with it
 on, `/api/capabilities` gives `smart_mix.listen_planner_version: "smart-mix-v3"`, and Listen

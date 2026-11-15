@@ -110,3 +110,13 @@ groups:
         expr: sum by (kind) (increase(crate_media_worker_package_completed_total[15m]))
       - record: crate:media_worker_package_failures:increase15m
         expr: sum by (kind) (increase(crate_media_worker_package_failed_total[15m]))
+
+  - name: crate-app-backups
+    interval: 60s
+    rules:
+      - record: crate:backup_last_success_age_seconds:last2m
+        expr: time() - max by (destination, kind) (last_over_time(crate_backup_last_success_timestamp_seconds[2m]))
+      - record: crate:backup_bytes:last2m
+        expr: max by (destination) (last_over_time(crate_backup_bytes[2m]))
+      - record: crate:backup_run_duration_seconds:last2m
+        expr: max by (destination, kind) (last_over_time(crate_backup_run_duration_seconds[2m]))

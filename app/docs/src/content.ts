@@ -272,6 +272,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/listen-design-system-visual-qa.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/admin-backups.md": () =>
+    import("../../../docs/technical/admin-backups.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/ops-runbook.md": () =>
     import("../../../docs/technical/ops-runbook.md?raw").then(
       (module) => module.default,

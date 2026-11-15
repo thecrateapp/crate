@@ -10,7 +10,7 @@ into the start of one of the first ``incoming_phrase_choices`` incoming phrases.
 In beatmatch it lasts one of ``policy.phrase_lengths`` bars of the outgoing tempo or
 the context's preferred duration; a phrase length longer than the preferred
 duration needs a long blend (longer than ``maximum_transition_ms``, allowed by the
-context), as in v2. In a crossfade (v2 decided the pair cannot be beatmatched) it
+context, up to its ``long_beatmatch_ceiling_ms``), as in v2. In a crossfade (v2 decided the pair cannot be beatmatched) it
 keeps the preferred duration, because the incoming bars do not follow the outgoing
 ones. Each geometry is tried with the bass handoff on (when the context allows it)
 and off, and with both curves when the mix is short enough for either; a long blend
@@ -121,7 +121,11 @@ from crate.smart_mix.planner import (
     plan_transition,
     score_compatibility,
 )
-from crate.smart_mix.policy import PLANNER_POLICY_V3, PlannerPolicy
+from crate.smart_mix.policy import (
+    PLANNER_POLICY_V3,
+    PlannerPolicy,
+    long_beatmatch_ceiling_ms,
+)
 from crate.smart_mix.transition_fit import genre_beatmatch_prior
 
 _BEATS_PER_BAR = 4
@@ -709,7 +713,7 @@ def _long_blend_allowed(edge: _Edge, duration: int) -> bool:
     return (
         edge.beatmatch
         and edge.context.allow_long_beatmatch
-        and duration <= policy.maximum_long_beatmatch_ms
+        and duration <= long_beatmatch_ceiling_ms(policy, edge.context)
         and all(
             stability is not None
             and stability >= policy.minimum_long_beatmatch_stability

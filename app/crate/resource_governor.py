@@ -22,6 +22,9 @@ log = logging.getLogger(__name__)
 RESOURCE_GOVERNED_TASK_TYPES = frozenset(
     {
         "backup_dump",
+        "backup_offsite",
+        "backup_verify",
+        "backup_restore_drill",
         "refresh_collection_insights",
         "backfill_track_audio_fingerprints",
         "backfill_smart_mix_profiles",
