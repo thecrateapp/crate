@@ -79,6 +79,17 @@ rebuilt for every change. `crate-ryoku-site` copies only the `app/web` sources i
 imports (styles, motion scripts, the clipboard helper, fonts and icons), so other
 website changes, such as blog posts, do not rebuild it.
 
+The Crate Agent and Crate Operator containers carry no per-release environment:
+their Compose services do not set `CRATE_RELEASE_SHA`, so a release changes them
+only when their image or configuration changes. The deployed release reaches
+them through `deployment.json` in the host context directory
+(`${DATA_DIR}/crate-agent/context`, or `${CRATE_OPERATOR_ROOT}/context`), mounted
+read-only at `/opt/crate-context`. Every deploy records that marker and activates
+the exact release context there, creating the agent directory if needed; a
+managed operator destination must already exist. The context server reads the
+marker beside the active context, else the host marker, else the release of the
+context it serves. Activation keeps the five most recently activated contexts.
+
 The remote profile combines `docker-compose.yaml` and
 `docker-compose.project.yaml`; it includes API, readplane, worker families,
 projector, media worker, Admin, Listen, Site, Docs, PostgreSQL, cache Redis,
