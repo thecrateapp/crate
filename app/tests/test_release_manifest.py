@@ -214,6 +214,19 @@ def test_detect_cli_scopes_git_workflow_diff_and_blog_changes(tmp_path):
     assert _detect_cli(tmp_path, base, head) == {"site", "agent", "any"}
 
 
+def test_detect_cli_selects_the_image_a_file_moves_out_of(tmp_path):
+    source = tmp_path / "app/web/src/styles/tokens.css"
+    source.parent.mkdir(parents=True)
+    source.write_text(":root { --accent: #f60; }\n" * 20)
+    base = _git_commit(tmp_path)
+    target = tmp_path / "app/web/src/legacy/tokens.css"
+    target.parent.mkdir(parents=True)
+    source.rename(target)
+    head = _git_commit(tmp_path)
+    # A rename-aware diff names only the destination, which ryoku-site does not watch.
+    assert "ryoku_site" in _detect_cli(tmp_path, base, head)
+
+
 def test_cast_receiver_change_only_selects_receiver_image() -> None:
     assert detect_changed_images(["app/cast-receiver/src/App.tsx"]) == {"cast-receiver"}
 
