@@ -773,6 +773,7 @@ def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
         allow_tempo_adjustment=payload.allow_tempo_adjustment,
         allow_bass_handoff=_bass_handoff_allowed(payload),
         allow_long_beatmatch=payload.allow_long_beatmatch,
+        assist=_assist(payload),
     )
 
 
@@ -783,6 +784,11 @@ def _bass_handoff_allowed(payload: TransitionContextRequest) -> bool:
         # Crate Decks has its own switch (S5), the one its capabilities advertise.
         return decks_bass_handoff_available()
     return android_bass_handoff_enabled()
+
+
+def _assist(payload: TransitionContextRequest) -> bool:
+    """Crate Decks' assist mode asked for its longer long blends (S5)."""
+    return payload.source == "decks" and payload.assist
 
 
 def _local_refinement(payload: TransitionContextRequest) -> bool:
@@ -798,6 +804,10 @@ def _cache_context(payload: TransitionContextRequest) -> dict:
         context.pop("allowBassHandoff", None)
     if not payload.allow_long_beatmatch:
         context.pop("allowLongBeatmatch", None)
+    # Only the decks context reads assist; elsewhere, or off, it must not split the
+    # cache (Android, VirtualDJ and Decks' AutoDJ keep their keys).
+    if not _assist(payload):
+        context.pop("assist", None)
     # No deterministic planner reads the set history or the AI flag: they must
     # not split the cache.
     context.pop("setHistory", None)

@@ -340,10 +340,10 @@ class TransitionContextRequest(SmartMixRequestModel):
         "decks",
     ] = Field(
         description=(
-            "Where the queue comes from. `decks` is Crate Decks (S5); it plans "
-            "like `playlist`, but its bass handoff follows "
-            "`capabilities.decks.features` (bass_handoff) instead of the Android "
-            "switch."
+            "Where the queue comes from. `decks` is Crate Decks (AutoDJ and the "
+            "assist mode, S5); it plans like `playlist`, but its bass handoff "
+            "follows `capabilities.decks.features` (bass_handoff) instead of the "
+            "Android switch, and it may ask for `assist`."
         )
     )
     automatic: bool
@@ -380,6 +380,16 @@ class TransitionContextRequest(SmartMixRequestModel):
             "chose from the planner's candidates (SM3-D4). The deterministic plan "
             "is always returned and does not depend on this flag. smart-mix-v2 "
             "ignores it."
+        ),
+    )
+    assist: bool = Field(
+        default=False,
+        description=(
+            "Source `decks` only: Crate Decks' assist mode, where a DJ mixing by "
+            "hand runs the plan. A long beatmatch (`allowLongBeatmatch`) may then "
+            "last longer, up to `policyLimits.maximumLongBeatmatchMs`; the "
+            "preferred duration and the tempo limits do not change. Ignored "
+            "otherwise; it does not change the plan or its cache."
         ),
     )
     local_refinement: bool = Field(

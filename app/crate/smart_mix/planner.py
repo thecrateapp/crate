@@ -14,7 +14,12 @@ from crate.smart_mix.models import (
     TransitionPlan,
 )
 from crate.smart_mix import transition_fit
-from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3, PlannerPolicy
+from crate.smart_mix.policy import (
+    PLANNER_POLICY,
+    PLANNER_POLICY_V3,
+    PlannerPolicy,
+    long_beatmatch_ceiling_ms,
+)
 from crate.smart_mix.transition_fit import (
     TransitionEdges,
     normalized_tempo,
@@ -204,7 +209,13 @@ def plan_transition(
     if fallback_reason is None:
         tempo_ratio = round(_cue_tempo_ratio(outgoing, incoming), 6)
         window = (
-            _long_beatmatch_window(outgoing, incoming, tempo_ratio, policy)
+            _long_beatmatch_window(
+                outgoing,
+                incoming,
+                tempo_ratio,
+                policy,
+                long_beatmatch_ceiling_ms(policy, context),
+            )
             if context.allow_long_beatmatch
             else None
         )
@@ -535,6 +546,7 @@ def _long_beatmatch_window(
     incoming: TrackMixProfile,
     tempo_ratio: float,
     policy: PlannerPolicy,
+    ceiling_ms: int,
 ) -> _TransitionWindow | None:
     bpm = _outro_beat(outgoing)[0]
     if not bpm:
@@ -548,7 +560,7 @@ def _long_beatmatch_window(
     beats_per_bar = outgoing.time_signature or 4
     for bars in policy.long_beatmatch_phrase_bars:
         phrase_ms = math.floor(bars * beats_per_bar * 60_000.0 / bpm)
-        if phrase_ms > policy.maximum_long_beatmatch_ms:
+        if phrase_ms > ceiling_ms:
             continue
         if phrase_ms <= policy.maximum_transition_ms:
             return None

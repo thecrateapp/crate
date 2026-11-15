@@ -462,6 +462,9 @@ class TransitionContext:
     allow_tempo_adjustment: bool
     allow_bass_handoff: bool = False
     allow_long_beatmatch: bool = False
+    # Crate Decks' assist mode: longer long blends (``policy.long_beatmatch_ceiling_ms``).
+    # Other sources ignore it.
+    assist: bool = False
 
     def __post_init__(self) -> None:
         if self.source not in {
@@ -489,6 +492,8 @@ class TransitionContext:
         }
         if self.allow_long_beatmatch:
             payload["allowLongBeatmatch"] = True
+        if self.assist:
+            payload["assist"] = True
         return payload
 
 

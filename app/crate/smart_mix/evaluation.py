@@ -33,7 +33,11 @@ from crate.smart_mix.models import (
     TransitionMode,
     TransitionPlan,
 )
-from crate.smart_mix.policy import PLANNER_POLICY, PlannerPolicy
+from crate.smart_mix.policy import (
+    PLANNER_POLICY,
+    PlannerPolicy,
+    long_beatmatch_ceiling_ms,
+)
 from crate.smart_mix.transition_fit import tempo_ratio
 from crate.smart_mix.versions import MEASUREMENT_VERSION
 
@@ -497,7 +501,7 @@ def policy_violations(
     if not gapless and not short_cut:
         if (
             plan.duration_ms < policy.minimum_transition_ms
-            or plan.duration_ms > policy.maximum_long_beatmatch_ms
+            or plan.duration_ms > long_beatmatch_ceiling_ms(policy, context)
         ):
             codes.append("duration_out_of_range")
         elif plan.duration_ms > policy.maximum_transition_ms and not (
@@ -627,7 +631,11 @@ def policy_limits(
     context: TransitionContext,
     policy: PlannerPolicy = PLANNER_POLICY,
 ) -> PolicyLimits:
-    """``policy_violations``' rules for the plans of one edge, as bounds."""
+    """``policy_violations``' rules for the plans of one edge, as bounds.
+
+    ``maximum_long_beatmatch_ms`` is the context's ceiling
+    (``policy.long_beatmatch_ceiling_ms``): longer in Crate Decks' assist mode.
+    """
     accredited = _has_accredited_measurement(outgoing) and _has_accredited_measurement(
         incoming
     )
@@ -644,7 +652,7 @@ def policy_limits(
         ),
         minimum_transition_ms=policy.minimum_transition_ms,
         maximum_transition_ms=policy.maximum_transition_ms,
-        maximum_long_beatmatch_ms=policy.maximum_long_beatmatch_ms,
+        maximum_long_beatmatch_ms=long_beatmatch_ceiling_ms(policy, context),
         maximum_boost_db=max(
             0.0,
             policy.max_loudness_adjustment_db
