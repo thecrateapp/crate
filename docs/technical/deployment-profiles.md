@@ -66,24 +66,37 @@ The remote deploy snapshots the previous release, pulls only changed images
 and recreates only services whose digest or Compose configuration changed.
 Images not rebuilt for a commit remain pinned to their last promoted digest.
 
-Website-only releases select `crate-site`. Editing the engineering blog's planning
+Website releases select `crate-site`. Editing the engineering blog's planning
 documents under `docs/technical/engineering-blog*.md` also selects `crate-docs`.
-Neither rebuilds the agent image. Its baked context remains a versioned source
-snapshot at the image's `source_sha`; configured host contexts are exported and
-activated for the exact new release independently of the image.
+`crate-ryoku-site` is selected only by the `app/web` sources its Dockerfile copies
+(styles, motion scripts, the clipboard helper, fonts and icons), so blog content
+does not rebuild it.
+
+Editorial changes reuse the agent image: `app/web/src/content`, the blog figures
+(`components/blog-viz`, `scripts/viz/blog`), the engineering-blog planning
+documents and `app/web` files outside `app/web/src`, which the agent context never
+includes. Other website code under `app/web/src` is part of the baked agent
+context and rebuilds the agent. A reused image's baked context remains a
+versioned source snapshot at its `source_sha`; configured host contexts are
+exported and activated for the exact new release independently of the image.
 
 The image detector compares the jobs in `build-images.yml`: changing only
 `build-site` rebuilds only the site. Changes to shared workflow settings, change
 detection, promotion, the reusable `build-image.yml` or shared actions still
-rebuild every image. Missing/unreadable workflow history or an unavailable release
-baseline also falls back to a complete build. Manual image selections remain
-available through `workflow_dispatch`.
+rebuild every image. The comparison checks both the parsed jobs and their raw
+text, so a difference YAML 1.1 parsing hides (`yes`/`on` booleans, duplicate
+keys) still counts as a change. Missing/unreadable workflow history, a missing
+PyYAML or an unavailable release baseline also falls back to a complete build.
+Manual image selections remain available through `workflow_dispatch`.
 
-For a site/docs-only deployment with an unchanged agent digest, the deploy leaves
-the running gateway, supervisor and provenance containers alone. In particular,
-the new global release SHA must not recreate them merely through a Compose
-environment change. Image updates and broader application/configuration releases
-continue through the normal agent refresh path.
+For a deployment that changes only website services (`crate-site`, `crate-docs`,
+`crate-ryoku-site`), the deploy leaves the running gateway, supervisor and
+provenance containers alone when every one of them already runs the release's
+`CRATE_AGENT_IMAGE`, as reported by `docker inspect`. In particular, the new
+global release SHA must not recreate them merely through a Compose environment
+change. A container on another image, one that cannot be inspected, a same-SHA
+redeploy (no changed services) and broader application/configuration releases
+all continue through the normal agent refresh path.
 
 The remote profile combines `docker-compose.yaml` and
 `docker-compose.project.yaml`; it includes API, readplane, worker families,
