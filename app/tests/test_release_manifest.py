@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -156,19 +157,28 @@ def test_shared_workflow_alias_rebuilds_all_its_consumers():
 
 
 def test_detect_cli_scopes_git_workflow_diff_and_blog_changes(tmp_path):
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    # Isolate the fixture repository from the developer's Git configuration
+    # (commit signing, templates, hooks).
+    git_env = {
+        **os.environ,
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_NOSYSTEM": "1",
+    }
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, env=git_env)
     workflow = tmp_path / ".github/workflows/build-images.yml"
     workflow.parent.mkdir(parents=True)
     before = "jobs:\n  changes:\n    steps: []\n  build-site:\n    steps:\n      - run: old\n"
     workflow.write_text(before)
 
     def commit():
-        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, env=git_env)
         subprocess.run(
             [
                 "git",
                 "-c",
                 "core.hooksPath=/dev/null",
+                "-c",
+                "commit.gpgsign=false",
                 "-c",
                 "user.name=Test",
                 "-c",
@@ -179,9 +189,10 @@ def test_detect_cli_scopes_git_workflow_diff_and_blog_changes(tmp_path):
             ],
             cwd=tmp_path,
             check=True,
+            env=git_env,
         )
         return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True
+            ["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True, env=git_env
         ).strip()
 
     base = commit()
@@ -204,6 +215,7 @@ def test_detect_cli_scopes_git_workflow_diff_and_blog_changes(tmp_path):
         check=True,
         capture_output=True,
         text=True,
+        env=git_env,
     )
     outputs = dict(line.split("=", 1) for line in result.stdout.splitlines())
     assert {name for name, value in outputs.items() if value == "true"} == {
