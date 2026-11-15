@@ -58,7 +58,7 @@
         "app/shared/ui/icons/system.tsx": "20905cda8ba015c8226a6aa2054498d76e14597aca80482bc1013a0104dbfd17",
         "app/shared/ui/icons/toolbox.tsx": "b793d9e34476a05180b0039f45d764387622022edbc33658a492c51165e19f42",
         "app/shared/ui/icons/translation.tsx": "c717ccbeb754dd40c7e774f7e0279a54562d31fd0ee96a2cb22954acfa8850ce",
-        "app/shared/ui/tokens/animations.css": "aec5fc762a96b85c70edd9ad835b55597b001d46abbd3b498fdad2db33d60cfa",
+        "app/shared/ui/tokens/animations.css": "84d173b25ae2cca3cce1bf851c5519c12323f819c35a1f2f7d7ed34ca9591208",
         "app/shared/ui/tokens/colors.css": "6fbc24a733b64f5ae4288679fd9e2329c8c72bb8aaf8e582487685aa5f53b965",
         "app/shared/ui/tokens/index.css": "f8d2752d17d286f270fdaa2a21cd2f5111e39620f3207ced101a4269629a2c79",
         "app/shared/ui/tokens/interactive.css": "25b88613c48a5fb0f6a0a390069229f87dea84f649c0b7a27629c1bcf22aa9c2",
@@ -74,7 +74,7 @@
         "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
         "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "ba2b1bbf0d0ac015f4255953e21054b078bef9c753828e1f9929421964613b4a",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "f9c7c8d6dc9e26ad020eaaf25ac4568df64494a511053c1ceabd3b50ebdae1cb"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "26176b9c37ee873374a85ebaadde47a8a5093fb9ebec7fef0e776abd35241365"
       },
       "category": "Foundations"
     },
