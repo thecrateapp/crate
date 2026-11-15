@@ -17,6 +17,7 @@ on:
       - "app/listen-desktop/**"
       - "app/docs/**"
       - "app/web/**"
+      - "app/ryoku/**"
       - "app/crate/api/browse_media.py"
       - "app/crate/actors.py"
       - "app/crate/audio_analysis.py"
@@ -54,6 +55,7 @@ on:
       - "app/listen-desktop/**"
       - "app/docs/**"
       - "app/web/**"
+      - "app/ryoku/**"
       - "app/crate/api/browse_media.py"
       - "app/crate/actors.py"
       - "app/crate/audio_analysis.py"
@@ -123,6 +125,7 @@ jobs:
         run: |
           npm ci --prefix app/docs
           npm ci --prefix app/web
+          npm ci --prefix app/ryoku
 
       - name: Test and build marketing site
         run: |
@@ -131,6 +134,14 @@ jobs:
           npm run budget --prefix app/web
           (cd app/web && npx playwright install --with-deps chromium)
           npm run test:e2e --prefix app/web
+
+      - name: Test and build the Crate for Ryoku site
+        run: |
+          npm test --prefix app/ryoku
+          npm run build --prefix app/ryoku
+          npm run budget --prefix app/ryoku
+          (cd app/ryoku && npx playwright install --with-deps chromium)
+          npm run test:e2e --prefix app/ryoku
 
       - name: Test and build docs site
         env:

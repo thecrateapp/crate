@@ -1,0 +1,39 @@
+<footer id="footer" class="footer">
+  <nav aria-label="Crate">
+    <a class="u-link" href="https://cratemusic.app">cratemusic.app</a>
+    <a class="u-link" href="https://docs.cratemusic.app">Docs</a>
+    <a class="u-link" href="https://github.com/thecrateapp/crate-for-ryoku">Crate for Ryoku on GitHub</a>
+    <a class="u-link" href="https://github.com/Ryoku-dev/ryoku">Ryoku</a>
+  </nav>
+  <p class="credits">
+    Icons from Solar (CC BY 4.0). Bricolage Grotesque, Roboto and JetBrains Mono under the SIL Open
+    Font License. Crate for Ryoku is MIT licensed and not affiliated with the Ryoku project.
+  </p>
+</footer>
+
+<style>
+  .footer {
+    display: grid;
+    gap: 18px;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 48px clamp(16px, 6vw, 96px) 64px;
+    border-top: 1px solid var(--line);
+  }
+
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 28px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+
+  .credits {
+    margin: 0;
+    max-width: 72ch;
+    color: var(--fg-3);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+</style>

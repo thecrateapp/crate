@@ -1,0 +1,138 @@
+/*
+ * @crate/ui form recipes, reproduced on app/web's tokens for this static site.
+ * Source of truth: app/shared/ui/tokens/recipes.css (.crate-form-slider,
+ * .crate-form-switch, .crate-form-chip) and SegmentedControl's chip classes.
+ * Token mapping: --border-quiet/--border-subtle = --line, --accent-action-hi = --cyan-hi,
+ * --text-secondary (idle) = --fg-2, --text-subtle = --fg-3, --surface-canvas = --bg.
+ */
+
+.crate-form-slider {
+  appearance: none;
+  display: block;
+  min-width: 0;
+  height: 40px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--cyan-hi);
+}
+.crate-form-slider::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 9999px;
+  background: var(--line);
+}
+.crate-form-slider::-moz-range-track {
+  height: 2px;
+  border-radius: 9999px;
+  background: var(--line);
+}
+.crate-form-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  margin-top: -3px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cyan-hi);
+}
+.crate-form-slider::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cyan-hi);
+}
+.crate-form-slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.crate-form-switch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+.crate-form-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.crate-form-switch-thumb {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fg-3);
+  transform: translateX(1px);
+  pointer-events: none;
+  transition:
+    transform 150ms ease,
+    background-color 150ms ease;
+}
+.crate-form-switch[data-state="checked"] {
+  border-color: var(--cyan-hi);
+  background: var(--cyan-hi);
+}
+.crate-form-switch-thumb[data-state="checked"] {
+  background: var(--bg);
+  transform: translateX(15px);
+}
+
+.crate-form-chip {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.crate-form-chip[data-state="inactive"]:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--cyan-hi) 40%, transparent);
+  color: var(--fg);
+}
+.crate-form-chip[data-state="active"] {
+  border-color: var(--cyan-hi);
+  background: var(--cyan-hi);
+  color: var(--bg);
+}
+
+@media (pointer: coarse) {
+  .crate-form-slider {
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crate-form-switch,
+  .crate-form-switch-thumb,
+  .crate-form-chip {
+    transition: none;
+  }
+}

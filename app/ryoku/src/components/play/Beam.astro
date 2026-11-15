@@ -1,0 +1,42 @@
+---
+interface Props {
+  label: string;
+  leg?: number;
+  class?: string;
+}
+
+const { label, leg = 900, class: className } = Astro.props;
+---
+
+<div class:list={["beam", className]} data-beam data-leg={leg} data-running="true" aria-hidden="true" data-label={label}>
+  <span data-beam-segment></span>
+</div>
+
+<script>
+  import { mountOnPage } from "@crate-web/scripts/motion/page";
+  import { mountBeams } from "../../scripts/beam";
+
+  mountOnPage("[data-beam]", mountBeams);
+</script>
+
+<style>
+  .beam {
+    position: relative;
+    height: 2px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--line);
+  }
+
+  [data-beam-segment] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 22%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent, var(--cyan-hi), transparent);
+    box-shadow: 0 0 12px rgba(103, 232, 249, 0.55);
+    will-change: transform;
+  }
+</style>

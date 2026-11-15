@@ -1,0 +1,66 @@
+---
+interface Props {
+  code: string;
+  label: string;
+}
+
+const { code, label } = Astro.props;
+---
+
+<div class="code">
+  <pre><code>{code}</code></pre>
+  <button type="button" class="copy" data-copy={code} aria-label={`Copy ${label}`}>Copy</button>
+</div>
+
+<script>
+  import { copyText } from "@crate-web/lib/clipboard";
+
+  document.addEventListener("click", async (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>(".code [data-copy]");
+    if (!button) return;
+    const copied = await copyText(button.dataset.copy ?? "");
+    button.textContent = copied ? "Copied" : "Select";
+    clearTimeout(Number(button.dataset.timer));
+    button.dataset.timer = String(setTimeout(() => (button.textContent = "Copy"), 1600));
+  });
+</script>
+
+<style>
+  .code {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: rgba(9, 16, 22, 0.72);
+  }
+
+  pre {
+    margin: 0;
+    padding: 16px 84px 16px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--fg);
+  }
+
+  .copy {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1;
+    padding: 6px 12px;
+    border: 1px solid rgba(103, 232, 249, 0.28);
+    border-radius: 999px;
+    background: rgb(9 16 22);
+    color: var(--cyan-hi);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .copy:hover {
+    border-color: rgba(103, 232, 249, 0.55);
+  }
+</style>

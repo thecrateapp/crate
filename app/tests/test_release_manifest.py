@@ -97,6 +97,38 @@ def test_shared_frontend_change_selects_every_shared_consumer() -> None:
     }
 
 
+def test_ryoku_site_change_only_selects_the_ryoku_site_image() -> None:
+    assert detect_changed_images(["app/ryoku/src/pages/index.astro"]) == {"ryoku-site"}
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "app/web/src/styles/tokens.css",
+        "app/web/src/scripts/motion/reveal.ts",
+        "app/web/public/fonts/roboto/latin.woff2",
+        "app/web/public/icons/logo.svg",
+    ],
+)
+def test_crate_web_foundation_change_rebuilds_both_sites(path: str) -> None:
+    assert detect_changed_images([path]) == {"site", "ryoku-site"}
+
+
+def test_ryoku_site_release_env_names_its_image() -> None:
+    manifest = assemble_manifest(
+        release_sha=RELEASE_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=_previous_manifest(),
+        changed_digests={},
+    )
+
+    assert (
+        "CRATE_RYOKU_SITE_IMAGE=ghcr.io/thecrateapp/crate-ryoku-site@sha256:"
+        in render_release_env(manifest)
+    )
+
+
 def test_backend_change_selects_backend_compatibility_group() -> None:
     assert detect_changed_images(["app/crate/api/catalog.py"]) == {
         "analysis-worker",
@@ -137,6 +169,8 @@ def test_backend_change_selects_backend_compatibility_group() -> None:
         ("app/ui/Dockerfile.dockerignore", {"ui"}),
         ("app/listen/Dockerfile.dockerignore", {"listen"}),
         ("app/cast-receiver/Dockerfile.dockerignore", {"cast-receiver"}),
+        ("app/ryoku/Dockerfile.dockerignore", {"ryoku-site"}),
+        ("app/web/README.md", {"site"}),
         (".github/workflows/build-images.yml", set(IMAGE_SPECS)),
     ],
 )

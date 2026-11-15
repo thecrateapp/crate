@@ -1,0 +1,85 @@
+---
+import "@crate-web/styles/tokens.css";
+import "@crate-web/styles/base.css";
+import "../styles/site.css";
+import "../styles/crate-controls.css";
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+// Static builds see the output file (/index.html); the public URL has no file name.
+const path = Astro.url.pathname.replace(/(?:index)?\.html$/, "");
+const url = new URL(path, Astro.site).href;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0a0a0f" />
+    <link rel="canonical" href={url} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={url} />
+    <link rel="icon" type="image/svg+xml" href="/icons/logo.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link
+      rel="preload"
+      href="/fonts/bricolage-grotesque-latin-opsz-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <script is:inline>
+      document.documentElement.classList.add("js");
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <main id="main"><slot /></main>
+    <slot name="after" />
+  </body>
+</html>
+
+<script>
+  import { mountOnPage } from "@crate-web/scripts/motion/page";
+  import { initReveals } from "@crate-web/scripts/motion/reveal";
+  import { initSmoothScroll } from "@crate-web/scripts/motion/smooth-scroll";
+
+  mountOnPage("[data-reveal]", () => {
+    const stopReveals = initReveals();
+    const stopScroll = initSmoothScroll();
+    return () => {
+      stopReveals();
+      stopScroll();
+    };
+  });
+</script>
+
+<style>
+  .skip {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 100;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: var(--cyan);
+    color: var(--bg);
+    font-size: 13px;
+    text-decoration: none;
+    transform: translateY(-200%);
+  }
+
+  .skip:focus-visible {
+    transform: none;
+  }
+</style>

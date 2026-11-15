@@ -1,0 +1,48 @@
+---
+import { CLIPS } from "../data/media";
+import MediaClip from "./MediaClip.astro";
+---
+
+<section id="surfaces" class="section" aria-labelledby="surfaces-title">
+  <header class="head" data-reveal>
+    <p class="eyebrow"><b>Surfaces</b> the whole desktop</p>
+    <h2 id="surfaces-title" class="display">One glass, everywhere.</h2>
+  </header>
+  <ul class="grid">
+    {
+      CLIPS.map((clip) => (
+        <li data-reveal>
+          <MediaClip clip={clip} />
+          <h3>{clip.title}</h3>
+          <p>{clip.caption}</p>
+        </li>
+      ))
+    }
+  </ul>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    gap: 48px 28px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  h3 {
+    margin: 16px 0 6px;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 21px;
+    letter-spacing: -0.02em;
+  }
+
+  li p {
+    margin: 0;
+    max-width: 42ch;
+    color: var(--fg-2);
+    line-height: 1.5;
+  }
+</style>

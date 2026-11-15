@@ -1,0 +1,8 @@
+dist/
+.astro/
+node_modules/
+test-results/
+playwright-report/
+# Synced from app/web/public by scripts/sync-web-assets.mjs.
+public/fonts/
+public/icons/

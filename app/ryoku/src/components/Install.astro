@@ -1,0 +1,116 @@
+---
+import {
+  INSTALL_PACKAGES,
+  MIN_RYOKU,
+  PACMAN_CONF,
+  SETUP,
+  TARBALL_COMMAND,
+  TARBALL_URL,
+} from "../data/install";
+import CodeLine from "./CodeLine.astro";
+---
+
+<section id="install" class="section" aria-labelledby="install-title">
+  <header class="head" data-reveal>
+    <p class="eyebrow"><b>Install</b> three steps</p>
+    <h2 id="install-title" class="display">Install Crate for Ryoku</h2>
+  </header>
+  <ol class="steps">
+    <li data-reveal>
+      <h3>Add the repository</h3>
+      <p>Append it to <code>/etc/pacman.conf</code>.</p>
+      <CodeLine code={PACMAN_CONF} label="the repository block" />
+    </li>
+    <li data-reveal>
+      <h3>Install the packages</h3>
+      <p>The mod and the Crate desktop app.</p>
+      <CodeLine code={INSTALL_PACKAGES} label="the install command" />
+    </li>
+    <li data-reveal>
+      <h3>Set it up</h3>
+      <p>Applies the rice, the icons, the terminal and the bar plugin. <code>crate-for-ryoku uninstall</code> takes you back.</p>
+      <CodeLine code={SETUP} label="the setup command" />
+    </li>
+  </ol>
+  <div class="other" data-reveal>
+    <div>
+      <h3>Ryostore</h3>
+      <p>Once it is published: Bundles, then Crate for Ryoku. It installs the app, the package and the plugin, and sets them up.</p>
+    </div>
+    <div>
+      <h3>Release tarball</h3>
+      <p>
+        Download it from <a class="u-link" href={TARBALL_URL}>the latest release</a>, unpack it and run
+        <code>{TARBALL_COMMAND}</code>.
+      </p>
+    </div>
+    <div>
+      <h3>Requirements</h3>
+      <p>
+        Ryoku {MIN_RYOKU} or newer on Arch. The Crate desktop app needs a Crate server. A few style
+        details need Ryoku changes on their way upstream.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .steps {
+    display: grid;
+    gap: 36px;
+    margin: 0 0 64px;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+    max-width: 820px;
+  }
+
+  .steps li {
+    counter-increment: step;
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .steps h3::before {
+    content: counter(step, decimal-leading-zero);
+    margin-right: 14px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--cyan-hi);
+  }
+
+  h3 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 21px;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    margin: 0;
+    color: var(--fg-2);
+    line-height: 1.55;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    color: var(--fg);
+  }
+
+  .other {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 28px;
+    padding-top: 36px;
+    border-top: 1px solid var(--line);
+  }
+
+  .other div {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+</style>
