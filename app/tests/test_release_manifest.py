@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -53,6 +54,164 @@ def _previous_manifest() -> dict:
 
 def test_listen_change_only_selects_listen_image() -> None:
     assert detect_changed_images(["app/listen/src/App.tsx"]) == {"listen"}
+
+
+def test_blog_edit_rebuilds_only_the_site_and_the_agent() -> None:
+    previous = assemble_manifest(
+        release_sha=PREVIOUS_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=_previous_manifest(),
+        changed_digests={"agent": "sha256:" + "e" * 64},
+    )
+    paths = ["app/web/src/content/blog/a-post.md"]
+    selected = detect_changed_images(
+        paths
+    ) | release_manifest.detect_changed_agent_images(paths)
+    # The agent image bakes the release context, so it follows every change.
+    assert selected == {"site", "agent"}
+    manifest = assemble_manifest(
+        release_sha=RELEASE_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=previous,
+        changed_digests={name: "sha256:" + "f" * 64 for name in selected},
+    )
+    assert manifest["agent_images"]["agent"]["source_sha"] == RELEASE_SHA
+    assert {
+        name
+        for name in IMAGE_SPECS
+        if manifest["images"][name] != previous["images"][name]
+    } == {"site"}
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "expected"),
+    [
+        (
+            "jobs:\n  build-site:\n    steps:\n      - run: build old\n",
+            "jobs:\n  build-site:\n    steps:\n      - run: build new\n",
+            {"site"},
+        ),
+        (
+            "jobs:\n  build-worker:\n    uses: old\n",
+            "jobs:\n  build-worker:\n    uses: new\n",
+            {"worker"},
+        ),
+        (
+            "env:\n  REGISTRY: old\njobs:\n  build-site:\n    steps: []\n",
+            "env:\n  REGISTRY: new\njobs:\n  build-site:\n    steps: []\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        (
+            "jobs:\n  changes:\n    steps: []\n",
+            "jobs:\n  changes:\n    steps: [new]\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        (
+            "jobs:\n  promote-release:\n    steps: []\n",
+            "jobs:\n  promote-release:\n    steps: [new]\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        (
+            "jobs:\n  unknown:\n    steps: []\n",
+            "jobs:\n  unknown:\n    steps: [new]\n",
+            set(release_manifest.ALL_IMAGE_SPECS),
+        ),
+        ("", "jobs: {}\n", set(release_manifest.ALL_IMAGE_SPECS)),
+    ],
+)
+def test_workflow_changes_rebuild_only_affected_jobs_or_fail_closed(
+    before, after, expected
+):
+    assert release_manifest.detect_workflow_images(before, after) == expected
+
+
+def test_scoped_site_workflow_change_does_not_rebuild_other_images():
+    detect_agent = release_manifest.detect_changed_agent_images
+    workflow = [".github/workflows/build-images.yml"]
+    assert detect_changed_images(workflow, workflow_images={"site"}) == {"site"}
+    assert detect_agent(workflow, workflow_images={"site"}) == set()
+    # Source changes still follow their own patterns; the agent follows all.
+    paths = [*workflow, "app/web/Dockerfile"]
+    assert detect_changed_images(paths, workflow_images={"site"}) == {"site"}
+    assert detect_agent(paths, workflow_images={"site"}) == {"agent"}
+
+
+def test_shared_workflow_alias_rebuilds_all_its_consumers():
+    before = "jobs:\n  build-site:\n    steps: &shared\n      - run: old\n  build-docs:\n    steps: *shared\n"
+    assert release_manifest.detect_workflow_images(
+        before, before.replace("run: old", "run: new")
+    ) == {"site", "docs"}
+    assert release_manifest.detect_workflow_images(before, before) == set()
+
+
+# Isolate fixture repositories from the developer's Git configuration (commit
+# signing, templates, hooks).
+GIT_ENV = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+
+
+def _git_commit(repo: Path) -> str:
+    if not (repo / ".git").exists():
+        subprocess.run(["git", "init", "-q", str(repo)], check=True, env=GIT_ENV)
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, env=GIT_ENV)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.test",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+        env=GIT_ENV,
+    )
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=repo, text=True, env=GIT_ENV
+    ).strip()
+
+
+def _detect_cli(repo: Path, base: str, head: str) -> set[str]:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/release_manifest.py"),
+            "detect",
+            "--base",
+            base,
+            "--head",
+            head,
+        ],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+        env=GIT_ENV,
+    )
+    outputs = dict(line.split("=", 1) for line in result.stdout.splitlines())
+    return {name for name, value in outputs.items() if value == "true"}
+
+
+def test_detect_cli_scopes_git_workflow_diff_and_blog_changes(tmp_path):
+    workflow = tmp_path / ".github/workflows/build-images.yml"
+    workflow.parent.mkdir(parents=True)
+    before = "jobs:\n  changes:\n    steps: []\n  build-site:\n    steps:\n      - run: old\n"
+    workflow.write_text(before)
+    base = _git_commit(tmp_path)
+    workflow.write_text(before.replace("run: old", "run: new"))
+    post = tmp_path / "app/web/src/content/blog/post.md"
+    post.parent.mkdir(parents=True)
+    post.write_text("A new post")
+    head = _git_commit(tmp_path)
+    assert _detect_cli(tmp_path, base, head) == {"site", "agent", "any"}
 
 
 def test_cast_receiver_change_only_selects_receiver_image() -> None:
@@ -174,6 +333,7 @@ def test_backend_change_selects_backend_compatibility_group() -> None:
         ("app/ryoku/Dockerfile.dockerignore", {"ryoku-site"}),
         ("app/web/README.md", {"site"}),
         (".github/workflows/build-images.yml", set(IMAGE_SPECS)),
+        (".github/workflows/build-image.yml", set(IMAGE_SPECS)),
     ],
 )
 def test_change_classifier_covers_independent_build_inputs(
@@ -552,6 +712,65 @@ def test_ryoku_image_copies_every_app_web_file_the_ryoku_site_imports() -> None:
 )
 def test_blog_edit_does_not_rebuild_the_ryoku_site(path: str) -> None:
     assert detect_changed_images([path]) == {"site"}
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        # YAML 1.1 reads yes/no as booleans; Actions (YAML 1.2) reads strings.
+        (
+            "jobs:\n  build-site:\n    with:\n      flag: true\n",
+            "jobs:\n  build-site:\n    with:\n      flag: yes\n",
+        ),
+        # Duplicate keys collapse to the last one when parsed.
+        (
+            "jobs:\n  build-site:\n    with:\n      flag: a\n",
+            "jobs:\n  build-site:\n    with:\n      flag: b\n      flag: a\n",
+        ),
+    ],
+)
+def test_job_text_change_hidden_by_yaml_parsing_still_selects_the_job(
+    before: str, after: str
+) -> None:
+    assert release_manifest.detect_workflow_images(before, after) == {"site"}
+
+
+def test_shared_text_change_hidden_by_yaml_parsing_rebuilds_everything() -> None:
+    before = "env:\n  FLAG: true\njobs:\n  build-site:\n    steps: []\n"
+    after = before.replace("FLAG: true", "FLAG: on")
+    assert release_manifest.detect_workflow_images(before, after) == set(
+        release_manifest.ALL_IMAGE_SPECS
+    )
+
+
+def test_duplicate_job_names_rebuild_everything() -> None:
+    before = "jobs:\n  build-site:\n    steps: []\n  build-docs:\n    steps: []\n"
+    after = before + "  build-site:\n    steps: []\n"
+    assert release_manifest.detect_workflow_images(before, after) == set(
+        release_manifest.ALL_IMAGE_SPECS
+    )
+
+
+def test_shared_settings_aliasing_a_job_anchor_rebuild_everything() -> None:
+    workflow = (
+        "jobs:\n  build-site:\n    env: &site\n      MODE: {mode}\n"
+        "    steps: []\nenv: *site\n"
+    )
+    assert release_manifest.detect_workflow_images(
+        workflow.format(mode="a"), workflow.format(mode="b")
+    ) == set(release_manifest.ALL_IMAGE_SPECS)
+
+
+def test_job_aliasing_a_shared_anchor_is_unchanged_until_that_anchor_changes() -> None:
+    workflow = (
+        "env: &shared\n  MODE: {mode}\njobs:\n  build-site:\n    env: *shared\n"
+        "    steps: []\n"
+    )
+    before = workflow.format(mode="a")
+    assert release_manifest.detect_workflow_images(before, before) == set()
+    assert release_manifest.detect_workflow_images(
+        before, workflow.format(mode="b")
+    ) == set(release_manifest.ALL_IMAGE_SPECS)
 
 
 def test_deploy_tooling_ci_runs_when_the_ryoku_web_sources_change() -> None:
