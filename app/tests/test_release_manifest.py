@@ -686,3 +686,40 @@ def test_agent_context_carries_app_web_only_from_its_source_tree() -> None:
     assert web_files == []
 
 
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        # YAML 1.1 reads yes/no as booleans; Actions (YAML 1.2) reads strings.
+        (
+            "jobs:\n  build-site:\n    with:\n      flag: true\n",
+            "jobs:\n  build-site:\n    with:\n      flag: yes\n",
+        ),
+        # Duplicate keys collapse to the last one when parsed.
+        (
+            "jobs:\n  build-site:\n    with:\n      flag: a\n",
+            "jobs:\n  build-site:\n    with:\n      flag: b\n      flag: a\n",
+        ),
+    ],
+)
+def test_job_text_change_hidden_by_yaml_parsing_still_selects_the_job(
+    before: str, after: str
+) -> None:
+    assert release_manifest.detect_workflow_images(before, after) == {"site"}
+
+
+def test_shared_text_change_hidden_by_yaml_parsing_rebuilds_everything() -> None:
+    before = "env:\n  FLAG: true\njobs:\n  build-site:\n    steps: []\n"
+    after = before.replace("FLAG: true", "FLAG: on")
+    assert release_manifest.detect_workflow_images(before, after) == set(
+        release_manifest.ALL_IMAGE_SPECS
+    )
+
+
+def test_duplicate_job_names_rebuild_everything() -> None:
+    before = "jobs:\n  build-site:\n    steps: []\n  build-docs:\n    steps: []\n"
+    after = before + "  build-site:\n    steps: []\n"
+    assert release_manifest.detect_workflow_images(before, after) == set(
+        release_manifest.ALL_IMAGE_SPECS
+    )
+
+

@@ -253,17 +253,26 @@ def detect_changed_agent_images(
     return _detect(AGENT_IMAGE_SPECS, paths, requested, workflow_images)
 
 
-def _workflow_sections(text: str) -> tuple[dict, dict]:
+@dataclass(frozen=True)
+class _WorkflowSections:
+    common: dict
+    jobs: dict
+    common_text: str
+    job_texts: dict[str, str]
+
+
+def _workflow_sections(text: str) -> _WorkflowSections:
     # Only workflow comparison needs YAML; manifest validation on production
     # hosts remains stdlib-only. Safe loading also expands aliases so an edited
     # shared step selects every build job that consumes it.
     import yaml
 
     try:
+        root = yaml.compose(text, Loader=yaml.SafeLoader)
         workflow = yaml.safe_load(text)
     except yaml.YAMLError as error:
         raise ValueError("Unreadable workflow") from error
-    if not isinstance(workflow, dict):
+    if not isinstance(workflow, dict) or not isinstance(root, yaml.MappingNode):
         raise ValueError("No workflow mapping")
     jobs = workflow.pop("jobs", None)
     if not isinstance(jobs, dict) or not jobs:
@@ -273,22 +282,43 @@ def _workflow_sections(text: str) -> tuple[dict, dict]:
         for name, job in jobs.items()
     ):
         raise ValueError("Unrecognized job")
-    return workflow, jobs
+    # PyYAML reads YAML 1.1 (yes/on become booleans) and keeps the last of
+    # duplicate keys, while Actions reads YAML 1.2. Raw text also has to match,
+    # so a difference the parser hides still counts as a change.
+    jobs_nodes = [
+        value
+        for key, value in root.value
+        if isinstance(key, yaml.ScalarNode) and key.value == "jobs"
+    ]
+    if len(jobs_nodes) != 1 or not isinstance(jobs_nodes[0], yaml.MappingNode):
+        raise ValueError("Ambiguous jobs mapping")
+    jobs_node = jobs_nodes[0]
+    job_texts: dict[str, str] = {}
+    for key, value in jobs_node.value:
+        if key.value in job_texts:
+            raise ValueError(f"Duplicate job: {key.value}")
+        job_texts[key.value] = text[key.start_mark.index : value.end_mark.index]
+    if set(job_texts) != set(jobs):
+        raise ValueError("Unrecognized job")
+    common_text = text[: jobs_node.start_mark.index] + text[jobs_node.end_mark.index :]
+    return _WorkflowSections(workflow, jobs, common_text, job_texts)
 
 
 def detect_workflow_images(before: str, after: str) -> set[str]:
     """Scope build-job edits; shared/unknown changes still rebuild everything."""
     all_images = set(ALL_IMAGE_SPECS)
     try:
-        old_common, old_jobs = _workflow_sections(before)
-        new_common, new_jobs = _workflow_sections(after)
+        old = _workflow_sections(before)
+        new = _workflow_sections(after)
     except (ImportError, ValueError):
         return all_images
-    if old_common != new_common:
+    if old.common != new.common or old.common_text != new.common_text:
         return all_images
     selected = set()
-    for job in old_jobs.keys() | new_jobs.keys():
-        if old_jobs.get(job) == new_jobs.get(job):
+    for job in old.jobs.keys() | new.jobs.keys():
+        if old.jobs.get(job) == new.jobs.get(job) and old.job_texts.get(
+            job
+        ) == new.job_texts.get(job):
             continue
         image = job.removeprefix("build-")
         if not job.startswith("build-") or image not in ALL_IMAGE_SPECS:
