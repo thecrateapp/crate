@@ -966,7 +966,7 @@ deploy-unlock: ## Release a stale host mutation lease (another owner requires CO
 	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_CONFIRM="$(CONFIRM)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh unlock
 
 .PHONY: ryoku-media-sync
-ryoku-media-sync: ## Upload ryoku.cratemusic.app clips and posters (SRC=<dir>); never deletes server files
+ryoku-media-sync: ## Upload ryoku.cratemusic.app media: shots/ screenshots, clips, posters (SRC=<dir>); never deletes server files
 	@test -n "$(strip $(SRC))" || { echo "$(RED)SRC=<dir with the cut clips> is required$(NC)"; exit 1; }
 	@test -d "$(SRC)" || { echo "$(RED)$(SRC) is not a directory$(NC)"; exit 1; }
 	@$(SSH) "mkdir -p $(SERVER_PATH)/media/ryoku"

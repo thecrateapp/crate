@@ -44,18 +44,3 @@ test("the install section shows the pacman repository and the setup command", as
   await expect(install).toContainText("crate-for-ryoku install");
   await expect(install).toContainText("Ryostore");
 });
-
-test("every surface has a clip slot", async ({ page }) => {
-  for (const id of [
-    "qsbar",
-    "controls",
-    "launcher",
-    "gamebar",
-    "kit",
-    "pickers",
-    "dock",
-    "notifications",
-  ]) {
-    await expect(page.locator(`#surfaces [data-clip="${id}"]`)).toHaveCount(1);
-  }
-});

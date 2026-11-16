@@ -57,6 +57,7 @@ import CodeLine from "./CodeLine.astro";
 <style>
   .steps {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 36px;
     margin: 0 0 64px;
     padding: 0;
@@ -68,6 +69,8 @@ import CodeLine from "./CodeLine.astro";
   .steps li {
     counter-increment: step;
     display: grid;
+    /* a long command scrolls inside its block instead of widening the step */
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     min-width: 0;
   }

@@ -138,6 +138,8 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
             "app/ryoku/**",
             "app/web/src/styles/**",
             "app/web/src/scripts/motion/**",
+            "app/web/src/components/showcase/**",
+            "app/web/src/scripts/gallery/**",
             "app/web/src/lib/clipboard.ts",
             "app/web/public/fonts/**",
             "app/web/public/icons/**",

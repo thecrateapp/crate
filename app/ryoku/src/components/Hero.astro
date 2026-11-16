@@ -1,12 +1,9 @@
 ---
-import { HERO } from "../data/media";
-import MediaClip from "./MediaClip.astro";
+import Showcase from "@crate-web/components/showcase/Showcase.astro";
+import { SHOTS } from "../data/shots";
 ---
 
 <section id="hero" class="hero" aria-labelledby="hero-title">
-  <div class="stage">
-    <MediaClip clip={HERO} class="hero-clip" />
-  </div>
   <div class="copy">
     <p class="eyebrow" data-reveal><b>A Ryoku mod</b> from the Crate project</p>
     <h1 id="hero-title" class="display" data-reveal>Crate for Ryoku</h1>
@@ -16,35 +13,18 @@ import MediaClip from "./MediaClip.astro";
       <a class="u-link" href="https://cratemusic.app">What is Crate?</a>
     </div>
   </div>
+  <Showcase
+    shots={SHOTS}
+    label="Crate for Ryoku screenshots"
+    position="{index} / {count}"
+    previous="Previous screenshot"
+    next="Next screenshot"
+    pause="Pause the screenshots"
+    play="Play the screenshots"
+  />
 </section>
 
 <style>
-  .hero {
-    position: relative;
-  }
-
-  .stage {
-    position: sticky;
-    top: 0;
-    height: 100svh;
-  }
-
-  .stage :global(.hero-clip) {
-    position: absolute;
-    inset: 0;
-    border: 0;
-    border-radius: 0;
-    aspect-ratio: auto;
-  }
-
-  .stage::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(transparent 55%, var(--bg));
-    pointer-events: none;
-  }
-
   .copy {
     position: relative;
     z-index: 2;
@@ -52,7 +32,7 @@ import MediaClip from "./MediaClip.astro";
     gap: 22px;
     max-width: 1100px;
     margin: 0 auto;
-    padding: 0 clamp(16px, 6vw, 96px) 12vh;
+    padding: 22vh clamp(16px, 6vw, 96px) 6vh;
   }
 
   h1 {
