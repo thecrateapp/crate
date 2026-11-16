@@ -145,9 +145,10 @@ def get_decade_distribution() -> dict[str, int]:
             session.execute(
                 text(
                     """
-                SELECT (CAST(year AS INTEGER)/10)*10 || 's' as decade, COUNT(*) as c
+                SELECT (CAST(SUBSTRING(year FROM '^[0-9]{4}') AS INTEGER)/10)*10 || 's'
+                    as decade, COUNT(*) as c
                 FROM library_albums
-                WHERE year IS NOT NULL AND year != '' AND length(year) >= 4
+                WHERE year ~ '^[0-9]{4}'
                 GROUP BY decade ORDER BY decade
                 """
                 )
