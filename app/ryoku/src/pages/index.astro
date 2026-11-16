@@ -1,8 +1,10 @@
 ---
+import CrateUI from "../components/CrateUI.astro";
 import Hero from "../components/Hero.astro";
 import Install from "../components/Install.astro";
-import PoweredByCrate from "../components/PoweredByCrate.astro";
 import SiteFooter from "../components/SiteFooter.astro";
+import Tour from "../components/Tour.astro";
+import WhatIsCrate from "../components/WhatIsCrate.astro";
 import Site from "../layouts/Site.astro";
 ---
 
@@ -11,7 +13,9 @@ import Site from "../layouts/Site.astro";
   description="An opinionated mod of Ryoku based on Crate's visual design."
 >
   <Hero />
-  <PoweredByCrate />
+  <Tour />
+  <CrateUI />
+  <WhatIsCrate />
   <Install />
   <SiteFooter slot="after" />
 </Site>

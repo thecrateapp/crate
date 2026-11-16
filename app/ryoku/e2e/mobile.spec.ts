@@ -4,7 +4,14 @@ test.use({ viewport: { width: 375, height: 812 } });
 
 test("fits a 375 px phone with no horizontal scroll", async ({ page }) => {
   await page.goto("/");
-  for (const id of ["hero", "crate", "install"]) {
+  for (const id of [
+    "hero",
+    "tour",
+    "crate-ui",
+    "what-is-crate",
+    "install",
+    "footer",
+  ]) {
     await page.locator(`#${id}`).scrollIntoViewIfNeeded();
   }
   const width = await page.evaluate(() => document.documentElement.scrollWidth);

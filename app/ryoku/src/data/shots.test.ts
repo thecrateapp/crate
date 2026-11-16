@@ -16,7 +16,7 @@ describe("SHOTS", () => {
         shot.portraitSmall,
       ]) {
         expect(path).toMatch(
-          /^\/media\/shots\/[a-z]+(-1280|-portrait|-portrait-1080)?\.webp\?v=\d{4}-\d{2}-\d{2}$/,
+          /^\/media\/shots\/[a-z]+(-[a-z]+)*(-1280|-portrait|-portrait-1080)?\.webp\?v=\d{4}-\d{2}-\d{2}(\.\d+)?$/,
         );
       }
     }

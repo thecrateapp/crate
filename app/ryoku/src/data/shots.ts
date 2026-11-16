@@ -5,7 +5,7 @@ import type { ShowcaseShot } from "@crate-web/components/showcase/types";
 // the clips they replace until a fluid screencast exists.
 // Bump when the shots are recomposed: the media location is cached for 30 days (and
 // Cloudflare keeps it), so a new set needs new URLs.
-const VERSION = "2026-11-16";
+const VERSION = "2026-11-16.2";
 const url = (file: string) => `/media/shots/${file}.webp?v=${VERSION}`;
 
 const shot = (
@@ -37,20 +37,62 @@ export const SHOTS: ShowcaseShot[] = [
   shot(
     "qsbar",
     "QS Bar and crate-mark",
-    "The Crate mark on the bar: now playing, transport and Crate's equalizer in one panel.",
+    "Crate's mark on the bar opens a panel in the same glass and cyan as the app.",
     "The crate-mark panel open from the QS Bar with now playing and the equalizer",
   ),
   shot(
     "controls",
     "Controls",
-    "Super+Esc for power, session and quick toggles, in the same glass as everything else.",
+    "Ryoku's Controls in Crate's glass, hairlines and one cyan accent.",
     "The Controls panel with system stats, quick toggles and power profiles",
   ),
   shot(
     "launcher",
     "Launcher",
-    "Apps, files and your Crate library in one field. Type cr to search Crate alone.",
+    "Ryoku's launcher in Crate's type, with album covers from your library.",
     "The launcher searching the Crate library for an artist",
+  ),
+  shot(
+    "ask",
+    "Ask Rashin",
+    "Ryoku's Ask Rashin, restyled with Crate's field, chips and mono labels.",
+    "The Ask Rashin panel with a question about the dock style",
+  ),
+  shot(
+    "rashin",
+    "Rashin",
+    "Rashin, Ryoku's companion, on Crate's dark canvas and display type.",
+    "The Rashin window on its overview with the clock, system load and code intelligence",
+  ),
+  shot(
+    "settings",
+    "Settings",
+    "Ryoku's settings, drawn with Crate's panels, hairlines and type.",
+    "Ryoku's settings window on the Animations page",
+  ),
+  shot(
+    "qsbar-settings",
+    "QS Bar layout",
+    "The QS Bar's own settings, restyled with Crate's glass and toggles.",
+    "The QS Bar settings on the Layout page with the left, centre and right lanes",
+  ),
+  shot(
+    "audio",
+    "Audio",
+    "Ryoku's audio widget, redrawn in Crate's glass and cyan.",
+    "The audio widget with output volume, devices, the Crate app and microphones",
+  ),
+  shot(
+    "network",
+    "Network",
+    "Ryoku's network widget, in the same glass as every other panel.",
+    "The network widget with the connected Wi-Fi network and nearby networks",
+  ),
+  shot(
+    "temperature",
+    "Temperature",
+    "Ryoku's temperature readout, with Crate's mono numbers and rails.",
+    "The temperature widget with CPU package, CPU core, GPU and NVMe readings",
   ),
   shot(
     "gamebar",
@@ -61,13 +103,13 @@ export const SHOTS: ShowcaseShot[] = [
   shot(
     "kit",
     "Kit",
-    "Ryoku's control kit in Crate's palette: the Beam, chips, sliders and toggles.",
+    "Ryoku's Kit in Crate's palette and mono labels.",
     "Ryoku's Kit window listing keybindings",
   ),
   shot(
     "pickers",
     "Pickers",
-    "Wallpaper, rice and theme pickers drawn to the same rules.",
+    "Ryoku's wallpaper browser, framed in Crate's glass.",
     "The wallpaper browser fanning out wallpapers over the desktop",
   ),
   shot(

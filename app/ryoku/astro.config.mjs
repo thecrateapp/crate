@@ -2,6 +2,8 @@ import { defineConfig } from "astro/config";
 import { fileURLToPath } from "node:url";
 
 const webSrc = fileURLToPath(new URL("../web/src", import.meta.url));
+// The bar's hover scramble lives with the apps' shared web helpers.
+const sharedWeb = fileURLToPath(new URL("../shared/web", import.meta.url));
 
 export default defineConfig({
   site: "https://ryoku.cratemusic.app",
@@ -24,7 +26,7 @@ export default defineConfig({
       },
     },
     server: {
-      fs: { allow: [fileURLToPath(new URL(".", import.meta.url)), webSrc] },
+      fs: { allow: [fileURLToPath(new URL(".", import.meta.url)), webSrc, sharedWeb] },
     },
   },
 });

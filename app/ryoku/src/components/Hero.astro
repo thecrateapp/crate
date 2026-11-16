@@ -1,18 +1,21 @@
 ---
 import Showcase from "@crate-web/components/showcase/Showcase.astro";
 import { SHOTS } from "../data/shots";
+import HeroBackdrop from "./HeroBackdrop.astro";
 ---
 
 <section id="hero" class="hero" aria-labelledby="hero-title">
+  <HeroBackdrop />
   <div class="copy">
     <p class="eyebrow" data-reveal><b>A Ryoku mod</b> from the Crate project</p>
     <h1 id="hero-title" class="display" data-reveal>Crate for Ryoku</h1>
     <p class="line" data-reveal>An opinionated mod of Ryoku based on Crate's visual design.</p>
     <div class="actions" data-reveal>
       <a class="primary" href="#install">Install Crate for Ryoku</a>
-      <a class="u-link" href="https://cratemusic.app">What is Crate?</a>
+      <a class="u-link" href="#what-is-crate">What is Crate?</a>
     </div>
   </div>
+  <div id="screenshots" class="screenshots">
   <Showcase
     shots={SHOTS}
     label="Crate for Ryoku screenshots"
@@ -22,9 +25,20 @@ import { SHOTS } from "../data/shots";
     pause="Pause the screenshots"
     play="Play the screenshots"
   />
+  </div>
 </section>
 
 <style>
+  .hero {
+    position: relative;
+  }
+
+  /* Above the backdrop, which is positioned. */
+  .screenshots {
+    position: relative;
+    z-index: 1;
+  }
+
   .copy {
     position: relative;
     z-index: 2;

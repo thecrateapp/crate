@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-const SECTIONS = ["hero", "crate", "install", "footer"];
+const SECTIONS = [
+  "hero",
+  "tour",
+  "crate-ui",
+  "what-is-crate",
+  "install",
+  "footer",
+];
 
 test("the page loads with every section", async ({ page }) => {
   const response = await page.goto("/");
