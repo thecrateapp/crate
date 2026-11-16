@@ -1,23 +1,9 @@
 ---
-// What Crate for Ryoku takes from Crate: its design system, not its player.
-const RULES = [
-  {
-    label: "One accent",
-    text: "Brand cyan for actions, key values and active states. Amber only reports status.",
-  },
-  {
-    label: "Hairlines, not boxes",
-    text: "A panel is a top rule and a header row. Only standalone objects get a card.",
-  },
-  {
-    label: "Display and mono",
-    text: "Bricolage Grotesque for names and numerals, JetBrains Mono for labels and readouts.",
-  },
-  {
-    label: "One glass",
-    text: "Every floating surface on the desktop shares the Controls panel's glass and 6 px corners.",
-  },
-];
+// What Crate for Ryoku takes from Crate: its design system, not its player. Each rule
+// comes with an example drawn in HTML and CSS from the site's Crate tokens, the way the
+// shell's QML kit draws it (Chip, Toggle, Beam, Frame, Label), not a screenshot.
+import { CRATE_UI_BLOCKS } from "../data/crateui";
+import { ICONS } from "../data/icons";
 ---
 
 <section id="crate-ui" class="section" aria-labelledby="crate-ui-title">
@@ -27,20 +13,148 @@ const RULES = [
     <p class="lede">
       Crate UI is the design system behind Crate: the tokens, components and rules that make Listen
       and Admin read as one product, and that cratemusic.app and this site are built with. Crate for
-      Ryoku draws Ryoku's bar, panels, dock and launcher with the same language, so the desktop
-      looks like the app you play your music in.
+      Ryoku draws Ryoku's bar, panels, dock, launcher and icons with the same language, so the
+      desktop looks like the app you play your music in.
     </p>
   </div>
-  <ul class="rules" data-reveal>
+
+  <ol class="blocks">
     {
-      RULES.map((rule) => (
-        <li>
-          <span class="label">{rule.label}</span>
-          <span class="text">{rule.text}</span>
+      CRATE_UI_BLOCKS.map((block) => (
+        <li class="block" data-block={block.id} data-reveal>
+          <div class="copy">
+            <h3 class="label">{block.label}</h3>
+            <p class="text">{block.text}</p>
+            {block.note && <p class="note">{block.note}</p>}
+          </div>
+          <div class="example">
+            {block.id === "accent" && (
+              <div
+                class="strip"
+                role="img"
+                aria-label="A Controls strip: a switch on in cyan, the selected power mode filled cyan, and a cyan volume line; everything else neutral"
+              >
+                <div class="strip-row">
+                  <span class="k">Night light</span>
+                  <span class="switch is-on" />
+                </div>
+                <div class="strip-row">
+                  <span class="k">Wi-Fi</span>
+                  <span class="switch" />
+                </div>
+                <div class="chips">
+                  <span class="chip">Saver</span>
+                  <span class="chip is-on">Balanced</span>
+                  <span class="chip">Performance</span>
+                </div>
+                <div class="beam-row">
+                  <span class="k">Volume</span>
+                  <span class="beam" style="--v: 62%">
+                    <span class="beam-fill" />
+                    <span class="beam-dot" />
+                  </span>
+                  <span class="v">62</span>
+                </div>
+              </div>
+            )}
+
+            {block.id === "hairlines" && (
+              <div
+                class="group"
+                role="img"
+                aria-label="A settings group: a top rule, a DISPLAY header row and three rows, with no filled box"
+              >
+                <div class="group-head">
+                  <span>Display</span>
+                  <span class="register">eDP-1</span>
+                </div>
+                <div class="group-row">
+                  <span>Scale</span>
+                  <span class="v">1.25</span>
+                </div>
+                <div class="group-row">
+                  <span>Refresh rate</span>
+                  <span class="v">120 Hz</span>
+                </div>
+                <div class="group-row">
+                  <span>Night light</span>
+                  <span class="v">Sunset to sunrise</span>
+                </div>
+              </div>
+            )}
+
+            {block.id === "type" && (
+              <div
+                class="specimen"
+                role="img"
+                aria-label="A clock: 16:42 in Bricolage Grotesque, and MONDAY · 16 NOV 2026 in JetBrains Mono"
+              >
+                <span class="clock">16:42</span>
+                <span class="date">
+                  <b>Monday</b> · 16 Nov 2026
+                </span>
+              </div>
+            )}
+
+            {block.id === "glass" && (
+              <div
+                class="stage"
+                role="img"
+                aria-label="A Controls panel in glass over part of the Crate app: the app is sharp beside the panel and frosted under it"
+              >
+                <div class="glass">
+                  <div class="glass-head">
+                    <span>Controls</span>
+                    <span class="register">16:42</span>
+                  </div>
+                  <div class="beam-row">
+                    <span class="k">Volume</span>
+                    <span class="beam" style="--v: 62%">
+                      <span class="beam-fill" />
+                      <span class="beam-dot" />
+                    </span>
+                    <span class="v">62</span>
+                  </div>
+                  <div class="beam-row">
+                    <span class="k">Brightness</span>
+                    <span class="beam" style="--v: 80%">
+                      <span class="beam-fill" />
+                      <span class="beam-dot" />
+                    </span>
+                    <span class="v">80</span>
+                  </div>
+                  <div class="strip-row">
+                    <span class="k">Night light</span>
+                    <span class="switch is-on" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {block.id === "icons" && (
+              <ul class="icons" aria-label="Icons from crate-icons">
+                {ICONS.map((icon) => (
+                  <li data-kind={icon.kind}>
+                    <img
+                      src={icon.file}
+                      alt={icon.name}
+                      width="48"
+                      height="48"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <span class="name" aria-hidden="true">
+                      {icon.name}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </li>
       ))
     }
-  </ul>
+  </ol>
 </section>
 
 <style>
@@ -52,32 +166,359 @@ const RULES = [
     line-height: 1.5;
   }
 
-  .rules {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 0 32px;
+  /* Each rule is a row between hairlines: the words on the left, the example on the right. */
+  .blocks {
     margin: 0;
     padding: 0;
     list-style: none;
+    border-bottom: 1px solid var(--line);
   }
 
-  .rules li {
+  .block {
     display: grid;
-    gap: 10px;
-    padding: 20px 0 28px;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 24px 64px;
+    align-items: center;
+    padding: 48px 0;
     border-top: 1px solid var(--line);
   }
 
+  .copy {
+    display: grid;
+    gap: 12px;
+    align-self: start;
+  }
+
   .label {
+    margin: 0;
     color: var(--cyan-hi);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .text {
+    margin: 0;
+    max-width: 44ch;
+    color: var(--fg-2);
+    font-size: 17px;
+    line-height: 1.55;
+  }
+
+  .note {
+    margin: 0;
+    max-width: 44ch;
+    color: var(--fg-3);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .example {
+    min-width: 0;
+  }
+
+  /* The kit's shared pieces: mono readouts, the switch, the chip and the beam. */
+  .k {
+    color: var(--fg-2);
+    font-size: 14px;
+  }
+
+  .v,
+  .register {
+    color: var(--fg-3);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+
+  .strip {
+    display: grid;
+    gap: 14px;
+    max-width: 420px;
+  }
+
+  .strip-row,
+  .beam-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .switch {
+    position: relative;
+    flex: none;
+    width: 34px;
+    height: 18px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+  }
+
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--fg-3);
+  }
+
+  .switch.is-on {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+  }
+
+  .switch.is-on::after {
+    left: 19px;
+    background: var(--bg);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 4px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--fg-2);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .chip.is-on {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+    color: var(--bg);
+  }
+
+  .beam-row .k {
+    flex: none;
+  }
+
+  .beam {
+    position: relative;
+    display: block;
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .beam-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--v);
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.14), var(--cyan-hi));
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.45);
+  }
+
+  .beam-dot {
+    position: absolute;
+    top: 50%;
+    left: var(--v);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--fg);
+    box-shadow: 0 0 0 2px rgba(103, 232, 249, 0.35);
+    transform: translate(-50%, -50%);
+  }
+
+  /* A group drawn with rules only: no fill, no box. */
+  .group {
+    max-width: 480px;
+    border-top: 1px solid var(--line);
+  }
+
+  .group-head,
+  .group-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .group-head {
+    padding: 12px 0 14px;
+    color: var(--fg);
     font-family: var(--mono);
     font-size: 12px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
-  .text {
+  .group-row {
+    padding: 12px 0;
+    border-top: 1px solid rgba(241, 245, 249, 0.06);
     color: var(--fg-2);
-    line-height: 1.55;
+    font-size: 14px;
+  }
+
+  .specimen {
+    display: grid;
+    gap: 6px;
+  }
+
+  .clock {
+    color: var(--fg);
+    font-family: var(--display);
+    font-size: clamp(64px, 9vw, 120px);
+    font-weight: 800;
+    line-height: 0.9;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .date {
+    color: var(--fg-2);
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .date b {
+    color: var(--cyan-hi);
+    font-weight: 400;
+  }
+
+  /* The one glass: Tokens.glass (popover #111218 at 0.68) over part of a Crate window, so
+     the same app reads sharp beside the panel and frosted under it. */
+  .stage {
+    position: relative;
+    aspect-ratio: 820 / 512;
+    max-width: 640px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #0a0a0f url("/crate-ui/crate-window.webp") left top / cover no-repeat;
+  }
+
+  .glass {
+    position: absolute;
+    top: 30%;
+    left: 27%;
+    display: grid;
+    gap: 12px;
+    width: min(62%, 340px);
+    padding: 0 16px 16px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: rgba(17, 18, 24, 0.68);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+  }
+
+  .glass-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0 10px;
+    border-bottom: 1px solid var(--line);
+    color: var(--fg-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .glass .k {
+    color: var(--fg);
+    font-size: 13px;
+  }
+
+  .glass .beam-row .k {
+    width: 7.5em;
+  }
+
+  @media (max-width: 520px) {
+    /* smaller on a phone, so the app still shows sharp around it */
+    .glass {
+      top: 24%;
+      left: 31%;
+      width: 64%;
+      gap: 8px;
+      padding: 0 12px 12px;
+    }
+
+    .glass .beam-row + .beam-row {
+      display: none;
+    }
+
+    .glass .beam-row .k {
+      width: auto;
+    }
+
+    .glass-head {
+      padding: 8px 0 6px;
+    }
+
+    .glass .k {
+      font-size: 12px;
+    }
+  }
+
+  /* The icons straight on the page, like the dock's on the wallpaper: no plate. */
+  .icons {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 28px 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .icons li {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+  }
+
+  .icons img {
+    display: block;
+    width: 48px;
+    height: 48px;
+  }
+
+  .name {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--fg-3);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 860px) {
+    .block {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 24px;
+      padding: 36px 0 40px;
+    }
+  }
+
+  @media (max-width: 520px) {
+    /* eighteen icons: six even rows of three, every name whole */
+    .icons {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 28px 8px;
+    }
+
+    .name {
+      font-size: 11px;
+    }
   }
 </style>

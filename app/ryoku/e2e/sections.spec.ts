@@ -51,6 +51,13 @@ test("the install section shows the signed pacman repository and the setup comma
     "pacman -Syu crate-for-ryoku crate-desktop-bin",
   );
   await expect(install).toContainText("crate-for-ryoku install");
+  await expect(install).toContainText("above the [ryoku] block");
+  await expect(install).toContainText("Crate's patches");
+  await expect(
+    install.locator('a[href="https://github.com/thecrateapp/ryoku"]'),
+  ).toHaveCount(1);
+  await expect(install).toContainText("Back to stock Ryoku");
+  await expect(install).toContainText("sudo pacman -Syuu");
   await expect(page.locator("body")).not.toContainText("Ryostore");
   await expect(page.locator("body")).not.toContainText("TrustAll");
 
