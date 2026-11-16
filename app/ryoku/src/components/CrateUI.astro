@@ -25,6 +25,7 @@ import { ICONS } from "../data/icons";
           <div class="copy">
             <h3 class="label">{block.label}</h3>
             <p class="text">{block.text}</p>
+            {block.note && <p class="note">{block.note}</p>}
           </div>
           <div class="example">
             {block.id === "accent" && (
@@ -189,6 +190,14 @@ import { ICONS } from "../data/icons";
     max-width: 44ch;
     color: var(--fg-2);
     font-size: 17px;
+    line-height: 1.55;
+  }
+
+  .note {
+    margin: 0;
+    max-width: 44ch;
+    color: var(--fg-3);
+    font-size: 15px;
     line-height: 1.55;
   }
 

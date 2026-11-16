@@ -11,6 +11,8 @@ export interface CrateUIBlock {
   id: CrateUIBlockId;
   label: string;
   text: string;
+  // an optional second line, quieter than the rule
+  note?: string;
 }
 
 export const CRATE_UI_BLOCKS: CrateUIBlock[] = [
@@ -38,5 +40,6 @@ export const CRATE_UI_BLOCKS: CrateUIBlock[] = [
     id: "icons",
     label: "Icons",
     text: "crate-icons draws the system apps as Solar glyphs, and crateize gives every app you install its brand mark or a glyph in the same ink.",
+    note: "A brand with no free mark keeps its own icon in Crate's colours, a watcher redraws the set as apps come and go, and Papirus fills the rest.",
   },
 ];

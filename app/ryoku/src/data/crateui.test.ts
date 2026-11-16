@@ -17,4 +17,15 @@ describe("CRATE_UI_BLOCKS", () => {
       expect(block.text).toMatch(/^[^.]+\.$/);
     }
   });
+
+  it("explains the icons' graded fallback and watcher in a second line", () => {
+    const icons = CRATE_UI_BLOCKS.find((block) => block.id === "icons");
+    expect(icons?.note).toMatch(/^[^.]+\.$/);
+    expect(icons?.note).toContain("own icon in Crate's colours");
+    expect(icons?.note).toContain("watcher");
+    expect(icons?.note).toContain("Papirus");
+    expect(
+      CRATE_UI_BLOCKS.filter((block) => block.note).map((block) => block.id),
+    ).toEqual(["icons"]);
+  });
 });

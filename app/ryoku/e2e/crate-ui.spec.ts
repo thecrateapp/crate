@@ -22,6 +22,15 @@ test("Crate UI shows its five rules in order, each with an example", async ({
   }
 });
 
+test("the icons block names the graded fallback, the watcher and Papirus", async ({
+  page,
+}) => {
+  const note = page.locator('[data-block="icons"] .note');
+  await expect(note).toContainText("keeps its own icon in Crate's colours");
+  await expect(note).toContainText("watcher");
+  await expect(note).toContainText("Papirus");
+});
+
 test("there is no separate icons section any more", async ({ page }) => {
   await expect(page.locator("#icons")).toHaveCount(0);
   await expect(page.locator('header.nav a[href="#icons"]')).toHaveCount(0);
