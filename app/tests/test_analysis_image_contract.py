@@ -201,3 +201,17 @@ def test_the_analysis_image_carries_the_graph_from_the_chosen_source() -> None:
 def test_onnxruntime_is_pinned_and_separation_needs_no_torch() -> None:
     assert re.search(r"^onnxruntime==\d+\.\d+\.\d+$", ANALYSIS_REQUIREMENTS, re.M)
     assert "onnxruntime" not in BEAT_THIS_REQUIREMENTS
+
+
+def test_the_beat_this_checkpoint_falls_back_between_share_endpoints() -> None:
+    # The JKU Nextcloud share serves the same file on two WebDAV endpoints, and on
+    # 2026-11-15 the newer dav/files one started answering 500. Both are tried and
+    # the pinned SHA-256 still decides what is accepted.
+    stage = _stage("beat-this-weights")
+    legacy = stage.find("public.php/webdav/")
+    newer = stage.find("public.php/dav/files/${BEAT_THIS_SHARE}/")
+    assert legacy != -1 and newer != -1
+    assert legacy < newer
+    assert re.search(r'-u "?\$\{?BEAT_THIS_SHARE\}?:"?', stage)
+    assert "ARG BEAT_THIS_SHARE=7ik4RrBKTS273gp" in stage
+    assert "sha256sum -c -" in stage
