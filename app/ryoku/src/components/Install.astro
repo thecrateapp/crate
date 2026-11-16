@@ -5,7 +5,10 @@ import {
   KEY_PATH,
   MIN_RYOKU,
   PACMAN_CONF,
+  RYOKU_FORK_URL,
+  RYOKU_REPO,
   SETUP,
+  STOCK_RYOKU,
   TARBALL_COMMAND,
   TARBALL_URL,
   TRUST_KEY,
@@ -30,12 +33,16 @@ import CodeLine from "./CodeLine.astro";
     </li>
     <li data-reveal>
       <h3>Add the repository</h3>
-      <p>Append it to <code>/etc/pacman.conf</code>.</p>
+      <p>
+        Put it in <code>/etc/pacman.conf</code> above the <code>[{RYOKU_REPO}]</code> block. It also ships Ryoku
+        itself, built from <a class="u-link" href={RYOKU_FORK_URL}>Crate's fork</a> with Crate's patches, and pacman
+        takes each package from the first repository that has it.
+      </p>
       <CodeLine code={PACMAN_CONF} label="the repository block" />
     </li>
     <li data-reveal>
       <h3>Install the packages</h3>
-      <p>The mod and the Crate desktop app.</p>
+      <p>The mod and the Crate desktop app. The same upgrade moves your Ryoku packages to Crate's builds.</p>
       <CodeLine code={INSTALL_PACKAGES} label="the install command" />
     </li>
     <li data-reveal>
@@ -57,10 +64,17 @@ import CodeLine from "./CodeLine.astro";
       </p>
     </div>
     <div>
+      <h3>Back to stock Ryoku</h3>
+      <p>
+        Delete the <code>[crate-for-ryoku]</code> block and run <code>{STOCK_RYOKU}</code>: pacman moves the Ryoku
+        packages back to Ryoku's own builds.
+      </p>
+    </div>
+    <div>
       <h3>Requirements</h3>
       <p>
-        Ryoku {MIN_RYOKU} or newer on Arch. The Crate desktop app needs a Crate server. A few style
-        details need Ryoku changes on their way upstream.
+        Ryoku {MIN_RYOKU} or newer on Arch. The Crate desktop app needs a Crate server. Without this repository,
+        a few style details need Crate's Ryoku patches.
       </p>
     </div>
   </div>
