@@ -1,7 +1,8 @@
-// The icons a Crate for Ryoku desktop draws, as vector files beside this site. Most are
-// copied unchanged from crate-icons' scalable/apps. Discord, Visual Studio Code and
-// GitHub Desktop were not installed on the machine they came from, so they were drawn
-// with crate-for-ryoku's build_icons.brand_svg from the same pinned Tabler set.
+// The icons a Crate for Ryoku desktop draws, as vector files beside this site, shown in
+// the Crate UI section. Most are copied unchanged from crate-icons' scalable/apps.
+// Discord, Visual Studio Code and GitHub Desktop were not installed on the machine they
+// came from, so they were drawn with crate-for-ryoku's build_icons.brand_svg, which maps
+// them since feat(icons) "Discord, VS Code and GitHub Desktop wear their brand marks".
 // Only Solar glyphs (CC BY 4.0) and brand marks (Tabler Icons, MIT; Simple Icons, CC0)
 // are shown: a graded fallback is the app's own drawing, so it stays on the machine.
 // No music-streaming services: Crate is the alternative to them.

@@ -8,7 +8,6 @@ test("fits a 375 px phone with no horizontal scroll", async ({ page }) => {
     "hero",
     "tour",
     "crate-ui",
-    "icons",
     "what-is-crate",
     "install",
     "footer",
