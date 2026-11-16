@@ -821,6 +821,30 @@ with all values `null` keep their row and their revision. A PUT of an empty set
 or an all-null correction over nothing stored is case 2: `200` with revision
 `0`, nothing stored.
 
+### Server time
+
+Every S7 response body carries `server_time` at its top level: the database
+clock when the response was read, in the format of `updated_at` (ISO 8601 in
+UTC with microseconds, `Z` suffix). It sits next to `cue_sets`/`corrections`
+and `missing` in a query, next to the stored set's or correction's own fields
+in a PUT `200`, and next to `detail` and `current` in a `409` (not inside
+`current`). A `404` or `422` has none.
+
+Use it to decide "the server's set is newer" in the server's clock, not the
+local one: on every S7 response, keep `offset = server_time - local time at
+receipt`; stamp each local edit with `local time + offset`; and compare that
+with the server's `updated_at`. The offset absorbs the machine's clock error;
+it is off by at most the request's latency.
+
+`server_time` is `clock_timestamp()`, read once per response in the same
+transaction as the content: in the query's single statement (after its
+snapshot) and as the last statement of a PUT. Writes stamp `updated_at` with
+`now()`, their transaction's start, which is before they commit. So every
+`updated_at` in a response is at or before its `server_time`; after a PUT
+that stored a change, the two differ by the time the write took. `now()` alone would break that for reads: a write whose transaction
+started after the reader's and committed before the reader's statement carries
+a later `now()` than the reader's.
+
 ### Read cue sets
 
 `POST /api/decks/cues/query`
@@ -878,7 +902,8 @@ or an all-null correction over nothing stored is case 2: `200` with revision
       ]
     }
   },
-  "missing": ["7d1e9b44-3f2a-4e8e-8c0d-61b5a2f4d7aa"]
+  "missing": ["7d1e9b44-3f2a-4e8e-8c0d-61b5a2f4d7aa"],
+  "server_time": "2026-11-16T18:07:03.552918Z"
 }
 ```
 
@@ -890,6 +915,8 @@ or an all-null correction over nothing stored is case 2: `200` with revision
   `"cues": []` was cleared and still has its revision.
 - `missing`: the requested UIDs with nothing stored, in request order. They read
   as revision `0` with no cues. A UID outside the library is simply missing.
+- `server_time`: see [Server time](#server-time). Present even when every UID
+  is missing.
 
 ### Replace a cue set
 
@@ -914,8 +941,31 @@ or an all-null correction over nothing stored is case 2: `200` with revision
 }
 ```
 
-`200` answers the stored set, in the shape of a `cue_sets` entry (revision `4`
-here). `409` answers:
+`200` answers the stored set, in the shape of a `cue_sets` entry, plus
+`server_time` next to its fields:
+
+```json
+{
+  "entity_uid": "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10",
+  "revision": 4,
+  "updated_at": "2026-11-16T18:05:12.660431Z",
+  "client_id": "5f0c6e9a-0d1b-4d55-9b3e-6f1d9c1a7e20",
+  "cues": [
+    {
+      "cue_type": "main",
+      "slot": 0,
+      "start_ms": 120.0,
+      "end_ms": null,
+      "label": null,
+      "color": null
+    }
+  ],
+  "server_time": "2026-11-16T18:05:12.664907Z"
+}
+```
+
+(The `cues` list is shortened here; it is the whole stored set.) `409`
+answers:
 
 ```json
 {
@@ -926,7 +976,8 @@ here). `409` answers:
     "updated_at": "2026-11-16T18:05:40.002113Z",
     "client_id": "a41e2b7c-1f3d-4b8a-9c6e-2d7f0e5b3a91",
     "cues": []
-  }
+  },
+  "server_time": "2026-11-16T18:06:02.118745Z"
 }
 ```
 
@@ -978,11 +1029,12 @@ Cue rules (`422` otherwise):
       "key": "8A"
     }
   },
-  "missing": ["7d1e9b44-3f2a-4e8e-8c0d-61b5a2f4d7aa"]
+  "missing": ["7d1e9b44-3f2a-4e8e-8c0d-61b5a2f4d7aa"],
+  "server_time": "2026-11-16T18:10:05.204377Z"
 }
 ```
 
-`corrections` and `missing` follow the cue query's rules. Each value is `null`
+`corrections`, `missing` and `server_time` follow the cue query's rules. Each value is `null`
 when the user did not correct it (the profile's value applies); a correction
 with all three `null` was cleared and keeps its revision.
 
@@ -1001,8 +1053,9 @@ with all three `null` was cleared and keeps its revision.
 }
 ```
 
-`200` answers the stored correction in the shape of a `corrections` entry;
-`409` answers `{"detail": "Correction revision conflict", "current": {…}}`.
+`200` answers the stored correction in the shape of a `corrections` entry plus
+`server_time` next to its fields; `409` answers
+`{"detail": "Correction revision conflict", "current": {…}, "server_time": "…"}`.
 
 The body is the whole correction: an omitted value is `null`, which means "not
 corrected", not "keep the stored value". Rules (`422` otherwise):
@@ -1037,7 +1090,7 @@ read and write is scoped to the session's user.
   `test_single_query_per_batch`): `user_id = :user_id AND entity_uid =
 ANY(:entity_uids)` on the primary keys, the cues by a left join on theirs.
 - A PUT is one transaction (`app/crate/db/repositories/decks_cues.py`): the
-  library check, the locked read, and the write.
+  library check, the locked read, the write, and the clock reading.
 - Nothing aggregates over `library_tracks` and nothing touches audio files.
 
 ### Smart Mix profiles are not affected
