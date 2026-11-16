@@ -651,3 +651,46 @@ print(json.dumps({'uid': os.geteuid(), 'public_identity': 'available', 'context'
             *list((context / "public").iterdir()),
         ]:
             assert path.stat().st_mode & 0o777 == 0o644
+
+
+def test_activation_keeps_only_the_recent_release_contexts(tmp_path):
+    import tarfile
+    import time
+
+    activate = _module(ROOT / "deploy/hermes/activate_context.py")
+    root = tmp_path / "contexts"
+
+    def release(revision):
+        bundle = tmp_path / ("bundle-" + revision[:4])
+        bundle.mkdir()
+        (bundle / "context-manifest.json").write_text(
+            json.dumps(
+                {
+                    "release_sha": revision,
+                    "deployment": {"release_sha": revision},
+                    "files": {},
+                }
+            )
+        )
+        archive = tmp_path / (revision[:4] + ".tar.gz")
+        with tarfile.open(archive, "w:gz") as handle:
+            handle.add(bundle, arcname=".")
+        activate.activate_context(root, archive, revision)
+        time.sleep(0.02)
+
+    def kept():
+        return {path.name[:40] for path in (root / "releases").iterdir()}
+
+    revisions = [f"{index:x}" * 40 for index in range(1, 11)]
+    for revision in revisions[:9]:
+        release(revision)
+    assert kept() == set(revisions[9 - activate.KEEP_RELEASES : 9])
+    # A rollback reactivates the oldest cached context; it then counts as recent.
+    oldest = revisions[9 - activate.KEEP_RELEASES]
+    activate.activate_context(root, None, oldest)
+    time.sleep(0.02)
+    release(revisions[9])
+    assert len(kept()) == activate.KEEP_RELEASES
+    assert {oldest, revisions[9]} <= kept()
+    assert revisions[9 - activate.KEEP_RELEASES + 1] not in kept()
+    assert (root / "active").resolve().name.startswith(revisions[9])

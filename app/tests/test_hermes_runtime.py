@@ -414,9 +414,9 @@ def test_agent_renders_managed_policy_and_degrades_without_context(
     )
     config = json.loads((managed / "config.yaml").read_text())
     assert config["model"] == model
+    # The release reaches the context server through the deployment marker.
     assert config["mcp_servers"]["crate_context"]["env"] == {
         "CRATE_CONTEXT_ROOT": "/opt/crate-context/active",
-        "CRATE_RELEASE_SHA": "a" * 40,
     }
     assert _mode(managed / ".env") == 0o600
     assert _mode(managed / "config.yaml") == 0o600
@@ -455,27 +455,74 @@ def test_operator_installs_the_image_plugin_and_managed_policy(tmp_path, monkeyp
     assert "ANTHROPIC_API_KEY=" in (tmp_path / "managed/.env").read_text()
 
 
-def test_context_reports_stale_when_the_running_release_differs(tmp_path, monkeypatch):
-    sys.path.insert(0, str(ROOT / "deploy/hermes"))
-    from context_server import ContextStore
-
-    active = tmp_path / "active"
-    active.mkdir()
-    (active / "context-manifest.json").write_text(
+def _context(root, release):
+    root.mkdir(parents=True)
+    (root / "context-manifest.json").write_text(
         json.dumps(
             {
-                "release_sha": "a" * 40,
-                "deployment": {"release_sha": "a" * 40},
+                "release_sha": release,
+                "deployment": {"release_sha": release},
                 "files": {},
             }
         )
     )
-    monkeypatch.delenv("CRATE_RELEASE_SHA", raising=False)
-    assert ContextStore(active).summary()["availability"] == "available"
-    monkeypatch.setenv("CRATE_RELEASE_SHA", "a" * 40)
-    assert ContextStore(active).summary()["availability"] == "available"
+    return root
+
+
+def test_context_ignores_a_release_sha_in_the_environment(tmp_path, monkeypatch):
+    sys.path.insert(0, str(ROOT / "deploy/hermes"))
+    from context_server import ContextStore
+
+    active = _context(tmp_path / "image/active", "a" * 40)
+    store = ContextStore(active, host_marker=tmp_path / "host/deployment.json")
     monkeypatch.setenv("CRATE_RELEASE_SHA", "b" * 40)
-    assert ContextStore(active).summary()["availability"] == "stale"
+    summary = store.summary()
+    assert summary["availability"] == "available"
+    assert summary["observed_release_sha"] == "a" * 40
+
+
+@pytest.mark.parametrize(
+    ("marker", "availability"),
+    [
+        ({"release_sha": "a" * 40, "state": "verified"}, "available"),
+        ({"release_sha": "b" * 40, "state": "verified"}, "stale"),
+        ({"release_sha": "a" * 40, "state": "deploying"}, "stale"),
+    ],
+)
+def test_image_context_reads_the_host_deployment_marker(tmp_path, marker, availability):
+    sys.path.insert(0, str(ROOT / "deploy/hermes"))
+    from context_server import ContextStore
+
+    active = _context(tmp_path / "image/active", "a" * 40)
+    host_marker = tmp_path / "host/deployment.json"
+    host_marker.parent.mkdir()
+    host_marker.write_text(json.dumps(marker))
+    summary = ContextStore(active, host_marker=host_marker).summary()
+    assert summary["availability"] == availability
+    assert summary["observed_release_sha"] == marker["release_sha"]
+
+
+def test_the_marker_beside_the_context_wins_over_the_host_marker(tmp_path):
+    sys.path.insert(0, str(ROOT / "deploy/hermes"))
+    from context_server import ContextStore
+
+    active = _context(tmp_path / "contexts/active", "a" * 40)
+    (tmp_path / "contexts/deployment.json").write_text(
+        json.dumps({"release_sha": "a" * 40, "state": "verified"})
+    )
+    host_marker = tmp_path / "host/deployment.json"
+    host_marker.parent.mkdir()
+    host_marker.write_text(json.dumps({"release_sha": "b" * 40, "state": "verified"}))
+    assert ContextStore(active, host_marker=host_marker).summary()["availability"] == (
+        "available"
+    )
+
+
+def test_the_default_host_marker_is_the_mounted_context_directory():
+    sys.path.insert(0, str(ROOT / "deploy/hermes"))
+    import context_server
+
+    assert context_server.HOST_MARKER == Path("/opt/crate-context/deployment.json")
 
 
 def test_prompts_are_english_and_carry_no_owner_specific_settings():

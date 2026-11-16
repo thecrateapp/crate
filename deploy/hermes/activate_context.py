@@ -5,10 +5,34 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
+
+
+# Contexts kept under releases/, newest activations first, the active one always
+# among them. Each holds the full allowlisted source tree (tens of MB), and every
+# deploy activates one, so older contexts are pruned.
+KEEP_RELEASES = 5
+
+
+def _prune_releases(releases: Path, active: Path) -> None:
+    contexts = sorted(
+        (
+            path
+            for path in releases.iterdir()
+            if path.is_dir() and not path.name.startswith("candidate-")
+        ),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    others = [path.name for path in contexts if path.name != active.name]
+    keep = {active.name, *others[: KEEP_RELEASES - 1]}
+    for path in contexts:
+        if path.name not in keep:
+            shutil.rmtree(path)
 
 
 def record_deployment(root: Path, deployment: dict, state: str) -> None:
@@ -113,6 +137,9 @@ def activate_context(root: Path, archive: Path | None, revision: str) -> None:
     link = root / (".active-" + uuid4().hex)
     link.symlink_to("releases/" + target.name)
     os.replace(link, root / "active")
+    # Count a reactivated cached context as recent before pruning older ones.
+    os.utime(target)
+    _prune_releases(releases, target)
     marker = root / "public" / (".context-" + uuid4().hex)
     marker.write_text(
         json.dumps(

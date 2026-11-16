@@ -1059,7 +1059,13 @@ activate_agent_context() {
     echo "Managed operator context destination is missing" >&2
     return 1
   fi
-  [[ -d "$context_root" ]] || return 0
+  # Every deploy activates the exact release context, also on a host that has
+  # never run the agent: created here it stays deploy-owned, not root-owned by
+  # a Docker bind mount, and a reused agent image never serves an older context.
+  if [[ -z "$operator_root" ]]; then
+    [[ -n "$data_dir" ]] || return 0
+    mkdir -p "$context_root"
+  fi
   revision="$(env_value CRATE_RELEASE_SHA)"
   if [[ -n "$operator_root" ]]; then
     # Never substitute a cached same-SHA bundle for the exact reviewed archive.
@@ -1078,7 +1084,16 @@ record_agent_deployment() {
   data_dir="$(env_value DATA_DIR)"
   context_root="${data_dir}/crate-agent/context"
   [[ -z "$(env_value CRATE_OPERATOR_ROOT)" ]] || context_root="$(env_value CRATE_OPERATOR_ROOT)/context"
-  [[ -d "$context_root" && -f deploy/hermes/activate_context.py ]] || return 0
+  [[ -f deploy/hermes/activate_context.py ]] || return 0
+  # The agent reads the deployed release from this marker, not from a per-release
+  # Compose variable, so record it on every deploy. A managed operator context is
+  # provisioned separately and stays fail-closed when missing.
+  if [[ -n "$(env_value CRATE_OPERATOR_ROOT)" ]]; then
+    [[ -d "$context_root" ]] || return 0
+  else
+    [[ -n "$data_dir" ]] || return 0
+    mkdir -p "$context_root"
+  fi
   if [[ ! -f .deploy/release-manifest.json ]]; then
     python3 -I - "${context_root}/deployment.json" <<'PY'
 import json, pathlib, sys

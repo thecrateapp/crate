@@ -1792,3 +1792,117 @@ def test_deploy_records_sentry_markers_after_verifying_and_before_cleanup() -> N
     record = run_deploy.index("record_sentry_deploys")
     cleanup = run_deploy.index("\n  cleanup\n")
     assert verify < record < cleanup
+
+
+def _agent_context_host(tmp_path: Path, *, operator_root: str = "") -> tuple[Path, str]:
+    """A deploy directory whose host has never created an agent context."""
+    release = "c" * 40
+    (tmp_path / "deploy/hermes").mkdir(parents=True)
+    shutil.copy(
+        ROOT / "deploy/hermes/activate_context.py",
+        tmp_path / "deploy/hermes/activate_context.py",
+    )
+    (tmp_path / ".env").write_text(
+        f"DATA_DIR={tmp_path / 'data'}\nCRATE_RELEASE_SHA={release}\n"
+        f"CRATE_OPERATOR_ROOT={operator_root}\n"
+    )
+    (tmp_path / ".deploy").mkdir()
+    (tmp_path / ".deploy/release-manifest.json").write_text(
+        json.dumps({"release_sha": release})
+    )
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "context-manifest.json").write_text(
+        json.dumps(
+            {
+                "release_sha": release,
+                "deployment": {"release_sha": release},
+                "files": {},
+            }
+        )
+    )
+    subprocess.run(
+        [
+            "tar",
+            "-czf",
+            str(tmp_path / ".deploy/agent-context.candidate.tar.gz"),
+            "-C",
+            str(bundle),
+            ".",
+        ],
+        check=True,
+    )
+    return tmp_path / "data/crate-agent/context", release
+
+
+def _run_agent_context_function(tmp_path: Path, command: str):
+    script = "\n".join(
+        _shell_function(name)
+        for name in (
+            "env_file_value",
+            "env_value",
+            "record_agent_deployment",
+            "activate_agent_context",
+        )
+    )
+    return subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", script + "\n" + command + "\n"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_every_deploy_records_the_release_marker_for_the_agent(tmp_path: Path):
+    context, release = _agent_context_host(tmp_path)
+    result = _run_agent_context_function(tmp_path, "record_agent_deployment verified")
+    assert result.returncode == 0, result.stderr
+    marker = json.loads((context / "deployment.json").read_text())
+    assert (marker["release_sha"], marker["state"]) == (release, "verified")
+
+
+def test_every_deploy_activates_the_exact_release_context(tmp_path: Path):
+    context, release = _agent_context_host(tmp_path)
+    result = _run_agent_context_function(tmp_path, "activate_agent_context")
+    assert result.returncode == 0, result.stderr
+    assert (context / "active").resolve().name.startswith(release + "-")
+    assert json.loads((context / "deployment.json").read_text())["state"] == "verified"
+
+
+def test_a_missing_managed_operator_context_still_fails_closed(tmp_path: Path):
+    _agent_context_host(tmp_path, operator_root=str(tmp_path / "operator"))
+    result = _run_agent_context_function(tmp_path, "activate_agent_context")
+    assert result.returncode != 0
+    assert "Managed operator context destination is missing" in result.stderr
+    assert not (tmp_path / "operator").exists()
+
+
+@pytest.mark.parametrize(
+    "command", ["record_agent_deployment verified", "activate_agent_context"]
+)
+def test_agent_context_needs_a_data_directory(tmp_path: Path, command: str):
+    _agent_context_host(tmp_path)
+    env = (tmp_path / ".env").read_text()
+    (tmp_path / ".env").write_text(
+        "\n".join(line for line in env.splitlines() if not line.startswith("DATA_DIR="))
+        + "\n"
+    )
+    script = "\n".join(
+        _shell_function(name)
+        for name in (
+            "env_file_value",
+            "env_value",
+            "record_agent_deployment",
+            "activate_agent_context",
+        )
+    )
+    # A stub mkdir records any attempt to create a context outside DATA_DIR.
+    script = 'mkdir() { echo "mkdir $*" >&2; return 1; }\n' + script
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", script + "\n" + command + "\n"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "mkdir" not in result.stderr

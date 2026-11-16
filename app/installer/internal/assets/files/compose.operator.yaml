@@ -40,7 +40,6 @@ services:
       CRATE_AGENT_PROVIDER: ${CRATE_AGENT_PROVIDER:-}
       CRATE_AGENT_MODEL: ${CRATE_AGENT_MODEL:-}
       CRATE_AGENT_BASE_URL: ${CRATE_AGENT_BASE_URL:-}
-      CRATE_RELEASE_SHA: ${CRATE_RELEASE_SHA:-}
     working_dir: /opt/data
     command: [python3, /opt/crate-hermes/runtime.py]
     volumes:
