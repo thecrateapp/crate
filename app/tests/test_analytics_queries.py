@@ -1128,6 +1128,27 @@ class TestDecadeDistribution:
 
         assert get_decade_distribution() == {}
 
+    def test_malformed_year_excluded_instead_of_failing(self, pg_db):
+        _seed_artist(pg_db, "Malformed Year Artist")
+        _seed_album(pg_db, "Malformed Year Artist", "Bad Tag", year="11-0")
+        _seed_album(pg_db, "Malformed Year Artist", "Not A Year", year="unknown")
+
+        from crate.db.queries.analytics_overview_distributions import (
+            get_decade_distribution,
+        )
+
+        assert get_decade_distribution() == {}
+
+    def test_full_date_counts_by_its_year(self, pg_db):
+        _seed_artist(pg_db, "Full Date Artist")
+        _seed_album(pg_db, "Full Date Artist", "Dated", year="2024-03-01")
+
+        from crate.db.queries.analytics_overview_distributions import (
+            get_decade_distribution,
+        )
+
+        assert get_decade_distribution() == {"2020s": 1}
+
     def test_null_year_excluded(self, pg_db):
         _seed_artist(pg_db, "No Year Decade Artist")
         _seed_album(pg_db, "No Year Decade Artist", "No Year", year=None)
