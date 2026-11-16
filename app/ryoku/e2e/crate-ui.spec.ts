@@ -82,19 +82,37 @@ test("the type specimen uses Crate's display and mono families", async ({
   await expect(date.locator("b")).toHaveCSS("color", "rgb(103, 232, 249)");
 });
 
-test("one glass: a frosted panel with a 6 px corner over the wallpaper", async ({
+test("one glass: a frosted panel over part of a Crate window", async ({
   page,
   request,
 }) => {
-  const glass = page.locator('[data-block="glass"] .glass');
+  const stage = page.locator('[data-block="glass"] .stage');
+  const glass = stage.locator(".glass");
   expect(
     await glass.evaluate((el) => getComputedStyle(el).backdropFilter),
-  ).toMatch(/blur\(/);
+  ).toMatch(/blur\((1[8-9]|2[0-4])px\)/);
   await expect(glass).toHaveCSS("border-top-left-radius", "6px");
+  await expect(glass).toHaveCSS("border-top-width", "1px");
   await expect(glass).toHaveCSS("background-color", "rgba(17, 18, 24, 0.68)");
-  const wallpaper = await request.get("/crate-ui/groove.webp");
-  expect(wallpaper.status()).toBe(200);
-  expect(wallpaper.headers()["content-type"]).toContain("image/webp");
+  expect(
+    await stage.evaluate((el) => getComputedStyle(el).backgroundImage),
+  ).toContain("/crate-ui/crate-window.webp");
+
+  // The panel covers only part of the window: the same app shows sharp beside it.
+  await stage.scrollIntoViewIfNeeded();
+  const outer = (await stage.boundingBox())!;
+  const inner = (await glass.boundingBox())!;
+  expect(inner.x).toBeGreaterThan(outer.x + outer.width * 0.15);
+  expect(inner.y).toBeGreaterThan(outer.y + outer.height * 0.15);
+  expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
+  expect(inner.width * inner.height).toBeLessThan(
+    outer.width * outer.height * 0.5,
+  );
+
+  const backdrop = await request.get("/crate-ui/crate-window.webp");
+  expect(backdrop.status()).toBe(200);
+  expect(backdrop.headers()["content-type"]).toContain("image/webp");
+  expect((await backdrop.body()).length).toBeLessThan(80_000);
 });
 
 test("the icons load, are named, and sit on the page with no plate", async ({

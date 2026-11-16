@@ -100,19 +100,33 @@ import { ICONS } from "../data/icons";
               <div
                 class="stage"
                 role="img"
-                aria-label="A glass panel over the Groove wallpaper: the wallpaper shows through, frosted"
+                aria-label="A Controls panel in glass over part of the Crate app: the app is sharp beside the panel and frosted under it"
               >
                 <div class="glass">
                   <div class="glass-head">
-                    <span>Now playing</span>
-                    <span class="register">Crate</span>
+                    <span>Controls</span>
+                    <span class="register">16:42</span>
                   </div>
-                  <p class="track">Clair de lune</p>
-                  <p class="artist">Claude Debussy · Suite bergamasque</p>
-                  <span class="beam" style="--v: 38%">
-                    <span class="beam-fill" />
-                    <span class="beam-dot" />
-                  </span>
+                  <div class="beam-row">
+                    <span class="k">Volume</span>
+                    <span class="beam" style="--v: 62%">
+                      <span class="beam-fill" />
+                      <span class="beam-dot" />
+                    </span>
+                    <span class="v">62</span>
+                  </div>
+                  <div class="beam-row">
+                    <span class="k">Brightness</span>
+                    <span class="beam" style="--v: 80%">
+                      <span class="beam-fill" />
+                      <span class="beam-dot" />
+                    </span>
+                    <span class="v">80</span>
+                  </div>
+                  <div class="strip-row">
+                    <span class="k">Night light</span>
+                    <span class="switch is-on" />
+                  </div>
                 </div>
               </div>
             )}
@@ -378,33 +392,31 @@ import { ICONS } from "../data/icons";
     font-weight: 400;
   }
 
-  /* The one glass: Tokens.glass (popover #111218 at 0.68) over a crop of Groove. */
+  /* The one glass: Tokens.glass (popover #111218 at 0.68) over part of a Crate window, so
+     the same app reads sharp beside the panel and frosted under it. */
   .stage {
     position: relative;
-    display: grid;
-    justify-items: center;
-    align-content: start;
-    /* the panel sits across Groove's lit arc, so the frost shows */
-    padding-top: 7%;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 820 / 512;
     max-width: 640px;
     overflow: hidden;
+    border: 1px solid var(--line);
     border-radius: 6px;
-    background: #0a0a0f url("/crate-ui/groove.webp") center / cover no-repeat;
+    background: #0a0a0f url("/crate-ui/crate-window.webp") left top / cover no-repeat;
   }
 
   .glass {
+    position: absolute;
+    top: 30%;
+    left: 27%;
     display: grid;
-    gap: 6px;
-    width: min(76%, 360px);
-    /* off centre, so the arc's lit stretch runs out from under the glass, sharp beside frosted */
-    translate: -12% 0;
-    padding: 0 16px 18px;
+    gap: 12px;
+    width: min(62%, 340px);
+    padding: 0 16px 16px;
     border: 1px solid var(--line);
     border-radius: 6px;
     background: rgba(17, 18, 24, 0.68);
-    -webkit-backdrop-filter: blur(18px);
-    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
   }
 
   .glass-head {
@@ -412,7 +424,6 @@ import { ICONS } from "../data/icons";
     justify-content: space-between;
     gap: 12px;
     padding: 12px 0 10px;
-    margin-bottom: 4px;
     border-bottom: 1px solid var(--line);
     color: var(--fg-2);
     font-family: var(--mono);
@@ -421,19 +432,40 @@ import { ICONS } from "../data/icons";
     text-transform: uppercase;
   }
 
-  .track {
-    margin: 0;
+  .glass .k {
     color: var(--fg);
-    font-family: var(--display);
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 1.1;
+    font-size: 13px;
   }
 
-  .artist {
-    margin: 0 0 12px;
-    color: var(--fg-3);
-    font-size: 13px;
+  .glass .beam-row .k {
+    width: 7.5em;
+  }
+
+  @media (max-width: 520px) {
+    /* smaller on a phone, so the app still shows sharp around it */
+    .glass {
+      top: 24%;
+      left: 31%;
+      width: 64%;
+      gap: 8px;
+      padding: 0 12px 12px;
+    }
+
+    .glass .beam-row + .beam-row {
+      display: none;
+    }
+
+    .glass .beam-row .k {
+      width: auto;
+    }
+
+    .glass-head {
+      padding: 8px 0 6px;
+    }
+
+    .glass .k {
+      font-size: 12px;
+    }
   }
 
   /* The icons straight on the page, like the dock's on the wallpaper: no plate. */
