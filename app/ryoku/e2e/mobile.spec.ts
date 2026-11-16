@@ -23,7 +23,7 @@ test("every install command keeps its copy button on screen", async ({
 }) => {
   await page.goto("/");
   const buttons = page.locator("#install .copy");
-  await expect(buttons).toHaveCount(3);
+  await expect(buttons).toHaveCount(4);
   for (const button of await buttons.all()) {
     await button.scrollIntoViewIfNeeded();
     const box = await button.boundingBox();

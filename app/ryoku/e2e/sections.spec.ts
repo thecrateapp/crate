@@ -33,16 +33,32 @@ test("says the desktop app needs a Crate server and points local music at Ryotun
   await expect(crate).toContainText("Ryotunes");
 });
 
-test("the install section shows the pacman repository and the setup command", async ({
+test("the install section shows the signed pacman repository and the setup command", async ({
   page,
+  request,
 }) => {
   const install = page.locator("#install");
+  await expect(install).toContainText("pacman-key --lsign-key");
+  await expect(install).toContainText(
+    "AD4DFA15F0A84853D4D711850EB2D64FEFAC7445",
+  );
   await expect(install).toContainText("[crate-for-ryoku]");
+  await expect(install).toContainText("SigLevel = Required");
+  await expect(install).toContainText(
+    "https://github.com/thecrateapp/crate-for-ryoku/releases/download/repo",
+  );
   await expect(install).toContainText(
     "pacman -Syu crate-for-ryoku crate-desktop-bin",
   );
   await expect(install).toContainText("crate-for-ryoku install");
-  await expect(install).toContainText("Ryostore");
+  await expect(page.locator("body")).not.toContainText("Ryostore");
+  await expect(page.locator("body")).not.toContainText("TrustAll");
+
+  const key = install.locator('a[href="/crate-for-ryoku.gpg"]');
+  await expect(key).toHaveCount(1);
+  const served = await request.get("/crate-for-ryoku.gpg");
+  expect(served.status()).toBe(200);
+  expect(await served.text()).toContain("BEGIN PGP PUBLIC KEY BLOCK");
 });
 
 test("the bar anchors every section, like cratemusic.app's", async ({
