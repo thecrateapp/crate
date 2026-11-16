@@ -69,6 +69,7 @@ test("the bar anchors every section, like cratemusic.app's", async ({
     "Screenshots",
     "Tour",
     "Crate UI",
+    "Icons",
     "What is Crate",
     "Install",
     "GitHub",
@@ -77,6 +78,7 @@ test("the bar anchors every section, like cratemusic.app's", async ({
     "screenshots",
     "tour",
     "crate-ui",
+    "icons",
     "what-is-crate",
     "install",
   ]) {

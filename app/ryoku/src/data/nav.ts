@@ -5,6 +5,7 @@ export const NAV_LINKS: SiteNavLink[] = [
   { href: "#screenshots", label: "Screenshots" },
   { href: "#tour", label: "Tour" },
   { href: "#crate-ui", label: "Crate UI" },
+  { href: "#icons", label: "Icons" },
   { href: "#what-is-crate", label: "What is Crate" },
   { href: "#install", label: "Install", accent: true },
   {

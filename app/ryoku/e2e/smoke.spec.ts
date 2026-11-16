@@ -4,6 +4,7 @@ const SECTIONS = [
   "hero",
   "tour",
   "crate-ui",
+  "icons",
   "what-is-crate",
   "install",
   "footer",
