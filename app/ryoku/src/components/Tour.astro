@@ -1,0 +1,33 @@
+---
+import Screencast from "@crate-web/components/screencast/Screencast.astro";
+import { TOUR } from "../data/tour";
+---
+
+<section id="tour" class="section tour" aria-labelledby="tour-title">
+  <div class="head" data-reveal>
+    <p class="eyebrow"><b>Tour</b> of the desktop</p>
+    <h2 id="tour-title" class="display">Ninety seconds on Crate for Ryoku.</h2>
+    <p class="lede">
+      Five short chapters, recorded live on a Ryoku desktop: music, the bar, the panels, Rashin and
+      the desktop itself.
+    </p>
+  </div>
+  <Screencast chapters={TOUR} label="Crate for Ryoku tour" play="Play the tour" pause="Pause the tour" />
+</section>
+
+<style>
+  .lede {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--fg-2);
+    font-size: clamp(18px, 2vw, 22px);
+    line-height: 1.5;
+  }
+
+  /* cratemusic.app gives the screencast a full screen of its own; here the section
+     already pads it under its head. */
+  .tour :global(.screencast) {
+    min-height: 0;
+    padding: 0;
+  }
+</style>

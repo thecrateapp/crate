@@ -1,0 +1,83 @@
+---
+// What Crate for Ryoku takes from Crate: its design system, not its player.
+const RULES = [
+  {
+    label: "One accent",
+    text: "Brand cyan for actions, key values and active states. Amber only reports status.",
+  },
+  {
+    label: "Hairlines, not boxes",
+    text: "A panel is a top rule and a header row. Only standalone objects get a card.",
+  },
+  {
+    label: "Display and mono",
+    text: "Bricolage Grotesque for names and numerals, JetBrains Mono for labels and readouts.",
+  },
+  {
+    label: "One glass",
+    text: "Every floating surface on the desktop shares the Controls panel's glass and 6 px corners.",
+  },
+];
+---
+
+<section id="crate-ui" class="section" aria-labelledby="crate-ui-title">
+  <div class="head" data-reveal>
+    <p class="eyebrow"><b>Powered by</b> Crate UI</p>
+    <h2 id="crate-ui-title" class="display">One visual language, from the server to the desktop.</h2>
+    <p class="lede">
+      Crate UI is the design system behind Crate: the tokens, components and rules that make Listen
+      and Admin read as one product, and that cratemusic.app and this site are built with. Crate for
+      Ryoku draws Ryoku's bar, panels, dock and launcher with the same language, so the desktop
+      looks like the app you play your music in.
+    </p>
+  </div>
+  <ul class="rules" data-reveal>
+    {
+      RULES.map((rule) => (
+        <li>
+          <span class="label">{rule.label}</span>
+          <span class="text">{rule.text}</span>
+        </li>
+      ))
+    }
+  </ul>
+</section>
+
+<style>
+  .lede {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--fg-2);
+    font-size: clamp(18px, 2vw, 22px);
+    line-height: 1.5;
+  }
+
+  .rules {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rules li {
+    display: grid;
+    gap: 10px;
+    padding: 20px 0 28px;
+    border-top: 1px solid var(--line);
+  }
+
+  .label {
+    color: var(--cyan-hi);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .text {
+    color: var(--fg-2);
+    line-height: 1.55;
+  }
+</style>

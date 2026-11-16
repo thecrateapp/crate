@@ -1096,6 +1096,21 @@ def test_ryoku_site_is_part_of_release_and_rollback_contracts() -> None:
     assert '[CRATE_RYOKU_SITE_IMAGE]="crate-ryoku-site"' in script
 
 
+def test_ryoku_site_serves_every_media_type_it_links() -> None:
+    # The /media/ location replaces nginx's MIME table, so a type missing here is
+    # served as application/octet-stream (and cached that way by Cloudflare).
+    conf = (ROOT / "app/ryoku/nginx.conf").read_text()
+    media = conf[conf.index("location /media/") :]
+    types = media[media.index("types {") : media.index("}")]
+    for line in (
+        "image/webp webp;",
+        "video/webm webm;",
+        "video/mp4 mp4;",
+        "image/jpeg jpg jpeg;",
+    ):
+        assert line in " ".join(types.split()), line
+
+
 def test_ryoku_site_routes_its_host_and_serves_host_media_read_only() -> None:
     project = yaml.safe_load((ROOT / "docker-compose.project.yaml").read_text())
     service = project["services"]["crate-ryoku-site"]

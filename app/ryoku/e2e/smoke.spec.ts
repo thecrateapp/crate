@@ -2,10 +2,9 @@ import { expect, test } from "@playwright/test";
 
 const SECTIONS = [
   "hero",
-  "cover",
-  "surfaces",
-  "play",
-  "crate",
+  "tour",
+  "crate-ui",
+  "what-is-crate",
   "install",
   "footer",
 ];

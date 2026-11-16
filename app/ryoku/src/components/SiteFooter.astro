@@ -1,32 +1,47 @@
 <footer id="footer" class="footer">
-  <nav aria-label="Crate">
-    <a class="u-link" href="https://cratemusic.app">cratemusic.app</a>
-    <a class="u-link" href="https://docs.cratemusic.app">Docs</a>
-    <a class="u-link" href="https://github.com/thecrateapp/crate-for-ryoku">Crate for Ryoku on GitHub</a>
-    <a class="u-link" href="https://github.com/Ryoku-dev/ryoku">Ryoku</a>
-  </nav>
+  <div class="row">
+    <span class="brand">Crate for Ryoku</span>
+    <nav class="links" aria-label="Footer">
+      <a class="u-link" href="https://cratemusic.app">Crate</a>
+      <a class="u-link" href="https://github.com/thecrateapp/crate-for-ryoku">GitHub</a>
+      <a class="u-link" href="https://ryoku.dev">Ryoku</a>
+    </nav>
+  </div>
   <p class="credits">
     Icons from Solar (CC BY 4.0). Bricolage Grotesque, Roboto and JetBrains Mono under the SIL Open
-    Font License. Crate for Ryoku is MIT licensed and not affiliated with the Ryoku project.
+    Font License. Wallpapers in the screenshots belong to their artists. Crate for Ryoku is MIT
+    licensed and not affiliated with the Ryoku project.
   </p>
 </footer>
 
 <style>
+  /* cratemusic.app's footer: a hairline, the name on the left, the links on the right. */
   .footer {
     display: grid;
-    gap: 18px;
+    gap: 22px;
     max-width: 1320px;
     margin: 0 auto;
-    padding: 48px clamp(16px, 6vw, 96px) 64px;
+    padding: 40px clamp(20px, 6vw, 96px) 56px;
     border-top: 1px solid var(--line);
   }
 
-  nav {
+  .row {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px 28px;
-    font-family: var(--mono);
-    font-size: 12.5px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px 30px;
+  }
+
+  .brand {
+    color: var(--fg-2);
+    font-size: 13px;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
   }
 
   .credits {

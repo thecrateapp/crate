@@ -131,7 +131,7 @@ services:
       dockerfile: app/ryoku/Dockerfile
     container_name: crate-ryoku-site
     restart: unless-stopped
-    # Screencast clips stay out of the image and git; `make ryoku-media-sync` uploads them.
+    # Screenshots (and screencast clips) stay out of the image and git; `make ryoku-media-sync` uploads them.
     volumes:
       - ./media/ryoku:/usr/share/nginx/media:ro
     healthcheck:

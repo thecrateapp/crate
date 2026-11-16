@@ -69,6 +69,8 @@ describe("initHoverScramble", () => {
     document.body.innerHTML = `
       <nav><a href="/listen" data-hover-scramble="true">Listen</a></nav>
       <ol><li><a href="#play"><b>01</b> <span data-hover-scramble>Play</span></a></li></ol>
+      <ol class="tabs"><li><button type="button"><b>02</b> <span data-hover-scramble>Bar</span></button></li></ol>
+      <button type="button" class="plain">Plain button</button>
       <a href="/plain">Plain</a>`;
   });
 
@@ -110,6 +112,23 @@ describe("initHoverScramble", () => {
     over(link);
     runFrames(400);
     expect(title.textContent).toBe("Play");
+    stop();
+  });
+
+  it("scrambles a button's marked title, like a chapter tab, and leaves plain buttons alone", () => {
+    const stop = initHoverScramble({ reducedMotion: false });
+    const tab = document.querySelector<HTMLElement>(".tabs button")!;
+
+    over(tab);
+    expect(frames.size).toBe(1);
+    runFrames(16);
+    expect(tab.querySelector("b")!.textContent).toBe("02");
+    runFrames(400);
+    expect(tab.querySelector("span")!.textContent).toBe("Bar");
+
+    over(document.querySelector<HTMLElement>(".plain")!);
+    expect(frames.size).toBe(0);
+    expect(document.querySelector(".plain")!.textContent).toBe("Plain button");
     stop();
   });
 

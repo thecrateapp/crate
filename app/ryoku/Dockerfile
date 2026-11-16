@@ -3,14 +3,22 @@ FROM node:24-alpine AS build
 WORKDIR /repo/app/ryoku
 COPY app/ryoku/package.json app/ryoku/package-lock.json ./
 RUN npm ci --no-audit --no-fund
-# The site builds on app/web's tokens, fonts and motion scripts (the @crate-web alias).
+# The site builds on app/web's tokens, fonts, motion scripts, screenshot showcase and
+# tour screencast (the @crate-web alias).
 # Copy only what it imports, so website content and blog edits do not rebuild it;
 # scripts/release_manifest.py watches exactly these paths.
 COPY app/web/src/styles/ /repo/app/web/src/styles/
 COPY app/web/src/scripts/motion/ /repo/app/web/src/scripts/motion/
+COPY app/web/src/components/showcase/ /repo/app/web/src/components/showcase/
+COPY app/web/src/components/nav/ /repo/app/web/src/components/nav/
+COPY app/web/src/scripts/gallery/ /repo/app/web/src/scripts/gallery/
+COPY app/web/src/components/screencast/ /repo/app/web/src/components/screencast/
+COPY app/web/src/scripts/screencast/ /repo/app/web/src/scripts/screencast/
 COPY app/web/src/lib/clipboard.ts /repo/app/web/src/lib/clipboard.ts
 COPY app/web/public/fonts/ /repo/app/web/public/fonts/
 COPY app/web/public/icons/ /repo/app/web/public/icons/
+# The bar's hover scramble, shared with the apps.
+COPY app/shared/web/scramble.ts /repo/app/shared/web/scramble.ts
 COPY app/ryoku/ .
 RUN npm run build
 

@@ -63,7 +63,8 @@ export function initHoverScramble({
     return () => {};
 
   const onOver = (event: MouseEvent) => {
-    const link = (event.target as Element | null)?.closest("a");
+    // Links, and buttons that mark their label (the screencast's chapter tabs).
+    const link = (event.target as Element | null)?.closest("a, button");
     if (!link || link.contains(event.relatedTarget as Node | null)) return;
     const target = hoverTarget(link);
     if (!target) return;
