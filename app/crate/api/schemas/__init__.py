@@ -21,6 +21,19 @@ from crate.api.schemas.decks import (
     DecksTrackResponse,
     DecksTracksPageResponse,
 )
+from crate.api.schemas.decks_cues import (
+    DecksCorrectionConflictResponse,
+    DecksCorrectionPutRequest,
+    DecksCorrectionResponse,
+    DecksCorrectionsQueryRequest,
+    DecksCorrectionsQueryResponse,
+    DecksCue,
+    DecksCueSetConflictResponse,
+    DecksCueSetPutRequest,
+    DecksCueSetResponse,
+    DecksCuesQueryRequest,
+    DecksCuesQueryResponse,
+)
 from crate.api.schemas.sonic_insights import SonicNeighborsResponse, SonicReport
 from crate.api.schemas.agent_telegram import (
     NativeCallback,
@@ -490,6 +503,17 @@ __all__ = [
     "DecksMixProfilesResponse",
     "DecksTrackResponse",
     "DecksTracksPageResponse",
+    "DecksCorrectionConflictResponse",
+    "DecksCorrectionPutRequest",
+    "DecksCorrectionResponse",
+    "DecksCorrectionsQueryRequest",
+    "DecksCorrectionsQueryResponse",
+    "DecksCue",
+    "DecksCueSetConflictResponse",
+    "DecksCueSetPutRequest",
+    "DecksCueSetResponse",
+    "DecksCuesQueryRequest",
+    "DecksCuesQueryResponse",
     "ShowCandidate",
     "ShowConsolidationInput",
     "ShowExtractionInput",

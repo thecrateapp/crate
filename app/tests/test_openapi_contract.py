@@ -1969,6 +1969,45 @@ def test_openapi_types_decks_mix_profiles_batch(test_app):
     assert "/api/decks/mix-profiles" in app_spec["paths"]
 
 
+def test_openapi_types_the_cue_routes(test_app):
+    schema = test_app.get("/openapi.json").json()
+    expected = {
+        ("/api/decks/cues/query", "post"): (
+            "DecksCuesQueryRequest",
+            "DecksCuesQueryResponse",
+        ),
+        ("/api/decks/cues/{entity_uid}", "put"): (
+            "DecksCueSetPutRequest",
+            "DecksCueSetResponse",
+        ),
+        ("/api/decks/corrections/query", "post"): (
+            "DecksCorrectionsQueryRequest",
+            "DecksCorrectionsQueryResponse",
+        ),
+        ("/api/decks/corrections/{entity_uid}", "put"): (
+            "DecksCorrectionPutRequest",
+            "DecksCorrectionResponse",
+        ),
+    }
+    for (path, method), (request, response) in expected.items():
+        operation = schema["paths"][path][method]
+        assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+        assert operation["requestBody"]["content"]["application/json"]["schema"][
+            "$ref"
+        ] == (f"#/components/schemas/{request}")
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"][
+            "$ref"
+        ] == (f"#/components/schemas/{response}")
+        for status in ("401", "403", "422"):
+            assert status in operation["responses"], (path, status)
+        if method == "put":
+            assert "404" in operation["responses"]
+            conflict = operation["responses"]["409"]["content"]["application/json"]
+            assert conflict["schema"]["$ref"].endswith("ConflictResponse")
+    app_spec = test_app.get("/openapi-app.json").json()
+    assert "/api/decks/cues/query" in app_spec["paths"]
+
+
 def test_openapi_native_confirmation_uses_independent_hmac_security(test_app):
     data = test_app.get("/openapi.json").json()
     native = data["paths"]["/api/internal/agent-telegram/events"]["post"]

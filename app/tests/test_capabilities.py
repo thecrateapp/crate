@@ -8,6 +8,7 @@ _DECKS_CAPABILITIES = {
     "features": [
         "library_cursor",
         "profiles_batch",
+        "cues",
         "stems",
         "stem_upload",
         "local_refinement",
@@ -22,6 +23,7 @@ _DECKS_CAPABILITIES_WITH_SMART_MIX = {
         "beatmatch",
         "bass_handoff",
         "long_beatmatch",
+        "cues",
         "stems",
         "stem_upload",
         "local_refinement",

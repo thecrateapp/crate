@@ -47,6 +47,7 @@ def test_capabilities_includes_decks_section(test_app, monkeypatch):
         "features": [
             "library_cursor",
             "profiles_batch",
+            "cues",
             "stems",
             "stem_upload",
             "local_refinement",
@@ -75,6 +76,7 @@ def test_decks_features_reflect_settings(test_app, monkeypatch, enabled):
     assert decks["features"] == [
         "library_cursor",
         "profiles_batch",
+        "cues",
         "stems",
         "stem_upload",
         "local_refinement",
@@ -110,6 +112,7 @@ def test_decks_smart_mix_features_follow_their_own_switches(
         "library_cursor",
         "profiles_batch",
         *expected,
+        "cues",
         "stems",
         "stem_upload",
         "local_refinement",
@@ -132,6 +135,7 @@ def test_decks_smart_mix_switches_default_to_on(test_app, monkeypatch, smart_mix
         "library_cursor",
         "profiles_batch",
         *s5,
+        "cues",
         "stems",
         "stem_upload",
         "local_refinement",
