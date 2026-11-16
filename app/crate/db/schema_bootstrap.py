@@ -199,3 +199,8 @@ def create_schema(cur):
     )
 
     create_backup_destination_snapshots_v165_schema(cur)
+    from crate.db.schema_sections.decks_cues_v166 import (
+        create_decks_cues_v166_schema,
+    )
+
+    create_decks_cues_v166_schema(cur)
