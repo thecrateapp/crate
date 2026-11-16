@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from crate.db.queries.decks_cues import (
     DECKS_BPM_MAX,
@@ -24,6 +31,25 @@ from crate.smart_mix.beat_grid import (
     BeatGridCodecError,
     encode_beat_grid,
 )
+
+
+def _in_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        raise ValueError("Server timestamps carry a time zone")
+    return value.astimezone(UTC)
+
+
+# ISO 8601 in UTC with microseconds, e.g. 2026-11-16T18:02:11.418204Z.
+UtcDatetime = Annotated[datetime, AfterValidator(_in_utc)]
+_SERVER_TIME = Field(
+    description=(
+        "The database clock when the response was read, in the clock and format "
+        "of updated_at, and at or after every updated_at in the response. "
+        "Clients keep an offset from it to compare their own edit times with "
+        "updated_at in server time."
+    )
+)
+_STRICT = ConfigDict(extra="forbid")
 
 DecksCueType = Literal["hotcue", "loop", "main", "intro", "outro", "jump"]
 _MS_DIGITS = 3
@@ -136,11 +162,13 @@ class DecksCuesQueryRequest(BaseModel):
 
 
 class DecksCueSetResponse(BaseModel):
+    model_config = _STRICT
+
     entity_uid: UUID
     revision: int = Field(
         ge=0, description="Revision of the whole set; 0 when nothing is stored."
     )
-    updated_at: datetime | None = Field(
+    updated_at: UtcDatetime | None = Field(
         description="When the set last changed; null when nothing is stored."
     )
     client_id: str | None = Field(
@@ -155,6 +183,8 @@ class DecksCueSetResponse(BaseModel):
 
 
 class DecksCuesQueryResponse(BaseModel):
+    model_config = _STRICT
+
     cue_sets: dict[str, DecksCueSetResponse] = Field(
         description=(
             "By entity UID (lowercase, hyphenated), in request order: the "
@@ -167,6 +197,7 @@ class DecksCuesQueryResponse(BaseModel):
             "revision 0 with no cues: PUT them with base_revision 0."
         )
     )
+    server_time: UtcDatetime = _SERVER_TIME
 
 
 class DecksCueSetPutRequest(BaseModel):
@@ -202,11 +233,20 @@ class DecksCueSetPutRequest(BaseModel):
         return self
 
 
+class DecksCueSetPutResponse(DecksCueSetResponse):
+    """The stored set after the PUT, with the server clock next to its fields."""
+
+    server_time: UtcDatetime = _SERVER_TIME
+
+
 class DecksCueSetConflictResponse(BaseModel):
+    model_config = _STRICT
+
     detail: str
     current: DecksCueSetResponse = Field(
         description="The stored set and revision; merge and PUT on top of it."
     )
+    server_time: UtcDatetime = _SERVER_TIME
 
 
 class DecksCorrectionsQueryRequest(BaseModel):
@@ -216,9 +256,11 @@ class DecksCorrectionsQueryRequest(BaseModel):
 
 
 class DecksCorrectionResponse(BaseModel):
+    model_config = _STRICT
+
     entity_uid: UUID
     revision: int = Field(ge=0, description="0 when nothing is stored.")
-    updated_at: datetime | None
+    updated_at: UtcDatetime | None
     client_id: str | None
     bpm: float | None
     beat_grid_format: Literal["delta-ms-v1"] | None
@@ -229,6 +271,8 @@ class DecksCorrectionResponse(BaseModel):
 
 
 class DecksCorrectionsQueryResponse(BaseModel):
+    model_config = _STRICT
+
     corrections: dict[str, DecksCorrectionResponse] = Field(
         description=(
             "By entity UID (lowercase, hyphenated), in request order: the "
@@ -242,6 +286,7 @@ class DecksCorrectionsQueryResponse(BaseModel):
             "revision 0, PUT them with base_revision 0."
         )
     )
+    server_time: UtcDatetime = _SERVER_TIME
 
 
 class DecksCorrectionPutRequest(BaseModel):
@@ -287,8 +332,17 @@ class DecksCorrectionPutRequest(BaseModel):
         return self
 
 
+class DecksCorrectionPutResponse(DecksCorrectionResponse):
+    """The stored correction after the PUT, with the server clock next to it."""
+
+    server_time: UtcDatetime = _SERVER_TIME
+
+
 class DecksCorrectionConflictResponse(BaseModel):
+    model_config = _STRICT
+
     detail: str
     current: DecksCorrectionResponse = Field(
         description="The stored correction and revision."
     )
+    server_time: UtcDatetime = _SERVER_TIME

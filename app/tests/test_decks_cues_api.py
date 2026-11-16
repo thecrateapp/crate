@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -47,6 +48,11 @@ def _put_correction(test_app, uid: str, base: int, **values):
     return test_app.put(_corrections_path(uid), json={"base_revision": base, **values})
 
 
+def _without_server_time(body: dict) -> dict:
+    assert "server_time" in body
+    return {key: value for key, value in body.items() if key != "server_time"}
+
+
 @pg
 def test_batch_query(pg_db, test_app):
     del pg_db
@@ -89,7 +95,7 @@ def test_batch_query(pg_db, test_app):
         _cue("intro", 0, None, 30000.0),
         _cue("loop", 2, 1000.25, 4750.5, label="Build", color="#00aaff"),
     ]
-    assert stored.json() == first_set
+    assert _without_server_time(stored.json()) == first_set
 
 
 @pg
@@ -146,9 +152,12 @@ def test_corrections_round_trip(pg_db, test_app):
         "beat_grid_ms": grid,
         "key": "8A",
     }
-    assert stored.json() == expected
+    assert _without_server_time(stored.json()) == expected
     query = test_app.post(CORRECTIONS_QUERY, json={"entity_uids": [uid]})
-    assert query.json() == {"corrections": {uid: expected}, "missing": []}
+    assert _without_server_time(query.json()) == {
+        "corrections": {uid: expected},
+        "missing": [],
+    }
 
     cleared = _put_correction(test_app, uid, 1)
     assert cleared.status_code == 200
@@ -176,7 +185,7 @@ def test_user_isolation(pg_db, test_app):
 
     with patch("crate.api.auth.AuthMiddleware.resolve_user", _other_user):
         body = test_app.post(CUES_QUERY, json={"entity_uids": [uid]}).json()
-        assert body == {"cue_sets": {}, "missing": [uid]}
+        assert _without_server_time(body) == {"cue_sets": {}, "missing": [uid]}
         mine = _put_cues(test_app, uid, [_cue(slot=9)], 0)
         assert mine.status_code == 200 and mine.json()["revision"] == 1
 
@@ -210,7 +219,7 @@ def test_single_query_per_batch(pg_db, test_app):
             stop()
         assert len(statements) == 1, statements
         assert "ANY" in statements[0]
-        assert list(result) == uids[:2]
+        assert list(result.found) == uids[:2]
 
     for path in (CUES_QUERY, CORRECTIONS_QUERY):
         statements, stop = _record_statements()
@@ -220,6 +229,50 @@ def test_single_query_per_batch(pg_db, test_app):
             stop()
         assert response.status_code == 200
         assert len(statements) == 1, (path, statements)
+
+
+def _instant(value: str) -> datetime:
+    # ISO 8601 in UTC, the way updated_at is serialised.
+    assert value.endswith("Z"), value
+    return datetime.fromisoformat(value)
+
+
+@pg
+def test_server_time_in_every_response(pg_db, test_app):
+    del pg_db
+    _track_id, uid = _create_track("decks-cues-api-server-time")
+    unknown = str(uuid.uuid4())
+
+    put = _put_cues(test_app, uid, [_cue()], 0)
+    unchanged = _put_cues(test_app, uid, [_cue()], 0)
+    conflict = _put_cues(test_app, uid, [_cue(slot=2)], 0)
+    correction = _put_correction(test_app, uid, 0, bpm=120.0)
+    correction_conflict = _put_correction(test_app, uid, 0, bpm=121.0)
+    cues_query = test_app.post(CUES_QUERY, json={"entity_uids": [uid, unknown]})
+    corrections_query = test_app.post(CORRECTIONS_QUERY, json={"entity_uids": [uid]})
+    nothing = test_app.post(CUES_QUERY, json={"entity_uids": [unknown]})
+
+    # PUT 200: next to the stored set's fields.
+    for response in (put, unchanged, correction):
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert _instant(body["server_time"]) >= _instant(body["updated_at"])
+    # 409: next to detail and current.
+    for response in (conflict, correction_conflict):
+        assert response.status_code == 409, response.text
+        body = response.json()
+        assert set(body) == {"detail", "current", "server_time"}
+        assert _instant(body["server_time"]) >= _instant(body["current"]["updated_at"])
+        assert "server_time" not in body["current"]
+    # Queries: top level, next to the found and missing entries.
+    for response, key in ((cues_query, "cue_sets"), (corrections_query, "corrections")):
+        body = response.json()
+        assert set(body) == {key, "missing", "server_time"}
+        assert "server_time" not in body[key][uid]
+        assert _instant(body["server_time"]) >= _instant(body[key][uid]["updated_at"])
+    later = nothing.json()
+    assert later["cue_sets"] == {} and later["missing"] == [unknown]
+    assert _instant(later["server_time"]) >= _instant(cues_query.json()["server_time"])
 
 
 def test_batch_over_200_rejected(test_app):

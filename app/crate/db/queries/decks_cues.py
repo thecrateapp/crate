@@ -4,12 +4,21 @@ Each read is one statement for up to ``DECKS_CUES_BATCH_LIMIT`` entity UIDs of o
 user, by primary key (``user_id``, ``entity_uid = ANY(...)``). The tables are the
 user's own data, so a UID with nothing stored (or outside the library) is simply
 absent from the result; nothing joins or aggregates over ``library_tracks``.
+
+Every read also returns ``server_time``: ``clock_timestamp()`` taken once, in the
+same statement, after its snapshot. Writes stamp ``updated_at`` with ``now()``
+(their transaction's start, before their commit), so every ``updated_at`` a read
+can see is at or before its ``server_time``. ``now()`` would not do for the
+reads: a writer that started after the reader's transaction and committed
+before its statement has a later ``now()``.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -30,6 +39,20 @@ DECKS_CUE_LABEL_MAX = 200
 DECKS_CLIENT_ID_MAX = 128
 DECKS_BPM_MIN = 30.0
 DECKS_BPM_MAX = 300.0
+
+# One clock reading per statement, whatever the number of rows.
+SERVER_CLOCK_CTE = (
+    "WITH server_clock AS MATERIALIZED (SELECT clock_timestamp() AS server_time)"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class DecksBatchRead:
+    """Stored entries by entity UID in request order, and the DB clock reading."""
+
+    found: dict[str, dict]
+    server_time: datetime
+
 
 _CUE_ORDER = {cue_type: index for index, cue_type in enumerate(DECKS_CUE_TYPES)}
 CUE_FIELDS = ("cue_type", "slot", "start_ms", "end_ms", "label", "color")
@@ -72,6 +95,8 @@ def cue_sets_from_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, dict]:
     empty set) into cue sets by entity UID."""
     sets: dict[str, dict] = {}
     for row in rows:
+        if row["entity_uid"] is None:
+            continue  # The clock row of a batch with nothing stored.
         uid = str(row["entity_uid"])
         current = sets.get(uid)
         if current is None:
@@ -124,24 +149,26 @@ CORRECTION_COLUMNS = """
 
 def get_decks_cue_sets(
     user_id: int, entity_uids: Sequence[str], *, session: Session | None = None
-) -> dict[str, dict]:
+) -> DecksBatchRead:
     """The user's stored cue set of each track in ``entity_uids``, in request
     order. Tracks without a stored set are absent (they read as revision 0)."""
     requested = canonical_entity_uids(entity_uids)
-    if not requested:
-        return {}
 
-    def _impl(current: Session) -> dict[str, dict]:
+    def _impl(current: Session) -> DecksBatchRead:
         rows = (
             current.execute(
                 text(
                     f"""
-                    SELECT {CUE_SET_COLUMNS}
-                    FROM user_track_cue_sets s
-                    LEFT JOIN user_track_cues c
-                        ON c.user_id = s.user_id AND c.entity_uid = s.entity_uid
-                    WHERE s.user_id = :user_id
-                      AND s.entity_uid = ANY(CAST(:entity_uids AS uuid[]))
+                    {SERVER_CLOCK_CTE}
+                    SELECT server_clock.server_time, {CUE_SET_COLUMNS}
+                    FROM server_clock
+                    LEFT JOIN (
+                        user_track_cue_sets s
+                        LEFT JOIN user_track_cues c
+                            ON c.user_id = s.user_id AND c.entity_uid = s.entity_uid
+                    )
+                        ON s.user_id = :user_id
+                       AND s.entity_uid = ANY(CAST(:entity_uids AS uuid[]))
                     """
                 ),
                 {"user_id": user_id, "entity_uids": requested},
@@ -150,7 +177,10 @@ def get_decks_cue_sets(
             .all()
         )
         sets = cue_sets_from_rows(rows)
-        return {uid: sets[uid] for uid in requested if uid in sets}
+        return DecksBatchRead(
+            found={uid: sets[uid] for uid in requested if uid in sets},
+            server_time=rows[0]["server_time"],
+        )
 
     if session is not None:
         return _impl(session)
@@ -160,22 +190,22 @@ def get_decks_cue_sets(
 
 def get_decks_corrections(
     user_id: int, entity_uids: Sequence[str], *, session: Session | None = None
-) -> dict[str, dict]:
+) -> DecksBatchRead:
     """The user's stored correction of each track in ``entity_uids``, in request
     order. Tracks without one are absent (they read as revision 0)."""
     requested = canonical_entity_uids(entity_uids)
-    if not requested:
-        return {}
 
-    def _impl(current: Session) -> dict[str, dict]:
+    def _impl(current: Session) -> DecksBatchRead:
         rows = (
             current.execute(
                 text(
                     f"""
-                    SELECT {CORRECTION_COLUMNS}
-                    FROM user_track_corrections
-                    WHERE user_id = :user_id
-                      AND entity_uid = ANY(CAST(:entity_uids AS uuid[]))
+                    {SERVER_CLOCK_CTE}
+                    SELECT server_clock.server_time, {CORRECTION_COLUMNS}
+                    FROM server_clock
+                    LEFT JOIN user_track_corrections
+                        ON user_id = :user_id
+                       AND entity_uid = ANY(CAST(:entity_uids AS uuid[]))
                     """
                 ),
                 {"user_id": user_id, "entity_uids": requested},
@@ -183,8 +213,15 @@ def get_decks_corrections(
             .mappings()
             .all()
         )
-        corrections = {str(row["entity_uid"]): correction_from_row(row) for row in rows}
-        return {uid: corrections[uid] for uid in requested if uid in corrections}
+        corrections = {
+            str(row["entity_uid"]): correction_from_row(row)
+            for row in rows
+            if row["entity_uid"] is not None
+        }
+        return DecksBatchRead(
+            found={uid: corrections[uid] for uid in requested if uid in corrections},
+            server_time=rows[0]["server_time"],
+        )
 
     if session is not None:
         return _impl(session)
@@ -206,6 +243,8 @@ __all__ = [
     "DECKS_CUE_TYPES",
     "DECKS_HOTCUE_SLOTS",
     "DECKS_SLOTTED_CUE_TYPES",
+    "DecksBatchRead",
+    "SERVER_CLOCK_CTE",
     "canonical_cues",
     "canonical_entity_uids",
     "correction_from_row",

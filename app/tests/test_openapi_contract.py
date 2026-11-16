@@ -1978,7 +1978,7 @@ def test_openapi_types_the_cue_routes(test_app):
         ),
         ("/api/decks/cues/{entity_uid}", "put"): (
             "DecksCueSetPutRequest",
-            "DecksCueSetResponse",
+            "DecksCueSetPutResponse",
         ),
         ("/api/decks/corrections/query", "post"): (
             "DecksCorrectionsQueryRequest",
@@ -1986,7 +1986,7 @@ def test_openapi_types_the_cue_routes(test_app):
         ),
         ("/api/decks/corrections/{entity_uid}", "put"): (
             "DecksCorrectionPutRequest",
-            "DecksCorrectionResponse",
+            "DecksCorrectionPutResponse",
         ),
     }
     for (path, method), (request, response) in expected.items():
@@ -2000,10 +2000,17 @@ def test_openapi_types_the_cue_routes(test_app):
         ] == (f"#/components/schemas/{response}")
         for status in ("401", "403", "422"):
             assert status in operation["responses"], (path, status)
+        assert "server_time" in schema["components"]["schemas"][response]["required"]
         if method == "put":
             assert "404" in operation["responses"]
             conflict = operation["responses"]["409"]["content"]["application/json"]
             assert conflict["schema"]["$ref"].endswith("ConflictResponse")
+            conflict_name = conflict["schema"]["$ref"].rsplit("/", 1)[1]
+            assert set(schema["components"]["schemas"][conflict_name]["required"]) == {
+                "detail",
+                "current",
+                "server_time",
+            }
     app_spec = test_app.get("/openapi-app.json").json()
     assert "/api/decks/cues/query" in app_spec["paths"]
 

@@ -5,8 +5,13 @@ track. Clients read them in batches and replace one track's set at a time with
 compare-and-set on its revision; a stale revision answers 409 with the stored
 content. Session users only, as for the rest of /api/decks.
 
-User corrections do not change the Smart Mix profiles or plans (decision
-pending, gate G5): they are applied by Decks on top of the profile.
+Every response body carries `server_time`, the database clock (see
+`crate.db.queries.decks_cues`), so clients compare edit times with
+`updated_at` in the server's clock.
+
+User corrections do not change the Smart Mix profiles or plans yet: Decks
+applies them on top of the profile. Feeding them into Smart Mix is planned as
+F8.SM (gate G5).
 """
 
 from __future__ import annotations
@@ -26,12 +31,12 @@ from crate.api.openapi_responses import (
 from crate.api.schemas.decks_cues import (
     DecksCorrectionConflictResponse,
     DecksCorrectionPutRequest,
-    DecksCorrectionResponse,
+    DecksCorrectionPutResponse,
     DecksCorrectionsQueryRequest,
     DecksCorrectionsQueryResponse,
     DecksCueSetConflictResponse,
     DecksCueSetPutRequest,
-    DecksCueSetResponse,
+    DecksCueSetPutResponse,
     DecksCuesQueryRequest,
     DecksCuesQueryResponse,
 )
@@ -90,15 +95,17 @@ def decks_cues_query(
     """One SQL statement per batch. Tracks without a stored set are in `missing`."""
     user = _require_session_user(request)
     uids = _unique(payload.entity_uids)
-    sets = get_decks_cue_sets(int(user["id"]), uids)
+    read = get_decks_cue_sets(int(user["id"]), uids)
     return DecksCuesQueryResponse(
-        cue_sets=sets, missing=[uid for uid in uids if uid not in sets]
+        cue_sets=read.found,
+        missing=[uid for uid in uids if uid not in read.found],
+        server_time=read.server_time,
     )
 
 
 @router.put(
     "/cues/{entity_uid}",
-    response_model=DecksCueSetResponse,
+    response_model=DecksCueSetPutResponse,
     responses=_put_responses(DecksCueSetConflictResponse, "cue set"),
     summary="Replace the caller's cue set of a track",
 )
@@ -113,7 +120,12 @@ def decks_cues_put(request: Request, entity_uid: UUID, payload: DecksCueSetPutRe
         base_revision=payload.base_revision,
         client_id=payload.client_id,
     )
-    return _sync_response(result, DecksCueSetResponse, "Cue set revision conflict")
+    return _sync_response(
+        result,
+        DecksCueSetPutResponse,
+        DecksCueSetConflictResponse,
+        "Cue set revision conflict",
+    )
 
 
 @router.post(
@@ -129,16 +141,17 @@ def decks_corrections_query(
     `missing`."""
     user = _require_session_user(request)
     uids = _unique(payload.entity_uids)
-    corrections = get_decks_corrections(int(user["id"]), uids)
+    read = get_decks_corrections(int(user["id"]), uids)
     return DecksCorrectionsQueryResponse(
-        corrections=corrections,
-        missing=[uid for uid in uids if uid not in corrections],
+        corrections=read.found,
+        missing=[uid for uid in uids if uid not in read.found],
+        server_time=read.server_time,
     )
 
 
 @router.put(
     "/corrections/{entity_uid}",
-    response_model=DecksCorrectionResponse,
+    response_model=DecksCorrectionPutResponse,
     responses=_put_responses(DecksCorrectionConflictResponse, "correction"),
     summary="Replace the caller's BPM, grid and key correction of a track",
 )
@@ -157,7 +170,10 @@ def decks_corrections_put(
         client_id=payload.client_id,
     )
     return _sync_response(
-        result, DecksCorrectionResponse, "Correction revision conflict"
+        result,
+        DecksCorrectionPutResponse,
+        DecksCorrectionConflictResponse,
+        "Correction revision conflict",
     )
 
 
@@ -165,13 +181,20 @@ def _unique(uids: list[UUID]) -> list[str]:
     return list(dict.fromkeys(str(uid) for uid in uids))
 
 
-def _sync_response(result: DecksSyncResult, model: type, conflict: str):
+def _sync_response(
+    result: DecksSyncResult, stored_model: type, conflict_model: type, detail: str
+):
     if result.status == "not_found":
         raise HTTPException(status_code=404, detail="Track not found")
-    current = model.model_validate(result.current)
     if result.status == "conflict":
-        return JSONResponse(
-            status_code=409,
-            content=jsonable_encoder({"detail": conflict, "current": current}),
+        body = conflict_model.model_validate(
+            {
+                "detail": detail,
+                "current": result.current,
+                "server_time": result.server_time,
+            }
         )
-    return current
+        return JSONResponse(status_code=409, content=jsonable_encoder(body))
+    return stored_model.model_validate(
+        {**result.current, "server_time": result.server_time}
+    )

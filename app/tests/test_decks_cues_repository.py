@@ -9,7 +9,10 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from crate.db.queries.decks_cues import get_decks_corrections, get_decks_cue_sets
+from crate.db.queries.decks_cues import (
+    get_decks_corrections as read_decks_corrections,
+)
+from crate.db.queries.decks_cues import get_decks_cue_sets as read_decks_cue_sets
 from crate.db.repositories.auth_user_accounts import create_user
 from crate.db.repositories.decks_cues import (
     put_decks_correction,
@@ -57,6 +60,14 @@ def _cue_rows(user_id: int, uid: str) -> list[dict]:
                 {"user_id": user_id, "uid": uid},
             ).mappings()
         ]
+
+
+def get_decks_cue_sets(user_id: int, uids: list[str]) -> dict:
+    return read_decks_cue_sets(user_id, uids).found
+
+
+def get_decks_corrections(user_id: int, uids: list[str]) -> dict:
+    return read_decks_corrections(user_id, uids).found
 
 
 def _user(name: str) -> int:
@@ -339,3 +350,33 @@ def test_batch_reads_answer_only_stored_uids(pg_db):
     assert get_decks_cue_sets(1, []) == {}
     with pytest.raises(ValueError):
         get_decks_cue_sets(1, [str(uuid.uuid4()) for _ in range(201)])
+
+
+@pg
+def test_reads_and_writes_report_the_database_clock(pg_db):
+    del pg_db
+    _track_id, uid = _create_track("decks-cues-clock")
+
+    stored = put_decks_cue_set(1, uid, [_cue()], base_revision=0, client_id=None)
+    conflict = put_decks_cue_set(
+        1, uid, [_cue(slot=2)], base_revision=0, client_id=None
+    )
+    correction = put_decks_correction(
+        1, uid, base_revision=0, bpm=120.0, beat_grid_ms=None, key=None, client_id=None
+    )
+    sets = read_decks_cue_sets(1, [uid, str(uuid.uuid4())])
+    corrections = read_decks_corrections(1, [uid])
+    nothing = read_decks_cue_sets(1, [str(uuid.uuid4())])
+
+    for result in (stored, conflict, correction):
+        assert result.server_time.tzinfo is not None
+        assert result.server_time >= result.current["updated_at"]
+    assert sets.server_time >= sets.found[uid]["updated_at"]
+    assert corrections.server_time >= corrections.found[uid]["updated_at"]
+    assert nothing.found == {} and nothing.server_time >= sets.server_time
+    assert (
+        put_decks_cue_set(
+            1, str(uuid.uuid4()), [], base_revision=0, client_id=None
+        ).server_time
+        is None
+    )

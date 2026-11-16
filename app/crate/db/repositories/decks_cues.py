@@ -14,6 +14,11 @@ stored row locked:
 
 The revision belongs to the whole set (``user_track_cue_sets``): an emptied set
 or a cleared correction keeps its row, so revisions never go back.
+
+Writes stamp ``updated_at`` with ``now()``. Every result but ``not_found`` also
+carries ``server_time``, ``clock_timestamp()`` read last in the transaction, so
+it is at or after the ``updated_at`` it is returned with (see
+``crate.db.queries.decks_cues``).
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal
 
 from sqlalchemy import text
@@ -42,10 +48,12 @@ DecksSyncStatus = Literal["stored", "unchanged", "conflict", "not_found"]
 
 @dataclass(frozen=True, slots=True)
 class DecksSyncResult:
-    """``current`` is the stored content after the call (None when not found)."""
+    """``current`` is the stored content after the call and ``server_time`` the
+    database clock read after it (both None when not found)."""
 
     status: DecksSyncStatus
     current: dict[str, Any] | None
+    server_time: datetime | None = None
 
 
 def put_decks_cue_set(
@@ -70,9 +78,9 @@ def put_decks_cue_set(
         for _attempt in range(2):
             stored = _locked_cue_set(current_session, user_id, uid)
             if stored["cues"] == submitted:
-                return DecksSyncResult("unchanged", stored)
+                return _result(current_session, "unchanged", stored)
             if stored["revision"] != base_revision:
-                return DecksSyncResult("conflict", stored)
+                return _result(current_session, "conflict", stored)
             revision = _bump_cue_set(current_session, user_id, uid, stored, client_id)
             if revision is not None:
                 break
@@ -80,7 +88,9 @@ def put_decks_cue_set(
         else:  # pragma: no cover - the second read always sees the stored row
             raise RuntimeError("cue set row vanished while locked")
         _replace_cues(current_session, user_id, uid, submitted, revision, client_id)
-        return DecksSyncResult("stored", _locked_cue_set(current_session, user_id, uid))
+        return _result(
+            current_session, "stored", _locked_cue_set(current_session, user_id, uid)
+        )
 
 
 def put_decks_correction(
@@ -117,18 +127,28 @@ def put_decks_correction(
                 and stored["beat_grid_ms"] == grid
                 and stored["key"] == values["key"]
             ):
-                return DecksSyncResult("unchanged", stored)
+                return _result(current_session, "unchanged", stored)
             if stored["revision"] != base_revision:
-                return DecksSyncResult("conflict", stored)
+                return _result(current_session, "conflict", stored)
             if _write_correction(
                 current_session, user_id, uid, stored["revision"], values, client_id
             ):
-                return DecksSyncResult(
-                    "stored", _locked_correction(current_session, user_id, uid)
+                return _result(
+                    current_session,
+                    "stored",
+                    _locked_correction(current_session, user_id, uid),
                 )
         raise RuntimeError(  # pragma: no cover - the second read sees the row
             "correction row vanished while locked"
         )
+
+
+def _result(
+    session: Session, status: DecksSyncStatus, current: dict[str, Any]
+) -> DecksSyncResult:
+    """Read the clock after everything ``current`` reflects."""
+    server_time = session.execute(text("SELECT clock_timestamp()")).scalar_one()
+    return DecksSyncResult(status, current, server_time)
 
 
 def _local_track_exists(session: Session, uid: str) -> bool:
