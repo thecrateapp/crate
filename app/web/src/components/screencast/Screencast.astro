@@ -1,0 +1,277 @@
+---
+// The Crate site's chaptered screencast: one clip per chapter in a 16:10 frame that
+// scales in on scroll, with chapter tabs and a play/pause toggle. Screencast.astro
+// feeds it cratemusic.app's walkthrough; ryoku.cratemusic.app feeds it its tour. It
+// imports no site content, i18n or filesystem checks, so a site that reuses it does
+// not rebuild when cratemusic.app's copy changes.
+import type { ScreencastChapter } from "./types";
+
+interface Props {
+  chapters: ScreencastChapter[];
+  /** Accessible name of the section. */
+  label: string;
+  play: string;
+  pause: string;
+}
+
+const { chapters, label, play, pause } = Astro.props;
+const hasVideo = chapters.some((chapter) => chapter.mp4);
+---
+
+<section class="screencast" aria-label={label} data-screencast data-play-label={play} data-pause-label={pause}>
+  <div class="frame" data-frame>
+    {
+      chapters.map((chapter, index) => (
+        <figure class="slot" data-chapter={chapter.id} data-active={index === 0 ? "" : undefined}>
+          <video preload="none" muted playsinline disablepictureinpicture poster={chapter.poster} aria-label={chapter.title}>
+            {chapter.webm && <source src={chapter.webm} type="video/webm" />}
+            {chapter.mp4 && <source src={chapter.mp4} type="video/mp4" />}
+          </video>
+          {!chapter.mp4 && (
+            <p class="eyebrow">
+              <b>{chapter.number}</b> / {chapter.title}
+            </p>
+          )}
+          {!chapter.poster && (
+            <span class="play" aria-hidden="true">
+              &#9654;
+            </span>
+          )}
+        </figure>
+      ))
+    }
+    {
+      hasVideo && (
+        <button type="button" class="toggle" data-toggle data-state="play" aria-label={play}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path class="icon-play" d="M8 5v14l11-7z" />
+            <path class="icon-pause" d="M7 5h4v14H7zM13 5h4v14h-4z" />
+          </svg>
+        </button>
+      )
+    }
+  </div>
+  <ol class="chapters">
+    {
+      chapters.map((chapter, index) => (
+        <li data-active={index === 0 ? "" : undefined}>
+          {hasVideo ? (
+            <button type="button" data-tab aria-pressed={index === 0 ? "true" : "false"}>
+              <b>{chapter.number}</b> <span data-hover-scramble>{chapter.title}</span>
+            </button>
+          ) : (
+            <>
+              <b>{chapter.number}</b> {chapter.title}
+            </>
+          )}
+        </li>
+      ))
+    }
+  </ol>
+</section>
+
+<script>
+  import { gsap } from "gsap";
+  import { ScrollTrigger } from "gsap/ScrollTrigger";
+  import { reducedMotion } from "../../scripts/motion/env";
+  import { mountOnPage } from "../../scripts/motion/page";
+  import { canAutoplay, createScreencast } from "../../scripts/screencast/player";
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  // mountOnPage starts on Astro's page-load where the ClientRouter runs (cratemusic.app)
+  // and on DOM readiness where it does not (ryoku.cratemusic.app).
+  mountOnPage("[data-screencast]", () => {
+    const root = document.querySelector<HTMLElement>("[data-screencast]")!;
+    const disposePlayer = root.querySelector("[data-toggle]")
+      ? createScreencast(root, {
+          autoplay: canAutoplay(reducedMotion()),
+          labels: {
+            play: root.dataset.playLabel ?? "",
+            pause: root.dataset.pauseLabel ?? "",
+          },
+        })
+      : undefined;
+    const ctx = reducedMotion()
+      ? undefined
+      : gsap.context(() => {
+          gsap.fromTo(
+            root.querySelector("[data-frame]"),
+            { scale: 0.86, opacity: 0, y: 60 },
+            {
+              scale: 1,
+              opacity: 1,
+              y: 0,
+              ease: "none",
+              scrollTrigger: { trigger: root, start: "top 85%", end: "top 20%", scrub: true },
+            },
+          );
+        });
+    return () => {
+      ctx?.revert();
+      disposePlayer?.();
+    };
+  });
+</script>
+
+<style>
+  .screencast {
+    grid-template-rows: auto auto;
+    align-content: center;
+    gap: 28px;
+  }
+
+  .slot {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .slot[data-active] {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .slot video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: transparent;
+  }
+
+  .toggle {
+    position: absolute;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(103, 232, 249, 0.4);
+    background: rgba(13, 14, 20, 0.72);
+    color: var(--cyan-hi);
+    cursor: pointer;
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
+  }
+
+  .toggle svg {
+    width: 40%;
+    height: 40%;
+    fill: currentColor;
+  }
+
+  .toggle[data-state="play"] {
+    inset: 0;
+    margin: auto;
+    width: 84px;
+    height: 84px;
+  }
+
+  .toggle[data-state="play"] .icon-pause,
+  .toggle[data-state="pause"] .icon-play {
+    display: none;
+  }
+
+  .toggle[data-state="pause"] {
+    inset: auto 16px 16px auto;
+    width: 44px;
+    height: 44px;
+    opacity: 0;
+  }
+
+  .frame:hover .toggle[data-state="pause"],
+  .toggle[data-state="pause"]:focus-visible {
+    opacity: 1;
+  }
+
+  .toggle:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 3px;
+  }
+
+  .chapters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 28px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .chapters button {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .chapters button:hover {
+    color: var(--fg);
+  }
+
+  /* The menu bar's hover: the title scrambles (data-hover-scramble) and a cyan rule
+     draws under it. */
+  .chapters button span {
+    position: relative;
+  }
+
+  .chapters button span::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -4px;
+    height: 1px;
+    background: var(--cyan-hi);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.45s var(--ease-snap);
+  }
+
+  .chapters button:hover span::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  .chapters button:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 4px;
+  }
+
+  .chapters b {
+    font-weight: 400;
+    margin-right: 6px;
+  }
+
+  .chapters [data-active] {
+    color: var(--fg);
+  }
+
+  .chapters [data-active] b {
+    color: var(--cyan-hi);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toggle {
+      transition: none;
+    }
+  }
+</style>
