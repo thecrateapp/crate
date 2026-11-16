@@ -25,8 +25,18 @@ export const PACMAN_CONF = [
   `Server = ${REPO_URL}`,
 ].join("\n");
 
+// The repository also ships Ryoku itself, built from Crate's fork with Crate's
+// patches, so its block goes above [ryoku]: pacman takes a package from the first
+// repository that lists it. The fork tags the source of every build it publishes.
+export const RYOKU_REPO = "ryoku";
+export const RYOKU_FORK_URL = "https://github.com/thecrateapp/ryoku";
+
 export const INSTALL_PACKAGES =
   "sudo pacman -Syu crate-for-ryoku crate-desktop-bin";
+
+// Back to stock Ryoku: with the block gone, -uu lets pacman move the Ryoku
+// packages down to the versions [ryoku] serves.
+export const STOCK_RYOKU = "sudo pacman -Syuu";
 export const SETUP = "crate-for-ryoku install";
 
 export const TARBALL_URL =

@@ -10,6 +10,9 @@ import {
   KEY_URL,
   PACMAN_CONF,
   REPO_URL,
+  RYOKU_FORK_URL,
+  RYOKU_REPO,
+  STOCK_RYOKU,
   TRUST_KEY,
 } from "./install";
 
@@ -91,5 +94,15 @@ describe("the signed repository", () => {
     expect(INSTALL_PACKAGES).toBe(
       "sudo pacman -Syu crate-for-ryoku crate-desktop-bin",
     );
+  });
+
+  it("goes above the stock Ryoku repository it shadows", () => {
+    expect(RYOKU_REPO).toBe("ryoku");
+    expect(PACMAN_CONF).not.toContain(`[${RYOKU_REPO}]`);
+    expect(RYOKU_FORK_URL).toBe("https://github.com/thecrateapp/ryoku");
+  });
+
+  it("goes back to stock Ryoku by letting pacman downgrade", () => {
+    expect(STOCK_RYOKU).toBe("sudo pacman -Syuu");
   });
 });
