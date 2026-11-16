@@ -214,4 +214,4 @@ def test_the_beat_this_checkpoint_falls_back_between_share_endpoints() -> None:
     assert legacy < newer
     assert re.search(r'-u "?\$\{?BEAT_THIS_SHARE\}?:"?', stage)
     assert "ARG BEAT_THIS_SHARE=7ik4RrBKTS273gp" in stage
-    assert 'sha256sum -c -' in stage
+    assert "sha256sum -c -" in stage
