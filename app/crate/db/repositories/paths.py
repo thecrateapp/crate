@@ -3,10 +3,22 @@
 import json
 from contextlib import nullcontext
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from sqlalchemy import text
 
 from crate.db.tx import transaction_scope
+
+
+def _json_number(value: object) -> float:
+    # Catalogue reads return NUMERIC columns as Decimal; store them as numbers.
+    if isinstance(value, Decimal):
+        return float(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def _dumps(value: object) -> str:
+    return json.dumps(value, default=_json_number)
 
 
 def _rowcount(result: object) -> int:
@@ -54,10 +66,10 @@ def create_music_path_record(
                     "dest_type": dest_type,
                     "dest_value": dest_value,
                     "dest_label": dest_label,
-                    "waypoints": json.dumps(waypoints),
+                    "waypoints": _dumps(waypoints),
                     "step_count": step_count,
-                    "tracks": json.dumps(tracks),
-                    "generation_metadata": json.dumps(generation_metadata or {}),
+                    "tracks": _dumps(tracks),
+                    "generation_metadata": _dumps(generation_metadata or {}),
                 },
             )
             .mappings()
@@ -101,9 +113,9 @@ def update_music_path_tracks(
             {
                 "id": path_id,
                 "user_id": user_id,
-                "tracks": json.dumps(tracks),
-                "generation_metadata": json.dumps(generation_metadata or {}),
-                "waypoints": json.dumps(waypoints) if waypoints is not None else None,
+                "tracks": _dumps(tracks),
+                "generation_metadata": _dumps(generation_metadata or {}),
+                "waypoints": _dumps(waypoints) if waypoints is not None else None,
                 "now": datetime.now(timezone.utc),
             },
         )
@@ -141,8 +153,8 @@ def apply_music_path_refinement(
                 "id": path_id,
                 "user_id": user_id,
                 "expected": expected_revision,
-                "tracks": json.dumps(tracks) if tracks is not None else None,
-                "generation_metadata": json.dumps(generation_metadata),
+                "tracks": _dumps(tracks) if tracks is not None else None,
+                "generation_metadata": _dumps(generation_metadata),
                 "now": datetime.now(timezone.utc),
             },
         )

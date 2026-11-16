@@ -490,3 +490,36 @@ def test_regeneration_response_reports_playability_like_the_saved_get(
     assert [track["playable"] for track in regenerated.json()["tracks"]] == [
         track["playable"] for track in saved.json()["tracks"]
     ]
+
+
+def test_paths_store_numeric_decimals_from_the_catalog_as_json_numbers(pg_db):
+    # Catalogue reads hand NUMERIC columns (bpm, energy, similarity) over as
+    # Decimal; saving a path with them must not fail with a 500.
+    from decimal import Decimal
+
+    from crate.db.tx import read_scope
+
+    tracks = [
+        {"track_id": 1, "title": "Start", "bpm": Decimal("124.50"), "score": 1},
+        {"track_id": 2, "title": "Finish", "bpm": Decimal("126.00"), "score": 0.5},
+    ]
+    row = _record(tracks, metadata={"similarity": Decimal("0.875")})
+    assert row is not None
+
+    regenerated = [{**tracks[0], "energy": Decimal("0.62")}]
+    assert update_music_path_tracks(
+        row["id"], 1, regenerated, generation_metadata={"revision": 2}
+    )
+
+    with read_scope() as session:
+        stored = (
+            session.execute(
+                text("SELECT tracks FROM music_paths WHERE id = :id"),
+                {"id": row["id"]},
+            )
+            .scalars()
+            .one()
+        )
+    assert stored == [
+        {"track_id": 1, "title": "Start", "bpm": 124.5, "score": 1, "energy": 0.62}
+    ]
