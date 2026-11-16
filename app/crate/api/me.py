@@ -905,6 +905,33 @@ def record(request: Request, body: RecordPlayRequest):
     return {"ok": True}
 
 
+DECKS_DEVICE_TYPE = "decks"
+
+
+def _is_decks_request(request: Request, user: dict) -> bool:
+    """Whether the call comes from Crate Decks.
+
+    Decks sends `X-Crate-App: decks/<version>` and its session is stored under
+    `crate-decks`, so either one identifies it.
+    """
+    if native_oauth_auth.is_decks_app_id(request.headers.get("x-crate-app")):
+        return True
+    session_id = user.get("session_id")
+    if not session_id:
+        return False
+    from crate.api.auth_cache import get_cached_session
+
+    session = get_cached_session(str(session_id)) or {}
+    return native_oauth_auth.is_decks_app_id(session.get("app_id"))
+
+
+def _decks_default(value: str | None, *, is_decks: bool) -> str | None:
+    """Label a Decks call as `decks` when the client left the field out."""
+    if value or not is_decks:
+        return value
+    return DECKS_DEVICE_TYPE
+
+
 @router.post(
     "/now-playing",
     response_model=OkResponse,
@@ -918,6 +945,7 @@ def update_now_playing(request: Request, body: NowPlayingRequest):
         delete_cache(cache_key)
         return {"ok": True}
 
+    is_decks = _is_decks_request(request, user)
     resolved_track = None
     if any((body.track_id, body.track_entity_uid, body.track_path)):
         resolved_track = resolve_track_reference_read(
@@ -940,9 +968,13 @@ def update_now_playing(request: Request, body: NowPlayingRequest):
         "album": body.album,
         "started_at": (body.started_at or datetime.now(timezone.utc)).isoformat(),
         "heartbeat_at": datetime.now(timezone.utc).isoformat(),
-        "device_type": body.device_type,
-        "app_platform": body.app_platform,
+        "device_type": _decks_default(body.device_type, is_decks=is_decks),
+        "app_platform": _decks_default(body.app_platform, is_decks=is_decks),
     }
+    if body.deck is not None:
+        payload["deck"] = body.deck
+    if body.mix_session_id is not None:
+        payload["mix_session_id"] = body.mix_session_id
     set_cache(cache_key, payload, ttl=90)
     return {"ok": True}
 
@@ -1380,6 +1412,7 @@ def _context_playlist_id(body: RecordPlayEventRequest) -> int | None:
 )
 def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
     user = _require_vdj_scope(request, "vdj.play_events.write")
+    is_decks = _is_decks_request(request, user)
     content_origin = "local"
     source_node_uid = None
     if body.playback_session:
@@ -1411,14 +1444,14 @@ def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
         completion_ratio=body.completion_ratio,
         was_skipped=body.was_skipped,
         was_completed=body.was_completed,
-        play_source_type=body.play_source_type,
+        play_source_type=_decks_default(body.play_source_type, is_decks=is_decks),
         play_source_id=body.play_source_id,
         play_source_name=body.play_source_name,
         context_artist=body.context_artist,
         context_album=body.context_album,
         context_playlist_id=_context_playlist_id(body),
-        device_type=body.device_type,
-        app_platform=body.app_platform,
+        device_type=_decks_default(body.device_type, is_decks=is_decks),
+        app_platform=_decks_default(body.app_platform, is_decks=is_decks),
         content_origin=content_origin,
         source_node_uid=source_node_uid,
     )

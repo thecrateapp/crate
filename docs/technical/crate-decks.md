@@ -704,6 +704,39 @@ cache keys they got before. Until the `decks` context of S5 exists, `decks`
 plans like `playlist` and its bass handoff still follows the Android flag
 (`CRATE_ANDROID_BASS_HANDOFF_ENABLED`).
 
+## Now playing and play events (S6)
+
+Decks reports listening through the same endpoints as Listen; no new columns or
+migrations are involved.
+
+- `POST /api/me/play-events`: one event per track actually played, with
+  `device_type: "decks"`, `play_source_type: "decks"` and a stable
+  `client_event_id` for deduplication. Both labels are free-form strings, as for
+  every other client.
+- `POST /api/me/now-playing`: the usual heartbeat (the state expires 90 s after
+  the last one) plus two optional fields that only Decks sends:
+
+  - `deck`: integer `1`-`4`, the deck the track plays on. Anything else (`0`,
+    `5`, `"2"`, `2.5`, `true`) is rejected with 422.
+  - `mix_session_id`: string of at most 128 characters naming the mix session.
+    A blank value is dropped.
+
+  Both are stored in the ephemeral now-playing state only when present, so the
+  state other clients write keeps its current shape. `{"playing": false}` still
+  clears it.
+
+A call is attributed to Decks when it carries `X-Crate-App: decks/<version>` or
+its session was created by Decks (`app_id` `crate-decks`). For those calls the
+server fills `device_type`, `app_platform` and (for play events)
+`play_source_type` with `decks` when the client leaves them out; values the
+client sends are kept. A Decks now-playing heartbeat marks the user's Decks
+session as active in the admin session list and user presence, the way a Listen
+heartbeat does for Listen sessions.
+
+Stats need no special case: the listening projections key on the user and the
+track, and the product KPIs group plays by `app_platform` and
+`play_source_type`, so Decks plays appear there as `decks`.
+
 ## Audio availability and plan fields (S9)
 
 ### `playable` in DJ search

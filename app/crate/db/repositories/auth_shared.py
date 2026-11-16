@@ -161,6 +161,12 @@ def is_listen_app(app_id: str | None) -> bool:
     return normalized.startswith("listen")
 
 
+def is_decks_app(app_id: str | None) -> bool:
+    """Crate Decks sessions are stored as `crate-decks`; the header is `decks/<v>`."""
+    normalized = (app_id or "").strip().lower()
+    return normalized in {"crate-decks", "decks"} or normalized.startswith("decks/")
+
+
 def enrich_auth_session(session: dict, *, now: datetime | None = None) -> dict:
     enriched = dict(session)
     parsed = parse_device_details(enriched.get("user_agent"))
@@ -209,7 +215,12 @@ def promote_now_playing_session(
         return sessions
 
     app_platform = (now_playing.get("app_platform") or "").strip().lower()
-    if not is_listen_app(app_platform):
+    device_type = (now_playing.get("device_type") or "").strip().lower()
+    if is_listen_app(app_platform):
+        session_matches = is_listen_app
+    elif device_type == "decks" or is_decks_app(app_platform):
+        session_matches = is_decks_app
+    else:
         return sessions
 
     current_time = now or datetime.now(timezone.utc)
@@ -217,7 +228,7 @@ def promote_now_playing_session(
     candidate_seen_at: datetime | None = None
 
     for index, session in enumerate(sessions):
-        if not is_listen_app(session.get("app_id")):
+        if not session_matches(session.get("app_id")):
             continue
         if session.get("revoked_at") is not None:
             continue
@@ -253,6 +264,7 @@ __all__ = [
     "build_device_fingerprint",
     "coerce_datetime",
     "enrich_auth_session",
+    "is_decks_app",
     "is_listen_app",
     "model_to_dict",
     "parse_device_details",

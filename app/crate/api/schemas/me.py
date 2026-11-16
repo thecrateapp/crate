@@ -59,6 +59,17 @@ class NowPlayingRequest(IdentityFieldsMixin):
     started_at: datetime | None = None
     device_type: str | None = None
     app_platform: str | None = None
+    # Crate Decks: the deck (1-4) the track plays on and the mix session it
+    # belongs to. Other clients omit both.
+    deck: int | None = Field(default=None, ge=1, le=4, strict=True)
+    mix_session_id: str | None = Field(default=None, max_length=128)
+
+    @field_validator("mix_session_id", mode="before")
+    @classmethod
+    def _blank_mix_session_id(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
 
 class RecommendationFeedbackRequest(BaseModel):
