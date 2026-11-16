@@ -1045,8 +1045,10 @@ ANY(:entity_uids)` on the primary keys, the cues by a left join on theirs.
 User corrections do not change the Smart Mix profiles, the planner or the plans
 in this phase: Decks applies a correction on top of the profile on the machine
 that loads the track (F8.C-PR2), and every other client keeps the analyser's
-values. Whether corrections should feed the profiles (for example, for the
-owner's plans or as a hint to re-analyse) is a future decision for gate G5.
+values. Gate G5 (Diego, 2026-11-16) approved this contract and decided that
+corrections will feed Smart Mix later: the planner will prefer the user's
+correction over the profile for that user's plans. That work is planned as
+F8.SM in the Decks plan and is not part of this contract.
 
 ## Audio availability and plan fields (S9)
 
