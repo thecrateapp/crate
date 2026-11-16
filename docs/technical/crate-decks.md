@@ -1,11 +1,11 @@
 ---
 title: Crate Decks server contract
-summary: What the server offers the Crate Decks desktop DJ client - session, capabilities and the fields it relies on.
+summary: What the server offers the Crate Decks desktop DJ client - session, capabilities, synchronised cues and the fields it relies on.
 section: reference
 audience: [developer]
 status: canonical
 order: 35
-verified: 2026-11-11
+verified: 2026-11-16
 sources:
   - app/crate/api/auth.py
   - app/crate/api/native_oauth_auth.py
@@ -15,6 +15,12 @@ sources:
   - app/crate/api/schemas/decks.py
   - app/crate/db/queries/decks_library.py
   - app/crate/db/queries/decks_profiles.py
+  - app/crate/api/decks_cues.py
+  - app/crate/api/schemas/decks_cues.py
+  - app/crate/db/queries/decks_cues.py
+  - app/crate/db/repositories/decks_cues.py
+  - app/crate/db/schema_sections/decks_cues_v166.py
+  - app/crate/smart_mix/beat_grid.py
   - app/crate/db/queries/vdj_catalog.py
   - app/crate/streaming/service.py
   - app/crate/api/browse_media.py
@@ -46,6 +52,8 @@ sources:
   - app/tests/test_decks_library_api.py
   - app/tests/test_decks_library_queries.py
   - app/tests/test_decks_profiles_api.py
+  - app/tests/test_decks_cues_repository.py
+  - app/tests/test_decks_cues_api.py
   - app/tests/test_openapi_contract.py
   - app/tests/test_readplane_route_manifest.py
   - app/tests/test_search_playable_audio.py
@@ -90,6 +98,7 @@ need them.
       "beatmatch",
       "bass_handoff",
       "long_beatmatch",
+      "cues",
       "stems",
       "stem_upload",
       "local_refinement"
@@ -123,8 +132,8 @@ Rules:
   | `stem_upload`                                 | Smart Mix Stems ST1, stem analysis uploads (only for a caller who may) |
   | `local_refinement`                            | Smart Mix Stems ST3, candidate menu for local refinement               |
 
-  Everything but `cues` ships so far. `library_cursor`, `profiles_batch`, `stems`
-  and `local_refinement` are always present. `stem_upload` is present only when the
+  `library_cursor`, `profiles_batch`, `cues`, `stems` and `local_refinement`
+  are always present. `stem_upload` is present only when the
   caller's session holds `smart_mix.stems.contribute` and an admin has not
   turned uploads off, so it depends on who asks. `beatmatch` and `long_beatmatch`
   need `CRATE_SMART_MIX_ENABLED` and `CRATE_DECKS_BEATMATCH_ENABLED`;
@@ -736,6 +745,308 @@ heartbeat does for Listen sessions.
 Stats need no special case: the listening projections key on the user and the
 track, and the product KPIs group plays by `app_platform` and
 `play_source_type`, so Decks plays appear there as `decks`.
+
+## Cues and corrections (S7)
+
+Each user keeps their own cues and their own BPM, beat grid and key corrections
+for every track, and Decks synchronises them across the user's machines (client
+phase F8). The routes are announced by the `cues` feature. They are the user's
+data: two users of the same server never see each other's cues or corrections.
+
+### Data model
+
+Migration `166` (`app/crate/db/schema_sections/decks_cues_v166.py`) adds three
+tables:
+
+| Table                    | Key                                     | Holds                                                                                              |
+| ------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `user_track_cue_sets`    | `(user_id, entity_uid)`                 | The revision of the user's whole cue set for the track, `updated_at`, `client_id`                  |
+| `user_track_cues`        | `(user_id, entity_uid, cue_type, slot)` | One cue: `start_ms`, `end_ms`, `label`, `color`, and its own `revision`, `updated_at`, `client_id` |
+| `user_track_corrections` | `(user_id, entity_uid)`                 | `bpm`, `beat_grid_format` + `beat_grid_data`, `key`, `revision`, `updated_at`, `client_id`         |
+
+Choices:
+
+- **The revision belongs to the set.** A client replaces the whole cue set of a
+  track in one PUT with one `base_revision`, so one revision per user and track
+  is what it compares against. It lives in `user_track_cue_sets`, which keeps
+  its row when the set is emptied, so a revision never goes back to zero and a
+  client that never saw a clearing cannot undo it. Each cue's `revision` is the
+  set revision that last changed that cue (unchanged cues keep theirs); it is
+  server bookkeeping and is not part of the API.
+- **Users, not tracks, own the rows.** `user_id` references `users(id)` with
+  `ON DELETE CASCADE`, as the other per-user tables do. `entity_uid` is a plain
+  `UUID` without a foreign key to `library_tracks`, like
+  `user_play_events.track_entity_uid` and `playlist_tracks.track_entity_uid`:
+  the entity UID is the track's stable identity, and the user's cues must
+  survive library rescans and repairs. A write still needs the track in the
+  local library (`404` otherwise).
+- **Hot cue slots are Mixxx's.** `hotcue`, `loop` and `jump` cues are all Mixxx
+  hot cues, so they share the 36 slots `0`-`35`. Besides the
+  `(cue_type, slot)` key, a partial unique index on `(user_id, entity_uid, slot)`
+  for those three types keeps one of them per slot. `main`, `intro` and `outro`
+  are single cues in slot `0`.
+- **Times are milliseconds as `DOUBLE PRECISION`,** rounded to 0.001 ms by the
+  API, because Mixxx positions are sample frames and a whole millisecond is
+  44 frames at 44.1 kHz: a saved loop must come back the length it was.
+- **The grid uses the profiles' codec.** A corrected grid is stored as
+  `delta-ms-v1` bytes by `encode_beat_grid` (`app/crate/smart_mix/beat_grid.py`),
+  exactly as `track_mix_profiles.beat_grid_data`, and served decoded as
+  `beat_grid_ms`, as the mix profiles serve `beatGridMs`.
+- **The key is a Camelot code** (`1A`-`12B`), the notation the Decks track lists
+  (`camelot`) and the planner use.
+- Table `CHECK` constraints repeat the per-cue rules below, so a write that
+  skips the API still cannot store an invalid cue.
+- Reads are by primary key; no other index is needed. Nothing joins or
+  aggregates over `library_tracks`.
+
+### Revisions and conflicts
+
+Every PUT carries `base_revision`: the revision the client last read or wrote
+for that track, `0` when it has seen none (a track listed in `missing`). The
+server locks the stored row and then:
+
+1. `404` when the track is not in the local library.
+2. `200` with the stored content, writing nothing, when the submitted content is
+   already the stored content, **whatever `base_revision` says**. A retried PUT
+   whose response was lost succeeds instead of conflicting with itself.
+3. `409` when `base_revision` is not the stored revision. The body carries the
+   stored content and revision in `current`; nothing is written.
+4. Otherwise `200`: the content is replaced, the revision goes up by one,
+   `updated_at` becomes the server time and `client_id` the one sent.
+
+A client that gets `409` merges (F8.C-PR1: the server's set wins when it is
+newer) and PUTs again with `current.revision` as its base. Revisions start at
+`1` and only go up; a set emptied with `"cues": []` and a correction cleared
+with all values `null` keep their row and their revision. A PUT of an empty set
+or an all-null correction over nothing stored is case 2: `200` with revision
+`0`, nothing stored.
+
+### Read cue sets
+
+`POST /api/decks/cues/query`
+
+```json
+{
+  "entity_uids": [
+    "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10",
+    "7d1e9b44-3f2a-4e8e-8c0d-61b5a2f4d7aa"
+  ]
+}
+```
+
+```json
+{
+  "cue_sets": {
+    "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10": {
+      "entity_uid": "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10",
+      "revision": 3,
+      "updated_at": "2026-11-16T18:02:11.418204Z",
+      "client_id": "5f0c6e9a-0d1b-4d55-9b3e-6f1d9c1a7e20",
+      "cues": [
+        {
+          "cue_type": "main",
+          "slot": 0,
+          "start_ms": 120.0,
+          "end_ms": null,
+          "label": null,
+          "color": null
+        },
+        {
+          "cue_type": "intro",
+          "slot": 0,
+          "start_ms": null,
+          "end_ms": 30000.0,
+          "label": null,
+          "color": null
+        },
+        {
+          "cue_type": "hotcue",
+          "slot": 0,
+          "start_ms": 15240.517,
+          "end_ms": null,
+          "label": "Drop",
+          "color": "#ff8800"
+        },
+        {
+          "cue_type": "loop",
+          "slot": 2,
+          "start_ms": 61875.0,
+          "end_ms": 69375.0,
+          "label": "Build",
+          "color": "#00aaff"
+        }
+      ]
+    }
+  },
+  "missing": ["7d1e9b44-3f2a-4e8e-8c0d-61b5a2f4d7aa"]
+}
+```
+
+- `entity_uids`: 1 to 200 track entity UIDs; a UID sent twice, or in another
+  case, is answered once. No other fields are accepted.
+- `cue_sets`: the caller's stored sets, keyed by lowercase hyphenated UID, in
+  request order. `cues` lists the whole set in a fixed order: `main`, `intro`,
+  `outro`, then `hotcue`, `loop` and `jump`, each by slot. A set with
+  `"cues": []` was cleared and still has its revision.
+- `missing`: the requested UIDs with nothing stored, in request order. They read
+  as revision `0` with no cues. A UID outside the library is simply missing.
+
+### Replace a cue set
+
+`PUT /api/decks/cues/{entity_uid}`
+
+```json
+{
+  "base_revision": 3,
+  "client_id": "5f0c6e9a-0d1b-4d55-9b3e-6f1d9c1a7e20",
+  "cues": [
+    { "cue_type": "main", "slot": 0, "start_ms": 120.0 },
+    {
+      "cue_type": "hotcue",
+      "slot": 0,
+      "start_ms": 15240.517,
+      "label": "Drop",
+      "color": "#FF8800"
+    },
+    { "cue_type": "loop", "slot": 2, "start_ms": 61875.0, "end_ms": 69375.0 },
+    { "cue_type": "jump", "slot": 3, "start_ms": 32000.0, "end_ms": 96000.0 }
+  ]
+}
+```
+
+`200` answers the stored set, in the shape of a `cue_sets` entry (revision `4`
+here). `409` answers:
+
+```json
+{
+  "detail": "Cue set revision conflict",
+  "current": {
+    "entity_uid": "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10",
+    "revision": 5,
+    "updated_at": "2026-11-16T18:05:40.002113Z",
+    "client_id": "a41e2b7c-1f3d-4b8a-9c6e-2d7f0e5b3a91",
+    "cues": []
+  }
+}
+```
+
+Request:
+
+- `base_revision`: integer `>= 0`, required.
+- `client_id`: optional, 1 to 128 characters. Decks sends its
+  `X-Device-Fingerprint` value, so it can tell its own writes from another
+  machine's. The server stores it and echoes it; it does not authorise anything.
+- `cues`: required, the whole new set, at most 39 cues. Omitted cue fields are
+  `null` (`slot` is `0`).
+
+Cue rules (`422` otherwise):
+
+| `cue_type` | `slot`                                  | `start_ms`                           | `end_ms`                                                   |
+| ---------- | --------------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| `hotcue`   | `0`-`35`, shared with `loop` and `jump` | required                             | `null`                                                     |
+| `loop`     | `0`-`35`, shared                        | required, loop start                 | required, `> start_ms`                                     |
+| `jump`     | `0`-`35`, shared                        | required, the position jumped **to** | required, the position jumped **from**, `!= start_ms`      |
+| `main`     | `0`                                     | required                             | `null`                                                     |
+| `intro`    | `0`                                     | optional                             | optional; at least one of the two, `end > start` when both |
+| `outro`    | `0`                                     | optional                             | optional; at least one of the two, `end > start` when both |
+
+- Times are milliseconds from the start of the audio file, `0` to `86400000`
+  (24 h), finite, rounded to 0.001 ms. A jump stores its positions as Mixxx's
+  saved jumps do: `end_ms` before `start_ms` jumps forward.
+- At most one cue per `(cue_type, slot)`, and one `hotcue`, `loop` or `jump` per
+  slot, so a set has at most 36 slotted cues plus `main`, `intro` and `outro`.
+- `label`: up to 200 characters; blank becomes `null`.
+- `color`: `#rrggbb` (24-bit RGB, no alpha, no names); stored and returned in
+  lowercase.
+- No other fields are accepted, in the body or in a cue.
+
+### Read corrections
+
+`POST /api/decks/corrections/query` takes the same body as the cue query.
+
+```json
+{
+  "corrections": {
+    "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10": {
+      "entity_uid": "0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10",
+      "revision": 1,
+      "updated_at": "2026-11-16T18:10:02.771940Z",
+      "client_id": "5f0c6e9a-0d1b-4d55-9b3e-6f1d9c1a7e20",
+      "bpm": 127.95,
+      "beat_grid_format": "delta-ms-v1",
+      "beat_grid_ms": [512, 981, 1450, 1919],
+      "key": "8A"
+    }
+  },
+  "missing": ["7d1e9b44-3f2a-4e8e-8c0d-61b5a2f4d7aa"]
+}
+```
+
+`corrections` and `missing` follow the cue query's rules. Each value is `null`
+when the user did not correct it (the profile's value applies); a correction
+with all three `null` was cleared and keeps its revision.
+
+### Replace a correction
+
+`PUT /api/decks/corrections/{entity_uid}`
+
+```json
+{
+  "base_revision": 0,
+  "client_id": "5f0c6e9a-0d1b-4d55-9b3e-6f1d9c1a7e20",
+  "bpm": 127.95,
+  "beat_grid_format": "delta-ms-v1",
+  "beat_grid_ms": [512, 981, 1450, 1919],
+  "key": "8a"
+}
+```
+
+`200` answers the stored correction in the shape of a `corrections` entry;
+`409` answers `{"detail": "Correction revision conflict", "current": {…}}`.
+
+The body is the whole correction: an omitted value is `null`, which means "not
+corrected", not "keep the stored value". Rules (`422` otherwise):
+
+- `base_revision` and `client_id` as for cues.
+- `bpm`: `30` to `300`, finite.
+- `beat_grid_format` and `beat_grid_ms` go together. The format is only
+  `delta-ms-v1`. The grid holds 2 to 100,000 absolute beat positions in
+  integer milliseconds, strictly increasing, the first `> 0` and none past
+  24 h: the rules `encode_beat_grid` applies to the mix profiles, which the
+  schema calls to validate. The server does not check that the grid agrees
+  with `bpm`.
+- `key`: a Camelot code `1A` to `12B`, any case; stored in uppercase.
+
+### Access, errors and cost
+
+Access is the same as for the other `/api/decks` routes: a user session. A
+`crv_` access token gets `401` from the middleware and `403` if it ever reaches
+the handler; a trusted-header user without a Crate account gets `403`. Every
+read and write is scoped to the session's user.
+
+| Status | When                                                                                               |
+| ------ | -------------------------------------------------------------------------------------------------- |
+| `401`  | No session, or a `crv_` access token                                                               |
+| `403`  | An access token or an accountless trusted-header user reaching the handler                         |
+| `404`  | PUT for a track that is not in the local library                                                   |
+| `409`  | PUT whose `base_revision` is not the stored revision and whose content differs from the stored one |
+| `422`  | A body or cue that breaks the rules above, more than 200 or no UIDs, or a path UID that is not one |
+
+- Each query is one SQL statement (`get_decks_cue_sets` and
+  `get_decks_corrections` in `app/crate/db/queries/decks_cues.py`, pinned by
+  `test_single_query_per_batch`): `user_id = :user_id AND entity_uid =
+ANY(:entity_uids)` on the primary keys, the cues by a left join on theirs.
+- A PUT is one transaction (`app/crate/db/repositories/decks_cues.py`): the
+  library check, the locked read, and the write.
+- Nothing aggregates over `library_tracks` and nothing touches audio files.
+
+### Smart Mix profiles are not affected
+
+User corrections do not change the Smart Mix profiles, the planner or the plans
+in this phase: Decks applies a correction on top of the profile on the machine
+that loads the track (F8.C-PR2), and every other client keeps the analyser's
+values. Whether corrections should feed the profiles (for example, for the
+owner's plans or as a hint to re-analyse) is a future decision for gate G5.
 
 ## Audio availability and plan fields (S9)
 
