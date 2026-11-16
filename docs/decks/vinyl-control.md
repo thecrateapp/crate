@@ -19,7 +19,7 @@ sources:
 # Vinyl control
 
 With vinyl control, a turntable or CD player plays a timecode record or CD,
-and Crate Decks follows it: the needle moves the track of a deck, so you can
+and Decks follows it: the needle moves the track of a deck, so you can
 scratch, nudge and back-cue a digital track as if it were on the record.
 Vinyl control uses the xwax timecode decoder.
 

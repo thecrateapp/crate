@@ -20,7 +20,7 @@ sources:
 
 # Recording and broadcasting
 
-Crate Decks can record what you play to a file and stream it live at the same
+Decks can record what you play to a file and stream it live at the same
 time. Both use the main mix, or the **Record/Broadcast** input when you mix
 on an external mixer (see
 [Output and input devices](sound.md#output-and-input-devices)).
@@ -35,7 +35,7 @@ recordings, and you can load them into a deck like any other track.
 **Preferences › Recording** sets:
 
 - **Directory:** where recordings are saved. The default is the
-  `Crate Decks/Recordings` folder inside your Music folder.
+  `Decks/Recordings` folder inside your Music folder.
 - **Output File Format:** lossless WAV, AIFF or FLAC, or lossy MP3, OGG
   Vorbis, and, depending on the build, Opus and AAC. Lossy formats have a
   quality setting, and FLAC a compression level.
@@ -54,7 +54,7 @@ or your voice will be out of time with the music in the recording.
 
 ## Broadcasting
 
-Crate Decks streams your mix to an Icecast or Shoutcast server, which your
+Decks streams your mix to an Icecast or Shoutcast server, which your
 listeners connect to. You need an account on such a server, or your own.
 
 1. Open **Preferences › Live Broadcasting**.

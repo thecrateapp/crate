@@ -1,6 +1,6 @@
 ---
 title: Track analysis
-summary: What Crate's analysis gives Crate Decks, and how the beat and key detectors analyze your local tracks.
+summary: What Crate's analysis gives Decks, and how the beat and key detectors analyze your local tracks.
 section: decks
 audience: [user]
 status: canonical
@@ -22,7 +22,7 @@ sources:
 # Track analysis
 
 A DJ app needs to know each track's tempo, beat positions and key. Crate
-analyzes your whole library on the server; Crate Decks shows that analysis in
+analyzes your whole library on the server; Decks shows that analysis in
 the Crate section and analyzes local tracks on this computer.
 
 ## Analysis from Crate
@@ -46,7 +46,7 @@ you play come from your local music and are analyzed by the detectors below.
 ## Beat detection
 
 When a local track is loaded into a deck, or when you run **Analyze** in the
-Local section of the sidebar, Crate Decks detects its tempo (BPM) and beat
+Local section of the sidebar, Decks detects its tempo (BPM) and beat
 positions, and builds a beatgrid. Sync, quantize, beat loops and beat jumps
 rely on it. **Preferences › Beat Detection** sets how:
 
@@ -66,7 +66,7 @@ rely on it. **Preferences › Beat Detection** sets how:
 
 ## Key detection
 
-Crate Decks also detects the musical key of local tracks, so that you can mix
+Decks also detects the musical key of local tracks, so that you can mix
 harmonically. **Preferences › Key Detection** sets how:
 
 - **Enable Key Detection:** turns the detector on or off.

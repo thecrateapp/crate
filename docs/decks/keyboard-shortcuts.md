@@ -1,6 +1,6 @@
 ---
 title: Keyboard shortcuts
-summary: The default keyboard mapping of Crate Decks for the decks, the mixer, Auto DJ, the library and the menus.
+summary: The default keyboard mapping of Decks for the decks, the mixer, Auto DJ, the library and the menus.
 section: decks
 audience: [user]
 status: canonical
@@ -17,7 +17,7 @@ sources:
 
 # Keyboard shortcuts
 
-Crate Decks can be played from the keyboard. The tables below are the
+Decks can be played from the keyboard. The tables below are the
 default mapping for a US English keyboard layout:
 
 - The left half of the keyboard controls deck 1 and the right half deck 2.
@@ -28,7 +28,7 @@ default mapping for a US English keyboard layout:
 - **Options › Enable Keyboard Shortcuts** (Ctrl+`` ` ``) turns the keyboard
   mapping on and off.
 
-Crate Decks picks the mapping for your keyboard layout when one ships with
+Decks picks the mapping for your keyboard layout when one ships with
 it: Czech, Danish, English (US), Finnish, French, German, Greek, Italian,
 Russian, Spanish, Swiss French and Swiss German. On other layouts it uses the
 US English mapping.
@@ -36,7 +36,7 @@ US English mapping.
 To change the keys, copy the mapping file of your layout from the
 `keyboard` folder of the installation to your
 [settings directory](user-manual.md#settings-directory) as
-`Custom.kbd.cfg`, and edit it while Crate Decks is not running. Each line is
+`Custom.kbd.cfg`, and edit it while Decks is not running. Each line is
 a [control](controllers.md#controls) and a key, under the control's group:
 
 ```text

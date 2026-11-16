@@ -18,20 +18,20 @@ sources:
 
 # Sound hardware
 
-**Preferences › Sound Hardware** sets which sound devices Crate Decks uses and
+**Preferences › Sound Hardware** sets which sound devices Decks uses and
 how. The first-start dialog only chooses the main output; everything else is
 here. Choose **Apply** to open the devices with the new settings.
 
 ## Sound API
 
-The sound API is the system layer Crate Decks uses to reach your sound
+The sound API is the system layer Decks uses to reach your sound
 cards. The list shows the APIs available on your system. Pick the one with
 the lowest latency that works with your device:
 
 - **Linux:** ALSA talks to the sound card directly and gives the lowest
-  latency, but takes the card for Crate Decks alone. JACK and PipeWire share
-  the card with other applications. When PipeWire is available, Crate Decks
-  offers **Use PipeWire API** (restart Crate Decks after changing it) and,
+  latency, but takes the card for Decks alone. JACK and PipeWire share
+  the card with other applications. When PipeWire is available, Decks
+  offers **Use PipeWire API** (restart Decks after changing it) and,
   with it, **Sync with external patchbay** and options to force PipeWire's
   buffer size and sample rate.
 - **Windows:** if the list offers ASIO and your sound card has an ASIO
@@ -47,7 +47,7 @@ connect one.
 
 ## Output and input devices
 
-The **Output** and **Input** tabs connect the parts of Crate Decks to the
+The **Output** and **Input** tabs connect the parts of Decks to the
 channels of your sound cards. Choose a device and channels for each one you
 use; leave the others empty.
 
@@ -73,7 +73,7 @@ Common setups:
   channels 3-4 of the same four-output sound card or controller.
 - **External mixer:** one Deck output per deck, each on its own stereo pair.
   Deck and bus outputs are post-fader and include effects and the crossfader
-  (for Auto DJ), so set all faders and EQ knobs in Crate Decks to their
+  (for Auto DJ), so set all faders and EQ knobs in Decks to their
   default position (right-click or double-click them), and mix on the
   external mixer.
 
@@ -121,7 +121,7 @@ button, or the `` ` `` key, turns the microphone on.
 ## Microphone latency compensation
 
 In **Direct monitor** mode, you hear your microphone directly while the
-music reaches you through Crate Decks with its latency. In the recording and
+music reaches you through Decks with its latency. In the recording and
 the broadcast, your voice would then be out of time with the music.
 
 **Microphone Latency Compensation** fixes this. Measure the round trip
@@ -142,7 +142,7 @@ audio buffer: measure again and enter the new value.
   application is using the device, or it was disconnected. Choose
   **Retry** after closing the other application or fixing the problem,
   **Reconfigure** to change the settings, or **Exit**.
-- **No output devices:** if Crate Decks finds no output when it starts, it
+- **No output devices:** if Decks finds no output when it starts, it
   asks whether to continue without sound or change the settings. The decks
   play nothing until there is an output.
 - **Pops, crackles or dropouts:** choose a larger **Audio Buffer**, and
