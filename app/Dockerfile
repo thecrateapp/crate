@@ -198,11 +198,17 @@ FROM python:3.13-slim AS beat-this-weights
 ARG BEAT_THIS_CHECKPOINT
 ARG BEAT_THIS_SHA256=6074be2c4d490c5f6101fcc374a1ec72ae93456e23bb6019783b849f5dc7d47b
 ARG BEAT_THIS_LICENSE_SHA256=909ab6549794a18e9bb243aacfadda4a5f308436fc2846f350755c53c4f06ae1
+# The JKU Nextcloud share serves the checkpoint on two WebDAV endpoints; the newer
+# dav/files one has answered 500 for days at a time, so both are tried. The pinned
+# SHA-256 below decides what is accepted, whichever endpoint answered.
+ARG BEAT_THIS_SHARE=7ik4RrBKTS273gp
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /beat-this
-RUN curl -fsSL --retry 5 -o "beat_this-${BEAT_THIS_CHECKPOINT}.ckpt" \
-        "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/${BEAT_THIS_CHECKPOINT}.ckpt" && \
+RUN { curl -fsSL --retry 3 -u "${BEAT_THIS_SHARE}:" -o "beat_this-${BEAT_THIS_CHECKPOINT}.ckpt" \
+        "https://cloud.cp.jku.at/public.php/webdav/${BEAT_THIS_CHECKPOINT}.ckpt" || \
+      curl -fsSL --retry 3 -o "beat_this-${BEAT_THIS_CHECKPOINT}.ckpt" \
+        "https://cloud.cp.jku.at/public.php/dav/files/${BEAT_THIS_SHARE}/${BEAT_THIS_CHECKPOINT}.ckpt"; } && \
     curl -fsSL --retry 5 -o beat_this.LICENSE \
         https://raw.githubusercontent.com/CPJKU/beat_this/v1.1.0/LICENSE && \
     echo "$BEAT_THIS_SHA256  beat_this-${BEAT_THIS_CHECKPOINT}.ckpt" | sha256sum -c - && \
