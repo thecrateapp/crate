@@ -1039,7 +1039,11 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
                 _record(
                     "worker.task.duration",
                     _time.monotonic() - _task_start,
-                    {"type": task_type, "status": "failed"},
+                    {
+                        "type": task_type,
+                        "status": "failed",
+                        "queue": get_queue_for_task(task_type),
+                    },
                 )
             except Exception:
                 log.debug("Metrics recording failed", exc_info=True)
@@ -1068,7 +1072,11 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
                 _record(
                     "worker.task.duration",
                     _time.monotonic() - _task_start,
-                    {"type": task_type, "status": "completed"},
+                    {
+                        "type": task_type,
+                        "status": "completed",
+                        "queue": get_queue_for_task(task_type),
+                    },
                 )
             except Exception:
                 log.debug("Metrics recording failed", exc_info=True)
@@ -1109,7 +1117,11 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
             _record(
                 "worker.task.duration",
                 _time.monotonic() - _task_start,
-                {"type": task_type, "status": "failed"},
+                {
+                    "type": task_type,
+                    "status": "failed",
+                    "queue": get_queue_for_task(task_type),
+                },
             )
         except Exception:
             log.debug("Metrics recording failed", exc_info=True)
@@ -1163,7 +1175,11 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
             _record(
                 "worker.task.duration",
                 _time.monotonic() - _task_start,
-                {"type": task_type, "status": "timeout"},
+                {
+                    "type": task_type,
+                    "status": "timeout",
+                    "queue": get_queue_for_task(task_type),
+                },
             )
         except Exception:
             log.debug("Metrics recording failed", exc_info=True)
