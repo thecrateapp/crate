@@ -1,0 +1,49 @@
+---
+import { BACKDROP } from "../data/backdrop";
+---
+
+<div class="backdrop" data-backdrop aria-hidden="true">
+  <video muted loop playsinline preload="none" tabindex="-1" poster={BACKDROP.poster}>
+    <source src={BACKDROP.webm} type='video/webm; codecs="av01.0.08M.10"' />
+    <source src={BACKDROP.mp4} type="video/mp4" />
+  </video>
+</div>
+
+<script>
+  import { mountOnPage } from "@crate-web/scripts/motion/page";
+  import { mountBackdrop } from "../scripts/backdrop";
+
+  mountOnPage("[data-backdrop]", () => mountBackdrop());
+</script>
+
+<style>
+  /* Fixed behind the whole page: the sections scroll over the loop. html paints
+     --bg and body is transparent, so z-index -1 sits between the two. */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.6;
+  }
+
+  /* A veil over the whole loop, deeper on the left where the copy sits, so text
+     stays legible in every section. */
+  .backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, var(--bg) 0%, transparent 70%),
+      color-mix(in srgb, var(--bg) 35%, transparent);
+    opacity: 0.85;
+  }
+</style>

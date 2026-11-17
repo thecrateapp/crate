@@ -1,11 +1,10 @@
 ---
+import CrateUI from "../components/CrateUI.astro";
 import Hero from "../components/Hero.astro";
 import Install from "../components/Install.astro";
-import Play from "../components/Play.astro";
-import ReloadCover from "../components/play/ReloadCover.astro";
-import PoweredByCrate from "../components/PoweredByCrate.astro";
 import SiteFooter from "../components/SiteFooter.astro";
-import Surfaces from "../components/Surfaces.astro";
+import Tour from "../components/Tour.astro";
+import WhatIsCrate from "../components/WhatIsCrate.astro";
 import Site from "../layouts/Site.astro";
 ---
 
@@ -14,10 +13,9 @@ import Site from "../layouts/Site.astro";
   description="An opinionated mod of Ryoku based on Crate's visual design."
 >
   <Hero />
-  <section id="cover" aria-label="The reload cover"><ReloadCover /></section>
-  <Surfaces />
-  <Play />
-  <PoweredByCrate />
+  <Tour />
+  <CrateUI />
+  <WhatIsCrate />
   <Install />
   <SiteFooter slot="after" />
 </Site>

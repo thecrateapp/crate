@@ -2,7 +2,8 @@
 import "@crate-web/styles/tokens.css";
 import "@crate-web/styles/base.css";
 import "../styles/site.css";
-import "../styles/crate-controls.css";
+import SiteNav from "@crate-web/components/nav/SiteNav.astro";
+import { NAV_LINKS } from "../data/nav";
 
 interface Props {
   title: string;
@@ -44,15 +45,21 @@ const url = new URL(path, Astro.site).href;
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
+    <SiteNav brand={{ href: "/", label: "Crate for Ryoku" }} links={NAV_LINKS} menu="Menu" close="Close" />
     <main id="main"><slot /></main>
     <slot name="after" />
   </body>
 </html>
 
 <script>
+  import { reducedMotion } from "@crate-web/scripts/motion/env";
   import { mountOnPage } from "@crate-web/scripts/motion/page";
   import { initReveals } from "@crate-web/scripts/motion/reveal";
   import { initSmoothScroll } from "@crate-web/scripts/motion/smooth-scroll";
+  import { initHoverScramble } from "../../../shared/web/scramble";
+
+  // The same link effect as cratemusic.app's bar.
+  mountOnPage("[data-hover-scramble]", () => initHoverScramble({ reducedMotion: reducedMotion() }));
 
   mountOnPage("[data-reveal]", () => {
     const stopReveals = initReveals();

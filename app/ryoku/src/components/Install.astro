@@ -1,29 +1,48 @@
 ---
 import {
   INSTALL_PACKAGES,
+  KEY_FINGERPRINT,
+  KEY_PATH,
   MIN_RYOKU,
   PACMAN_CONF,
+  RYOKU_FORK_URL,
+  RYOKU_REPO,
   SETUP,
+  STOCK_RYOKU,
   TARBALL_COMMAND,
   TARBALL_URL,
+  TRUST_KEY,
 } from "../data/install";
 import CodeLine from "./CodeLine.astro";
 ---
 
 <section id="install" class="section" aria-labelledby="install-title">
   <header class="head" data-reveal>
-    <p class="eyebrow"><b>Install</b> three steps</p>
+    <p class="eyebrow"><b>Install</b> four steps</p>
     <h2 id="install-title" class="display">Install Crate for Ryoku</h2>
   </header>
   <ol class="steps">
     <li data-reveal>
+      <h3>Trust the signing key</h3>
+      <p>
+        Crate signs every package and the repository database. Download <a class="u-link" href={KEY_PATH}>the
+        key</a>, check that it reads <code class="fpr">{KEY_FINGERPRINT}</code>, then add it to pacman and sign it
+        locally.
+      </p>
+      <CodeLine code={TRUST_KEY} label="the key commands" />
+    </li>
+    <li data-reveal>
       <h3>Add the repository</h3>
-      <p>Append it to <code>/etc/pacman.conf</code>.</p>
+      <p>
+        Put it in <code>/etc/pacman.conf</code> above the <code>[{RYOKU_REPO}]</code> block. It also ships Ryoku
+        itself, built from <a class="u-link" href={RYOKU_FORK_URL}>Crate's fork</a> with Crate's patches, and pacman
+        takes each package from the first repository that has it.
+      </p>
       <CodeLine code={PACMAN_CONF} label="the repository block" />
     </li>
     <li data-reveal>
       <h3>Install the packages</h3>
-      <p>The mod and the Crate desktop app.</p>
+      <p>The mod and the Crate desktop app. The same upgrade moves your Ryoku packages to Crate's builds.</p>
       <CodeLine code={INSTALL_PACKAGES} label="the install command" />
     </li>
     <li data-reveal>
@@ -34,8 +53,8 @@ import CodeLine from "./CodeLine.astro";
   </ol>
   <div class="other" data-reveal>
     <div>
-      <h3>Ryostore</h3>
-      <p>Once it is published: Bundles, then Crate for Ryoku. It installs the app, the package and the plugin, and sets them up.</p>
+      <h3>AUR</h3>
+      <p>Not yet. The packages go to the AUR once its registration reopens; until then this repository is the source.</p>
     </div>
     <div>
       <h3>Release tarball</h3>
@@ -45,18 +64,31 @@ import CodeLine from "./CodeLine.astro";
       </p>
     </div>
     <div>
+      <h3>Back to stock Ryoku</h3>
+      <p>
+        Delete the <code>[crate-for-ryoku]</code> block and run <code>{STOCK_RYOKU}</code>: pacman moves the Ryoku
+        packages back to Ryoku's own builds.
+      </p>
+    </div>
+    <div>
       <h3>Requirements</h3>
       <p>
-        Ryoku {MIN_RYOKU} or newer on Arch. The Crate desktop app needs a Crate server. A few style
-        details need Ryoku changes on their way upstream.
+        Ryoku {MIN_RYOKU} or newer on Arch. The Crate desktop app needs a Crate server. Without this repository,
+        a few style details need Crate's Ryoku patches.
       </p>
     </div>
   </div>
 </section>
 
 <style>
+  /* A link inside running text takes the text's size. */
+  .u-link {
+    font-size: inherit;
+  }
+
   .steps {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 36px;
     margin: 0 0 64px;
     padding: 0;
@@ -68,6 +100,8 @@ import CodeLine from "./CodeLine.astro";
   .steps li {
     counter-increment: step;
     display: grid;
+    /* a long command scrolls inside its block instead of widening the step */
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     min-width: 0;
   }
@@ -98,6 +132,11 @@ import CodeLine from "./CodeLine.astro";
     font-family: var(--mono);
     font-size: 0.9em;
     color: var(--fg);
+  }
+
+  /* forty hex digits wrap on a phone instead of widening the step */
+  .fpr {
+    overflow-wrap: anywhere;
   }
 
   .other {

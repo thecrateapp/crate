@@ -716,6 +716,48 @@ def test_ryoku_image_copies_every_app_web_file_the_ryoku_site_imports() -> None:
     } == set()
 
 
+def _ryoku_shared_copies() -> set[str]:
+    """app/shared files the ryoku-site image copies (the bar's hover scramble)."""
+    return {
+        source
+        for line in RYOKU_DOCKERFILE.read_text().splitlines()
+        if line.startswith("COPY ") and "--" not in line
+        for source in line.split()[1:-1]
+        if source.startswith("app/shared/")
+    }
+
+
+def _ryoku_shared_imports() -> set[str]:
+    """app/shared files that app/ryoku/src reaches by relative import."""
+    found = set()
+    for source in (ROOT / "app/ryoku/src").rglob("*"):
+        if not source.is_file() or source.suffix not in WEB_SOURCE_SUFFIXES:
+            continue
+        for reference in _web_references(source.read_text(errors="ignore")):
+            if not reference.startswith("../"):
+                continue
+            target = _resolve_web_file((source.parent / reference).resolve())
+            relative = str(target.relative_to(ROOT))
+            if relative.startswith("app/shared/"):
+                found.add(relative)
+    return found
+
+
+def test_ryoku_image_copies_every_shared_file_the_ryoku_site_imports() -> None:
+    imports = _ryoku_shared_imports()
+    assert imports, "app/ryoku no longer imports app/shared"
+    assert imports <= _ryoku_shared_copies()
+
+
+def test_ryoku_site_watches_exactly_the_shared_files_its_image_copies() -> None:
+    shared_patterns = {
+        pattern
+        for pattern in IMAGE_SPECS["ryoku-site"].patterns
+        if pattern.startswith("app/shared/")
+    }
+    assert shared_patterns == _ryoku_shared_copies()
+
+
 @pytest.mark.parametrize(
     "path",
     [

@@ -1,5 +1,10 @@
 # ryoku.cratemusic.app: Design
 
+> **2026-11-16:** the site is simplified to the hero copy, a screenshot showcase (the Crate
+> site's own `components/showcase/Showcase.astro`, fed from `media/shots/`), Powered by Crate,
+> Install and the footer. The screencast hero, the surface clips, the reload cover and the Play
+> section are gone until a take plays smoothly. The rest of this design is the original plan.
+
 Status: design agreed with Diego on 2026-11-14. Implementation plan to follow once this spec is
 approved.
 
@@ -9,8 +14,8 @@ A showcase site for **Crate for Ryoku** at `ryoku.cratemusic.app`. Its audience 
 (r/unixporn and Linux communities). The site's job is to make them install Crate for Ryoku, and in
 doing so bring them to Crate: the mod is the hook, Crate is the destination.
 
-Positioning line (final wording during implementation): *"An opinionated mod of Ryoku based on
-Crate's visual design"*, with a prominent link to `cratemusic.app`.
+Positioning line (final wording during implementation): _"An opinionated mod of Ryoku based on
+Crate's visual design"_, with a prominent link to `cratemusic.app`.
 
 The site is one more piece of the Crate universe (website, Listen, admin, the Ryoku mod): it follows
 the Crate website's aesthetic exactly. English only, like `cratemusic.app`.
