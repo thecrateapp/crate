@@ -282,6 +282,15 @@ class ErrorTrackingAccess(BaseModel):
     error_code: str | None = None
 
 
+class ErrorFactoryConnection(BaseModel):
+    """The `factory` executor's settings. Its token itself is never returned."""
+
+    base_url: str
+    # The factory GitHub App's login; Approve & merge accepts only its pull requests.
+    pr_author: str
+    has_token: bool
+
+
 class ErrorFixConnection(BaseModel):
     """Launch fix settings. The GitHub token itself is never returned."""
 
@@ -291,6 +300,7 @@ class ErrorFixConnection(BaseModel):
     executor: FixExecutorName = "github_actions"
     has_token: bool
     actions_url: str
+    factory: ErrorFactoryConnection | None = None
 
 
 class ErrorTriageSettings(BaseModel):
@@ -321,15 +331,30 @@ def _new_secret(value: SecretStr | None) -> str | None:
     return secret if secret.strip() else None
 
 
+class ErrorFactorySettingsUpdate(BaseModel):
+    """The `factory` executor. `token` is write-only; omitted, null or blank keeps it."""
+
+    base_url: str = Field(max_length=2048)
+    pr_author: str = Field(max_length=39)
+    token: SecretStr | None = Field(default=None, json_schema_extra={"writeOnly": True})
+
+    def settings(self) -> dict[str, object]:
+        return {"base_url": self.base_url, "pr_author": self.pr_author}
+
+
 class ErrorFixSettingsUpdate(BaseModel):
-    """Launch fix settings. `token` is write-only; omitted, null or blank keeps it."""
+    """Launch fix settings. `token` is write-only; omitted, null or blank keeps it.
+
+    `factory` omitted or null removes the factory settings and revokes its token.
+    """
 
     repository: str = Field(max_length=201)
     workflow: str = Field(max_length=105)
     ref: str | None = Field(default=None, max_length=100)
-    # Who works on the issue; only `github_actions` is available today.
+    # Who works on the issue: `github_actions` (the default) or `factory`.
     executor: FixExecutorName | None = None
     token: SecretStr | None = Field(default=None, json_schema_extra={"writeOnly": True})
+    factory: ErrorFactorySettingsUpdate | None = None
 
     def settings(self) -> dict[str, object]:
         return {
@@ -337,10 +362,14 @@ class ErrorFixSettingsUpdate(BaseModel):
             "workflow": self.workflow,
             "ref": self.ref,
             "executor": self.executor,
+            "factory": self.factory.settings() if self.factory else None,
         }
 
     def new_token(self) -> str | None:
         return _new_secret(self.token)
+
+    def new_factory_token(self) -> str | None:
+        return _new_secret(self.factory.token) if self.factory else None
 
 
 class ErrorTrackingConnectionUpdate(BaseModel):
@@ -419,6 +448,8 @@ class ErrorIssueStatusChange(BaseModel):
 
 __all__ = [
     "Digest",
+    "ErrorFactoryConnection",
+    "ErrorFactorySettingsUpdate",
     "ErrorFixConnection",
     "ErrorFixMergeRequest",
     "ErrorFixRequest",

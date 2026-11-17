@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 121
-verified: 2026-11-06
+verified: 2026-11-17
 sources:
   [
     app/crate/metrics.py,
@@ -29,6 +29,7 @@ sources:
     app/crate/error_inbox/sentry_client.py,
     app/crate/error_inbox/autofix.py,
     app/crate/error_inbox/github_client.py,
+    app/crate/error_inbox/factory_client.py,
     app/crate/worker_handlers/error_inbox.py,
     app/crate/error_inbox/evaluation.py,
     tools/error-inbox-eval/run_eval.py,
@@ -400,11 +401,13 @@ the evaluation sends and how it stays inside the AI lanes.
 ### Launch fix
 
 _Launch fix_ hands one issue to a fixer through the executor `fix.executor`
-names. Today that is `github_actions`, the autofix workflow of the Crate repository,
-`.github/workflows/error-autofix.yml`: an agent there tries to reproduce the error
-with a failing test, fixes it and opens a **draft** pull request with
-`Fixes <SHORT-ID>`. The Crate Software Factory is the next executor;
-[Error fix executors](error-fix-executors.md) is the contract every fixer follows.
+names. The default is `github_actions`, the autofix workflow of the Crate
+repository, `.github/workflows/error-autofix.yml`: an agent there tries to
+reproduce the error with a failing test, fixes it and opens a **draft** pull
+request with `Fixes <SHORT-ID>`. The other is `factory`, the Crate Software
+Factory, reached over the tailnet, which does the same behind two human gates of
+its own; [Error fix executors](error-fix-executors.md) is the contract every fixer
+follows and describes the factory's.
 Crate merges only when a person approves ([Reviewing a fix](#reviewing-a-fix)), and
 neither a model nor the triage can launch a fix: only a person can.
 
@@ -433,21 +436,31 @@ Sentry token and the issue digest never reach GitHub. The workflow does nothing
 unless the repository variable `AUTOFIX_ENABLED` is `true`, so a dispatch before
 then starts a run that ends at once.
 
+With the factory, step 3 sends the short id, the note and the sanitized bug
+payload to the factory's bug API instead (typed failures `FACTORY_AUTH`,
+`FACTORY_CONFLICT`, `FACTORY_VALIDATION`, ...), and the factory opens its pull
+request only after a person accepts the bug's spec and grants its publication.
+
 The **Launch fix** section of the connection drawer (`ops.runtime.manage`) holds
 the settings:
 
-- **Repository** (`owner/name`), **workflow** (the file name) and **branch** the
-  run starts from: `thecrateapp/crate`, `error-autofix.yml` and `main`.
+- **Fixer**: the GitHub Actions workflow or the Crate Software Factory.
+- **Repository** (`owner/name`), **workflow** (the file name, for the workflow
+  only) and **branch** the run starts from: `thecrateapp/crate`,
+  `error-autofix.yml` and `main`.
 - **GitHub token**: a fine-grained personal access token limited to that
   repository with Actions read and write to launch fixes, plus the read and write
   permissions that tracking and review need
   ([operations](operations.md#launch-fix-token)). Classic tokens (`ghp_`) are
   refused because they cannot be limited that way. It is stored encrypted like the
   Sentry token, never shown again and only replaced when a new one is typed.
-- **Turn off** removes the settings and deletes the stored GitHub token. The
-  button disappears from every issue.
+- For the factory, its **URL** (the bugs listener on the tailnet), the login of
+  its **GitHub App** (`<app>[bot]`), which opens its pull requests, and its
+  **token**, write-only like the others.
+- **Turn off** removes the settings and deletes the stored tokens. The button
+  disappears from every issue.
 
-The button only appears when the settings and a token are stored.
+The button only appears when the settings and the tokens they need are stored.
 
 ### Reviewing a fix
 
@@ -456,7 +469,8 @@ while Launch fix is configured and a run needs it. It finds the workflow run and
 then the pull request (branch `autofix/<short id>-<run id>`, label `autofix`,
 `Fixes <SHORT-ID>`), and records its state, whether it is a draft, whether GitHub
 can merge it and the combined state of its checks. A run without a pull request
-after 6 hours expires; a run that finished without one failed.
+expires after 6 hours with the workflow and after 48 hours with the factory, whose
+people may take that long; a run that finished without one failed.
 
 The **Fix** panel of the issue detail shows that state and, for `ops.errors.manage`:
 

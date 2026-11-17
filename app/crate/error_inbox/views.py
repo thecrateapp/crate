@@ -1,9 +1,9 @@
 """Read models of the error inbox for the admin API, System Health and MCP.
 
 Everything comes from PostgreSQL (`error_issues`, `error_fix_runs`, `settings`,
-`ops_runtime_state`): no function here calls Sentry, GitHub or a model (EI-D3). The
-Sentry and GitHub tokens never leave `credential_secrets`; these views only say
-whether one is stored.
+`ops_runtime_state`): no function here calls Sentry, GitHub, the factory or a model
+(EI-D3). The Sentry, GitHub and factory tokens never leave `credential_secrets`;
+these views only say whether one is stored.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from crate.error_inbox.config import (
     FixSettings,
     parse_config,
 )
-from crate.error_inbox.fix_runs import can_discard, merge_blockers
+from crate.error_inbox.fix_runs import PR_AUTHORS, can_discard, merge_blockers
 from crate.error_inbox.state import access_view, sync_view, write_access
 
 
@@ -90,6 +90,13 @@ def _fix_connection(fix: FixSettings | None) -> dict[str, Any] | None:
         "executor": fix.executor,
         "has_token": fix.has_token,
         "actions_url": fix.actions_url,
+        "factory": None
+        if fix.factory is None
+        else {
+            "base_url": fix.factory.base_url,
+            "pr_author": fix.factory.pr_author,
+            "has_token": fix.factory.has_token,
+        },
     }
 
 
@@ -160,9 +167,11 @@ def fix_view(
     }
 
 
-def fix_run_view(run: Mapping[str, Any]) -> dict[str, Any]:
+def fix_run_view(
+    run: Mapping[str, Any], pr_authors: Mapping[str, str] = PR_AUTHORS
+) -> dict[str, Any]:
     """`ErrorFixRun`: a fix run and what a person can do with it now."""
-    blockers = merge_blockers(run)
+    blockers = merge_blockers(run, pr_authors)
     return {
         **run,
         "review": {
@@ -180,7 +189,9 @@ def issue_detail(issue_id: str) -> dict[str, Any] | None:
     if issue is None:
         return None
     stored = stored_connection()
-    runs = [fix_run_view(run) for run in fix_runs_for_issue(issue["id"])]
+    fix = stored.config.fix if stored.config else None
+    pr_authors = fix.pr_authors if fix else PR_AUTHORS
+    runs = [fix_run_view(run, pr_authors) for run in fix_runs_for_issue(issue["id"])]
     return {
         **issue,
         "write_access": write_access(stored.config, stored.access_state)

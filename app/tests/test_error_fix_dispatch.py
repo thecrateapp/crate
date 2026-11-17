@@ -17,11 +17,16 @@ from sqlalchemy import text
 
 from tests.error_inbox_fakes import (
     DISPATCH_PATH,
+    FACTORY_FIXER,
+    FACTORY_SETTINGS,
+    FACTORY_TOKEN,
+    FACTORY_URL,
     GITHUB_TOKEN,
     ORGANIZATION,
     TOKEN,
     FakeGitHub,
     configure,
+    configure_factory,
     configure_fix,
     raw_issue,
 )
@@ -481,6 +486,7 @@ def test_put_connection_stores_fix_settings_and_a_write_only_token(api):
         "actions_url": (
             "https://github.com/thecrateapp/crate/actions/workflows/error-autofix.yml"
         ),
+        "factory": None,
     }
     bodies.append(saved.text)
     first_ref = load_config().fix.secret_ref
@@ -542,6 +548,80 @@ def test_put_connection_stores_fix_settings_and_a_write_only_token(api):
             text("SELECT value FROM settings WHERE key = 'error_tracking'")
         ).scalar_one()
     assert "github_pat_" not in stored
+
+
+def test_put_connection_stores_factory_settings_and_a_write_only_token(api):
+    from crate.credentials import CredentialSecretError, load_secret
+    from crate.error_inbox.config import load_config, load_factory_token
+
+    base = {"organization": ORGANIZATION, "token": TOKEN}
+    factory = {"base_url": FACTORY_URL, "pr_author": FACTORY_FIXER}
+    fix = {
+        "repository": "thecrateapp/crate",
+        "workflow": "error-autofix.yml",
+        "executor": "factory",
+        "token": GITHUB_TOKEN,
+    }
+
+    saved = api.put(
+        f"{BASE}/connection",
+        json={**base, "fix": {**fix, "factory": {**factory, "token": FACTORY_TOKEN}}},
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["fix"]["executor"] == "factory"
+    assert saved.json()["fix"]["factory"] == {**factory, "has_token": True}
+    assert load_factory_token(load_config()) == FACTORY_TOKEN
+    first_ref = load_config().fix.factory.secret_ref
+
+    # The factory's token is kept unless a new one is typed.
+    kept = api.put(
+        f"{BASE}/connection",
+        json={"organization": ORGANIZATION, "fix": {**fix, "factory": factory}},
+    )
+    assert kept.json()["fix"]["factory"]["has_token"] is True
+    assert load_config().fix.factory.secret_ref == first_ref
+
+    for invalid in (
+        {**fix, "factory": None},
+        {**fix, "factory": {**factory, "pr_author": "diego"}},
+        {**fix, "factory": {**factory, "base_url": "http://factory.example.com"}},
+    ):
+        rejected = api.put(f"{BASE}/connection", json={**base, "fix": invalid})
+        assert rejected.status_code == 422, invalid
+        assert _code(rejected) == "ERROR_TRACKING_INVALID"
+
+    # Back to the workflow without factory settings: the factory token is revoked.
+    back = api.put(
+        f"{BASE}/connection",
+        json={**base, "fix": {**fix, "executor": "github_actions"}},
+    )
+    assert back.status_code == 200
+    assert back.json()["fix"]["factory"] is None
+    with pytest.raises(CredentialSecretError):
+        load_secret(first_ref)
+
+    connection = api.get(f"{BASE}/connection").text
+    for body in (saved.text, kept.text, connection):
+        assert FACTORY_TOKEN not in body
+    with _scope() as session:
+        stored = session.execute(
+            text("SELECT value FROM settings WHERE key = 'error_tracking'")
+        ).scalar_one()
+    assert FACTORY_TOKEN not in stored
+
+
+def test_launch_fix_needs_the_factory_token(api):
+    configure_fix(executor="factory", factory=FACTORY_SETTINGS)
+    issue_id = _seed_issue()
+
+    refused = api.post(f"{BASE}/{issue_id}/fix", json={})
+    assert refused.status_code == 409
+    assert _code(refused) == "ERROR_FIX_NOT_CONFIGURED"
+    assert api.get(f"{BASE}/{issue_id}").json()["fix"] is None
+
+    configure_factory()
+    assert api.post(f"{BASE}/{issue_id}/fix", json={}).status_code == 202
+    assert api.get(f"{BASE}/{issue_id}").json()["fix"]["executor"] == "factory"
 
 
 def test_no_outbound_http_when_launching(api, monkeypatch):

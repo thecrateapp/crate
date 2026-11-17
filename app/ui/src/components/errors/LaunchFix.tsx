@@ -23,9 +23,10 @@ import {
 
 /**
  * Launch fix (E3): asks a worker to dispatch the autofix workflow for this
- * issue. The repository is public, so the confirmation says plainly that the
- * short id and the note will be visible there. The parent shows this only when
- * Launch fix is configured and the person has ops.errors.manage.
+ * issue, or to hand it to the Crate Software Factory. The repository is
+ * public, so the confirmation says plainly what will be visible there. The
+ * parent shows this only when Launch fix is configured and the person has
+ * ops.errors.manage.
  */
 export function LaunchFix({
   issue,
@@ -43,6 +44,7 @@ export function LaunchFix({
   const [pending, setPending] = useState(false);
   const inProgress = isOpenFix(issue.fix_runs?.[0]?.status);
   const blocked = !fix.supported || fix.available_at !== null || inProgress;
+  const usesFactory = fix.executor === "factory";
 
   /** Queues the dispatch; a refusal throws so the dialog stays open. */
   async function launch() {
@@ -65,13 +67,20 @@ export function LaunchFix({
       () => {
         setPending(false);
         toast.success(
-          `Fix launched for ${issue.short_id}. Follow the run on GitHub.`,
+          usesFactory
+            ? `Fix handed to the factory for ${issue.short_id}. Follow it here.`
+            : `Fix launched for ${issue.short_id}. Follow the run on GitHub.`,
         );
         onChanged();
       },
       (error) => {
         setPending(false);
-        toast.error(error || "GitHub did not start the workflow.");
+        toast.error(
+          error ||
+            (usesFactory
+              ? "The factory did not accept the fix."
+              : "GitHub did not start the workflow."),
+        );
         onChanged();
       },
     );
@@ -102,7 +111,9 @@ export function LaunchFix({
       </Button>
       <p role="status" className="text-sm text-text-muted">
         {pending
-          ? "Asking GitHub to start the workflow. This can take a few seconds."
+          ? usesFactory
+            ? "Handing the fix to the factory. This can take a few seconds."
+            : "Asking GitHub to start the workflow. This can take a few seconds."
           : !fix.supported
             ? "The autofix workflow only accepts Crate short ids such as CRATE-API-1F."
             : inProgress
@@ -118,20 +129,24 @@ export function LaunchFix({
         onConfirm={launch}
         onError={refused}
         title={`Launch a fix for ${issue.short_id}?`}
-        description={`Crate asks GitHub Actions to run ${fix.workflow} in ${fix.repository}. An agent tries to reproduce the error with a test and, if it can, opens a draft pull request for review. Crate follows it here; nothing is merged unless a person approves it.`}
+        description={
+          usesFactory
+            ? `Crate hands the issue to the Crate Software Factory for ${fix.repository}. Once a person accepts its spec, the factory reproduces the error with a test and fixes it, and a person grants it before it opens a draft pull request. Crate follows it here; nothing is merged unless a person approves it.`
+            : `Crate asks GitHub Actions to run ${fix.workflow} in ${fix.repository}. An agent tries to reproduce the error with a test and, if it can, opens a draft pull request for review. Crate follows it here; nothing is merged unless a person approves it.`
+        }
         body={
           <div className="grid gap-4">
             <p
               role="note"
               className="border-l-2 border-state-warning pl-3 text-sm text-state-warning-text"
             >
-              {fix.repository} is a public repository. The short id and your
-              note will be visible to anyone in the workflow run. Do not include
-              personal data, file paths or secrets.
+              {usesFactory
+                ? `${fix.repository} is a public repository. The factory keeps your note and the event summary to itself, but its pull request is public. Do not include personal data, file paths, links or secrets.`
+                : `${fix.repository} is a public repository. The short id and your note will be visible to anyone in the workflow run. Do not include personal data, file paths or secrets.`}
             </p>
             <FormField
               label="Note for the agent (optional)"
-              hint={`${note.length} of ${MAX_FIX_NOTE_LENGTH} characters. Public.`}
+              hint={`${note.length} of ${MAX_FIX_NOTE_LENGTH} characters. ${usesFactory ? "No links, e-mail or IP addresses." : "Public."}`}
             >
               <Textarea
                 rows={4}
@@ -161,7 +176,7 @@ export function FixRequestState({ issue }: { issue: ErrorIssueDetail }) {
       {issue.fix_requested_at
         ? `Fix requested by ${issue.fix_requested_by_name ?? "someone"} at ${clockText(issue.fix_requested_at)}.`
         : "No fix has been launched for this issue."}
-      {issue.fix ? (
+      {issue.fix && issue.fix.executor !== "factory" ? (
         <>
           {" "}
           <a

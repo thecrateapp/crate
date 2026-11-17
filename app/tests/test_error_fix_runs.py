@@ -27,7 +27,15 @@ from crate.error_inbox.fix_runs import (
     can_transition,
     merge_blockers,
 )
-from tests.error_inbox_fakes import FIXER, REPOSITORY, FakeGitHubRepo, sha_for
+from tests.error_inbox_fakes import (
+    FACTORY_FIXER,
+    FACTORY_URL,
+    FIXER,
+    REPOSITORY,
+    FakeFactory,
+    FakeGitHubRepo,
+    sha_for,
+)
 
 NOW = datetime(2026, 11, 8, 12, 0, tzinfo=timezone.utc)
 SHA = sha_for("head")
@@ -81,12 +89,23 @@ def test_the_state_machine():
 
 
 def test_expiry_windows():
-    run = {"status": RUNNING, "requested_at": NOW - timedelta(hours=5)}
+    run = {
+        "status": RUNNING,
+        "executor": "github_actions",
+        "requested_at": NOW - timedelta(hours=5),
+    }
     assert not fix_runs.expired(run, NOW)
     assert fix_runs.expired({**run, "requested_at": NOW - timedelta(hours=7)}, NOW)
     assert not fix_runs.expired(
         {"status": PR_OPEN, "requested_at": NOW - timedelta(days=3)}, NOW
     )
+    # The factory waits for a spec acceptance and a publication grant first.
+    factory = {**run, "executor": "factory", "requested_at": NOW - timedelta(hours=47)}
+    assert not fix_runs.expired(factory, NOW)
+    assert fix_runs.expired({**factory, "requested_at": NOW - timedelta(hours=49)}, NOW)
+    assert fix_runs.no_pr_expiry("github_actions") == timedelta(hours=6)
+    assert fix_runs.no_pr_expiry("factory") == timedelta(hours=48)
+    assert fix_runs.no_pr_expiry(None) == timedelta(hours=6)
     approved = {"merge_requested_at": NOW - timedelta(hours=2)}
     assert not fix_runs.approval_expired(approved, NOW)
     assert fix_runs.approval_expired(
@@ -155,6 +174,11 @@ def test_merge_blockers_accept_only_qualifying_pull_requests():
     assert merge_blockers(_run(pr_state="closed")) == ["PR_NOT_OPEN"]
     # An executor without a known GitHub account never qualifies.
     assert "PR_NOT_FROM_FIXER" in merge_blockers(_run(executor="factory"))
+    # The factory's account comes from its settings.
+    authors = {"github_actions": FIXER, "factory": FACTORY_FIXER}
+    factory_run = _run(executor="factory", pr_author=FACTORY_FIXER)
+    assert merge_blockers(factory_run, authors) == []
+    assert merge_blockers(_run(executor="factory"), authors) == ["PR_NOT_FROM_FIXER"]
 
 
 def test_discard_is_for_open_runs_only():
@@ -180,6 +204,8 @@ def test_bug_payload_carries_no_titles_links_or_raw_events():
         "status": "unresolved",
         "substatus": "regressed",
         "events_24h": 3,
+        "first_seen": datetime(2026, 10, 6, 15, 45, tzinfo=timezone.utc),
+        "last_seen": NOW,
         "first_release": "crate-aaa",
         "last_release": "crate-bbb",
         "digest": {
@@ -210,6 +236,8 @@ def test_bug_payload_carries_no_titles_links_or_raw_events():
 
     assert payload["version"] == 1
     assert payload["issue"]["short_id"] == "CRATE-API-1F"
+    assert payload["issue"]["first_seen"] == "2026-10-06T15:45:00+00:00"
+    assert payload["issue"]["last_seen"] == "2026-11-08T12:00:00+00:00"
     assert payload["releases"] == {"first": "crate-aaa", "last": "crate-bbb"}
     assert payload["digest"]["frames"][0]["index"] == 0
     assert payload["candidates"][0]["short_id"] == "CRATE-API-2"
@@ -474,17 +502,44 @@ def test_github_actions_executor_submits_only_the_short_id_and_note():
 
 
 def test_only_available_executors_are_built():
-    from crate.error_inbox.config import ErrorTrackingConfigError
-    from crate.error_inbox.executors import GitHubActionsExecutor, build_executor
+    from crate.error_inbox.config import ErrorTrackingConfigError, FactorySettings
+    from crate.error_inbox.executors import (
+        FactoryExecutor,
+        GitHubActionsExecutor,
+        build_executor,
+    )
 
     repo = FakeGitHubRepo()
-    with repo.factory("github_pat_test") as client:
+    factory = FakeFactory()
+    settings = FactorySettings(base_url=FACTORY_URL, pr_author=FACTORY_FIXER)
+    with (
+        repo.factory("github_pat_test") as client,
+        factory.factory(FACTORY_URL, "factory-token") as factory_client,
+    ):
         assert isinstance(
             build_executor(_fix_settings(), client), GitHubActionsExecutor
         )
+        built = build_executor(
+            _fix_settings(executor="factory", factory=settings), client, factory_client
+        )
+        assert isinstance(built, FactoryExecutor)
+        assert (built.name, built.pr_author, built.sends_payload) == (
+            "factory",
+            FACTORY_FIXER,
+            True,
+        )
+        # Without its settings or its token's client the factory is not built.
+        for fix, factory_arg in (
+            (_fix_settings(executor="factory", factory=settings), None),
+            (_fix_settings(executor="factory"), factory_client),
+        ):
+            with pytest.raises(ErrorTrackingConfigError) as missing:
+                build_executor(fix, client, factory_arg)
+            assert missing.value.code == "ERROR_FIX_NOT_CONFIGURED"
         with pytest.raises(ErrorTrackingConfigError) as unavailable:
-            build_executor(_fix_settings(executor="factory"), client)
+            build_executor(_fix_settings(executor="cron"), client)
     assert unavailable.value.code == "ERROR_FIX_EXECUTOR_UNAVAILABLE"
+    assert factory.requests == []
 
 
 def test_fix_executor_setting():
@@ -499,10 +554,33 @@ def test_fix_executor_setting():
     assert config.fix.executor == "github_actions"
     assert config.to_settings()["fix"]["executor"] == "github_actions"
     assert parse_config(config.to_settings()).fix == config.fix
-    for executor, message in (("factory", "not available"), ("cron", "must be one")):
+    for executor, message in (
+        ("factory", "needs fix.factory"),
+        ("cron", "must be one"),
+    ):
         with pytest.raises(ErrorTrackingConfigError) as refused:
             parse_config({**base, "fix": {**base["fix"], "executor": executor}})
         assert message in refused.value.message
+
+    factory = parse_config(
+        {
+            **base,
+            "fix": {
+                **base["fix"],
+                "executor": "factory",
+                "factory": {"base_url": FACTORY_URL, "pr_author": FACTORY_FIXER},
+            },
+        }
+    )
+    assert factory.fix is not None and factory.fix.factory is not None
+    assert factory.fix.executor == "factory"
+    assert factory.fix.factory.base_url == FACTORY_URL
+    assert factory.fix.pr_authors == {
+        "github_actions": FIXER,
+        "factory": FACTORY_FIXER,
+    }
+    assert parse_config(factory.to_settings()).fix == factory.fix
+    assert config.fix.pr_authors == {"github_actions": FIXER}
 
 
 def test_the_workflow_names_its_runs_after_the_short_id():

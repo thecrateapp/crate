@@ -11,7 +11,7 @@ contract for executors is `docs/technical/error-fix-executors.md`.
         │            │           └──────> cancelled  (Discard)
         ├────────────┴─────────> failed     (the executor failed or proposed nothing)
         ├────────────┴─────────> cancelled  (Discard before a pull request exists)
-        └────────────┴─────────> expired    (no pull request within NO_PR_EXPIRY)
+        └────────────┴─────────> expired    (no pull request within its NO_PR_EXPIRY)
 
 `requested` can also go straight to `pr_open` when the first look already finds the
 pull request. The terminal states never change again.
@@ -34,9 +34,7 @@ GITHUB_ACTIONS = "github_actions"
 FACTORY = "factory"
 EXECUTORS = (GITHUB_ACTIONS, FACTORY)
 DEFAULT_EXECUTOR = GITHUB_ACTIONS
-# Executors Crate can run today. `factory` is reserved for the Crate Software
-# Factory; the settings refuse it until its executor exists.
-AVAILABLE_EXECUTORS = frozenset({GITHUB_ACTIONS})
+AVAILABLE_EXECUTORS = frozenset({GITHUB_ACTIONS, FACTORY})
 
 REQUESTED = "requested"
 RUNNING = "running"
@@ -61,8 +59,10 @@ PR_STATES = ("open", "closed", "merged")
 CLEANUP_STATES = ("none", "pending", "done", "failed")
 
 # A run without a pull request this long after the request expires. The workflow
-# needs at most 40 minutes (30 for the agent, 10 to publish) plus the queue.
-NO_PR_EXPIRY = timedelta(hours=6)
+# needs at most 40 minutes (30 for the agent, 10 to publish) plus the queue. The
+# factory waits for two people first: one accepts the bug's spec, another grants
+# its publication.
+NO_PR_EXPIRY = {GITHUB_ACTIONS: timedelta(hours=6), FACTORY: timedelta(hours=48)}
 # An approval waits this long for the checks of the approved commit to pass.
 MERGE_APPROVAL_EXPIRY = timedelta(hours=3)
 # A branch Crate could not delete is retried for this long, then left alone.
@@ -72,7 +72,8 @@ CLEANUP_EXPIRY = timedelta(days=7)
 FIX_LABEL = "autofix"
 BRANCH_PREFIX = "autofix/"
 # The GitHub account each executor opens pull requests with. Approve & merge only
-# accepts pull requests from it.
+# accepts pull requests from it. The factory's comes from its settings
+# (`FixSettings.pr_authors`).
 PR_AUTHORS = {GITHUB_ACTIONS: "crate-error-autofix[bot]"}
 
 MAX_SUMMARY_LENGTH = 280
@@ -147,13 +148,17 @@ def sanitize_summary(value: Any) -> str | None:
     return text or None
 
 
+def no_pr_expiry(executor: Any) -> timedelta:
+    return NO_PR_EXPIRY.get(str(executor), NO_PR_EXPIRY[DEFAULT_EXECUTOR])
+
+
 def expired(run: Mapping[str, Any], now: datetime) -> bool:
-    """A run with no pull request yet, past its window."""
+    """A run with no pull request yet, past its executor's window."""
     requested_at = run.get("requested_at")
     return (
         run.get("status") in {REQUESTED, RUNNING}
         and isinstance(requested_at, datetime)
-        and now - requested_at > NO_PR_EXPIRY
+        and now - requested_at > no_pr_expiry(run.get("executor"))
     )
 
 
@@ -164,21 +169,24 @@ def approval_expired(run: Mapping[str, Any], now: datetime) -> bool:
     )
 
 
-def merge_blockers(run: Mapping[str, Any]) -> list[str]:
+def merge_blockers(
+    run: Mapping[str, Any], pr_authors: Mapping[str, str] = PR_AUTHORS
+) -> list[str]:
     """Why Approve & merge cannot start now; empty when it can.
 
-    Only an open pull request from the executor's GitHub account, with the
-    `autofix` label, on a branch named after the issue, that GitHub can merge. A
-    ready pull request needs its checks green; a draft is accepted unless a check
-    already failed, because its checks only run once it is ready for review (the
-    approval then waits for them, see `crate.worker_handlers.error_fixes`).
+    Only an open pull request from the executor's GitHub account (`pr_authors`),
+    with the `autofix` label, on a branch named after the issue, that GitHub can
+    merge. A ready pull request needs its checks green; a draft is accepted unless
+    a check already failed, because its checks only run once it is ready for
+    review (the approval then waits for them, see
+    `crate.worker_handlers.error_fixes`).
     """
     blockers: list[str] = []
     if run.get("status") != PR_OPEN:
         return [BLOCKER_NOT_OPEN]
     if run.get("pr_state") != "open":
         return [BLOCKER_PR_CLOSED]
-    author = PR_AUTHORS.get(str(run.get("executor")))
+    author = pr_authors.get(str(run.get("executor")))
     if author is None or run.get("pr_author") != author:
         blockers.append(BLOCKER_AUTHOR)
     if run.get("pr_labeled") is not True:
@@ -216,9 +224,13 @@ def bug_payload(triage_input: Mapping[str, Any]) -> dict[str, Any]:
     triage reads: the short id and counts, the sanitized digest, at most ten
     duplicate candidates reduced to their main exception and innermost frame, the
     releases and the latest triage of the current digest. Never the title, the
-    culprit, links, raw events or the person's identity.
+    culprit, links, raw events or the person's identity. It is JSON: timestamps are
+    ISO 8601 strings.
     """
-    issue = issue_view(triage_input)
+    issue = {
+        key: value.isoformat() if isinstance(value, datetime) else value
+        for key, value in issue_view(triage_input).items()
+    }
     digest = triage_input.get("digest")
     triage = triage_input.get("current_triage")
     return {
@@ -295,6 +307,7 @@ __all__ = [
     "is_fix_branch",
     "is_open",
     "merge_blockers",
+    "no_pr_expiry",
     "run_id_from_branch",
     "sanitize_summary",
     "valid_sha",

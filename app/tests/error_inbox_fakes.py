@@ -1,5 +1,5 @@
-"""A fake Sentry organisation and a fake GitHub behind `httpx.MockTransport` for the
-error inbox tasks.
+"""A fake Sentry organisation, a fake GitHub and a fake factory bug API behind
+`httpx.MockTransport` for the error inbox tasks.
 
 Nothing here reaches the network: the client factories always inject the transport.
 """
@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from collections.abc import Callable
 from typing import Any
 
 import httpx
 
+from crate.error_inbox.factory_client import FactoryClient
 from crate.error_inbox.github_client import GitHubClient
 from crate.error_inbox.sentry_client import SentryClient
 
@@ -271,7 +273,11 @@ def configure(**overrides: Any):
     return save_config(payload, sentry_token=TOKEN)
 
 
-def configure_fix(github_token: str | None = GITHUB_TOKEN, **fix: Any):
+def configure_fix(
+    github_token: str | None = GITHUB_TOKEN,
+    factory_token: str | None = None,
+    **fix: Any,
+):
     """Error tracking plus Launch fix, with a GitHub token unless told otherwise."""
     from crate.error_inbox.config import save_config
 
@@ -281,7 +287,22 @@ def configure_fix(github_token: str | None = GITHUB_TOKEN, **fix: Any):
         "environments": ["production"],
         "fix": {**FIX_SETTINGS, **fix},
     }
-    return save_config(payload, sentry_token=TOKEN, github_token=github_token)
+    return save_config(
+        payload,
+        sentry_token=TOKEN,
+        github_token=github_token,
+        factory_token=factory_token,
+    )
+
+
+def configure_factory(**fix: Any):
+    """Launch fix with the factory executor and both tokens."""
+    return configure_fix(
+        factory_token=FACTORY_TOKEN,
+        executor="factory",
+        factory=FACTORY_SETTINGS,
+        **fix,
+    )
 
 
 class FakeGitHub:
@@ -658,3 +679,128 @@ class FakeGitHubRepo:
                 }
             },
         )
+
+
+FACTORY_URL = "http://100.101.102.103:8788"
+FACTORY_TOKEN = "synthetic-factory-bugs-token"
+FACTORY_FIXER = "crate-factory[bot]"
+FACTORY_SETTINGS = {"base_url": FACTORY_URL, "pr_author": FACTORY_FIXER}
+_BUG = re.compile(r"^/v1/bugs/([^/]+)$")
+_BUG_CANCEL = re.compile(r"^/v1/bugs/([^/]+)/cancel$")
+_ENDED_BUG_STATES = frozenset(
+    {"rejected", "merged", "closed", "not_reproduced", "failed", "cancelled"}
+)
+
+
+class FakeFactory:
+    """The factory's bug API (`/v1/bugs`) behind `httpx.MockTransport`.
+
+    Submissions are idempotent on `Idempotency-Key`, as the factory's are. Records
+    every request and the URL and token each client was built with. With
+    `lose_submit_answer` a submission is stored and then its answer is lost, as
+    when the connection drops after the factory committed.
+    """
+
+    def __init__(self) -> None:
+        self.bugs: dict[str, dict[str, Any]] = {}
+        self.requests: list[httpx.Request] = []
+        self.clients: list[tuple[str, str]] = []
+        self.fail: Callable[[httpx.Request], httpx.Response | None] | None = None
+        self.lose_submit_answer = False
+
+    def factory(self, base_url: str, token: str) -> FactoryClient:
+        self.clients.append((base_url, token))
+        return FactoryClient(base_url, token, transport=httpx.MockTransport(self))
+
+    def bodies(self, method: str = "POST") -> list[dict[str, Any]]:
+        return [
+            json.loads(request.content)
+            for request in self.requests
+            if request.method == method and request.content
+        ]
+
+    def paths(self, method: str | None = None) -> list[str]:
+        return [
+            request.url.path
+            for request in self.requests
+            if method is None or request.method == method
+        ]
+
+    def only_bug(self) -> dict[str, Any]:
+        [bug] = self.bugs.values()
+        return bug
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        if self.fail is not None:
+            response = self.fail(request)
+            if response is not None:
+                return response
+        path, method = request.url.path, request.method
+        if path == "/v1/bugs" and method == "POST":
+            response = self._submit(request)
+            if self.lose_submit_answer:
+                raise httpx.ReadTimeout("the answer was lost", request=request)
+            return response
+        if path == "/v1/bugs" and method == "GET":
+            params = request.url.params
+            bugs = [
+                bug
+                for bug in reversed(list(self.bugs.values()))
+                if bug["short_id"] == params.get("short_id", bug["short_id"])
+                and bug["repository"] == params.get("repository", bug["repository"])
+            ]
+            return httpx.Response(200, json={"request_id": "r", "data": bugs})
+        if (match := _BUG.match(path)) and method == "GET":
+            bug = self.bugs.get(match.group(1))
+            return self._data(bug) if bug else self._missing()
+        if (match := _BUG_CANCEL.match(path)) and method == "POST":
+            bug = self.bugs.get(match.group(1))
+            if bug is None:
+                return self._missing()
+            if bug["state"] in _ENDED_BUG_STATES:
+                return httpx.Response(
+                    409, json={"code": "INVALID_STATE", "message": "already ended"}
+                )
+            bug["state"] = "cancelled"
+            return self._data(bug)
+        return self._missing()
+
+    def _submit(self, request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        key = request.headers.get("idempotency-key")
+        if key is None:
+            return httpx.Response(428, json={"code": "IDEMPOTENCY_KEY_REQUIRED"})
+        if key != body["run_id"]:
+            return httpx.Response(422, json={"code": "INVALID_SCHEMA"})
+        for bug in self.bugs.values():
+            if bug["external_run_id"] == key:
+                return self._data(bug, replayed=True)
+        bug_id = str(uuid.uuid4())
+        self.bugs[bug_id] = {
+            "id": bug_id,
+            "repository": body["repository"],
+            "short_id": body["short_id"],
+            "external_run_id": key,
+            "state": "received",
+            "run_id": None,
+            "spec_id": str(uuid.uuid4()),
+            "branch": None,
+            "pr_number": None,
+            "pr_url": None,
+            "summary": None,
+            "created_at": "2026-11-17T10:00:00.000Z",
+            "updated_at": "2026-11-17T10:00:00.000Z",
+        }
+        return self._data(self.bugs[bug_id], status=201, replayed=False)
+
+    def _data(
+        self, bug: dict[str, Any], *, status: int = 200, replayed: bool | None = None
+    ) -> httpx.Response:
+        body: dict[str, Any] = {"request_id": str(uuid.uuid4()), "data": bug}
+        if replayed is not None:
+            body["replayed"] = replayed
+        return httpx.Response(status, json=body)
+
+    def _missing(self) -> httpx.Response:
+        return httpx.Response(404, json={"code": "NOT_FOUND", "message": "no bug"})

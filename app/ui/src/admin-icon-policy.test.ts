@@ -732,6 +732,11 @@ const approvedLibraryControls = new Map<string, number>([
     "app/ui/src/components/errors/ConnectionPanel.tsx:./FixSettingsForm:FixSettingsForm",
     1,
   ],
+  // The fixer is a categorical field: the shared Select (T12, factory executor).
+  [
+    "app/ui/src/components/errors/FixSettingsForm.tsx:@/components/ui/AdminSelect:AdminSelect",
+    1,
+  ],
   // The shared confirmation: close control and busy glyph are its own.
   [
     "app/ui/src/components/errors/LaunchFix.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",

@@ -8,8 +8,13 @@ and the client re-checks every resolved address before it connects.
 `fix` configures Launch fix (E3): the executor that works on the issue
 (`fix.executor`, `github_actions` by default; see `crate.error_inbox.executors`),
 the GitHub repository, workflow file and ref it dispatches, and a fine-grained
-GitHub token stored like the Sentry one. Both tokens live in `credential_secrets`;
-`settings` only keeps refs.
+GitHub token stored like the Sentry one. `fix.factory` configures the `factory`
+executor: the URL of the Crate Software Factory's bugs API, the GitHub login of
+the factory's App, which opens its pull requests, and the factory's bugs token.
+Every token lives in `credential_secrets`; `settings` only keeps refs.
+
+Plain HTTP to the factory is accepted only on the tailnet (a Tailscale address or
+a `*.ts.net` name), where WireGuard carries the token.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ from crate.ai.contracts import AIConfigurationError
 from crate.ai.discovery import _METADATA_HOSTS, _check_address
 from crate.credentials import CredentialSecretError, load_secret
 from crate.db.repositories.error_tracking_settings import (
+    FACTORY_TOKEN_SCOPE,
     GITHUB_TOKEN_SCOPE,
     SENTRY_TOKEN_SCOPE,
     read_error_tracking_settings,
@@ -34,6 +40,8 @@ from crate.error_inbox.fix_runs import (
     AVAILABLE_EXECUTORS,
     DEFAULT_EXECUTOR,
     EXECUTORS,
+    FACTORY,
+    PR_AUTHORS,
 )
 
 SENTRY_CLOUD_HOSTS = frozenset({"sentry.io", "us.sentry.io", "de.sentry.io"})
@@ -52,6 +60,13 @@ _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 _WORKFLOW = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,99}\.ya?ml$")
 _REF = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]{0,99}$")
 _HOSTNAME = re.compile(r"^[a-z0-9.-]+$")
+# A GitHub App's bot account: `<app slug>[bot]`.
+_APP_LOGIN = re.compile(r"^[a-z0-9][a-z0-9-]{0,33}\[bot\]$")
+_TAILNET_NETWORKS = (
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("fd7a:115c:a1e0::/48"),
+)
+_TAILNET_DOMAIN = ".ts.net"
 
 
 class ErrorTrackingConfigError(ValueError):
@@ -72,16 +87,46 @@ class TriageSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class FactorySettings:
+    """The `factory` executor: where its bugs API is and who opens its PRs."""
+
+    base_url: str
+    pr_author: str
+    secret_ref: str | None = None
+
+    @property
+    def has_token(self) -> bool:
+        return bool(self.secret_ref)
+
+
+@dataclass(frozen=True, slots=True)
 class FixSettings:
     repository: str
     workflow: str
     ref: str = "main"
     secret_ref: str | None = None
     executor: str = DEFAULT_EXECUTOR
+    factory: FactorySettings | None = None
 
     @property
     def has_token(self) -> bool:
         return bool(self.secret_ref)
+
+    @property
+    def ready(self) -> bool:
+        """The GitHub token, and the factory's when the factory works on the fixes."""
+        if not self.has_token:
+            return False
+        return self.executor != FACTORY or (
+            self.factory is not None and self.factory.has_token
+        )
+
+    @property
+    def pr_authors(self) -> dict[str, str]:
+        """The GitHub login each executor opens pull requests with."""
+        if self.factory is None:
+            return dict(PR_AUTHORS)
+        return {**PR_AUTHORS, FACTORY: self.factory.pr_author}
 
     @property
     def actions_url(self) -> str:
@@ -110,8 +155,8 @@ class ErrorTrackingConfig:
 
     @property
     def fix_ready(self) -> bool:
-        """Launch fix is configured: repository, workflow and a stored GitHub token."""
-        return self.fix is not None and self.fix.has_token
+        """Launch fix is configured: repository, workflow and the tokens it needs."""
+        return self.fix is not None and self.fix.ready
 
     def to_settings(self) -> dict[str, Any]:
         return {
@@ -133,6 +178,13 @@ class ErrorTrackingConfig:
                 "ref": self.fix.ref,
                 "secret_ref": self.fix.secret_ref,
                 "executor": self.fix.executor,
+                "factory": None
+                if self.fix.factory is None
+                else {
+                    "base_url": self.fix.factory.base_url,
+                    "pr_author": self.fix.factory.pr_author,
+                    "secret_ref": self.fix.factory.secret_ref,
+                },
             },
         }
 
@@ -192,6 +244,67 @@ def validate_base_url(raw: Any) -> str:
     return f"https://{host}" + (f":{port}" if port is not None else "")
 
 
+def _is_tailnet(hostname: str, address: Any) -> bool:
+    if address is not None:
+        return any(
+            address.version == network.version and address in network
+            for network in _TAILNET_NETWORKS
+        )
+    return hostname.endswith(_TAILNET_DOMAIN)
+
+
+def validate_factory_url(raw: Any) -> str:
+    """The factory's bugs API as a bare origin; HTTP only on the tailnet."""
+    if (
+        not isinstance(raw, str)
+        or not raw
+        or len(raw) > 2048
+        or any(ord(char) <= 32 for char in raw)
+        or "\\" in raw
+        or "%" in raw
+    ):
+        raise _invalid("Invalid factory URL")
+    try:
+        parsed = urlsplit(raw)
+        port = parsed.port
+        hostname = (
+            (parsed.hostname or "").rstrip(".").encode("idna").decode("ascii").lower()
+        )
+    except (ValueError, UnicodeError):
+        raise _invalid("Invalid factory URL") from None
+    if parsed.scheme not in {"http", "https"}:
+        raise _invalid("The factory URL must use HTTP or HTTPS")
+    if (
+        not hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+    ):
+        raise _invalid("The factory URL must be a bare origin")
+    if hostname in _METADATA_HOSTS or hostname.endswith(".metadata.google.internal"):
+        raise _invalid("Metadata endpoints are not allowed")
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        address = None
+    if address is not None:
+        try:
+            _check_address(str(address))
+        except (AIConfigurationError, ValueError):
+            raise _invalid("The factory address is not allowed") from None
+    elif not _HOSTNAME.match(hostname):
+        raise _invalid("Invalid factory hostname")
+    if parsed.scheme == "http" and not _is_tailnet(hostname, address):
+        raise _invalid(
+            "Plain HTTP is only accepted on the tailnet (a Tailscale address or a "
+            f"*{_TAILNET_DOMAIN} name); use HTTPS"
+        )
+    host = f"[{hostname}]" if ":" in hostname else hostname
+    return f"{parsed.scheme}://{host}" + (f":{port}" if port is not None else "")
+
+
 def _flag(value: Any, default: bool, name: str) -> bool:
     if value is None:
         return default
@@ -238,6 +351,23 @@ def _optional_ref(value: Any) -> str | None:
     return value
 
 
+def _factory(value: Any) -> FactorySettings | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise _invalid("fix.factory must be an object")
+    pr_author = value.get("pr_author")
+    if not isinstance(pr_author, str) or not _APP_LOGIN.match(pr_author):
+        raise _invalid(
+            "fix.factory.pr_author must be the factory GitHub App's login (<app>[bot])"
+        )
+    return FactorySettings(
+        base_url=validate_factory_url(value.get("base_url")),
+        pr_author=pr_author,
+        secret_ref=_optional_ref(value.get("secret_ref")),
+    )
+
+
 def _fix(value: Any) -> FixSettings | None:
     if value is None:
         return None
@@ -261,12 +391,16 @@ def _fix(value: Any) -> FixSettings | None:
         raise _invalid(f"fix.executor must be one of {', '.join(EXECUTORS)}")
     if executor not in AVAILABLE_EXECUTORS:
         raise _invalid(f"The {executor} executor is not available yet")
+    factory = _factory(value.get("factory"))
+    if executor == FACTORY and factory is None:
+        raise _invalid("The factory executor needs fix.factory")
     return FixSettings(
         repository=repository,
         workflow=workflow,
         ref=ref,
         secret_ref=_optional_ref(value.get("secret_ref")),
         executor=executor,
+        factory=factory,
     )
 
 
@@ -335,29 +469,44 @@ def _validated_github_token(token: Any) -> str:
     return token
 
 
+def _validated_factory_token(token: Any) -> str:
+    if not _token_shape_ok(token):
+        raise _invalid("Invalid factory token")
+    return token
+
+
 def save_config(
     payload: Mapping[str, Any],
     *,
     sentry_token: str | None = None,
     github_token: str | None = None,
+    factory_token: str | None = None,
     session=None,
 ) -> ErrorTrackingConfig:
     """Validate and store settings. Secret refs in the payload are ignored.
 
-    Without `fix` the stored GitHub token is revoked: turning Launch fix off leaves
-    no credential behind.
+    Without `fix` the stored GitHub and factory tokens are revoked, and without
+    `fix.factory` the factory token: turning Launch fix off leaves no credential
+    behind.
     """
     if sentry_token is not None:
         sentry_token = _validated_token(sentry_token)
     if github_token is not None:
         github_token = _validated_github_token(github_token)
+    if factory_token is not None:
+        factory_token = _validated_factory_token(factory_token)
     candidate = parse_config({**payload, "secret_ref": None})
     if github_token is not None and candidate.fix is None:
         raise _invalid("A GitHub token needs the fix repository and workflow")
+    if factory_token is not None and (
+        candidate.fix is None or candidate.fix.factory is None
+    ):
+        raise _invalid("A factory token needs the factory settings")
     stored = save_error_tracking_settings(
         candidate.to_settings(),
         sentry_token=sentry_token,
         github_token=github_token,
+        factory_token=factory_token,
         session=session,
     )
     return parse_config(stored)
@@ -406,6 +555,29 @@ def load_github_token(config: ErrorTrackingConfig, *, session=None) -> str:
     return token
 
 
+def load_factory_token(config: ErrorTrackingConfig, *, session=None) -> str:
+    """The factory's bugs token; only the error fix tasks read it."""
+    factory = config.fix.factory if config.fix is not None else None
+    if factory is None or not factory.secret_ref:
+        raise ErrorTrackingConfigError(
+            "ERROR_FIX_NOT_CONFIGURED", "The factory executor is not configured"
+        )
+    try:
+        payload = load_secret(
+            factory.secret_ref, scope=FACTORY_TOKEN_SCOPE, session=session
+        )
+    except CredentialSecretError:
+        raise ErrorTrackingConfigError(
+            "ERROR_FIX_TOKEN_UNAVAILABLE", "The factory token cannot be read"
+        ) from None
+    token = payload.get("token")
+    if not isinstance(token, str) or not token:
+        raise ErrorTrackingConfigError(
+            "ERROR_FIX_TOKEN_UNAVAILABLE", "The factory token cannot be read"
+        )
+    return token
+
+
 __all__ = [
     "DEFAULT_BASE_URL",
     "GITHUB_TOKEN_PREFIX",
@@ -413,13 +585,16 @@ __all__ = [
     "SENTRY_CLOUD_HOSTS",
     "ErrorTrackingConfig",
     "ErrorTrackingConfigError",
+    "FactorySettings",
     "FixSettings",
     "TriageSettings",
     "check_resolved_address",
     "load_config",
+    "load_factory_token",
     "load_github_token",
     "load_sentry_token",
     "parse_config",
     "save_config",
     "validate_base_url",
+    "validate_factory_url",
 ]
