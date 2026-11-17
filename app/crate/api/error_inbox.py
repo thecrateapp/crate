@@ -63,7 +63,7 @@ from crate.db.repositories.tasks import (
 )
 from crate.error_inbox import views
 from crate.error_inbox.autofix import next_request_at, supports_short_id
-from crate.error_inbox.config import ErrorTrackingConfigError, save_config
+from crate.error_inbox.config import ErrorTrackingConfigError, FixSettings, save_config
 from crate.error_inbox.fix_runs import can_discard, is_open, merge_blockers
 from crate.error_inbox.state import record_access, write_access
 
@@ -278,15 +278,18 @@ def put_connection(request: Request, body: ErrorTrackingConnectionUpdate):
     if body.triage is not None:
         preserved["triage"] = body.triage.model_dump()
     github_token = None
+    factory_token = None
     if body.updates_fix:
         preserved["fix"] = body.fix.settings() if body.fix else None
         github_token = body.fix.new_token() if body.fix else None
+        factory_token = body.fix.new_factory_token() if body.fix else None
     token = body.new_token()
     try:
         saved = save_config(
             {**preserved, **body.settings()},
             sentry_token=token,
             github_token=github_token,
+            factory_token=factory_token,
         )
     except ErrorTrackingConfigError as error:
         _fail(422, "ERROR_TRACKING_INVALID", error.message)
@@ -460,7 +463,7 @@ def _canonical_id(value: str) -> str | None:
         return None
 
 
-def _fix_run(issue_id: str, run_id: str) -> dict:
+def _fix_run(issue_id: str, run_id: str) -> tuple[dict, FixSettings]:
     """The run, which must belong to the issue, and a usable Launch fix setup."""
     run = get_fix_run(run_id)
     if run is None or run["issue_id"] != _canonical_id(issue_id):
@@ -468,9 +471,9 @@ def _fix_run(issue_id: str, run_id: str) -> dict:
             _fail(404, "ERROR_ISSUE_NOT_FOUND", "Error issue not found")
         _fail(404, "ERROR_FIX_RUN_NOT_FOUND", "Fix run not found")
     config = views.stored_connection().config
-    if config is None or not config.fix_ready:
+    if config is None or config.fix is None or not config.fix_ready:
         _fail(409, "ERROR_FIX_NOT_CONFIGURED", "Launch fix is not configured")
-    return run
+    return run, config.fix
 
 
 @router.post(
@@ -490,14 +493,14 @@ def approve_fix(
     request: Request, issue_id: str, run_id: str, body: ErrorFixMergeRequest
 ):
     actor = require_permission(request, MANAGE)
-    run = _fix_run(issue_id, run_id)
+    run, fix = _fix_run(issue_id, run_id)
     if run.get("pr_head_sha") != body.head_sha:
         _fail(
             409,
             "ERROR_FIX_HEAD_CHANGED",
             "The pull request changed since this page loaded; review it again",
         )
-    blockers = merge_blockers(run)
+    blockers = merge_blockers(run, fix.pr_authors)
     if blockers:
         _fail(
             409,
@@ -522,7 +525,7 @@ def approve_fix(
 )
 def discard_fix(request: Request, issue_id: str, run_id: str):
     actor = require_permission(request, MANAGE)
-    run = _fix_run(issue_id, run_id)
+    run, _ = _fix_run(issue_id, run_id)
     if not can_discard(run):
         _fail(409, "ERROR_FIX_RUN_CLOSED", "This fix has already ended")
     actor_id = int(actor["id"])

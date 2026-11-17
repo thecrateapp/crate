@@ -9,6 +9,7 @@ import pytest
 from crate.error_inbox.config import (
     ErrorTrackingConfigError,
     load_config,
+    load_factory_token,
     load_github_token,
     load_sentry_token,
     parse_config,
@@ -285,3 +286,88 @@ def test_load_github_token_without_fix_is_typed():
         with pytest.raises(ErrorTrackingConfigError) as caught:
             load_github_token(config)
         assert caught.value.code == "ERROR_FIX_NOT_CONFIGURED"
+
+
+FACTORY = {"base_url": "http://100.101.102.103:8788", "pr_author": "crate-factory[bot]"}
+FACTORY_TOKEN = "synthetic-factory-bugs-token"
+
+
+def test_factory_token_is_stored_encrypted_rotated_and_revoked(pg_db):
+    from crate.credentials import CredentialSecretError, load_secret
+
+    fix = {**FIX, "executor": "factory", "factory": {**FACTORY, "secret_ref": "x"}}
+    first = save_config(
+        {"organization": "ninja-development", "fix": fix},
+        github_token=GITHUB_TOKEN,
+        factory_token=FACTORY_TOKEN,
+    )
+
+    assert first.fix is not None and first.fix.factory is not None
+    assert first.fix_ready is True
+    factory_ref = first.fix.factory.secret_ref
+    assert factory_ref not in {None, "x", first.fix.secret_ref}
+    assert FACTORY_TOKEN not in json.dumps(_stored_settings())
+    assert load_factory_token(first) == FACTORY_TOKEN
+    assert load_github_token(first) == GITHUB_TOKEN
+
+    kept = save_config({"organization": "ninja-development", "fix": fix})
+    assert kept.fix is not None and kept.fix.factory is not None
+    assert kept.fix.factory.secret_ref == factory_ref
+
+    rotated = save_config(
+        {"organization": "ninja-development", "fix": fix}, factory_token="two"
+    )
+    assert load_factory_token(rotated) == "two"
+    with pytest.raises(CredentialSecretError):
+        load_secret(factory_ref)
+
+    # Without the factory settings its token goes; the GitHub token stays.
+    assert rotated.fix is not None and rotated.fix.factory is not None
+    rotated_ref = rotated.fix.factory.secret_ref
+    without = save_config({"organization": "ninja-development", "fix": FIX})
+    assert without.fix is not None and without.fix.factory is None
+    with pytest.raises(CredentialSecretError):
+        load_secret(rotated_ref)
+    assert load_github_token(without) == GITHUB_TOKEN
+
+    # Turning Launch fix off revokes both.
+    again = save_config(
+        {"organization": "ninja-development", "fix": fix}, factory_token="three"
+    )
+    assert again.fix is not None and again.fix.factory is not None
+    save_config({"organization": "ninja-development"})
+    for ref in (again.fix.secret_ref, again.fix.factory.secret_ref):
+        with pytest.raises(CredentialSecretError):
+            load_secret(ref)
+
+
+def test_the_factory_executor_is_not_ready_without_its_token(pg_db):
+    config = save_config(
+        {
+            "organization": "ninja-development",
+            "fix": {**FIX, "executor": "factory", "factory": FACTORY},
+        },
+        github_token=GITHUB_TOKEN,
+    )
+    assert config.fix is not None and config.fix_ready is False
+    with pytest.raises(ErrorTrackingConfigError) as caught:
+        load_factory_token(config)
+    assert caught.value.code == "ERROR_FIX_NOT_CONFIGURED"
+
+
+@pytest.mark.parametrize(
+    "fix,token,message",
+    [
+        (FIX, FACTORY_TOKEN, "needs the factory settings"),
+        ({**FIX, "factory": FACTORY}, "with space", "Invalid factory token"),
+        ({**FIX, "factory": FACTORY}, "", "Invalid factory token"),
+    ],
+)
+def test_factory_token_needs_its_settings(pg_db, fix, token, message):
+    with pytest.raises(ErrorTrackingConfigError) as caught:
+        save_config(
+            {"organization": "ninja-development", "fix": fix}, factory_token=token
+        )
+    assert message in caught.value.message
+    assert token not in caught.value.message or not token
+    assert load_config() is None

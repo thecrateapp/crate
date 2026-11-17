@@ -1880,6 +1880,12 @@ def test_openapi_types_error_inbox_routes_and_marks_them_authenticated(test_app)
         "token"
         not in schema["components"]["schemas"]["ErrorFixConnection"]["properties"]
     )
+    factory_put = schema["components"]["schemas"]["ErrorFactorySettingsUpdate"]
+    assert factory_put["properties"]["token"]["writeOnly"] is True
+    assert (
+        "token"
+        not in schema["components"]["schemas"]["ErrorFactoryConnection"]["properties"]
+    )
     launch = schema["components"]["schemas"]["ErrorFixRequest"]
     assert launch["properties"]["note"]["maxLength"] == 500
     approve = schema["components"]["schemas"]["ErrorFixMergeRequest"]

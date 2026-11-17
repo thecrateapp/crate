@@ -12,9 +12,9 @@ the `FixExecutor` protocol:
 
 The pull request itself is followed and reviewed by Crate
 (`crate.error_inbox.pull_requests`), whatever executor opened it. `fix.executor`
-selects the executor; `github_actions` is the only one today. `factory`, the Crate
-Software Factory, is the next one: `docs/technical/error-fix-executors.md` is the
-contract it implements.
+selects the executor: `github_actions` (the autofix workflow, the default) or
+`factory` (the Crate Software Factory's bug API). The contract both implement is
+`docs/technical/error-fix-executors.md`.
 
 Executors run inside worker tasks only, never in an HTTP request.
 """
@@ -28,7 +28,9 @@ from typing import Any, Literal, Protocol
 
 from crate.error_inbox.autofix import workflow_inputs
 from crate.error_inbox.config import ErrorTrackingConfigError, FixSettings
+from crate.error_inbox.factory_client import FactoryAPIError, FactoryClient
 from crate.error_inbox.fix_runs import (
+    FACTORY,
     GITHUB_ACTIONS,
     PR_AUTHORS,
     fix_branch,
@@ -48,6 +50,25 @@ CLOCK_SKEW = timedelta(minutes=2)
 _ACTIVE_RUN_STATUSES = frozenset(
     {"queued", "in_progress", "waiting", "requested", "pending"}
 )
+# A factory bug's state (`BUG_STATES` in the factory's contract) as a run state.
+# Before a run starts a person has to accept the bug's spec; while it runs it may
+# wait for a decision or for a person to grant its publication.
+FACTORY_STATES: dict[str, ExecutorState] = {
+    "received": "queued",
+    "accepted": "queued",
+    "reproducing": "running",
+    "fixing": "running",
+    "checking": "running",
+    "needs_decision": "running",
+    "awaiting_publication": "running",
+    "awaiting_review": "succeeded",
+    "merged": "succeeded",
+    "rejected": "failed",
+    "not_reproduced": "failed",
+    "failed": "failed",
+    "cancelled": "cancelled",
+    "closed": "cancelled",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,10 +248,97 @@ class GitHubActionsExecutor:
         return self._client.cancel_workflow_run(self._fix.repository, int(run_id))
 
 
-def build_executor(fix: FixSettings, client: GitHubClient) -> FixExecutor:
-    """The executor `fix.executor` names, with a client holding the fix token."""
+def _positive(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return None
+    return value
+
+
+class FactoryExecutor:
+    """The Crate Software Factory, through its bug API (`/v1/bugs`).
+
+    `submit` sends the bug with its payload; the factory answers with its bug id,
+    kept as the run's external id. The factory names the pull request's branch
+    after its own run, so Crate reads the pull request number from the bug.
+    """
+
+    name = FACTORY
+    pr_author: str
+    sends_payload = True
+
+    def __init__(self, fix: FixSettings, client: FactoryClient) -> None:
+        if fix.factory is None:
+            raise ErrorTrackingConfigError(
+                "ERROR_FIX_NOT_CONFIGURED", "The factory executor is not configured"
+            )
+        self.pr_author = fix.factory.pr_author
+        self._client = client
+
+    def submit(self, bug: FixBug) -> Submission:
+        if bug.payload is None:
+            raise ErrorTrackingConfigError(
+                "ERROR_FIX_PAYLOAD_UNAVAILABLE",
+                "The issue has no payload to send to the factory",
+            )
+        created = self._client.submit_bug(
+            {
+                "run_id": bug.run_id,
+                "issue_id": bug.issue_id,
+                "short_id": bug.short_id,
+                "note": bug.note,
+                "repository": bug.repository,
+                "base_ref": bug.base_ref,
+                "payload": dict(bug.payload),
+            }
+        )
+        bug_id = created.get("id")
+        if not isinstance(bug_id, str) or not bug_id:
+            raise FactoryAPIError(
+                "FACTORY_UNEXPECTED_RESPONSE", "The factory sent an unexpected answer"
+            )
+        return Submission(external_run_id=bug_id)
+
+    def refresh(self, run: Mapping[str, Any]) -> RunObservation:
+        bug_id = run.get("external_run_id")
+        if not bug_id:
+            return RunObservation(state="queued")
+        bug = self._client.get_bug(str(bug_id))
+        state = FACTORY_STATES.get(str(bug.get("state")))
+        if state is None:
+            raise FactoryAPIError(
+                "FACTORY_UNEXPECTED_RESPONSE", "The factory sent an unknown bug state"
+            )
+        branch = bug.get("branch")
+        summary = bug.get("summary")
+        return RunObservation(
+            state=state,
+            external_run_id=str(bug_id),
+            pull_number=_positive(bug.get("pr_number")),
+            branch=branch if isinstance(branch, str) else None,
+            summary=summary if isinstance(summary, str) else None,
+            details={"factory_state": bug.get("state")},
+        )
+
+    def cancel(self, run: Mapping[str, Any]) -> bool:
+        bug_id = run.get("external_run_id")
+        if not bug_id:
+            return False
+        return self._client.cancel_bug(str(bug_id))
+
+
+def build_executor(
+    fix: FixSettings, client: GitHubClient, factory: FactoryClient | None = None
+) -> FixExecutor:
+    """The executor `fix.executor` names, with a client holding the fix token, and
+    for the factory a client holding the factory's token."""
     if fix.executor == GITHUB_ACTIONS:
         return GitHubActionsExecutor(fix, client)
+    if fix.executor == FACTORY:
+        if factory is None:
+            raise ErrorTrackingConfigError(
+                "ERROR_FIX_NOT_CONFIGURED", "The factory executor is not configured"
+            )
+        return FactoryExecutor(fix, factory)
     raise ErrorTrackingConfigError(
         "ERROR_FIX_EXECUTOR_UNAVAILABLE",
         f"The {fix.executor} executor is not available in this version of Crate",
@@ -239,8 +347,10 @@ def build_executor(fix: FixSettings, client: GitHubClient) -> FixExecutor:
 
 __all__ = [
     "CLOCK_SKEW",
+    "FACTORY_STATES",
     "RUN_NAME_PREFIX",
     "ExecutorState",
+    "FactoryExecutor",
     "FixBug",
     "FixExecutor",
     "GitHubActionsExecutor",
