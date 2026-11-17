@@ -904,6 +904,7 @@ METRIC_SPECS = {
 
 METRIC_SPECS.update(
     {
+        "db.queries": ("counter_delta", "1", {}),
         "mcp.tool.latency_ms": ("distribution", "milliseconds", {}),
         "mcp.tool.response_bytes": ("distribution", "bytes", {}),
     }

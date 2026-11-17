@@ -54,6 +54,11 @@ FAMILIES = (
         "Which serving mode answered a catalog search.",
     ),
     (
+        "db.",
+        "Database queries",
+        "Statements each process sends to PostgreSQL, counted in memory and exported only to Prometheus, where the scrape adds the Compose service. The Stack map draws them as pulses into PostgreSQL.",
+    ),
+    (
         "catalog.search_stream.",
         "Federated search stream",
         "Searches that asked for local and network results as one stream (FED1).",

@@ -1,6 +1,15 @@
 from types import SimpleNamespace
 
+import pytest
+
 import crate.db.engine as engine_module
+
+
+@pytest.fixture(autouse=True)
+def _fake_engines_take_no_listeners(monkeypatch):
+    monkeypatch.setattr(
+        engine_module, "event", SimpleNamespace(listen=lambda *_args: None)
+    )
 
 
 class _URL:

@@ -37,7 +37,7 @@ bytes and ratios. **Prometheus** is the exported family name, without the
 not exported is still in System Health or the PostgreSQL history. See
 [Observability](observability.md) for what each surface shows.
 
-The catalogue defines 848 metrics; 83 are exported to Prometheus.
+The catalogue defines 849 metrics; 84 are exported to Prometheus.
 
 ## Metrics by family
 
@@ -139,6 +139,14 @@ Authorization failures, job outcomes, and the outcome, latency and response size
 
 Each of the 71 tools also records `mcp.tool.<tool>.latency_ms`,
 `mcp.tool.<tool>.response_bytes` and one counter per outcome (`denied`, `rate_limited`, `conflict`, `invalid`, `status_unknown`, `unavailable`, `success`, `deduplicated`).
+
+### Database queries
+
+Statements each process sends to PostgreSQL, counted in memory and exported only to Prometheus, where the scrape adds the Compose service. The Stack map draws them as pulses into PostgreSQL.
+
+| Metric | Type | Unit | Labels | Prometheus | Shown in |
+| --- | --- | --- | --- | --- | --- |
+| `db.queries` | counter | 1 | none | `crate_db_queries` | PostgreSQL history only |
 
 ### Early skips
 

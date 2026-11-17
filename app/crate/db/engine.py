@@ -19,8 +19,11 @@ Configuration reads the same ``CRATE_POSTGRES_*`` env vars as
 import os
 import logging
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+from crate.observability import prometheus
+from crate.observability.metric_catalog import canonical_metric
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +41,11 @@ def _build_dsn() -> str:
 # require a live database (tests, CLI tools, etc.).
 _engine = None
 _session_factory = None
+_QUERY_SERIES = canonical_metric("db.queries")
+
+
+def _count_query(*_args) -> None:
+    prometheus.observe(_QUERY_SERIES, 1.0)
 
 
 def _default_pool_settings() -> tuple[int, int]:
@@ -83,6 +91,7 @@ def get_engine():
             },
             echo=False,
         )
+        event.listen(_engine, "after_cursor_execute", _count_query)
         log.info(
             "SQLAlchemy engine created: %s "
             "(pool_size=%s, max_overflow=%s, pool_timeout=%ss, "

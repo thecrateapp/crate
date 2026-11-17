@@ -24,6 +24,7 @@ EXPORTED_PREFIXES = (
     "artwork.",
     "backup.",
     "catalog.search.",
+    "db.",
     "federation.playback.",
     "home.",
     "media_worker.",

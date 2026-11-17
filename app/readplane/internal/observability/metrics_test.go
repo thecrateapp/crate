@@ -93,3 +93,27 @@ func TestWritePrometheus(t *testing.T) {
 		})
 	}
 }
+
+func TestDatabaseQueriesAreExported(t *testing.T) {
+	tests := []struct {
+		name       string
+		statements int
+		line       string
+	}{
+		{"none yet", 0, "crate_db_queries_total 0"},
+		{"one", 1, "crate_db_queries_total 1"},
+		{"several", 3, "crate_db_queries_total 3"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			databaseQueries.Store(0)
+			for range tt.statements {
+				CountDatabaseQuery()
+			}
+			var body strings.Builder
+			require.NoError(t, WritePrometheus(&body, nil, nil))
+			assert.Contains(t, body.String(), "# TYPE crate_db_queries_total counter\n")
+			assert.Contains(t, body.String(), tt.line+"\n")
+		})
+	}
+}

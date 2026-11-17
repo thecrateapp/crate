@@ -11,7 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
+	"github.com/thecrateapp/crate/app/readplane/internal/observability"
 )
+
+type queryCounter struct{}
+
+func (queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.TraceQueryStartData) context.Context {
+	observability.CountDatabaseQuery()
+	return ctx
+}
+
+func (queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
 
 // Connect builds a read-only PostgreSQL connection pool from the given config.
 func Connect(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
@@ -25,6 +35,7 @@ func Connect(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	poolCfg.MaxConns = cfg.MaxDBConns
 	poolCfg.MinConns = cfg.MinDBConns
 	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeCacheStatement
+	poolCfg.ConnConfig.Tracer = queryCounter{}
 	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		_, err := conn.Exec(ctx, "SET default_transaction_read_only = on")
 		return err
