@@ -696,7 +696,9 @@ class FakeFactory:
     """The factory's bug API (`/v1/bugs`) behind `httpx.MockTransport`.
 
     Submissions are idempotent on `Idempotency-Key`, as the factory's are. Records
-    every request and the URL and token each client was built with.
+    every request and the URL and token each client was built with. With
+    `lose_submit_answer` a submission is stored and then its answer is lost, as
+    when the connection drops after the factory committed.
     """
 
     def __init__(self) -> None:
@@ -704,6 +706,7 @@ class FakeFactory:
         self.requests: list[httpx.Request] = []
         self.clients: list[tuple[str, str]] = []
         self.fail: Callable[[httpx.Request], httpx.Response | None] | None = None
+        self.lose_submit_answer = False
 
     def factory(self, base_url: str, token: str) -> FactoryClient:
         self.clients.append((base_url, token))
@@ -735,7 +738,19 @@ class FakeFactory:
                 return response
         path, method = request.url.path, request.method
         if path == "/v1/bugs" and method == "POST":
-            return self._submit(request)
+            response = self._submit(request)
+            if self.lose_submit_answer:
+                raise httpx.ReadTimeout("the answer was lost", request=request)
+            return response
+        if path == "/v1/bugs" and method == "GET":
+            params = request.url.params
+            bugs = [
+                bug
+                for bug in reversed(list(self.bugs.values()))
+                if bug["short_id"] == params.get("short_id", bug["short_id"])
+                and bug["repository"] == params.get("repository", bug["repository"])
+            ]
+            return httpx.Response(200, json={"request_id": "r", "data": bugs})
         if (match := _BUG.match(path)) and method == "GET":
             bug = self.bugs.get(match.group(1))
             return self._data(bug) if bug else self._missing()

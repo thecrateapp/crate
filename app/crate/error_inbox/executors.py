@@ -69,6 +69,8 @@ FACTORY_STATES: dict[str, ExecutorState] = {
     "cancelled": "cancelled",
     "closed": "cancelled",
 }
+# A submission that got no answer may still have created its bug.
+_LOST_ANSWER_CODES = frozenset({"FACTORY_TIMEOUT", "FACTORY_UNAVAILABLE"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,8 +260,11 @@ class FactoryExecutor:
     """The Crate Software Factory, through its bug API (`/v1/bugs`).
 
     `submit` sends the bug with its payload; the factory answers with its bug id,
-    kept as the run's external id. The factory names the pull request's branch
-    after its own run, so Crate reads the pull request number from the bug.
+    kept as the run's external id. When the answer is lost (a timeout or a
+    dropped connection), the bug the submission may have created is looked up by
+    its run id and adopted; Crate never submits twice. The factory names the pull
+    request's branch after its own run, so Crate reads the pull request number
+    from the bug.
     """
 
     name = FACTORY
@@ -280,23 +285,37 @@ class FactoryExecutor:
                 "ERROR_FIX_PAYLOAD_UNAVAILABLE",
                 "The issue has no payload to send to the factory",
             )
-        created = self._client.submit_bug(
-            {
-                "run_id": bug.run_id,
-                "issue_id": bug.issue_id,
-                "short_id": bug.short_id,
-                "note": bug.note,
-                "repository": bug.repository,
-                "base_ref": bug.base_ref,
-                "payload": dict(bug.payload),
-            }
-        )
+        try:
+            created = self._client.submit_bug(
+                {
+                    "run_id": bug.run_id,
+                    "issue_id": bug.issue_id,
+                    "short_id": bug.short_id,
+                    "note": bug.note,
+                    "repository": bug.repository,
+                    "base_ref": bug.base_ref,
+                    "payload": dict(bug.payload),
+                }
+            )
+        except FactoryAPIError as error:
+            if error.code not in _LOST_ANSWER_CODES:
+                raise
+            created = self._created_by(bug, error)
         bug_id = created.get("id")
         if not isinstance(bug_id, str) or not bug_id:
             raise FactoryAPIError(
                 "FACTORY_UNEXPECTED_RESPONSE", "The factory sent an unexpected answer"
             )
         return Submission(external_run_id=bug_id)
+
+    def _created_by(self, bug: FixBug, lost: FactoryAPIError) -> Mapping[str, Any]:
+        try:
+            created = self._client.find_bug(bug.short_id, bug.repository, bug.run_id)
+        except FactoryAPIError:
+            created = None
+        if created is None:
+            raise lost
+        return created
 
     def refresh(self, run: Mapping[str, Any]) -> RunObservation:
         bug_id = run.get("external_run_id")
@@ -308,12 +327,16 @@ class FactoryExecutor:
             raise FactoryAPIError(
                 "FACTORY_UNEXPECTED_RESPONSE", "The factory sent an unknown bug state"
             )
+        pull_number = _positive(bug.get("pr_number"))
+        if state == "succeeded" and pull_number is None:
+            # Published, but the record does not carry the pull request yet.
+            state = "running"
         branch = bug.get("branch")
         summary = bug.get("summary")
         return RunObservation(
             state=state,
             external_run_id=str(bug_id),
-            pull_number=_positive(bug.get("pr_number")),
+            pull_number=pull_number,
             branch=branch if isinstance(branch, str) else None,
             summary=summary if isinstance(summary, str) else None,
             details={"factory_state": bug.get("state")},

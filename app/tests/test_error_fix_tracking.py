@@ -16,6 +16,7 @@ from sqlalchemy import text
 
 from tests.error_inbox_fakes import (
     FACTORY_FIXER,
+    FACTORY_SETTINGS,
     FACTORY_TOKEN,
     FACTORY_URL,
     FIXER,
@@ -952,7 +953,10 @@ def test_a_refused_factory_submission_gives_the_claim_back(api):
 
     result = _launch_factory(repo, factory, issue_id)
 
-    assert (result["status"], result["error_code"]) == ("failed", "FACTORY_CONFLICT")
+    assert (result["status"], result["error_code"]) == (
+        "failed",
+        "FACTORY_BUG_IN_PROGRESS",
+    )
     assert result["expected"] is True
     assert "still open" not in result["error"]
     assert _run(result["run_id"])["status"] == "failed"
@@ -981,3 +985,118 @@ def test_discard_cancels_the_factory_bug(api):
     assert _run(run_id)["status"] == "cancelled"
     [audit] = _audits("error_issue.fix.discarded")
     assert audit["details_json"]["external_run_id"] == bug["id"]
+
+
+def test_a_launch_whose_answer_was_lost_adopts_the_factory_bug(api):
+    configure_factory()
+    issue_id = _seed_issue()
+    repo, factory = FakeGitHubRepo(), FakeFactory()
+    factory.lose_submit_answer = True
+
+    result = _launch_factory(repo, factory, issue_id)
+
+    assert result["status"] == "succeeded", result
+    run = _run(result["run_id"])
+    assert run["status"] == "requested"
+    assert run["external_run_id"] == factory.only_bug()["id"]
+    assert factory.paths("POST") == ["/v1/bugs"]
+
+
+def test_a_published_factory_bug_without_its_pull_request_keeps_running(api):
+    configure_factory()
+    issue_id = _seed_issue()
+    repo, factory = FakeGitHubRepo(), FakeFactory()
+    run_id = _launch_factory(repo, factory, issue_id)["run_id"]
+    factory.only_bug()["state"] = "awaiting_review"
+
+    _track_factory(repo, factory)
+
+    run = _run(run_id)
+    assert (run["status"], run["error_code"]) == ("running", None)
+
+
+def test_an_expired_run_waits_until_its_cancel_goes_through(api):
+    configure_factory()
+    issue_id = _seed_issue()
+    repo, factory = FakeGitHubRepo(), FakeFactory()
+    run_id = _launch_factory(repo, factory, issue_id)["run_id"]
+    bug = factory.only_bug()
+    _shift(run_id, requested_at=49)
+
+    def cancel_fails(request):
+        if request.url.path.endswith("/cancel"):
+            return httpx.Response(503, json={"message": "restarting"})
+        return None
+
+    factory.fail = cancel_fails
+    _track_factory(repo, factory)
+    run = _run(run_id)
+    assert (run["status"], run["error_code"]) == ("requested", "FACTORY_SERVER")
+    assert bug["state"] == "received"
+
+    factory.fail = None
+    _track_factory(repo, factory)
+    run = _run(run_id)
+    assert (run["status"], run["error_code"]) == ("expired", "FIX_NO_PULL_REQUEST")
+    assert bug["state"] == "cancelled"
+
+
+def test_an_expired_run_whose_cancel_is_refused_for_good_expires(api):
+    configure_fix()
+    issue_id = _seed_issue()
+    repo = FakeGitHubRepo()
+    run_id = _launch(repo, issue_id)
+    workflow_run = repo.add_run(SHORT_ID)
+    _track(repo)
+    _shift(run_id, requested_at=7)
+    repo.fail = lambda request: (
+        httpx.Response(403, json={"message": "no"})
+        if request.url.path.endswith("/cancel")
+        else None
+    )
+
+    _track(repo)
+
+    assert _run(run_id)["status"] == "expired"
+    assert repo.runs[workflow_run]["conclusion"] is None
+
+
+def test_a_broken_factory_token_does_not_stop_the_workflow(api):
+    from crate.credentials import revoke_secret
+    from crate.error_inbox.config import load_config
+    from crate.worker_handlers.error_fixes import discard_fix
+
+    configure_fix(factory_token=FACTORY_TOKEN, factory={**FACTORY_SETTINGS})
+    revoke_secret(load_config().fix.factory.secret_ref)
+    issue_id = _seed_issue()
+    repo, factory = FakeGitHubRepo(), FakeFactory()
+
+    run_id = _launch_factory(repo, factory, issue_id)["run_id"]
+    workflow_run = repo.add_run(SHORT_ID)
+    assert _track_factory(repo, factory)["errors"] == {}
+    assert _run(run_id)["status"] == "running"
+    result = discard_fix(
+        "task-discard",
+        {"run_id": run_id, "actor_id": _admin_id()},
+        client_factory=repo.factory,
+        factory_client_factory=factory.factory,
+    )
+    assert result["status"] == "succeeded", result
+    assert repo.runs[workflow_run]["conclusion"] == "cancelled"
+    assert factory.clients == []
+
+
+def test_a_broken_factory_token_stops_only_the_factory_runs(api):
+    from crate.credentials import revoke_secret
+    from crate.error_inbox.config import load_config
+
+    configure_factory()
+    issue_id = _seed_issue()
+    repo, factory = FakeGitHubRepo(), FakeFactory()
+    run_id = _launch_factory(repo, factory, issue_id)["run_id"]
+    revoke_secret(load_config().fix.factory.secret_ref)
+
+    result = _track_factory(repo, factory)
+
+    assert result["errors"] == {"ERROR_FIX_TOKEN_UNAVAILABLE": 1}
+    assert _run(run_id)["error_code"] == "ERROR_FIX_TOKEN_UNAVAILABLE"

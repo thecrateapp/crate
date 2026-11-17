@@ -6,7 +6,8 @@ GitHub client: no retries (a submission starts work; the run id is its
 idempotency key), no redirects, no proxies from the environment and a 15 s
 timeout. Errors never carry the token or a response body; bodies are read only
 from successful answers, at most `MAX_RESPONSE_BYTES`, and must be the factory's
-`{"data": {...}}` envelope.
+`{"data": ...}` envelope. The one exception is a `409`, whose error code is read
+from at most `MAX_ERROR_BYTES` and kept only when it is one of `CONFLICT_CODES`.
 
 Never call this from an HTTP request handler: only the error fix tasks do.
 """
@@ -22,6 +23,22 @@ import httpx
 
 REQUEST_TIMEOUT_SECONDS = 15.0
 MAX_RESPONSE_BYTES = 256 * 1024
+MAX_ERROR_BYTES = 4 * 1024
+# The factory's reasons for refusing a submission with 409, and Crate's codes.
+CONFLICT_CODES = {
+    "BUG_IN_PROGRESS": (
+        "FACTORY_BUG_IN_PROGRESS",
+        "The factory already has an open bug for this issue",
+    ),
+    "BUG_LIMIT": (
+        "FACTORY_BUG_LIMIT",
+        "The factory has reached its limit of open bugs for this repository",
+    ),
+    "IDEMPOTENCY_CONFLICT": (
+        "FACTORY_IDEMPOTENCY_CONFLICT",
+        "The factory already received this run with different content",
+    ),
+}
 _BUG_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _RUN_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,99}$")
 
@@ -48,10 +65,29 @@ class FactoryAPIError(Exception):
         self.status = status
 
 
+def _conflict_code(response: httpx.Response) -> str | None:
+    """The factory's error code of a 409, read from a bounded body."""
+    body = b""
+    for chunk in response.iter_bytes():
+        body += chunk
+        if len(body) > MAX_ERROR_BYTES:
+            return None
+    try:
+        answer = json.loads(body)
+    except ValueError:
+        return None
+    code = answer.get("code") if isinstance(answer, dict) else None
+    return code if isinstance(code, str) else None
+
+
 def _raise_for_status(response: httpx.Response) -> None:
     status = response.status_code
     if 200 <= status < 300:
         return
+    if status == 409:
+        known = CONFLICT_CODES.get(_conflict_code(response) or "")
+        if known is not None:
+            raise FactoryAPIError(*known, status=status)
     if status in _STATUS_ERRORS:
         code, message = _STATUS_ERRORS[status]
         raise FactoryAPIError(code, message, status=status)
@@ -65,6 +101,12 @@ def _raise_for_status(response: httpx.Response) -> None:
         )
     raise FactoryAPIError(
         f"FACTORY_HTTP_{status}", "The factory rejected the request", status=status
+    )
+
+
+def _unexpected() -> FactoryAPIError:
+    return FactoryAPIError(
+        "FACTORY_UNEXPECTED_RESPONSE", "The factory sent an unexpected answer"
     )
 
 
@@ -112,11 +154,16 @@ class FactoryClient:
         *,
         body: Any = None,
         headers: Mapping[str, str] | None = None,
-    ) -> dict[str, Any]:
-        """One request; the `data` object of the answer. Never retried."""
+        params: Mapping[str, str] | None = None,
+    ) -> Any:
+        """One request; the `data` of the answer. Never retried."""
         try:
             with self._client.stream(
-                method, path, json=body, headers=dict(headers) if headers else None
+                method,
+                path,
+                json=body,
+                headers=dict(headers) if headers else None,
+                params=dict(params) if params else None,
             ) as response:
                 _raise_for_status(response)
                 chunks: list[bytes] = []
@@ -144,11 +191,14 @@ class FactoryClient:
             answer = json.loads(b"".join(chunks))
         except ValueError:
             answer = None
-        data = answer.get("data") if isinstance(answer, dict) else None
+        if not isinstance(answer, dict) or "data" not in answer:
+            raise _unexpected()
+        return answer["data"]
+
+    def _object(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        data = self._call(*args, **kwargs)
         if not isinstance(data, dict):
-            raise FactoryAPIError(
-                "FACTORY_UNEXPECTED_RESPONSE", "The factory sent an unexpected answer"
-            )
+            raise _unexpected()
         return data
 
     def submit_bug(self, bug: Mapping[str, Any]) -> dict[str, Any]:
@@ -157,17 +207,40 @@ class FactoryClient:
         run_id = bug.get("run_id")
         if not isinstance(run_id, str) or not _RUN_ID.match(run_id):
             raise ValueError("Invalid run id")
-        return self._call(
+        return self._object(
             "POST", "/v1/bugs", body=dict(bug), headers={"Idempotency-Key": run_id}
         )
 
+    def find_bug(
+        self, short_id: str, repository: str, run_id: str
+    ) -> dict[str, Any] | None:
+        """The bug a submission of `run_id` created, if any (newest 50 of the issue).
+
+        For a submission whose answer was lost: it never submits again.
+        """
+        bugs = self._call(
+            "GET",
+            "/v1/bugs",
+            params={"short_id": short_id, "repository": repository},
+        )
+        if not isinstance(bugs, list):
+            raise _unexpected()
+        return next(
+            (
+                bug
+                for bug in bugs
+                if isinstance(bug, dict) and bug.get("external_run_id") == run_id
+            ),
+            None,
+        )
+
     def get_bug(self, bug_id: str) -> dict[str, Any]:
-        return self._call("GET", f"/v1/bugs/{_bug_id(bug_id)}")
+        return self._object("GET", f"/v1/bugs/{_bug_id(bug_id)}")
 
     def cancel_bug(self, bug_id: str) -> bool:
         """Cancel a bug and its run; False when it had already ended."""
         try:
-            self._call("POST", f"/v1/bugs/{_bug_id(bug_id)}/cancel")
+            self._object("POST", f"/v1/bugs/{_bug_id(bug_id)}/cancel")
         except FactoryAPIError as error:
             if error.status == 409:
                 return False
@@ -176,6 +249,7 @@ class FactoryClient:
 
 
 __all__ = [
+    "CONFLICT_CODES",
     "MAX_RESPONSE_BYTES",
     "FactoryAPIError",
     "FactoryClient",

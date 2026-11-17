@@ -151,6 +151,95 @@ def test_submit_needs_the_payload_and_a_valid_run_id():
     assert factory.requests == []
 
 
+def test_a_submission_whose_answer_was_lost_adopts_the_bug_it_created():
+    factory = FakeFactory()
+    factory.lose_submit_answer = True
+    with factory.factory(FACTORY_URL, TOKEN) as client:
+        executor = FactoryExecutor(_fix(), client)
+        submission = executor.submit(_bug())
+
+    bug = factory.only_bug()
+    assert submission.external_run_id == bug["id"]
+    post, lookup = factory.requests
+    assert post.method == "POST"
+    # Never submitted again: the bug is looked up by its short id and run id.
+    assert (lookup.method, lookup.url.path) == ("GET", "/v1/bugs")
+    assert dict(lookup.url.params) == {
+        "short_id": "CRATE-API-1F",
+        "repository": REPOSITORY,
+    }
+
+
+def test_a_lost_submission_that_created_nothing_fails_as_before():
+    def handler(request):
+        if request.method == "POST":
+            raise httpx.ConnectError("refused")
+        # Another run of the same issue is open there; it is not adopted.
+        other = {"id": str(uuid.uuid4()), "external_run_id": "another-run"}
+        return httpx.Response(200, json={"data": [other]})
+
+    with _client(handler) as client:
+        with pytest.raises(FactoryAPIError) as error:
+            FactoryExecutor(_fix(), client).submit(_bug())
+    assert error.value.code == "FACTORY_UNAVAILABLE"
+
+
+@pytest.mark.parametrize("status", [409, 422, 500])
+def test_only_lost_answers_are_looked_up(status):
+    calls = []
+
+    def handler(request):
+        calls.append(request.method)
+        return httpx.Response(status, json={"code": "INVALID_STATE"})
+
+    with _client(handler) as client:
+        with pytest.raises(FactoryAPIError):
+            FactoryExecutor(_fix(), client).submit(_bug())
+    assert calls == ["POST"]
+
+
+def test_a_failed_lookup_keeps_the_submission_error():
+    def handler(request):
+        raise httpx.ReadTimeout("slow")
+
+    with _client(handler) as client:
+        with pytest.raises(FactoryAPIError) as error:
+            FactoryExecutor(_fix(), client).submit(_bug())
+    assert error.value.code == "FACTORY_TIMEOUT"
+
+
+@pytest.mark.parametrize(
+    ("factory_code", "code"),
+    [
+        ("BUG_IN_PROGRESS", "FACTORY_BUG_IN_PROGRESS"),
+        ("BUG_LIMIT", "FACTORY_BUG_LIMIT"),
+        ("IDEMPOTENCY_CONFLICT", "FACTORY_IDEMPOTENCY_CONFLICT"),
+        ("PROFILE_INACTIVE", "FACTORY_CONFLICT"),
+        (None, "FACTORY_CONFLICT"),
+    ],
+)
+def test_submission_conflicts_are_told_apart_without_the_body(factory_code, code):
+    def handler(request):
+        return httpx.Response(
+            409, json={"code": factory_code, "message": SECRET_BODY, "details": {}}
+        )
+
+    with _client(handler) as client:
+        with pytest.raises(FactoryAPIError) as error:
+            client.submit_bug({"run_id": RUN_ID})
+    assert (error.value.code, error.value.status) == (code, 409)
+    assert "synthetic body" not in str(error.value)
+    assert TOKEN not in str(error.value)
+
+
+def test_unreadable_conflict_bodies_are_plain_conflicts():
+    for content in (b"not json", b"[]", b'{"code": 7}', b"x" * 100_000):
+        with _client(lambda request: httpx.Response(409, content=content)) as client:
+            with pytest.raises(FactoryAPIError) as error:
+                client.submit_bug({"run_id": RUN_ID})
+        assert error.value.code == "FACTORY_CONFLICT"
+
+
 def test_submit_refuses_an_answer_without_a_bug_id():
     def handler(request):
         return httpx.Response(201, json={"data": {"state": "received"}})
@@ -192,7 +281,7 @@ def test_refresh_maps_the_bug_state(state, expected):
     with factory.factory(FACTORY_URL, TOKEN) as client:
         executor = FactoryExecutor(_fix(), client)
         bug_id = executor.submit(_bug()).external_run_id
-        factory.bugs[str(bug_id)]["state"] = state
+        factory.bugs[str(bug_id)].update(state=state, pr_number=41)
         observed = executor.refresh({"external_run_id": bug_id})
     assert observed.state == expected
     assert observed.external_run_id == bug_id
@@ -228,6 +317,17 @@ def test_refresh_reads_the_pull_request_branch_and_summary():
         summary="Reproduced with a failing test and fixed.",
         details={"factory_state": "awaiting_review"},
     )
+
+
+@pytest.mark.parametrize("state", ["awaiting_review", "merged"])
+def test_a_published_state_without_its_pull_request_is_still_running(state):
+    factory = FakeFactory()
+    with factory.factory(FACTORY_URL, TOKEN) as client:
+        executor = FactoryExecutor(_fix(), client)
+        bug_id = str(executor.submit(_bug()).external_run_id)
+        factory.bugs[bug_id]["state"] = state
+        observed = executor.refresh({"external_run_id": bug_id})
+    assert (observed.state, observed.pull_number) == ("running", None)
 
 
 def test_refresh_without_a_bug_id_waits_and_unknown_states_are_typed():
@@ -300,7 +400,7 @@ def test_failed_answers_are_typed_without_secrets_or_bodies(status, code):
         return httpx.Response(
             status,
             headers={"location": f"{FACTORY_URL}/elsewhere"},
-            json={"code": "BUG_LIMIT", "message": SECRET_BODY},
+            json={"code": "INVALID_STATE", "message": SECRET_BODY},
         )
 
     with _client(handler) as client:

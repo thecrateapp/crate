@@ -31,7 +31,6 @@ import logging
 import time
 from collections import Counter
 from collections.abc import Callable, Mapping
-from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any
@@ -67,6 +66,7 @@ from crate.error_inbox.fix_runs import (
     CLEANUP_EXPIRY,
     CLOSED,
     EXPIRED,
+    FACTORY,
     FAILED,
     MERGED,
     PR_OPEN,
@@ -90,6 +90,8 @@ from crate.error_inbox.github_client import (
     GitHubForbiddenError,
     GitHubNotMergeableError,
     GitHubRateLimitedError,
+    GitHubServerError,
+    GitHubUnavailableError,
 )
 from crate.error_inbox.pull_requests import (
     PullRequestState,
@@ -127,8 +129,11 @@ EXPECTED_FAILURE_CODES = frozenset(
         "ERROR_ISSUE_NOT_FOUND",
         "ERROR_TRACKING_INVALID",
         "FACTORY_AUTH",
+        "FACTORY_BUG_IN_PROGRESS",
+        "FACTORY_BUG_LIMIT",
         "FACTORY_CONFLICT",
         "FACTORY_FORBIDDEN",
+        "FACTORY_IDEMPOTENCY_CONFLICT",
         "FACTORY_NOT_FOUND",
         "FACTORY_RATE_LIMITED",
         "FACTORY_REDIRECT",
@@ -148,6 +153,11 @@ EXPECTED_FAILURE_CODES = frozenset(
         "GITHUB_UNAVAILABLE",
         "GITHUB_VALIDATION",
     }
+)
+
+# Cancel failures worth another try on the next pass; any other refusal is final.
+_TRANSIENT_FACTORY_CODES = frozenset(
+    {"FACTORY_TIMEOUT", "FACTORY_UNAVAILABLE", "FACTORY_SERVER", "FACTORY_RATE_LIMITED"}
 )
 
 # Run summaries Crate writes; the admin shows them as they are.
@@ -198,50 +208,72 @@ class _Setup:
     config: ErrorTrackingConfig
     fix: FixSettings
     token: str
-    factory_token: str | None = None
 
 
 def _setup() -> _Setup:
-    """The Launch fix settings and tokens, or a typed configuration error."""
+    """The Launch fix settings and GitHub token, or a typed configuration error."""
     config = load_config()
     if config is None or config.fix is None:
         raise ErrorTrackingConfigError(
             "ERROR_FIX_NOT_CONFIGURED", "Launch fix is not configured"
         )
-    factory = config.fix.factory
-    return _Setup(
-        config=config,
-        fix=config.fix,
-        token=load_github_token(config),
-        factory_token=load_factory_token(config)
-        if factory is not None and factory.has_token
-        else None,
-    )
+    return _Setup(config=config, fix=config.fix, token=load_github_token(config))
 
 
-def _factory_client(
-    setup: _Setup, factory_client_factory: FactoryClientFactory | None
-) -> AbstractContextManager[FactoryClient | None]:
-    """A client for the factory's bug API when the factory is configured."""
-    factory = setup.fix.factory
-    if factory is None or setup.factory_token is None:
-        return nullcontext()
-    return (factory_client_factory or FactoryClient)(
-        factory.base_url, setup.factory_token
-    )
+class _FactoryClients:
+    """The factory's client, opened with its token on first use only, so a broken
+    factory token stops the factory's runs and nothing else."""
+
+    def __init__(
+        self, setup: _Setup, factory_client_factory: FactoryClientFactory | None
+    ) -> None:
+        self._setup = setup
+        self._factory = factory_client_factory or FactoryClient
+        self._client: FactoryClient | None = None
+
+    def get(self) -> FactoryClient | None:
+        factory = self._setup.fix.factory
+        if factory is None:
+            return None
+        if self._client is None:
+            token = load_factory_token(self._setup.config)
+            self._client = self._factory(factory.base_url, token)
+        return self._client
+
+    def __enter__(self) -> _FactoryClients:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        if self._client is not None:
+            self._client.close()
+
+
+def _executor(
+    fix: FixSettings, client: GitHubClient, factories: _FactoryClients
+) -> FixExecutor:
+    factory = factories.get() if fix.executor == FACTORY else None
+    return build_executor(fix, client, factory)
 
 
 def _executor_for(
     run: Mapping[str, Any],
     fix: FixSettings,
     client: GitHubClient,
-    factory: FactoryClient | None,
+    factories: _FactoryClients,
 ) -> FixExecutor:
     """The executor that started `run`, on the repository it started in."""
-    return build_executor(
+    return _executor(
         replace(fix, executor=str(run["executor"]), repository=str(run["repository"])),
         client,
-        factory,
+        factories,
+    )
+
+
+def _transient(error: GitHubAPIError | FactoryAPIError) -> bool:
+    if isinstance(error, FactoryAPIError):
+        return error.code in _TRANSIENT_FACTORY_CODES
+    return isinstance(
+        error, (GitHubUnavailableError, GitHubServerError, GitHubRateLimitedError)
     )
 
 
@@ -351,9 +383,9 @@ def dispatch_fix(
     try:
         with (
             (client_factory or GitHubClient)(setup.token) as client,
-            _factory_client(setup, factory_client_factory) as factory,
+            _FactoryClients(setup, factory_client_factory) as factories,
         ):
-            executor = build_executor(fix, client, factory)
+            executor = _executor(fix, client, factories)
             payload = None
             if executor.sends_payload:
                 triage_input = get_triage_input(request.issue_id)
@@ -451,12 +483,12 @@ class _Tracker:
         setup: _Setup,
         client: GitHubClient,
         now: Callable[[], datetime],
-        factory: FactoryClient | None = None,
+        factories: _FactoryClients,
     ) -> None:
         self.task_id = task_id
         self.setup = setup
         self.client = client
-        self.factory = factory
+        self.factories = factories
         self.now = now
         self.counts: Counter[str] = Counter()
 
@@ -471,7 +503,7 @@ class _Tracker:
             self._cleanup(run)
 
     def _follow_run(self, run: Mapping[str, Any]) -> None:
-        executor = _executor_for(run, self.setup.fix, self.client, self.factory)
+        executor = _executor_for(run, self.setup.fix, self.client, self.factories)
         observation = executor.refresh(run)
         now = self.now()
         changes: dict[str, Any] = {"checked_at": now, "error_code": None}
@@ -521,6 +553,14 @@ class _Tracker:
                 executor.cancel({**run, **changes})
             except (GitHubAPIError, FactoryAPIError) as error:
                 log.info("Could not cancel an expired fix run: %s", error.code)
+                if _transient(error):
+                    # Still going on the fixer's side: try again next pass.
+                    changes["error_code"] = error.code[:64]
+                    update_fix_run(
+                        str(run["id"]), changes, expected_status=run["status"]
+                    )
+                    self.counts["expiry_retried"] += 1
+                    return
             hours = int(no_pr_expiry(run["executor"]).total_seconds() // 3600)
             changes.update(
                 status=EXPIRED,
@@ -707,9 +747,9 @@ def track_fixes(
     errors: Counter[str] = Counter()
     with (
         (client_factory or GitHubClient)(setup.token) as client,
-        _factory_client(setup, factory_client_factory) as factory,
+        _FactoryClients(setup, factory_client_factory) as factories,
     ):
-        tracker = _Tracker(task_id, setup, client, now, factory)
+        tracker = _Tracker(task_id, setup, client, now, factories)
         for run in runs:
             if cancelled() or time.monotonic() - started > budget_seconds:
                 break
@@ -894,7 +934,7 @@ def discard_fix(
     try:
         with (
             (client_factory or GitHubClient)(setup.token) as client,
-            _factory_client(setup, factory_client_factory) as factory,
+            _FactoryClients(setup, factory_client_factory) as factories,
         ):
             if run["status"] == PR_OPEN and run.get("pr_number"):
                 pull = parse_pull(
@@ -917,7 +957,7 @@ def discard_fix(
                 )
                 details.update(pr_number=pull.number, branch=pull.head_ref)
             else:
-                executor = _executor_for(run, setup.fix, client, factory)
+                executor = _executor_for(run, setup.fix, client, factories)
                 if run.get("external_run_id"):
                     executor.cancel(run)
                     details["external_run_id"] = run["external_run_id"]
