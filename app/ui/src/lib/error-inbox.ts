@@ -258,6 +258,15 @@ export interface ConnectionAccess {
   error_code: string | null;
 }
 
+/** The `factory` executor's settings. */
+export interface FactoryConnection {
+  base_url: string;
+  /** The factory GitHub App's login; Approve & merge accepts only its PRs. */
+  pr_author: string;
+  /** The factory token itself is never returned. */
+  has_token: boolean;
+}
+
 export interface FixConnection {
   repository: string;
   workflow: string;
@@ -266,6 +275,7 @@ export interface FixConnection {
   /** The GitHub token itself is never returned. */
   has_token: boolean;
   actions_url: string;
+  factory?: FactoryConnection | null;
 }
 
 export interface TriageSettings {
@@ -298,13 +308,29 @@ export interface ErrorIssuePage {
   next_cursor: string | null;
 }
 
+export interface FactorySettingsUpdate {
+  base_url: string;
+  pr_author: string;
+  /** Write-only: omitted keeps the stored factory token. */
+  token?: string;
+}
+
 export interface FixSettingsUpdate {
   repository: string;
   workflow: string;
   ref?: string;
+  executor?: FixExecutor;
   /** Write-only: omitted keeps the stored GitHub token. */
   token?: string;
+  /** Omitted removes the factory settings and deletes its token. */
+  factory?: FactorySettingsUpdate;
 }
+
+/** Hours without a pull request before a run expires (`NO_PR_EXPIRY`). */
+export const NO_PR_EXPIRY_HOURS: Record<FixExecutor, number> = {
+  github_actions: 6,
+  factory: 48,
+};
 
 export interface ConnectionUpdate {
   base_url?: string;
@@ -736,7 +762,7 @@ export function fixRunStateText(run: ErrorFixRun): string {
     case "cancelled":
       return "The fix was discarded.";
     case "expired":
-      return "No pull request appeared within 6 hours.";
+      return `No pull request appeared within ${NO_PR_EXPIRY_HOURS[run.executor] ?? NO_PR_EXPIRY_HOURS.github_actions} hours.`;
     case "failed":
       return "The fix did not produce a pull request.";
   }

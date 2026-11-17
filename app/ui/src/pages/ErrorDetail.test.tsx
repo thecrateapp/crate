@@ -278,6 +278,44 @@ describe("ErrorDetail", () => {
     expect(refetchMock).toHaveBeenCalled();
   });
 
+  it("launch fix with the factory says who works on it", async () => {
+    const detail = sampleDetail({ fix: sampleFix({ executor: "factory" }) });
+    apiMock.mockResolvedValue({ task_id: "task-fix" });
+    renderDetail(detail);
+
+    expect(
+      screen.queryByRole("link", { name: /Workflow runs on GitHub/ }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(launchButton()!);
+
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Launch a fix for CRATE-WORKERS-3K?",
+    });
+    expect(dialog).toHaveTextContent(/Crate Software Factory/);
+    expect(dialog).not.toHaveTextContent(/GitHub Actions/);
+    expect(within(dialog).getByRole("note")).toHaveTextContent(
+      /its pull request is public/,
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText("Note for the agent (optional)"),
+      "Pool",
+    );
+    expect(
+      within(dialog).getByText(
+        "4 of 500 characters. No links, e-mail or IP addresses.",
+      ),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Launch fix" }),
+    );
+    const onComplete = pollTaskMock.mock.calls[0]![1] as () => void;
+    act(() => onComplete());
+    expect(toastMock.success).toHaveBeenCalledWith(
+      "Fix handed to the factory for CRATE-WORKERS-3K. Follow it here.",
+    );
+  });
+
   it("launch fix hidden without config", () => {
     renderDetail(sampleDetail({ fix: null }));
     expect(launchButton()).not.toBeInTheDocument();

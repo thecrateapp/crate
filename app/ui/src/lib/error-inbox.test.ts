@@ -293,5 +293,8 @@ describe("fix runs", () => {
     expect(fixRunStateText(sampleFixRun({ status: "expired" }))).toBe(
       "No pull request appeared within 6 hours.",
     );
+    expect(
+      fixRunStateText(sampleFixRun({ status: "expired", executor: "factory" })),
+    ).toBe("No pull request appeared within 48 hours.");
   });
 });

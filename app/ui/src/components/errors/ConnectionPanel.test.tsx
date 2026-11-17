@@ -315,8 +315,111 @@ describe("ConnectionPanel", () => {
       fix: null,
     });
     expect(toastMock.success).toHaveBeenLastCalledWith(
-      "Launch fix is off and its GitHub token was deleted",
+      "Launch fix is off and its tokens were deleted",
     );
+  });
+
+  it("hands fixes to the factory with its own write-only token", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    apiMock.mockResolvedValue(sampleConnection());
+    renderPanel(sampleConnection({ fix: sampleFixConnection() }));
+
+    expect(fixField("Workflow")).toBeInTheDocument();
+    expect(
+      within(fixForm()).queryByLabelText("Factory URL"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      within(fixForm()).getByRole("combobox", { name: "Fixer" }),
+    );
+    await userEvent.click(
+      screen.getByRole("option", { name: /^Crate Software Factory/ }),
+    );
+
+    expect(
+      within(fixForm()).queryByLabelText("Workflow"),
+    ).not.toBeInTheDocument();
+    expect(fixField("Factory URL")).toBeRequired();
+    expect(fixField("Factory GitHub App")).toBeRequired();
+    const factoryToken = fixField("Factory token");
+    expect(factoryToken).toHaveAttribute("type", "password");
+    expect(factoryToken).toBeRequired();
+    expect(within(fixForm()).getByText(/up to 48 hours/)).toBeInTheDocument();
+
+    await userEvent.type(
+      fixField("Factory URL"),
+      "http://100.101.102.103:8788",
+    );
+    await userEvent.type(fixField("Factory GitHub App"), "crate-factory[[bot]");
+    await userEvent.type(factoryToken, "factory-bugs-token");
+    await userEvent.click(
+      within(fixForm()).getByRole("button", { name: "Save Launch fix" }),
+    );
+
+    expect(apiMock.mock.lastCall![2].fix).toEqual({
+      repository: "thecrateapp/crate",
+      workflow: "error-autofix.yml",
+      ref: "main",
+      executor: "factory",
+      factory: {
+        base_url: "http://100.101.102.103:8788",
+        pr_author: "crate-factory[bot]",
+        token: "factory-bugs-token",
+      },
+    });
+    expect(fixField("Factory token")).toHaveValue("");
+  });
+
+  it("keeps the stored factory settings and flags a missing factory token", async () => {
+    apiMock.mockResolvedValue(sampleConnection());
+    const factory = {
+      base_url: "http://100.101.102.103:8788",
+      pr_author: "crate-factory[bot]",
+      has_token: false,
+    };
+    renderPanel(
+      sampleConnection({
+        fix: sampleFixConnection({ executor: "factory", factory }),
+      }),
+    );
+
+    const section = screen.getByRole("region", { name: "Launch fix" });
+    expect(
+      within(section).getByText("Factory token missing"),
+    ).toBeInTheDocument();
+    expect(fixField("Factory URL")).toHaveValue(factory.base_url);
+    expect(fixField("Factory GitHub App")).toHaveValue(factory.pr_author);
+    expect(fixField("Factory token")).toBeRequired();
+  });
+
+  it("keeps the factory settings while the workflow works on new fixes", async () => {
+    apiMock.mockResolvedValue(sampleConnection());
+    renderPanel(
+      sampleConnection({
+        fix: sampleFixConnection({
+          factory: {
+            base_url: "http://100.101.102.103:8788",
+            pr_author: "crate-factory[bot]",
+            has_token: true,
+          },
+        }),
+      }),
+    );
+
+    expect(
+      within(fixForm()).queryByLabelText("Factory URL"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      within(fixForm()).getByRole("button", { name: "Save Launch fix" }),
+    );
+    expect(apiMock.mock.lastCall![2].fix).toEqual({
+      repository: "thecrateapp/crate",
+      workflow: "error-autofix.yml",
+      ref: "main",
+      factory: {
+        base_url: "http://100.101.102.103:8788",
+        pr_author: "crate-factory[bot]",
+      },
+    });
   });
 
   it("flags Launch fix settings without a token", () => {
