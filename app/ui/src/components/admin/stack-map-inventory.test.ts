@@ -4,6 +4,7 @@ import {
   inventoryToStackMap,
   type StackInventory,
 } from "./stack-map-inventory";
+import { STACK_ACTIVITY_ROLES } from "./stack-map-topology";
 
 function service(
   project: string,
@@ -221,5 +222,24 @@ describe("applyStackResources", () => {
     );
 
     expect(map.links).toEqual({ grafana: "https://g.example" });
+  });
+});
+
+describe("stack activity roles", () => {
+  it("gives every worker queue a consumer, so its tasks reach a worker", () => {
+    const consumed = new Set(
+      Object.values(STACK_ACTIVITY_ROLES).flatMap((role) => role?.queues ?? []),
+    );
+
+    for (const queue of [
+      "default",
+      "fast",
+      "maintenance",
+      "heavy",
+      "playback",
+      "ai",
+      "ai_bulk",
+    ])
+      expect(consumed).toContain(queue);
   });
 });

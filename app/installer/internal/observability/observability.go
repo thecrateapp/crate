@@ -106,6 +106,9 @@ func Assess(host system.Host, engine Engine, resolve func(string) (string, error
 		if err != nil || !strings.HasPrefix(filepath.Clean(socket), "/run/") {
 			return Availability{Reason: "the containerd socket is not under /run"}
 		}
+		if filepath.Base(socket) != "containerd.sock" || filepath.Dir(socket) == "/run" {
+			return Availability{Reason: "the containerd socket is not a containerd.sock in its own directory"}
+		}
 		return Availability{Available: true, Containerd: true, Socket: socket}
 	default:
 		return Availability{Reason: fmt.Sprintf("Docker storage driver %s is not supported", engine.Driver)}
@@ -144,6 +147,7 @@ func Env(s Settings) *envfile.Values {
 	values.Set("OBS_GRAFANA_PORT", s.GrafanaPort)
 	values.Set("OBS_DOCKER_ROOT", s.DockerRoot)
 	values.Set("OBS_CONTAINERD_SOCKET", s.Socket)
+	values.Set("OBS_CONTAINERD_SOCKET_DIR", filepath.Dir(s.Socket))
 	values.Set("OBS_CONTAINERD", containerd)
 	values.Set("OBS_RELEASE", s.Release)
 	return values

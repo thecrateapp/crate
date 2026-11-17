@@ -37,7 +37,7 @@ def test_containerd_reuses_existing_services_images_and_resources():
         assert not service.get("privileged")
 
 
-def test_host_containerd_socket_is_only_bound_to_the_filter():
+def test_host_containerd_socket_directory_is_only_bound_to_the_filter():
     services = _adapter()["services"]
     proxy = services["crate-observability-docker-proxy"]
     host_sockets = [
@@ -51,10 +51,19 @@ def test_host_containerd_socket_is_only_bound_to_the_filter():
     assert socket["type"] == "bind"
     assert socket["bind"]["create_host_path"] is False
     assert socket["read_only"] is True
-    assert (
-        "${OBS_CONTAINERD_SOCKET:-/run/containerd/containerd.sock}" == socket["source"]
-    )
+    assert socket["source"] == "${OBS_CONTAINERD_SOCKET_DIR:-/run/containerd}"
+    assert socket["target"] == "/var/run/crate-containerd"
     assert "OBS_CONTAINERD_SOCKET" not in str(services["crate-cadvisor"])
+
+
+def test_filter_follows_the_socket_containerd_recreates_on_restart():
+    config = (DIRECTORY / "runtime-proxy.haproxy.cfg").read_text()
+    backend = re.search(r"(?m)^backend containerd\n((?:  .*\n?)+)", config)
+    assert backend
+    assert (
+        "server containerd /var/run/crate-containerd/containerd.sock proto h2"
+        in (backend[1])
+    )
 
 
 def test_cadvisor_uses_a_read_only_proxy_socket_volume():
@@ -185,13 +194,13 @@ def test_containerd_override_resolves_without_adding_services_or_public_ports(
             assert not resolved.get("ports"), name
     proxy_mounts = services["crate-observability-docker-proxy"]["volumes"]
     assert any(
-        mount.get("source") == "/run/containerd/containerd.sock"
+        mount.get("source") == "/run/containerd"
         and mount["bind"]["create_host_path"] is False
         for mount in proxy_mounts
     )
     for name, service in services.items():
         if name != "crate-observability-docker-proxy":
             assert all(
-                mount.get("source") != "/run/containerd/containerd.sock"
+                mount.get("source") != "/run/containerd"
                 for mount in service.get("volumes", [])
             ), name

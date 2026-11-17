@@ -71,7 +71,7 @@ func TestAssess(t *testing.T) {
 			return path, nil
 		case "/var/run/containerd/containerd.sock":
 			return "/run/containerd/containerd.sock", nil
-		case "/opt/containerd.sock":
+		case "/opt/containerd.sock", "/run/containerd/other.sock", "/run/containerd.sock":
 			return path, nil
 		}
 		return "", errors.New("missing")
@@ -89,6 +89,10 @@ func TestAssess(t *testing.T) {
 			want: Availability{Available: true, Containerd: true, Socket: "/run/containerd/containerd.sock"}},
 		{name: "socket outside run", host: linux, engine: Engine{Driver: "overlayfs", Containerd: "/opt/containerd.sock", Compose: "2.29.1"},
 			reason: "not under /run"},
+		{name: "socket with another name", host: linux, engine: Engine{Driver: "overlayfs", Containerd: "/run/containerd/other.sock", Compose: "2.29.1"},
+			reason: "containerd.sock in its own directory"},
+		{name: "socket directly in run", host: linux, engine: Engine{Driver: "overlayfs", Containerd: "/run/containerd.sock", Compose: "2.29.1"},
+			reason: "containerd.sock in its own directory"},
 		{name: "socket missing", host: linux, engine: Engine{Driver: "overlayfs", Containerd: "/run/gone.sock", Compose: "2.29.1"},
 			reason: "not under /run"},
 		{name: "macos", host: system.Host{OS: "darwin"}, engine: Engine{Driver: "overlay2", Compose: "2.29.1"},
@@ -189,9 +193,10 @@ func TestEnvWritesEveryMonitoringVariableAndNoSecret(t *testing.T) {
 		t.Fatalf("monitoring.env keys %v, manifest monitoring.env %v", got, declared)
 	}
 	for key, want := range map[string]string{
-		"OBS_SECRETS_DIR": "/srv/crate/data/observability/secrets",
-		"OBS_CONTAINERD":  "1",
-		"OBS_RELEASE":     "v3.1.3",
+		"OBS_SECRETS_DIR":           "/srv/crate/data/observability/secrets",
+		"OBS_CONTAINERD":            "1",
+		"OBS_CONTAINERD_SOCKET_DIR": "/run/containerd",
+		"OBS_RELEASE":               "v3.1.3",
 	} {
 		if value, _ := env.Get(key); value != want {
 			t.Errorf("%s = %q, want %q", key, value, want)

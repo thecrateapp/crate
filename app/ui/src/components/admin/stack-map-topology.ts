@@ -221,7 +221,7 @@ export const STACK_ACTIVITY_ROLES: Partial<
       "crate-readplane-stream",
     ],
   },
-  "crate-worker": { queues: ["default", "fast"] },
+  "crate-worker": { queues: ["default", "fast", "ai", "ai_bulk"] },
   "crate-fast-worker": { queues: ["fast"] },
   "crate-maintenance-worker": { queues: ["maintenance"] },
   "crate-analysis-worker": { queues: ["heavy"] },

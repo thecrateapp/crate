@@ -48,12 +48,14 @@ if [ "$OBS_CONTAINERD" = 1 ]; then
     exit 1
   }
   case "$socket_path" in
-    /run/*) ;;
+    /run/*/containerd.sock) ;;
     *)
-      echo "Containerd socket must resolve under masked /run; no services started."
+      echo "Containerd socket must resolve to a containerd.sock under masked /run; no services started."
       exit 1
       ;;
   esac
+  OBS_CONTAINERD_SOCKET_DIR=${socket_path%/*}
+  export OBS_CONTAINERD_SOCKET_DIR
   $DOCKER compose "$@" up -d --no-deps --wait --wait-timeout 45 crate-observability-docker-proxy
 fi
 

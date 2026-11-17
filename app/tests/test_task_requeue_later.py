@@ -261,3 +261,18 @@ def test_a_requeued_child_keeps_its_parent_waiting(pg_db) -> None:
     assert (task["status"], task["parent_task_id"]) == ("pending", parent)
     assert check_siblings_complete(parent)["all_done"] is False
     assert get_task(parent)["status"] == "delegated"
+
+
+def test_a_finished_task_records_its_duration_under_its_queue(harness) -> None:
+    from crate import actors
+
+    actors._execute_task(TASK_TYPE, "task-1")
+
+    [tags] = [
+        tags for name, _value, tags in harness.metrics if name == "worker.task.duration"
+    ]
+    assert tags == {
+        "type": TASK_TYPE,
+        "status": "completed",
+        "queue": actors.get_queue_for_task(TASK_TYPE),
+    }
