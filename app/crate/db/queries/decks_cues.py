@@ -90,7 +90,9 @@ def empty_cue_set(entity_uid: str) -> dict[str, Any]:
     }
 
 
-def cue_sets_from_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, dict]:
+# Rows arrive as SQLAlchemy RowMapping, whose key type is wider than str
+# (Mapping[_KeyType, Any]); Mapping is invariant in its key, so accept any key.
+def cue_sets_from_rows(rows: Sequence[Mapping[Any, Any]]) -> dict[str, dict]:
     """Group set-and-cue rows (one per cue, or one with null cue fields for an
     empty set) into cue sets by entity UID."""
     sets: dict[str, dict] = {}
@@ -123,7 +125,7 @@ def cue_sets_from_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, dict]:
     return sets
 
 
-def correction_from_row(row: Mapping[str, Any]) -> dict[str, Any]:
+def correction_from_row(row: Mapping[Any, Any]) -> dict[str, Any]:
     data = row["beat_grid_data"]
     return {
         "entity_uid": str(row["entity_uid"]),

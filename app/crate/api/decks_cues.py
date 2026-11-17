@@ -21,10 +21,12 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from crate.api.decks import _require_session_user
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
+    OpenApiResponses,
     error_response,
     merge_responses,
 )
@@ -49,7 +51,7 @@ from crate.db.repositories.decks_cues import (
 
 router = APIRouter(prefix="/api/decks", tags=["browse"])
 
-_FORBIDDEN = {
+_FORBIDDEN: OpenApiResponses = {
     403: error_response(
         "An access token, or a trusted-header user without a Crate account."
     )
@@ -65,22 +67,19 @@ _QUERY_RESPONSES = merge_responses(
 )
 
 
-def _put_responses(conflict_model: type, what: str) -> dict:
-    return merge_responses(
-        AUTH_ERROR_RESPONSES,
-        _FORBIDDEN,
-        {
-            404: error_response("The track is not in the local library."),
-            409: {
-                "model": conflict_model,
-                "description": (
-                    f"base_revision is not the stored revision; `current` is the "
-                    f"stored {what}."
-                ),
-            },
-            422: error_response(f"The {what} or the path UID failed validation."),
+def _put_responses(conflict_model: type[BaseModel], what: str) -> OpenApiResponses:
+    put_errors: OpenApiResponses = {
+        404: error_response("The track is not in the local library."),
+        409: {
+            "model": conflict_model,
+            "description": (
+                f"base_revision is not the stored revision; `current` is the "
+                f"stored {what}."
+            ),
         },
-    )
+        422: error_response(f"The {what} or the path UID failed validation."),
+    }
+    return merge_responses(AUTH_ERROR_RESPONSES, _FORBIDDEN, put_errors)
 
 
 @router.post(
@@ -96,10 +95,12 @@ def decks_cues_query(
     user = _require_session_user(request)
     uids = _unique(payload.entity_uids)
     read = get_decks_cue_sets(int(user["id"]), uids)
-    return DecksCuesQueryResponse(
-        cue_sets=read.found,
-        missing=[uid for uid in uids if uid not in read.found],
-        server_time=read.server_time,
+    return DecksCuesQueryResponse.model_validate(
+        {
+            "cue_sets": read.found,
+            "missing": [uid for uid in uids if uid not in read.found],
+            "server_time": read.server_time,
+        }
     )
 
 
@@ -142,10 +143,12 @@ def decks_corrections_query(
     user = _require_session_user(request)
     uids = _unique(payload.entity_uids)
     read = get_decks_corrections(int(user["id"]), uids)
-    return DecksCorrectionsQueryResponse(
-        corrections=read.found,
-        missing=[uid for uid in uids if uid not in read.found],
-        server_time=read.server_time,
+    return DecksCorrectionsQueryResponse.model_validate(
+        {
+            "corrections": read.found,
+            "missing": [uid for uid in uids if uid not in read.found],
+            "server_time": read.server_time,
+        }
     )
 
 
@@ -182,19 +185,21 @@ def _unique(uids: list[UUID]) -> list[str]:
 
 
 def _sync_response(
-    result: DecksSyncResult, stored_model: type, conflict_model: type, detail: str
-):
-    if result.status == "not_found":
+    result: DecksSyncResult,
+    stored_model: type[BaseModel],
+    conflict_model: type[BaseModel],
+    detail: str,
+) -> BaseModel | JSONResponse:
+    current = result.current
+    if result.status == "not_found" or current is None:
         raise HTTPException(status_code=404, detail="Track not found")
     if result.status == "conflict":
         body = conflict_model.model_validate(
             {
                 "detail": detail,
-                "current": result.current,
+                "current": current,
                 "server_time": result.server_time,
             }
         )
         return JSONResponse(status_code=409, content=jsonable_encoder(body))
-    return stored_model.model_validate(
-        {**result.current, "server_time": result.server_time}
-    )
+    return stored_model.model_validate({**current, "server_time": result.server_time})
