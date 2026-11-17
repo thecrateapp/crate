@@ -18,9 +18,17 @@ export interface StackActivityFrame {
   sources: Record<string, string>;
 }
 
+export interface StackScrape {
+  health: "up" | "down" | "unknown";
+  interval_seconds: number | null;
+  last_scrape: string | null;
+}
+
 export interface StackActivityResources {
   observed_at: string;
   ingress?: Record<string, number> | null;
+  stores?: Record<string, number> | null;
+  scrapes?: Record<string, StackScrape> | null;
   host: {
     cpu_percent: number | null;
     memory_used_gib: number | null;
@@ -75,12 +83,30 @@ const dotsFor = (count: number) =>
 const taskValue = (completed: number, failed: number) =>
   `${completed + failed} tasks${failed ? ` · ${failed} failed` : ""}`;
 
+const STORE_LABELS = {
+  transactions: "Transactions",
+  commands: "Commands",
+} as const;
+
+const serviceName = (id: string) => id.slice(id.indexOf("/") + 1);
+
+function scrapesWithin(scrape: StackScrape, from: number, to: number) {
+  const last = scrape.last_scrape ? Date.parse(scrape.last_scrape) : NaN;
+  const interval = (scrape.interval_seconds ?? 0) * 1000;
+  if (!Number.isFinite(last) || !(interval > 0)) return 0;
+  return (
+    Math.floor((to - last) / interval) - Math.floor((from - last) / interval)
+  );
+}
+
 function measuring(
   services: StackMapService[],
-  measure: "requests" | "events" | "listening" | "ingress",
+  measure: NonNullable<
+    NonNullable<StackMapService["activity"]>["measures"]
+  >[number],
 ) {
-  return services.filter((service) =>
-    service.activity?.measures?.includes(measure),
+  return services.filter(
+    (service) => service.activity?.measures?.includes(measure),
   );
 }
 
@@ -142,8 +168,8 @@ export function deriveStackActivity(
     for (const [client, entry] of Object.entries(frame.requests)) {
       total += entry.count;
       errors += entry.errors;
-      const origins = services.filter((service) =>
-        service.activity?.clients?.includes(client),
+      const origins = services.filter(
+        (service) => service.activity?.clients?.includes(client),
       );
       if (origins.length !== 1) continue;
       const merged = byOrigin.get(origins[0]!.id) ?? { count: 0, errors: 0 };
@@ -186,8 +212,8 @@ export function deriveStackActivity(
       const count = entry.completed + entry.failed;
       tasks += count;
       if (!count) continue;
-      const consumers = services.filter((service) =>
-        service.activity?.queues?.includes(queue),
+      const consumers = services.filter(
+        (service) => service.activity?.queues?.includes(queue),
       );
       const links = consumers
         .map((consumer) =>
@@ -248,11 +274,13 @@ export function deriveStackActivity(
     }
   }
 
-  const ingress = frame.resources?.ingress;
-  const ingressAge = frame.resources
-    ? now - Date.parse(frame.resources.observed_at)
-    : Infinity;
-  if (ingress && ingressAge <= RESOURCES_MAX_AGE_MS) {
+  const resources =
+    frame.resources &&
+    now - Date.parse(frame.resources.observed_at) <= RESOURCES_MAX_AGE_MS
+      ? frame.resources
+      : null;
+  const ingress = resources?.ingress;
+  if (ingress) {
     const edges = measuring(services, "ingress");
     let total: number | null = null;
     for (const service of services) {
@@ -286,6 +314,50 @@ export function deriveStackActivity(
         add(edge.id, { label: "Ingress", value: `${total}/min` });
         raise(edge.id, level(total, 3));
       }
+  }
+
+  const stores = resources?.stores;
+  if (stores) {
+    for (const measure of ["transactions", "commands"] as const)
+      for (const store of measuring(services, measure)) {
+        const rate = stores[serviceName(store.id)];
+        if (rate === undefined || rate === null) continue;
+        add(store.id, {
+          label: STORE_LABELS[measure],
+          value: `${Math.round(rate)}/min`,
+        });
+        raise(store.id, level(rate, 5));
+      }
+  }
+
+  const scrapes = resources?.scrapes;
+  if (scrapes) {
+    for (const hub of measuring(services, "scrapes")) {
+      let up = 0;
+      let total = 0;
+      for (const service of services) {
+        const scrape = scrapes[serviceName(service.id)];
+        if (!scrape) continue;
+        total += 1;
+        if (scrape.health === "up") up += 1;
+        const count = window
+          ? scrapesWithin(scrape, observed - window * 1000, observed)
+          : 0;
+        if (!count) continue;
+        const link = connection(
+          (item) => item.source === hub.id && item.target === service.id,
+        );
+        if (link)
+          pulses.push({
+            connection: link,
+            count,
+            errors: scrape.health === "down" ? count : 0,
+            dots: dotsFor(count),
+            reverse: true,
+          });
+      }
+      if (total) add(hub.id, { label: "Targets", value: `${up}/${total} up` });
+    }
   }
 
   if (paused || view.status === "warming") {

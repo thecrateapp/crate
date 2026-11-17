@@ -519,6 +519,18 @@ Set `CRATE_GRAFANA_URL` on the API to show "Open in Grafana" links from the map
 inspector. Grafana only listens on `127.0.0.1:${OBS_GRAFANA_PORT}`, so the URL
 must be one the operator's browser can reach, typically through an SSH tunnel.
 
+### Scrapes and store activity
+
+The same 30-second read also asks Prometheus for its active targets and for two
+store rates. Each target becomes a pulse from that service into the monitoring
+dome at the moment Prometheus scrapes it, using the target's own interval and
+last scrape; a failing target pulses as an error, and the Prometheus node shows
+how many targets are up. Jobs map to services in
+`app/crate/observability/prometheus_adapter.py` (`crate-app` targets carry their
+Compose service as a label). PostgreSQL shows transactions per minute and each
+Redis shows commands per minute, from the existing exporters. Neither rate says
+which service caused it, so the stores glow with their load but draw no pulses.
+
 ### Ingress readings from Traefik
 
 With router metrics enabled, the map shows requests per minute through Edge for
