@@ -145,6 +145,7 @@ def test_rate_windows_hold_four_scrapes_of_their_job():
         "pg_stat_database_xact_commit": "postgresql",
         "pg_stat_database_xact_rollback": "postgresql",
         "redis_commands_processed_total": "redis-cache",
+        "crate_db_queries_total": "crate-app",
     }
 
     def seconds(value):
@@ -268,3 +269,23 @@ def test_every_scrape_job_maps_to_a_stack_service():
     )
     jobs = {job["job_name"] for job in config["scrape_configs"]}
     assert jobs == set(SCRAPE_JOBS) | {APP_JOB}
+
+
+def test_database_queries_are_named_by_the_service_that_sent_them():
+    from crate.observability import prometheus_adapter
+
+    resources = prometheus_adapter.fetch_stack_resources(
+        "http://p:9090",
+        opener=_opener(
+            {
+                "queries": _vector(
+                    ({"service": "crate-api"}, 1200.04),
+                    ({"service": "crate-readplane"}, 300),
+                    ({}, 7),
+                )
+            },
+            _targets(),
+        ),
+    )
+
+    assert resources["queries"] == {"crate-api": 1200.0, "crate-readplane": 300.0}

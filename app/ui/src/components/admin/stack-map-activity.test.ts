@@ -370,6 +370,7 @@ describe("deriveStackActivity telemetry", () => {
         { source: "prometheus", target: "worker", kind: "telemetry" },
         { source: "prometheus", target: "projector", kind: "telemetry" },
         { source: "prometheus", target: "readplane", kind: "telemetry" },
+        { source: "api", target: "postgres", kind: "data" },
       ],
     };
   }
@@ -443,6 +444,35 @@ describe("deriveStackActivity telemetry", () => {
     expect(view.levels.get("redis")).toBeGreaterThan(
       view.levels.get("postgres")!,
     );
+  });
+
+  it("sends each service's queries into PostgreSQL at their rate", () => {
+    const view = deriveStackActivity(
+      telemetrySnapshot(),
+      frame({
+        projector: null,
+        resources: resources({
+          queries: { api: 1200, readplane: 30, projector: 0 },
+        }),
+      }),
+      { now: NOW },
+    );
+
+    expect(pulse(view, "api", "postgres")).toMatchObject({
+      count: 100,
+      errors: 0,
+      reverse: false,
+    });
+    expect(view.readings.get("api")).toContainEqual({
+      label: "Queries",
+      value: "1200/min",
+    });
+    expect(view.readings.get("readplane")).toContainEqual({
+      label: "Queries",
+      value: "30/min",
+    });
+    expect(pulse(view, "readplane", "postgres")).toBeUndefined();
+    expect(pulse(view, "projector", "postgres")).toBeUndefined();
   });
 
   it("ignores old telemetry instead of replaying it", () => {

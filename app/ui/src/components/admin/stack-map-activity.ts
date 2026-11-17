@@ -28,6 +28,7 @@ export interface StackActivityResources {
   observed_at: string;
   ingress?: Record<string, number> | null;
   stores?: Record<string, number> | null;
+  queries?: Record<string, number> | null;
   scrapes?: Record<string, StackScrape> | null;
   host: {
     cpu_percent: number | null;
@@ -327,6 +328,32 @@ export function deriveStackActivity(
           value: `${Math.round(rate)}/min`,
         });
         raise(store.id, level(rate, 5));
+      }
+  }
+
+  const queries = resources?.queries;
+  if (queries) {
+    for (const store of measuring(services, "transactions"))
+      for (const service of services) {
+        const rate = queries[serviceName(service.id)];
+        if (rate === undefined || rate === null) continue;
+        add(service.id, {
+          label: "Queries",
+          value: `${Math.round(rate)}/min`,
+        });
+        const count = window ? Math.round((rate / 60) * window) : 0;
+        if (!count) continue;
+        const link = connection(
+          (item) => item.source === service.id && item.target === store.id,
+        );
+        if (link)
+          pulses.push({
+            connection: link,
+            count,
+            errors: 0,
+            dots: dotsFor(count),
+            reverse: false,
+          });
       }
   }
 
