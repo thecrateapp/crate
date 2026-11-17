@@ -40,17 +40,18 @@ names `nginx`, `traefik` and `slskd`; other service names are not retained.
 
 Defaults (override with exported environment values before calling Make):
 
-| Variable                | Default                                | Purpose                                                      |
-| ----------------------- | -------------------------------------- | ------------------------------------------------------------ |
-| `OBS_DATA_DIR`          | `/var/lib/crate-observability`         | Persistent Prometheus and Grafana directories                |
-| `OBS_SECRETS_DIR`       | `/var/lib/crate-observability/secrets` | File secrets, outside Git                                    |
-| `OBS_DOCKER_ROOT`       | `/var/lib/docker`                      | Actual Docker data-root, from `docker info`                  |
-| `OBS_CONTAINERD`        | `0`                                    | Set `1` only for Docker's `overlayfs` image store            |
-| `OBS_CONTAINERD_SOCKET` | `/run/containerd/containerd.sock`      | Actual containerd address from `docker info`, adapter only   |
-| `OBS_GRAFANA_PORT`      | `3001`                                 | Loopback-only Grafana port                                   |
-| `OBS_APP_NETWORK`       | `crate`                                | Existing external application network for PG/Redis exporters |
-| `OBS_ENV_FILE`          | `/dev/null`                            | Explicit monitoring settings; never the application `.env`   |
-| `CRATE_POSTGRES_DB`     | `crate` for config parsing only        | Actual observed database; must be explicitly set for startup |
+| Variable                    | Default                                | Purpose                                                      |
+| --------------------------- | -------------------------------------- | ------------------------------------------------------------ |
+| `OBS_DATA_DIR`              | `/var/lib/crate-observability`         | Persistent Prometheus and Grafana directories                |
+| `OBS_SECRETS_DIR`           | `/var/lib/crate-observability/secrets` | File secrets, outside Git                                    |
+| `OBS_DOCKER_ROOT`           | `/var/lib/docker`                      | Actual Docker data-root, from `docker info`                  |
+| `OBS_CONTAINERD`            | `0`                                    | Set `1` only for Docker's `overlayfs` image store            |
+| `OBS_CONTAINERD_SOCKET`     | `/run/containerd/containerd.sock`      | Actual containerd address from `docker info`, adapter only   |
+| `OBS_CONTAINERD_SOCKET_DIR` | Directory of `OBS_CONTAINERD_SOCKET`   | Mounted into the proxy; Make and the scripts derive it       |
+| `OBS_GRAFANA_PORT`          | `3001`                                 | Loopback-only Grafana port                                   |
+| `OBS_APP_NETWORK`           | `crate`                                | Existing external application network for PG/Redis exporters |
+| `OBS_ENV_FILE`              | `/dev/null`                            | Explicit monitoring settings; never the application `.env`   |
+| `CRATE_POSTGRES_DB`         | `crate` for config parsing only        | Actual observed database; must be explicitly set for startup |
 
 Defaults are available for configuration inspection. **Startup requires explicit
 `OBS_DATA_DIR`, `OBS_SECRETS_DIR`, `OBS_APP_NETWORK` and `CRATE_POSTGRES_DB`**,
@@ -456,17 +457,19 @@ Two Docker storage backends are supported explicitly: classic **overlay2** with
 `OBS_CONTAINERD=0`, and the containerd image store (**overlayfs**) with
 `OBS_CONTAINERD=1`. `observability-up` refuses a mismatch or any other driver
 before starting services. Record the actual driver/address in C0.
-The containerd socket's canonical host path must be under `/run`, where cAdvisor's
-host rootfs is masked. Make resolves symlinks and refuses paths outside that tree;
-do not bypass this guard with a direct Compose invocation. Alternate socket
+The containerd socket's canonical host path must be a `containerd.sock` in its own
+directory under `/run`, where cAdvisor's host rootfs is masked. Make resolves symlinks
+and refuses other paths; do not bypass this guard with a direct Compose invocation. Alternate socket
 locations require a collector/mount review before activation.
 Set this variable in the exported environment or as a Make argument. Make exports
 its default too, so the path checked by the guard is the same one Compose mounts;
 a divergent `.env` value cannot silently override it.
 
 The optional `compose.containerd.yaml` reuses the same proxy, image and resource
-limits. Only that proxy mounts the host containerd socket, with automatic path
-creation disabled. `runtime-proxy.haproxy.cfg` permits exactly the gRPC
+limits. Only that proxy mounts the host containerd socket's directory, read-only and
+with automatic path creation disabled. It mounts the directory, not the socket file:
+containerd recreates its socket when it restarts, and a file bind mount would keep
+the dead one, so every container created afterwards would lose its metrics. `runtime-proxy.haproxy.cfg` permits exactly the gRPC
 `containerd.services.containers.v1.Containers/Get` RPC through HTTP/2 POST and
 exactly one `containerd-namespace: moby` header. Other namespaces, duplicate
 namespace headers, task/list/version RPCs and mutations are denied. Docker's

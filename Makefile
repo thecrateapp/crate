@@ -1315,7 +1315,8 @@ OBS_PROJECT_DIR := $(CURDIR)
 export OBS_ENV_FILE OBS_PROJECT_DIR
 OBS_CONTAINERD ?= 0
 OBS_CONTAINERD_SOCKET ?= /run/containerd/containerd.sock
-export OBS_CONTAINERD_SOCKET
+OBS_CONTAINERD_SOCKET_DIR ?= $(patsubst %/,%,$(dir $(OBS_CONTAINERD_SOCKET)))
+export OBS_CONTAINERD_SOCKET OBS_CONTAINERD_SOCKET_DIR
 OBS_DC = $(DC) --project-name crate-observability --project-directory "$$OBS_PROJECT_DIR" --env-file "$$OBS_ENV_FILE" -f deploy/observability/compose.standalone.yaml $(if $(filter 1,$(OBS_CONTAINERD)),-f deploy/observability/compose.containerd.yaml) --profile observability
 OBS_SERVICES := crate-prometheus crate-grafana crate-node-exporter crate-postgres-exporter crate-redis-exporter crate-redis-durable-exporter crate-cadvisor crate-observability-docker-proxy
 

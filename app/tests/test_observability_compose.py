@@ -125,6 +125,9 @@ def _fake_monitoring_cli(
         "    if sys.argv[1] == 'compose':\n"
         "        socket = os.environ.get('OBS_CONTAINERD_SOCKET', '/outside/from-dotenv.sock')\n"
         "        output.write(json.dumps(['compose-socket', socket]) + '\\n')\n"
+        "        directory = os.environ.get('OBS_CONTAINERD_SOCKET_DIR', '')\n"
+        "        if 'up' in sys.argv:\n"
+        "            output.write(json.dumps(['compose-up-dir', directory]) + '\\n')\n"
         "if '--environment' in sys.argv:\n"
         "    for key in ('OBS_DATA_DIR', 'OBS_SECRETS_DIR', 'OBS_APP_NETWORK', 'CRATE_POSTGRES_DB'):\n"
         "        print(key + '=' + os.environ[key])\n"
@@ -238,8 +241,16 @@ def test_monitoring_start_rejects_unreviewed_storage_drivers(
             True,
             False,
         ),
+        (
+            "/var/run/containerd/containerd.sock",
+            "/run/containerd/containerd.sock",
+            True,
+            True,
+        ),
         ("/run/escape.sock", "/opt/containerd.sock", True, False),
         ("/run/missing.sock", "", False, False),
+        ("/run/containerd.sock", "/run/containerd.sock", True, False),
+        ("/run/containerd/other.sock", "/run/containerd/other.sock", True, False),
     ],
 )
 def test_containerd_start_rejects_socket_paths_outside_masked_run(
@@ -266,6 +277,8 @@ def test_containerd_start_rejects_socket_paths_outside_masked_run(
         assert len(starts) == 2
         assert "--wait" in starts[0] and "crate-observability-docker-proxy" in starts[0]
         assert "crate-cadvisor" in starts[1]
+        directories = {row[1] for row in commands if row[0] == "compose-up-dir"}
+        assert directories == {resolved.rsplit("/", 1)[0]}
     else:
         assert not starts
         assert "no services started" in result.stdout
@@ -275,15 +288,15 @@ def test_containerd_start_rejects_socket_paths_outside_masked_run(
 def test_compose_uses_the_same_socket_path_as_the_admission_guard(tmp_path, source):
     expected = {
         "default": "/run/containerd/containerd.sock",
-        "command-line": "/run/containerd/command-line.sock",
-        "environment": "/run/containerd/environment.sock",
+        "command-line": "/run/command-line/containerd.sock",
+        "environment": "/run/environment/containerd.sock",
     }[source]
     calls, environment = _fake_monitoring_cli(tmp_path, "overlayfs", expected)
     command = [shutil.which("make") or "make", "observability-up", "OBS_CONTAINERD=1"]
     if source == "environment":
         environment["OBS_CONTAINERD_SOCKET"] = expected
     elif source == "command-line":
-        environment["OBS_CONTAINERD_SOCKET"] = "/run/containerd/overridden.sock"
+        environment["OBS_CONTAINERD_SOCKET"] = "/run/overridden/containerd.sock"
         command.append(f"OBS_CONTAINERD_SOCKET={expected}")
     result = subprocess.run(
         command,
@@ -298,6 +311,10 @@ def test_compose_uses_the_same_socket_path_as_the_admission_guard(tmp_path, sour
     assert ["readlink", "-f", expected] in commands
     sockets = [row[1] for row in commands if row[0] == "compose-socket"]
     assert sockets and all(socket == expected for socket in sockets)
+    directories = [row[1] for row in commands if row[0] == "compose-up-dir"]
+    assert directories and all(
+        directory == expected.rsplit("/", 1)[0] for directory in directories
+    )
 
 
 def test_monitoring_has_bounded_cpu_memory_and_rotated_logs():

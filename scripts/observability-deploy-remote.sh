@@ -200,9 +200,10 @@ assert_containerd_socket() {
   resolved="$(readlink -f "${socket:-/run/containerd/containerd.sock}")" ||
     fail "unable to validate the containerd socket"
   case "$resolved" in
-    /run/*) ;;
-    *) fail "containerd socket must resolve under masked /run" ;;
+    /run/*/containerd.sock) ;;
+    *) fail "containerd socket must resolve to a containerd.sock under masked /run" ;;
   esac
+  export OBS_CONTAINERD_SOCKET_DIR="${resolved%/*}"
 }
 
 stage_release() {

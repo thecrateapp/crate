@@ -238,6 +238,9 @@ monitoring:
       label: Docker data root
     - env: OBS_CONTAINERD_SOCKET
       label: containerd socket
+      installer_only: true
+    - env: OBS_CONTAINERD_SOCKET_DIR
+      label: Directory the containerd socket lives in
     - env: OBS_CONTAINERD
       label: Docker containerd image store
       installer_only: true

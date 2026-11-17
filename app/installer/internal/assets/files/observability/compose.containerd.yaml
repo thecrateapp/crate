@@ -7,8 +7,8 @@ services:
     volumes:
       - ./deploy/observability/runtime-proxy.haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
       - type: bind
-        source: ${OBS_CONTAINERD_SOCKET:-/run/containerd/containerd.sock}
-        target: /var/run/crate-containerd.sock
+        source: ${OBS_CONTAINERD_SOCKET_DIR:-/run/containerd}
+        target: /var/run/crate-containerd
         read_only: true
         bind:
           create_host_path: false

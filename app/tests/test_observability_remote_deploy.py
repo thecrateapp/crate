@@ -743,3 +743,62 @@ def test_adoption_creates_the_new_project_before_the_monitoring_gap(lab):
     assert all(item["running"] for item in lab.docker_state()["objects"].values())
     assert lab.state("current") is None
     assert not (lab.root / "live").exists()
+
+
+def _remote_function(name: str) -> str:
+    script = (ROOT / "scripts/observability-deploy-remote.sh").read_text()
+    start = script.index(f"\n{name}() {{\n") + 1
+    return script[start : script.index("\n}\n", start) + 3]
+
+
+@pytest.mark.parametrize(
+    "socket,resolved,directory",
+    [
+        (
+            "/run/containerd/containerd.sock",
+            "/run/containerd/containerd.sock",
+            "/run/containerd",
+        ),
+        (
+            "/var/run/containerd/containerd.sock",
+            "/run/containerd/containerd.sock",
+            "/run/containerd",
+        ),
+        (
+            "/run/docker/containerd/containerd.sock",
+            "/run/docker/containerd/containerd.sock",
+            "/run/docker/containerd",
+        ),
+        ("/run/containerd.sock", "/run/containerd.sock", None),
+        ("/run/containerd/other.sock", "/run/containerd/other.sock", None),
+        ("/opt/containerd/containerd.sock", "/opt/containerd/containerd.sock", None),
+    ],
+)
+def test_remote_deploy_mounts_the_resolved_socket_directory(
+    socket, resolved, directory
+):
+    if not shutil.which("bash"):
+        pytest.skip("bash required")
+    program = "\n".join(
+        [
+            _remote_function("fail"),
+            _remote_function("assert_containerd_socket"),
+            f'env_value() {{ printf "%s\\n" "{socket}"; }}',
+            f'readlink() {{ printf "%s\\n" "{resolved}"; }}',
+            "OBS_CONTAINERD=1",
+            'assert_containerd_socket "$1"',
+            'printf "%s" "$OBS_CONTAINERD_SOCKET_DIR"',
+        ]
+    )
+    result = subprocess.run(
+        ["bash", "-c", program, "guard", "release"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    if directory is None:
+        assert result.returncode != 0
+        assert "containerd.sock under masked /run" in result.stderr
+    else:
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == directory
