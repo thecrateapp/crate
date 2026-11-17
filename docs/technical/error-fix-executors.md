@@ -266,15 +266,27 @@ Crate still needs the GitHub token to follow, merge and clean up the pull reques
 with the factory it needs no Actions permission. Launch fix is ready only when both
 tokens are stored. The factory settings may stay while `github_actions` launches new
 fixes, so the factory's open runs keep being followed; removing them deletes the
-factory token, and turning Launch fix off deletes both.
+factory token, and turning Launch fix off deletes both. The factory token is read
+only when a factory run needs it, so an unreadable one stops the factory's runs
+(`ERROR_FIX_TOKEN_UNAVAILABLE`) and never the workflow's.
+
+`fix.workflow` stays required even with the factory executor: the form keeps the
+stored value without showing it, so switching back to `github_actions` loses
+nothing.
+
+The factory's hostname is trusted as configured: Crate checks the URL when it is
+saved (scheme, metadata and link-local addresses, plain HTTP only on the tailnet)
+but does not pin or re-check its DNS answers on each request, as the Sentry client
+does for self-hosted Sentry. The tailnet and WireGuard are what keep the token on
+the way to the factory.
 
 ### Calls
 
-| Method    | Request                                                                                                                                                                                                                                                                     |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `submit`  | `POST /v1/bugs` with `Authorization: Bearer <token>`, `Idempotency-Key: <run_id>` and `run_id`, `issue_id`, `short_id`, `note`, `repository`, `base_ref` and the bug payload. The bug's id becomes the run's external id. A replay answers with the bug it already created. |
-| `refresh` | `GET /v1/bugs/{id}`: the bug's state, its pull request number and branch once published, and a short summary that Crate sanitizes like any fixer's.                                                                                                                         |
-| `cancel`  | `POST /v1/bugs/{id}/cancel`. False when the factory answers `409` because the bug already ended.                                                                                                                                                                            |
+| Method    | Request                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submit`  | `POST /v1/bugs` with `Authorization: Bearer <token>`, `Idempotency-Key: <run_id>` and `run_id`, `issue_id`, `short_id`, `note`, `repository`, `base_ref` and the bug payload. The bug's id becomes the run's external id. A replay answers with the bug it already created. When the answer is lost (`FACTORY_TIMEOUT`, `FACTORY_UNAVAILABLE`), `GET /v1/bugs?short_id=&repository=` finds the bug whose `external_run_id` is this run id and the run adopts it; with none, the submission fails. It is never sent twice. |
+| `refresh` | `GET /v1/bugs/{id}`: the bug's state, its pull request number and branch once published, and a short summary that Crate sanitizes like any fixer's.                                                                                                                                                                                                                                                                                                                                                                       |
+| `cancel`  | `POST /v1/bugs/{id}/cancel`. False when the factory answers `409` because the bug already ended.                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 The factory refuses unknown keys anywhere in the submission, so the body is exactly
 its `bugSubmitInputSchema`; the payload's timestamps are ISO 8601 strings.
@@ -288,7 +300,7 @@ from its spec and run. Crate maps it:
 | ----------------------------------------------------------------------------- | ---------------------- |
 | `received`, `accepted`                                                        | `queued`               |
 | `reproducing`, `fixing`, `checking`, `needs_decision`, `awaiting_publication` | `running`              |
-| `awaiting_review`, `merged`                                                   | `succeeded`            |
+| `awaiting_review`, `merged` (with their pull request number)                  | `succeeded`            |
 | `rejected`, `not_reproduced`, `failed`                                        | `failed`               |
 | `cancelled`, `closed`                                                         | `cancelled`            |
 
@@ -296,30 +308,44 @@ A `received` bug waits for a person to accept its spec, and an
 `awaiting_publication` one for a person to grant its publication. Those two human
 gates are why a factory run expires after **48 hours** without a pull request
 instead of 6. On expiry Crate cancels the bug, also while it is still `received`.
+A published state whose record does not carry the pull request number yet counts
+as `running`, never as a run that proposed nothing. If the cancel at expiry fails
+for a passing reason (`FACTORY_TIMEOUT`, `FACTORY_UNAVAILABLE`, `FACTORY_SERVER`,
+`FACTORY_RATE_LIMITED`, or GitHub's unavailable, server or rate-limit errors), the
+run stays open with that code and the next pass tries again; it expires once the
+cancel goes through, is refused for good, or the fixer reports a terminal state.
 When a bug fails or is cancelled before its pull request, the run keeps the
 factory's summary (for example why it was not reproduced) instead of Crate's
 generic sentence. An unknown state is a `FACTORY_UNEXPECTED_RESPONSE` on the run.
 
 ### Errors
 
-| Code                                                        | Cause                                                                                              |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `FACTORY_AUTH`, `FACTORY_FORBIDDEN`                         | `401`, `403`: a wrong token, or a caller outside the listener's allowed networks                   |
-| `FACTORY_CONFLICT`                                          | `409`: the bug is already open there, the repository has too many open bugs or an inactive profile |
-| `FACTORY_VALIDATION`                                        | `413`, `422`, `428`: the factory refused the submission's content                                  |
-| `FACTORY_NOT_FOUND`, `FACTORY_RATE_LIMITED`                 | `404`, `429`                                                                                       |
-| `FACTORY_SERVER`, `FACTORY_REDIRECT`, `FACTORY_HTTP_*`      | Other answers                                                                                      |
-| `FACTORY_TIMEOUT`, `FACTORY_UNAVAILABLE`                    | No answer in 15 s, or the factory could not be reached                                             |
-| `FACTORY_UNEXPECTED_RESPONSE`, `FACTORY_RESPONSE_TOO_LARGE` | An answer Crate cannot read                                                                        |
+| Code                                                        | Cause                                                                                |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `FACTORY_AUTH`, `FACTORY_FORBIDDEN`                         | `401`, `403`: a wrong token, or a caller outside the listener's allowed networks     |
+| `FACTORY_BUG_IN_PROGRESS`                                   | `409 BUG_IN_PROGRESS`: another bug of this issue is open on the factory              |
+| `FACTORY_BUG_LIMIT`                                         | `409 BUG_LIMIT`: the repository has its maximum of open bugs                         |
+| `FACTORY_IDEMPOTENCY_CONFLICT`                              | `409 IDEMPOTENCY_CONFLICT`: this run id was already submitted with different content |
+| `FACTORY_CONFLICT`                                          | Any other `409`, such as an inactive profile                                         |
+| `FACTORY_VALIDATION`                                        | `413`, `422`, `428`: the factory refused the submission's content                    |
+| `FACTORY_NOT_FOUND`, `FACTORY_RATE_LIMITED`                 | `404`, `429`                                                                         |
+| `FACTORY_SERVER`, `FACTORY_REDIRECT`, `FACTORY_HTTP_*`      | Other answers                                                                        |
+| `FACTORY_TIMEOUT`, `FACTORY_UNAVAILABLE`                    | No answer in 15 s, or the factory could not be reached                               |
+| `FACTORY_UNEXPECTED_RESPONSE`, `FACTORY_RESPONSE_TOO_LARGE` | An answer Crate cannot read                                                          |
 
-A refused submission fails the run and gives the claim back, as with GitHub. A
-factory error while tracking is recorded on that run only; GitHub runs go on.
+Of a `409` body Crate reads only its `code` (at most 4 KiB), and only those three
+codes are told apart; the rest of the body is never kept or shown. A refused
+submission fails the run and gives the claim back, as with GitHub. A factory error
+while tracking is recorded on that run only; GitHub runs go on.
 
 ### What can go wrong
 
-- **A submission that timed out** may still have created the bug. Launching again
-  sends a new run id, so the factory refuses it with `FACTORY_CONFLICT` while that
-  bug is open; cancel it on the factory (`factory bugs cancel <id>`) first.
+- **A submission whose answer was lost and whose lookup failed too** fails the run,
+  although the factory may have created the bug. Launching again sends a new run
+  id, so the factory refuses it with `FACTORY_BUG_IN_PROGRESS` while that bug is
+  open; cancel it on the factory (`factory bugs cancel <id>`) first.
+- **A cancel that keeps failing at expiry** keeps the run open, and the issue
+  blocked for a new fix, until the factory answers again.
 - **Removing the factory settings while a factory run is open** leaves that run
   unfollowed (`ERROR_FIX_NOT_CONFIGURED` on each pass) until they are back.
 - **The App login is wrong**: the pull request is found but Approve & merge shows
