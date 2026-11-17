@@ -348,3 +348,116 @@ describe("deriveStackActivity", () => {
     ).toBeLessThanOrEqual(40);
   });
 });
+
+describe("deriveStackActivity telemetry", () => {
+  function telemetrySnapshot(): StackMapSnapshot {
+    const base = snapshot();
+    const service = (
+      id: string,
+      activity: StackMapSnapshot["services"][number]["activity"],
+    ) => ({ ...base.services[0]!, id, label: id, description: id, activity });
+    return {
+      ...base,
+      services: [
+        ...base.services.filter((item) => item.id !== "postgres"),
+        service("prometheus", { measures: ["scrapes"] }),
+        service("postgres", { measures: ["transactions"] }),
+        service("redis", { measures: ["commands"] }),
+      ],
+      connections: [
+        ...base.connections,
+        { source: "prometheus", target: "api", kind: "telemetry" },
+        { source: "prometheus", target: "worker", kind: "telemetry" },
+        { source: "prometheus", target: "projector", kind: "telemetry" },
+        { source: "prometheus", target: "readplane", kind: "telemetry" },
+      ],
+    };
+  }
+
+  const resources = (
+    overrides: Partial<NonNullable<StackActivityFrame["resources"]>> = {},
+  ): NonNullable<StackActivityFrame["resources"]> => ({
+    observed_at: "2026-11-01T12:00:00Z",
+    host: { cpu_percent: null, memory_used_gib: null, memory_total_gib: null },
+    services: {},
+    scrapes: {
+      api: {
+        health: "up",
+        interval_seconds: 15,
+        last_scrape: "2026-11-01T11:59:45Z",
+      },
+      worker: {
+        health: "down",
+        interval_seconds: 30,
+        last_scrape: "2026-11-01T11:59:31Z",
+      },
+      projector: {
+        health: "up",
+        interval_seconds: 15,
+        last_scrape: "2026-11-01T11:59:50Z",
+      },
+      readplane: { health: "unknown", interval_seconds: 15, last_scrape: null },
+    },
+    stores: { postgres: 998.4, redis: 8570.7 },
+    ...overrides,
+  });
+
+  it("sends each scrape that lands inside the frame into the dome", () => {
+    const view = deriveStackActivity(
+      telemetrySnapshot(),
+      frame({ resources: resources() }),
+      { now: NOW },
+    );
+
+    expect(pulse(view, "prometheus", "api")).toMatchObject({
+      count: 1,
+      errors: 0,
+      reverse: true,
+    });
+    expect(pulse(view, "prometheus", "worker")).toMatchObject({
+      count: 1,
+      errors: 1,
+      reverse: true,
+    });
+    expect(pulse(view, "prometheus", "projector")).toBeUndefined();
+    expect(pulse(view, "prometheus", "readplane")).toBeUndefined();
+    expect(view.readings.get("prometheus")).toEqual([
+      { label: "Targets", value: "2/4 up" },
+    ]);
+  });
+
+  it("reads store activity as transactions and commands", () => {
+    const view = deriveStackActivity(
+      telemetrySnapshot(),
+      frame({ resources: resources() }),
+      { now: NOW },
+    );
+
+    expect(view.readings.get("postgres")).toContainEqual({
+      label: "Transactions",
+      value: "998/min",
+    });
+    expect(view.readings.get("redis")).toEqual([
+      { label: "Commands", value: "8571/min" },
+    ]);
+    expect(view.levels.get("redis")).toBeGreaterThan(
+      view.levels.get("postgres")!,
+    );
+  });
+
+  it("ignores old telemetry instead of replaying it", () => {
+    const view = deriveStackActivity(
+      telemetrySnapshot(),
+      frame({
+        resources: resources({ observed_at: "2026-11-01T11:58:00Z" }),
+      }),
+      { now: NOW },
+    );
+
+    expect(
+      view.pulses.some((item) => item.connection.source === "prometheus"),
+    ).toBe(false);
+    expect(view.readings.get("prometheus")).toBeUndefined();
+    expect(view.readings.get("redis")).toBeUndefined();
+  });
+});

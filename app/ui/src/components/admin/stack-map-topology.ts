@@ -227,6 +227,10 @@ export const STACK_ACTIVITY_ROLES: Partial<
   "crate-analysis-worker": { queues: ["heavy"] },
   "crate-playback-worker": { queues: ["playback"] },
   "crate-projector": { measures: ["events"] },
+  "crate-prometheus": { measures: ["scrapes"] },
+  "crate-postgres": { measures: ["transactions"] },
+  "crate-redis": { measures: ["commands"] },
+  "crate-redis-durable": { measures: ["commands"] },
 };
 
 export const STACK_CONNECTIONS: [string, string, StackMapConnection["kind"]][] =
@@ -263,4 +267,14 @@ export const STACK_CONNECTIONS: [string, string, StackMapConnection["kind"]][] =
     ["crate-prometheus", "crate-postgres-exporter", "telemetry"],
     ["crate-prometheus", "crate-redis-exporter", "telemetry"],
     ["crate-prometheus", "crate-redis-durable-exporter", "telemetry"],
+    ["crate-prometheus", "traefik", "telemetry"],
+    ["crate-prometheus", "crate-api", "telemetry"],
+    ["crate-prometheus", "crate-readplane", "telemetry"],
+    ["crate-prometheus", "crate-projector", "telemetry"],
+    ["crate-prometheus", "crate-worker", "telemetry"],
+    ["crate-prometheus", "crate-fast-worker", "telemetry"],
+    ["crate-prometheus", "crate-maintenance-worker", "telemetry"],
+    ["crate-prometheus", "crate-analysis-worker", "telemetry"],
+    ["crate-prometheus", "crate-playback-worker", "telemetry"],
+    ["crate-prometheus", "crate-media-worker", "telemetry"],
   ];

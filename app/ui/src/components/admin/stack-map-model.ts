@@ -4,7 +4,15 @@ export interface StackMapActivityRole {
   clients?: string[];
   queues?: string[];
   routers?: string[];
-  measures?: ("requests" | "events" | "listening" | "ingress")[];
+  measures?: (
+    | "requests"
+    | "events"
+    | "listening"
+    | "ingress"
+    | "scrapes"
+    | "transactions"
+    | "commands"
+  )[];
 }
 
 export interface StackMapService {

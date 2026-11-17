@@ -31,6 +31,37 @@ def _vector(*samples):
     }
 
 
+def _targets(*targets):
+    return {"status": "success", "data": {"activeTargets": list(targets)}}
+
+
+def _target(
+    job, health="up", interval="30s", last="2026-11-17T12:57:28.418Z", **labels
+):
+    return {
+        "labels": {"job": job, **labels},
+        "health": health,
+        "scrapeInterval": interval,
+        "lastScrape": last,
+    }
+
+
+def _opener(responses, targets, seen=None):
+    from crate.observability import prometheus_adapter
+
+    def opener(url, timeout):
+        if seen is not None:
+            seen.append((url, timeout))
+        if url.endswith("/api/v1/targets?state=active"):
+            return _Response(targets)
+        for key, query in prometheus_adapter.QUERIES.items():
+            if url.endswith(prometheus_adapter.quote_query(query)):
+                return _Response(responses.get(key, _vector()))
+        raise AssertionError(url)
+
+    return opener
+
+
 def test_resources_combine_container_and_host_readings():
     from crate.observability import prometheus_adapter
 
@@ -49,15 +80,10 @@ def test_resources_combine_container_and_host_readings():
     }
     seen = []
 
-    def opener(url, timeout):
-        seen.append((url, timeout))
-        for key, query in prometheus_adapter.QUERIES.items():
-            if url.endswith(prometheus_adapter.quote_query(query)):
-                return _Response(responses[key])
-        raise AssertionError(url)
-
     resources = prometheus_adapter.fetch_stack_resources(
-        "http://crate-prometheus:9090/", opener=opener, now=lambda: 1730462405.0
+        "http://crate-prometheus:9090/",
+        opener=_opener(responses, _targets(), seen),
+        now=lambda: 1730462405.0,
     )
 
     assert resources["services"]["crate-api"] == {
@@ -79,8 +105,7 @@ def test_resources_combine_container_and_host_readings():
         == datetime.fromtimestamp(1730462405.0, tz=timezone.utc).isoformat()
     )
     assert all(
-        url.startswith("http://crate-prometheus:9090/api/v1/query?query=")
-        for url, _ in seen
+        url.startswith("http://crate-prometheus:9090/api/v1/") for url, _ in seen
     )
     assert {timeout for _, timeout in seen} == {2.0}
 
@@ -117,6 +142,9 @@ def test_rate_windows_hold_four_scrapes_of_their_job():
         "container_cpu_usage_seconds_total": "cadvisor",
         "node_cpu_seconds_total": "node",
         "traefik_router_requests_total": "traefik",
+        "pg_stat_database_xact_commit": "postgresql",
+        "pg_stat_database_xact_rollback": "postgresql",
+        "redis_commands_processed_total": "redis-cache",
     }
 
     def seconds(value):
@@ -130,3 +158,113 @@ def test_rate_windows_hold_four_scrapes_of_their_job():
     assert {metric for metric, _ in windows} == set(source)
     for metric, window in windows:
         assert seconds(window) >= 4 * seconds(interval[source[metric]]), metric
+
+
+def test_store_activity_names_the_store_each_rate_belongs_to():
+    from crate.observability import prometheus_adapter
+
+    resources = prometheus_adapter.fetch_stack_resources(
+        "http://p:9090",
+        opener=_opener(
+            {
+                "postgres": _vector(({}, 998.4)),
+                "redis": _vector(
+                    ({"job": "redis-cache"}, 8570.66),
+                    ({"job": "redis-durable"}, 9472),
+                    ({"job": "unknown"}, 5),
+                ),
+            },
+            _targets(),
+        ),
+    )
+
+    assert resources["stores"] == {
+        "crate-postgres": 998.4,
+        "crate-redis": 8570.7,
+        "crate-redis-durable": 9472.0,
+    }
+
+
+def test_scrapes_name_each_target_by_its_stack_service():
+    from crate.observability import prometheus_adapter
+
+    resources = prometheus_adapter.fetch_stack_resources(
+        "http://p:9090",
+        opener=_opener(
+            {},
+            _targets(
+                _target(
+                    "crate-app",
+                    interval="15s",
+                    service="crate-api",
+                    last="2026-11-17T12:57:33.533123456Z",
+                ),
+                _target("postgresql", interval="1m"),
+                _target(
+                    "traefik",
+                    health="down",
+                    interval="1m30s",
+                    last="0001-01-01T00:00:00Z",
+                ),
+                _target("crate-app", interval="15s"),
+                _target("someone-else"),
+            ),
+        ),
+    )
+
+    assert resources["scrapes"] == {
+        "crate-api": {
+            "health": "up",
+            "interval_seconds": 15,
+            "last_scrape": "2026-11-17T12:57:33.533Z",
+        },
+        "crate-postgres-exporter": {
+            "health": "up",
+            "interval_seconds": 60,
+            "last_scrape": "2026-11-17T12:57:28.418Z",
+        },
+        "traefik": {"health": "down", "interval_seconds": 90, "last_scrape": None},
+    }
+
+
+def test_a_down_target_wins_over_an_up_one_for_the_same_service():
+    from crate.observability import prometheus_adapter
+
+    resources = prometheus_adapter.fetch_stack_resources(
+        "http://p:9090",
+        opener=_opener(
+            {},
+            _targets(
+                _target("crate-app", health="down", service="crate-worker"),
+                _target("crate-app", service="crate-worker"),
+            ),
+        ),
+    )
+
+    assert resources["scrapes"]["crate-worker"]["health"] == "down"
+
+
+def test_unreadable_targets_raise_instead_of_hiding_the_dome():
+    from crate.observability import prometheus_adapter
+
+    with pytest.raises(prometheus_adapter.PrometheusUnavailableError):
+        prometheus_adapter.fetch_stack_resources(
+            "http://p:9090",
+            opener=_opener({}, {"status": "error", "error": "unavailable"}),
+        )
+
+
+def test_every_scrape_job_maps_to_a_stack_service():
+    from pathlib import Path
+
+    import yaml
+
+    from crate.observability.prometheus_adapter import APP_JOB, SCRAPE_JOBS
+
+    config = yaml.safe_load(
+        (
+            Path(__file__).resolve().parents[2] / "deploy/observability/prometheus.yml"
+        ).read_text()
+    )
+    jobs = {job["job_name"] for job in config["scrape_configs"]}
+    assert jobs == set(SCRAPE_JOBS) | {APP_JOB}
