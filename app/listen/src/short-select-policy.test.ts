@@ -130,6 +130,12 @@ const FORM_SELECTS: Record<string, FormSelect> = {
       reason:
         "Categorical manifest field: each model declares JSON schema or JSON object, which the API validates; form Select under1AQ/1AR, not a filter.",
     },
+  "app/ui/src/components/errors/FixSettingsForm.tsx:AdminSelect:executor": {
+    choices: 2,
+    sites: 1,
+    reason:
+      "Categorical Launch fix setting persisted as fix.executor (github_actions or factory); form Select under1AQ/1AR, not a filter.",
+  },
   'app/ui/src/components/shows/ShowCandidateFields.tsx:AdminSelect:candidate.status ?? "scheduled"':
     {
       choices: 6,
