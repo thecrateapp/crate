@@ -101,7 +101,7 @@ def _scrapes(targets: list[dict]) -> dict[str, dict]:
     scrapes: dict[str, dict] = {}
     for target in targets:
         labels = target.get("labels") or {}
-        job = labels.get("job")
+        job = labels.get("job", "")
         service = labels.get("service") if job == APP_JOB else SCRAPE_JOBS.get(job)
         if not service:
             continue
