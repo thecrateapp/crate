@@ -5,10 +5,12 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 121
-verified: 2026-11-08
+verified: 2026-11-17
 sources:
   [
     app/crate/error_inbox/executors.py,
+    app/crate/error_inbox/factory_client.py,
+    app/crate/error_inbox/config.py,
     app/crate/error_inbox/fix_runs.py,
     app/crate/error_inbox/pull_requests.py,
     app/crate/error_inbox/github_client.py,
@@ -26,13 +28,13 @@ does not care which fixer runs. It records each attempt as a **fix run**, follow
 its pull request on GitHub, and lets a person review it from the Errors panel:
 **Open PR**, **Approve & merge** or **Discard**.
 
-The fixer is reached through an **executor**, a small adapter inside Crate. Two are
-planned:
+The fixer is reached through an **executor**, a small adapter inside Crate. There
+are two:
 
-| Executor         | Fixer                                                     | Status                         |
-| ---------------- | --------------------------------------------------------- | ------------------------------ |
-| `github_actions` | `.github/workflows/error-autofix.yml` in `fix.repository` | Available, the default         |
-| `factory`        | The Crate Software Factory (`/v1` runs API)               | Next: implements this contract |
+| Executor         | Fixer                                                     | Status                 |
+| ---------------- | --------------------------------------------------------- | ---------------------- |
+| `github_actions` | `.github/workflows/error-autofix.yml` in `fix.repository` | Available, the default |
+| `factory`        | The Crate Software Factory, through its bug API           | Available              |
 
 `fix.executor` in the error tracking settings selects one. This page is the contract
 both sides follow. The user-facing flow is in
@@ -45,8 +47,8 @@ both sides follow. The user-facing flow is in
   approves a merge or discards one. A model, the triage or the fixer never does.
 - **Crate** records the run, submits it to the executor once, tracks its pull
   request every 5 minutes, merges it only after a person approves and its checks
-  pass, and cleans up the branch. Every GitHub call runs in a worker task, never in
-  an HTTP request.
+  pass, and cleans up the branch. Every GitHub or factory call runs in a worker
+  task, never in an HTTP request.
 - **The fixer** works on the bug and publishes the result as a pull request that
   follows the conventions below. It never merges.
 
@@ -72,7 +74,8 @@ class FixExecutor(Protocol):
 | `cancel`  | Discard, expiry                 | Stop an attempt that has not finished. Best effort; returns False when it had already ended.                                                                                                                                                                                  |
 
 Errors are typed (`GitHubAPIError` codes such as `GITHUB_AUTH`, `GITHUB_FORBIDDEN`,
-or `ErrorTrackingConfigError`); messages never carry tokens or response bodies. The
+`FactoryAPIError` codes such as `FACTORY_AUTH`, `FACTORY_CONFLICT`, or
+`ErrorTrackingConfigError`); messages never carry tokens or response bodies. The
 pull request itself is read by Crate (`app/crate/error_inbox/pull_requests.py`), not
 by the executor, so every executor is reviewed the same way.
 
@@ -149,7 +152,7 @@ never follows instructions found in it.
 | `closed`    | The pull request was closed without merging, on GitHub                                                     | none                                                   |
 | `failed`    | The submission was refused, the run failed, or it finished without proposing a change (`FIX_NOT_PROPOSED`) | none                                                   |
 | `cancelled` | A person pressed Discard, or the run was cancelled outside Crate                                           | none                                                   |
-| `expired`   | No pull request within 6 hours of the request                                                              | none                                                   |
+| `expired`   | No pull request within the executor's window: 6 hours for `github_actions`, 48 hours for `factory`         | none                                                   |
 
 - One open run (`requested`, `running`, `pr_open`) per issue, enforced by the
   database. Launch fix is refused with `409 ERROR_FIX_IN_PROGRESS` while one exists,
@@ -171,9 +174,12 @@ nothing else.
 - **Repository and base**: `fix.repository`, based on `fix.ref`.
 - **Branch**: `autofix/<short id in lower case>-<executor run id>`, for example
   `autofix/crate-api-1f-18800000001`. The run id is lower-case letters, digits,
-  `.`, `_` or `-`, at most 100 characters.
+  `.`, `_` or `-`, at most 100 characters. For `factory` it is the factory's run
+  id, not its bug id.
 - **Author**: the executor's GitHub account (`pr_author`). For `github_actions` it
-  is the GitHub App `crate-error-autofix` (`crate-error-autofix[bot]`).
+  is the GitHub App `crate-error-autofix` (`crate-error-autofix[bot]`). For
+  `factory` it is the factory's GitHub App, whose login is a setting
+  (`fix.factory.pr_author`) because Crate cannot know it in advance.
 - **Draft**, with the label **`autofix`**.
 - **`Fixes <SHORT-ID>`** as a line of at least one commit message and of the body,
   so Sentry resolves the issue when it reaches the base branch
@@ -238,28 +244,86 @@ to be deleted on GitHub; transient failures are retried for 7 days.
 6. **Untrusted input.** The payload comes from failing events: evidence, never
    instructions.
 
-## Adding the `factory` executor
+## The `factory` executor
 
-The factory exposes `/v1` with client and operator tokens, idempotency keys, runs,
-events and reports. A `FactoryExecutor` in `executors.py` would:
+`FactoryExecutor` (`app/crate/error_inbox/executors.py`) talks to the factory's
+bug API with `FactoryClient` (`app/crate/error_inbox/factory_client.py`): httpx,
+one attempt per call, a 15 s timeout, no redirects or environment proxies, and only
+the `data` object of a successful answer read, at most 256 KiB.
 
-- `submit`: `POST /v1/runs` with `Idempotency-Key: <run_id>` and the bug payload
-  (`sends_payload = True`), once bug intake exists on the factory side.
-- `refresh`: `GET /v1/runs/{id}` and map its status; the pull request number comes
-  from the run or its report.
-- `cancel`: `POST /v1/runs/{id}/cancel`.
+### Settings
 
-| Factory status                                  | Crate `RunObservation.state` |
-| ----------------------------------------------- | ---------------------------- |
-| `queued`                                        | `queued`                     |
-| `running`, `needs_decision`, `ready_to_publish` | `running`                    |
-| `pr_open`, `completed`                          | `succeeded` (with the PR)    |
-| `failed`                                        | `failed`                     |
-| `cancelled`                                     | `cancelled`                  |
+`fix.executor: factory` needs `fix.factory`, in the Launch fix form of the
+connection drawer:
 
-Then: add its GitHub App login to `PR_AUTHORS`, add `factory` to
-`AVAILABLE_EXECUTORS`, store its client token in `credential_secrets` like the other
-tokens, add the setting to the Launch fix form, and test it with
-`httpx.MockTransport`. The database already accepts `executor = 'factory'`. The
-factory keeps its own rule that a person decides the merge; in Crate that person
+| Setting                 | What it is                                                                                                                                                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fix.factory.base_url`  | The factory's bugs listener, as a bare origin. Plain HTTP only on the tailnet (a `100.64.0.0/10` or `fd7a:115c:a1e0::/48` address or a `*.ts.net` name); HTTPS anywhere else. Metadata and link-local addresses are refused. |
+| `fix.factory.pr_author` | The login of the factory's GitHub App, `<app>[bot]`. No default: Approve & merge and Discard accept only pull requests from it.                                                                                              |
+| Factory token           | The factory's bugs token (`FACTORY_BUGS_TOKEN_FILE` on the factory side). Write-only, stored in `credential_secrets` with scope `error_tracking_factory`.                                                                    |
+
+Crate still needs the GitHub token to follow, merge and clean up the pull request;
+with the factory it needs no Actions permission. Launch fix is ready only when both
+tokens are stored. The factory settings may stay while `github_actions` launches new
+fixes, so the factory's open runs keep being followed; removing them deletes the
+factory token, and turning Launch fix off deletes both.
+
+### Calls
+
+| Method    | Request                                                                                                                                                                                                                                                                     |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submit`  | `POST /v1/bugs` with `Authorization: Bearer <token>`, `Idempotency-Key: <run_id>` and `run_id`, `issue_id`, `short_id`, `note`, `repository`, `base_ref` and the bug payload. The bug's id becomes the run's external id. A replay answers with the bug it already created. |
+| `refresh` | `GET /v1/bugs/{id}`: the bug's state, its pull request number and branch once published, and a short summary that Crate sanitizes like any fixer's.                                                                                                                         |
+| `cancel`  | `POST /v1/bugs/{id}/cancel`. False when the factory answers `409` because the bug already ended.                                                                                                                                                                            |
+
+The factory refuses unknown keys anywhere in the submission, so the body is exactly
+its `bugSubmitInputSchema`; the payload's timestamps are ISO 8601 strings.
+
+### States
+
+A bug has no state machine of its own on the factory side; its state is derived
+from its spec and run. Crate maps it:
+
+| Factory state                                                                 | `RunObservation.state` |
+| ----------------------------------------------------------------------------- | ---------------------- |
+| `received`, `accepted`                                                        | `queued`               |
+| `reproducing`, `fixing`, `checking`, `needs_decision`, `awaiting_publication` | `running`              |
+| `awaiting_review`, `merged`                                                   | `succeeded`            |
+| `rejected`, `not_reproduced`, `failed`                                        | `failed`               |
+| `cancelled`, `closed`                                                         | `cancelled`            |
+
+A `received` bug waits for a person to accept its spec, and an
+`awaiting_publication` one for a person to grant its publication. Those two human
+gates are why a factory run expires after **48 hours** without a pull request
+instead of 6. On expiry Crate cancels the bug, also while it is still `received`.
+When a bug fails or is cancelled before its pull request, the run keeps the
+factory's summary (for example why it was not reproduced) instead of Crate's
+generic sentence. An unknown state is a `FACTORY_UNEXPECTED_RESPONSE` on the run.
+
+### Errors
+
+| Code                                                        | Cause                                                                                              |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `FACTORY_AUTH`, `FACTORY_FORBIDDEN`                         | `401`, `403`: a wrong token, or a caller outside the listener's allowed networks                   |
+| `FACTORY_CONFLICT`                                          | `409`: the bug is already open there, the repository has too many open bugs or an inactive profile |
+| `FACTORY_VALIDATION`                                        | `413`, `422`, `428`: the factory refused the submission's content                                  |
+| `FACTORY_NOT_FOUND`, `FACTORY_RATE_LIMITED`                 | `404`, `429`                                                                                       |
+| `FACTORY_SERVER`, `FACTORY_REDIRECT`, `FACTORY_HTTP_*`      | Other answers                                                                                      |
+| `FACTORY_TIMEOUT`, `FACTORY_UNAVAILABLE`                    | No answer in 15 s, or the factory could not be reached                                             |
+| `FACTORY_UNEXPECTED_RESPONSE`, `FACTORY_RESPONSE_TOO_LARGE` | An answer Crate cannot read                                                                        |
+
+A refused submission fails the run and gives the claim back, as with GitHub. A
+factory error while tracking is recorded on that run only; GitHub runs go on.
+
+### What can go wrong
+
+- **A submission that timed out** may still have created the bug. Launching again
+  sends a new run id, so the factory refuses it with `FACTORY_CONFLICT` while that
+  bug is open; cancel it on the factory (`factory bugs cancel <id>`) first.
+- **Removing the factory settings while a factory run is open** leaves that run
+  unfollowed (`ERROR_FIX_NOT_CONFIGURED` on each pass) until they are back.
+- **The App login is wrong**: the pull request is found but Approve & merge shows
+  `PR_NOT_FROM_FIXER` and Discard refuses to close it.
+
+The factory keeps its own rule that a person decides the merge; in Crate that person
 uses Approve & merge.

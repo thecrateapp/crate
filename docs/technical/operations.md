@@ -5,7 +5,7 @@ section: operations
 audience: [operator]
 status: canonical
 order: 120
-verified: 2026-11-05
+verified: 2026-11-17
 sources:
   [
     docker-compose.yaml,
@@ -21,6 +21,7 @@ sources:
     app/tests/fixtures/hermes_context_acceptance.json,
     app/crate/error_inbox/config.py,
     app/crate/error_inbox/github_client.py,
+    app/crate/error_inbox/factory_client.py,
     .github/workflows/error-autofix.yml,
   ]
 ---
@@ -268,6 +269,24 @@ more:
 - Store it in Admin, **Errors > Sentry connection > Launch fix**. It goes to
   `credential_secrets` encrypted (scope `error_tracking_github`), never to
   `settings`, and no API response returns it. Classic tokens (`ghp_`) are refused.
+
+With the Crate Software Factory as the fixer, the factory opens the pull requests
+with its own GitHub App and the GitHub token only follows, merges and cleans them
+up: it needs no Actions permission. Crate also needs:
+
+- **The factory's bugs token**, the one in the factory's
+  `FACTORY_BUGS_TOKEN_FILE`. It can only submit, read and cancel bugs. Stored the
+  same way, scope `error_tracking_factory`.
+- **The factory URL**: its bugs listener on the tailnet, such as
+  `http://100.101.102.103:8788`. Plain HTTP is accepted only for tailnet
+  addresses and `*.ts.net` names, where WireGuard carries the token; the worker
+  containers must reach it, so the Crate host must be on the tailnet and inside
+  the listener's `FACTORY_BUGS_ALLOW_CIDRS`.
+- **The factory App's login** (`<app>[bot]`). Approve & merge and Discard accept
+  only pull requests it authored.
+
+Removing the factory settings deletes its token; keep them until the factory's
+open runs end ([Error fix executors](error-fix-executors.md#the-factory-executor)).
 
 The token starts runs and reviews their pull requests. What the run can do is
 decided by the workflow's own
