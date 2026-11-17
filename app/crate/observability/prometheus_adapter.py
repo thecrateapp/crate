@@ -29,6 +29,7 @@ QUERIES = {
         " + sum(rate(pg_stat_database_xact_rollback[4m]))) * 60"
     ),
     "redis": "sum by (job) (rate(redis_commands_processed_total[2m])) * 60",
+    "queries": "sum by (service) (rate(crate_db_queries_total[1m])) * 60",
 }
 REDIS_JOBS = {"redis-cache": "crate-redis", "redis-durable": "crate-redis-durable"}
 SCRAPE_JOBS = {
@@ -148,6 +149,11 @@ def fetch_stack_resources(
         store = REDIS_JOBS.get(row.get("metric", {}).get("job", ""))
         if store:
             stores[store] = round(float(row["value"][1]), 1)
+    queries = {}
+    for row in rows["queries"]:
+        service = row.get("metric", {}).get("service")
+        if service:
+            queries[service] = round(float(row["value"][1]), 1)
     return {
         "observed_at": datetime.fromtimestamp(now(), tz=timezone.utc).isoformat(),
         "ingress": ingress,
@@ -158,6 +164,7 @@ def fetch_stack_resources(
         },
         "services": services,
         "stores": stores,
+        "queries": queries,
         "scrapes": _scrapes(targets),
     }
 

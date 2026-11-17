@@ -7,8 +7,16 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+var databaseQueries atomic.Int64
+
+// CountDatabaseQuery records one statement sent to PostgreSQL.
+func CountDatabaseQuery() {
+	databaseQueries.Add(1)
+}
 
 var requestBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
 
@@ -97,6 +105,8 @@ func WritePrometheus(w io.Writer, requests *RequestMetrics, media *MediaMetrics)
 	if media != nil {
 		media.write(out)
 	}
+	out.header("crate_db_queries_total", "counter", "Statements sent to PostgreSQL")
+	out.sample("crate_db_queries_total", "", float64(databaseQueries.Load()))
 	return out.err
 }
 

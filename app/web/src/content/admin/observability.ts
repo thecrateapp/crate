@@ -224,7 +224,7 @@ export const REJECTED = {
 };
 
 export const FIGURES: ScaleFigure[] = [
-  { value: 83, label: "Metric families in Prometheus" },
+  { value: 84, label: "Metric families in Prometheus" },
   { value: 32, label: "Recording rules" },
   { value: 6, label: "Grafana dashboards" },
 ];

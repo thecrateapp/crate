@@ -529,7 +529,11 @@ how many targets are up. Jobs map to services in
 `app/crate/observability/prometheus_adapter.py` (`crate-app` targets carry their
 Compose service as a label). PostgreSQL shows transactions per minute and each
 Redis shows commands per minute, from the existing exporters. Neither rate says
-which service caused it, so the stores glow with their load but draw no pulses.
+which service caused it, so those readings only make the stores glow. Pulses into
+PostgreSQL come from `crate_db_queries_total` instead: every Python process counts
+the statements its SQLAlchemy engine sends and the readplane counts its pgx
+queries, in memory, and the `crate-app` scrape names the service. Redis draws no
+pulses.
 
 ### Ingress readings from Traefik
 
