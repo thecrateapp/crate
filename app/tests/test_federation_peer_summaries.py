@@ -136,9 +136,10 @@ def test_network_error_is_unavailable(monkeypatch):
 @pytest.mark.parametrize(
     "caps,expected",
     [
-        ({"catalog.search": True}, True),
-        (["catalog.search"], True),
-        ({"catalog.other": True}, False),
+        ({"catalog.summary": True}, True),
+        (["catalog.summary"], True),
+        ({"catalog.search": True}, False),
+        (["catalog.search"], False),
         ({}, False),
         ([], False),
         (None, False),
@@ -155,7 +156,7 @@ def test_peer_without_capability_is_never_asked(monkeypatch):
 
     asked: list[str] = []
     no_cap = {**PEER, "node_uid": "22222222-2222-2222-2222-222222222222"}
-    no_cap["capabilities_json"] = {}
+    no_cap["capabilities_json"] = {"catalog.search": True}
     monkeypatch.setattr(handlers.repo, "list_peers", lambda **kw: [PEER, no_cap])
     monkeypatch.setattr(handlers.repo, "get_local_node", lambda: LOCAL)
     monkeypatch.setattr(
