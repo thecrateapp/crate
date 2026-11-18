@@ -58,7 +58,7 @@ def parse_summary_payload(payload: dict) -> dict:
     if not isinstance(counts, dict):
         raise InvalidSummary("summary is missing artist_album_counts")
     try:
-        source_sequence = int(payload.get("source_sequence"))
+        source_sequence = int(payload["source_sequence"])
         bloom = base64.b64decode(str(payload.get("bloom") or ""), validate=True)
         BloomFilter.from_bytes(bloom, m=int(params["m"]), k=int(params["k"]))
     except (TypeError, ValueError, KeyError, binascii.Error) as exc:
