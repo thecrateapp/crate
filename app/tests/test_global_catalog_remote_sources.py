@@ -391,7 +391,7 @@ def test_catalog_manifest_applies_allowlist_before_pagination(pg_db, monkeypatch
     pg_db.upsert_artist({"name": "Z Allowed", "entity_uid": allowed_uid})
     monkeypatch.setattr(
         federation,
-        "_catalog_share_policy",
+        "catalog_share_policy",
         lambda: {"catalog_filter": {"artist_entity_uids": [allowed_uid]}},
     )
 
@@ -429,7 +429,7 @@ def test_catalog_manifest_exposes_stable_snapshot_pagination(monkeypatch):
     monkeypatch.setattr(federation, "_require_signed_node_request", require_peer)
     monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
-    monkeypatch.setattr(federation, "_catalog_share_policy", lambda: {})
+    monkeypatch.setattr(federation, "catalog_share_policy", lambda: {})
     monkeypatch.setattr(
         federation,
         "_catalog_manifest_snapshot",
@@ -463,7 +463,7 @@ def test_catalog_manifest_hides_all_genre_evidence_without_metadata_grant(
     monkeypatch.setattr(federation, "_require_signed_node_request", fake_peer)
     monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
-    monkeypatch.setattr(federation, "_catalog_share_policy", lambda: {})
+    monkeypatch.setattr(federation, "catalog_share_policy", lambda: {})
     monkeypatch.setattr(
         federation,
         "_catalog_manifest_snapshot",

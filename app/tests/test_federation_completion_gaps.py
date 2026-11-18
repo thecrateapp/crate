@@ -175,15 +175,15 @@ def test_projector_refreshes_ops_for_federation_catalog_events(monkeypatch):
     assert calls["processed"] == [["1682349000100-0"]]
 
 
-def test_catalog_share_policy_filters_non_federated_rows():
-    from crate.api.federation import _catalog_policy_allows_item
+def testcatalog_share_policy_filters_non_federated_rows():
+    from crate.federation.catalog_scope import catalog_policy_allows_item
 
     policy = {"catalog_filter": {"share_scope": "federated"}}
 
-    assert _catalog_policy_allows_item(
+    assert catalog_policy_allows_item(
         {"remote_entity_uid": "album-1", "_share_scope": "federated"}, policy
     )
-    assert not _catalog_policy_allows_item(
+    assert not catalog_policy_allows_item(
         {"remote_entity_uid": "album-2", "_share_scope": "library"}, policy
     )
 

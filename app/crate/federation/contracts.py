@@ -25,6 +25,7 @@ CAPABILITIES = frozenset(
     {
         "catalog.search",
         "catalog.sync",
+        "catalog.summary",
         "catalog.artist.read",
         "catalog.album.read",
         "catalog.track.read",
@@ -47,6 +48,7 @@ CAPABILITY_ENDPOINTS: dict[str, tuple[tuple[str, str], ...]] = {
         ("GET", "/api/federation/v1/catalog/manifest"),
         ("GET", "/api/federation/v1/catalog/delta"),
     ),
+    "catalog.summary": (("GET", "/api/federation/v1/catalog/summary"),),
     "catalog.artist.read": (("GET", "/api/federation/v1/artists/{remote_entity_uid}"),),
     "catalog.album.read": (("GET", "/api/federation/v1/albums/{remote_entity_uid}"),),
     "catalog.track.read": (("GET", "/api/federation/v1/tracks/{remote_entity_uid}"),),

@@ -595,9 +595,9 @@ def test_federated_artist_photo_serves_sidecar_without_local_user_session(
         federation_api, "_require_user_assertion", lambda *_args, **_kwargs: None
     )
     monkeypatch.setattr(
-        federation_api, "_catalog_policy_allows_item", lambda *_args: True
+        federation_api, "catalog_policy_allows_item", lambda *_args: True
     )
-    monkeypatch.setattr(federation_api, "_catalog_share_policy", lambda: {})
+    monkeypatch.setattr(federation_api, "catalog_share_policy", lambda: {})
     monkeypatch.setattr(
         "crate.db.repositories.library.get_library_artist_by_entity_uid",
         lambda _remote_entity_uid: {"name": "Rival Schools"},
@@ -655,9 +655,9 @@ def test_federated_generic_artist_background_serves_sidecar(tmp_path, monkeypatc
         federation_api, "_require_user_assertion", lambda *_args, **_kwargs: None
     )
     monkeypatch.setattr(
-        federation_api, "_catalog_policy_allows_item", lambda *_args: True
+        federation_api, "catalog_policy_allows_item", lambda *_args: True
     )
-    monkeypatch.setattr(federation_api, "_catalog_share_policy", lambda: {})
+    monkeypatch.setattr(federation_api, "catalog_share_policy", lambda: {})
     monkeypatch.setattr(
         "crate.db.repositories.library.get_library_artist_by_entity_uid",
         lambda _remote_entity_uid: {"name": "High Vis"},

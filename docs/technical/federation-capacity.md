@@ -93,3 +93,31 @@ The gate writes `.artifacts/catalog-search-fallback-capacity.json` and fails
 when p95 exceeds 300 ms, p99 reaches 800 ms, or a response violates the
 artists/albums/tracks contract. Fix query shape or indexes; do not satisfy the
 gate by increasing a readplane timeout.
+
+## Per-peer summary size
+
+Each catalog scope has one Bloom-filter summary (`crate.federation.summary/1`,
+see the [Protocol](federation-protocol.md)). The filter holds every word token
+of artist, album and track names plus their prefixes of three or more
+characters, sized for a 1 % false-positive rate.
+
+`test_reference_catalog_size` (marked `slow`) builds one from a seeded synthetic
+catalogue of production size: 1,050 artists, 10,900 albums and 138,000 tracks.
+
+| Measure | Value |
+| --- | --- |
+| Distinct terms | 154,577 |
+| Filter size | 185,204 bytes (about 181 KiB), m = 1,481,630 bits, k = 7 |
+| Measured false-positive rate | 1.06 % (100,000 absent probes; the test allows 1.5 %) |
+| Build time | 3.4 to 3.7 s (token set plus filter, one process) |
+
+The summary adds the artist album counts, one 16-hex key per artist (about
+1,050 entries), so a full summary stays in the low hundreds of KiB per scope.
+A peer fetches it with `If-None-Match` and the owner answers `304` while the
+content is unchanged. Real catalogues repeat words more than the synthetic one
+does, so the term count and size are an upper-end estimate for this catalogue
+size. Rebuilds run in the maintenance worker every 300 s and never in a request.
+
+```bash
+cd app && ../.venv/bin/python -m pytest tests/test_federation_summary_bloom.py -s -k reference_catalog
+```

@@ -279,6 +279,29 @@ describe("SearchResults with network search", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("says nothing about the network when no summary matches", async () => {
+    renderSearch("joy division");
+    await waitFor(() => expect(streams).toHaveLength(1));
+    act(() => {
+      streams[0]!.handlers.onLocal(EMPTY);
+      streams[0]!.handlers.onDone(
+        coverage({
+          state: "skipped",
+          reason: "no_summary_match",
+          peers_total: 0,
+          peers_pending: 0,
+        }),
+      );
+    });
+
+    expect(
+      await screen.findByText("Try another artist, album, or track."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("More results from the network"),
+    ).not.toBeInTheDocument();
+  });
+
   it("falls back to the canonical search when the stream fails before local results", async () => {
     vi.mocked(api).mockResolvedValue({
       ...EMPTY,
