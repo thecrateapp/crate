@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -62,6 +63,37 @@ func TestApplyWritesTheReadplaneProxyConfiguration(t *testing.T) {
 	}
 	if !bytes.Equal(got, want) {
 		t.Error("the installed readplane proxy configuration differs from the embedded asset")
+	}
+}
+
+func TestApplyWritesEveryRepositoryFileTheComposeMounts(t *testing.T) {
+	dir := t.TempDir()
+	if err := Apply(loadManifest(t), Defaults(dir), nil); err != nil {
+		t.Fatal(err)
+	}
+	compose, err := assets.Read(assets.Compose)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mounts := regexp.MustCompile(`(?m)^\s+- \./(deploy/[^:\s]+):`).FindAllStringSubmatch(string(compose), -1)
+	if len(mounts) == 0 {
+		t.Fatal("the compose file mounts no deploy files")
+	}
+	for _, mount := range mounts {
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(mount[1]))); err != nil {
+			t.Errorf("%s is mounted but not installed: %v", mount[1], err)
+		}
+	}
+	want, err := assets.Read(assets.DockerProxy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "deploy", "docker-proxy", "haproxy.cfg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Error("the installed Docker API proxy configuration differs from the embedded asset")
 	}
 }
 

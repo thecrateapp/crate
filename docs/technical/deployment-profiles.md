@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 110
-verified: 2026-07-21
+verified: 2026-11-18
 sources:
   [
     Makefile,
@@ -13,6 +13,7 @@ sources:
     docker-compose.home.yaml,
     docker-compose.yaml,
     docker-compose.project.yaml,
+    deploy/docker-proxy/haproxy.cfg,
     scripts/deploy.sh,
     scripts/deploy-remote.sh,
     scripts/worker_queue_contract.py,
@@ -108,6 +109,36 @@ database and durable-Redis recovery path.
 `make deploy-build` and `make deploy-sync` are exceptional/manual workflows.
 Do not replace the image-first flow with a repository-wide `rsync --delete`:
 the server owns media and data outside the checkout.
+
+## Docker API access
+
+In the home and project profiles `crate-api` does not mount the Docker socket.
+It reaches Docker through `crate-docker-proxy`, an HAProxy filter on the
+internal `docker-api` network that only `crate-api` joins
+(`DOCKER_HOST=tcp://crate-docker-proxy:2375`). The proxy is the only Crate
+service that mounts `/var/run/docker.sock`; it runs as the HAProxy user with the
+socket's group (`DOCKER_GID`), a read-only filesystem, no capabilities and no
+published port. Traefik keeps its own read-only socket mount for its provider.
+
+`deploy/docker-proxy/haproxy.cfg` allows only what the Stack page and the worker
+restart use:
+
+- `GET` `/_ping`, `/info`, `/containers/json`, `/containers/<name>/json` and
+  `/containers/<name>/logs`;
+- `POST` `/containers/<name>/restart|stop|start` for the containers Admin
+  manages (`librarian-*`, `tidalrr*`, `slskd*`, `soulsync*`, `traefik*`,
+  `nginx*`), and `POST /containers/crate-worker/restart`.
+
+Everything else, including container creation, exec, images, volumes and
+archives, gets `403`. Container inspection still returns environment values, so
+keep secrets in files where a service supports it (see Secrets from files).
+When the managed prefixes in `app/crate/api/stack.py` change, change the filter
+in the same commit; `app/tests/test_docker_proxy_compose.py` fails otherwise.
+A deploy that changes `crate-api` also starts the proxy, and `make deploy` ships
+its configuration. HAProxy reads it only at start, so restart
+`crate-docker-proxy` after changing it. `docker-compose.dev.yaml` still mounts
+the socket into the development API; without `DOCKER_HOST`, `docker_ctl` uses
+the Unix socket.
 
 ## Preflight and post-deploy
 

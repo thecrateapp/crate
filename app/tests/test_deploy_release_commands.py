@@ -493,8 +493,8 @@ def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
     for file in tooling:
         assert (ROOT / file).is_file(), file
     loop = (
-        'for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}" '
-        '"${BACKUP_TOOLING[@]}"; do'
+        'for file in "${STACK_TOOLING[@]}" "${AGENT_TOOLING[@]}" '
+        '"${MONITORING_OVERLAYS[@]}" "${BACKUP_TOOLING[@]}"; do'
     )
     payload = deploy[
         deploy.index("prepare_payload() {") : deploy.index("sync_config() {")
@@ -502,6 +502,17 @@ def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
     assert payload.count(loop) == 2
     sync = deploy[deploy.index("sync_config() {") :]
     assert sync.index(loop) < sync.index("deploy-remote.sh")
+
+
+def test_deploy_ships_the_docker_proxy_configuration() -> None:
+    deploy = (ROOT / "scripts/deploy.sh").read_text()
+    block = deploy[deploy.index("STACK_TOOLING=(") :]
+    files = block[len("STACK_TOOLING=(") : block.index(")")].split()
+
+    assert files == ["deploy/docker-proxy/haproxy.cfg"]
+    assert (ROOT / files[0]).is_file()
+    compose = (ROOT / "docker-compose.yaml").read_text()
+    assert f"./{files[0]}:/usr/local/etc/haproxy/haproxy.cfg:ro" in compose
 
 
 def test_deploy_ships_the_offsite_backup_build_context() -> None:

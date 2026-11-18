@@ -3,6 +3,8 @@ networks:
     external: true
   # Internet-only network for crate-backup-offsite: it must not reach crate-postgres.
   backup-offsite: {}
+  docker-api:
+    internal: true
 
 x-logging: &default-logging
   driver: local
@@ -297,6 +299,36 @@ services:
     networks:
       - backup-offsite
 
+  crate-docker-proxy:
+    logging: *default-logging
+    image: haproxy:3.2.26-alpine@sha256:5893840576071e6217cd52ebdcc14f454c6f7a631056fa6f4e0f40d3cac4215b
+    container_name: crate-docker-proxy
+    restart: unless-stopped
+    group_add:
+      - "${DOCKER_GID:-988}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - "no-new-privileges:true"
+    mem_limit: 32m
+    cpus: 0.1
+    pids_limit: 32
+    command: [-f, /usr/local/etc/haproxy/haproxy.cfg]
+    volumes:
+      - ./deploy/docker-proxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    tmpfs:
+      - /tmp:size=1m,mode=1777
+    networks:
+      - docker-api
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:2375/_ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      traefik.enable: false
+
   # Crate — Music stack management
   crate-api:
     logging: *default-logging
@@ -307,13 +339,12 @@ services:
     container_name: crate-api
     restart: unless-stopped
     user: ${PUID}:${PGID}
-    group_add:
-      - "${DOCKER_GID:-988}"
     environment:
       - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
       - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=${TZ}
       - CRATE_RUNTIME=api
+      - DOCKER_HOST=tcp://crate-docker-proxy:2375
       - CRATE_HOST_ID=${CRATE_HOST_ID:-}
       - CRATE_HOST_NAME=${CRATE_HOST_NAME:-}
       - CRATE_GRAFANA_URL=${CRATE_GRAFANA_URL:-}
@@ -428,14 +459,15 @@ services:
       - ${STEMS_DIR:-${MEDIA_DIR}/smart-mix-stems}:/stems:ro
       - ${DATA_DIR}/crate:/data
       - ${CACHE_DIR:-./data/cache}:/cache:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - crate
+      - docker-api
     depends_on:
       - crate-postgres
       - crate-redis
       - crate-redis-durable
       - crate-media-worker
+      - crate-docker-proxy
     mem_limit: 768m
     mem_reservation: 256m
     cpus: "1.0"

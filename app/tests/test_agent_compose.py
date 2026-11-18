@@ -145,10 +145,11 @@ def test_provenance_publisher_runs_in_the_operator_profile_without_host_root():
     assert publisher["healthcheck"]["test"][-1] == "--health"
     assert not publisher.get("ports") and not publisher.get("depends_on")
 
-    # Among Crate services, only the filter sees the Docker socket.
+    # Among Crate services, only the filters see the Docker socket.
     base = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())["services"]
+    filters = {"crate-provenance-docker", "crate-docker-proxy"}
     for name, service in {**base, **services}.items():
-        if name.startswith("crate-") and name != "crate-provenance-docker":
+        if name.startswith("crate-") and name not in filters:
             assert "docker.sock" not in str(service.get("volumes", [])), name
     for name in (
         "crate-api",

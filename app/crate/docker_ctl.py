@@ -1,9 +1,10 @@
-"""Docker container management via Unix socket API."""
+"""Docker container management through the Docker Engine API."""
 
 import json
 import logging
+import os
 import socket
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 log = logging.getLogger(__name__)
 
@@ -14,14 +15,37 @@ class DockerUnavailableError(RuntimeError):
     """The Docker API could not be reached or returned an unreadable response."""
 
 
+def _connect(timeout: float) -> socket.socket:
+    """Open a connection to DOCKER_HOST (tcp:// or unix://), the local socket by default."""
+    endpoint = os.environ.get("DOCKER_HOST", "").strip()
+    if endpoint.startswith("tcp://"):
+        try:
+            address = urlsplit(endpoint)
+            host, port = address.hostname, address.port or 2375
+        except ValueError as error:
+            raise OSError(f"Invalid DOCKER_HOST {endpoint!r}") from error
+        if not host:
+            raise OSError(f"Invalid DOCKER_HOST {endpoint!r}")
+        return socket.create_connection((host, port), timeout=timeout)
+    if endpoint and not endpoint.startswith("unix://"):
+        raise OSError(f"Unsupported DOCKER_HOST {endpoint!r}")
+    path = endpoint.removeprefix("unix://") or DOCKER_SOCKET
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(timeout)
+        sock.connect(path)
+    except OSError:
+        sock.close()
+        raise
+    return sock
+
+
 def _call(
     method: str, path: str, body: bytes | None = None
 ) -> tuple[int, dict | list | None]:
     """Send one request and return its HTTP status with the decoded JSON body."""
     try:
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(30)
-        sock.connect(DOCKER_SOCKET)
+        sock = _connect(30)
 
         headers = f"{method} {path} HTTP/1.1\r\nHost: localhost\r\n"
         if body:
@@ -49,7 +73,7 @@ def _call(
         status = int(head.split(b"\r\n", 1)[0].split()[1])
     except (IndexError, ValueError) as error:
         raise DockerUnavailableError(f"{method} {path}: malformed response") from error
-    if "Transfer-Encoding: chunked" in head.decode(errors="replace"):
+    if "transfer-encoding: chunked" in head.decode(errors="replace").lower():
         body_data = _decode_chunked(body_data)
     if not separator or not body_data.strip():
         return status, None
@@ -92,12 +116,9 @@ def _decode_chunked(data: bytes) -> bytes:
 
 
 def is_available() -> bool:
-    """Check if Docker socket is accessible."""
+    """Check if the Docker API endpoint is accessible."""
     try:
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(2)
-        sock.connect(DOCKER_SOCKET)
-        sock.close()
+        _connect(2).close()
         return True
     except Exception:
         return False
@@ -317,9 +338,7 @@ def container_project(name: str) -> str | None:
 def get_container_logs(name: str, tail: int = 50) -> str:
     """Get recent logs from a container."""
     try:
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(10)
-        sock.connect(DOCKER_SOCKET)
+        sock = _connect(10)
 
         path = f"/containers/{quote(name, safe='')}/logs?stdout=true&stderr=true&tail={tail}"
         request = f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
