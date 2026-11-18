@@ -159,6 +159,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "federation_health_poll": TaskPoolConfig("maintenance", 1, 300, 0),
     "federation_directory_refresh": TaskPoolConfig("maintenance", 2, 600, 1),
     "federation_build_catalog_summaries": TaskPoolConfig("maintenance", 3, 900, 1),
+    "federation_fetch_peer_summaries": TaskPoolConfig("maintenance", 2, 300, 0),
     "global_catalog_reconcile_incremental": TaskPoolConfig("maintenance", 2, 7200, 0),
     "global_catalog_reconcile_full": TaskPoolConfig("maintenance", 3, 14400, 0),
     "reset_enrichment": TaskPoolConfig("fast", 1, 120, 0),

@@ -318,3 +318,44 @@ def test_successful_health_poll_resets_backoff(monkeypatch):
         "consecutive_failures": 0,
         "backoff_until": None,
     }
+
+
+def test_signed_client_passes_extra_headers_outside_the_signature(monkeypatch):
+    from crate.federation.client import SignedFederationClient
+    from crate.federation.url_policy import FederationURLPolicy
+
+    captured: dict[str, object] = {}
+    signed: dict[str, object] = {}
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        def request(self, **kwargs):
+            captured["request"] = kwargs
+            return httpx.Response(304)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("crate.federation.client.httpx.Client", Client)
+
+    def fake_sign(**kwargs):
+        signed.update(kwargs)
+        return {"Host": "peer.example.test", "X-Test": "signed"}
+
+    monkeypatch.setattr("crate.federation.client.build_signed_headers", fake_sign)
+    client = SignedFederationClient(
+        base_url="https://peer.example.test",
+        node_id="node-a",
+        key_id="key-a",
+        private_key_ref="federation/keys/key-a.pem",
+        policy=FederationURLPolicy(resolver=_public_resolver),
+    )
+    client.request("GET", "/x", headers={"If-None-Match": '"abc"'})
+    client.close()
+
+    sent = captured["request"]["headers"]
+    assert sent["If-None-Match"] == '"abc"'
+    assert sent["X-Test"] == "signed"
+    assert "headers" not in signed and "If-None-Match" not in str(signed)

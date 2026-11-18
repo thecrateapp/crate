@@ -151,6 +151,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "federation_build_catalog_summaries": TaskTypeInfo(
         "Build Federation Catalog Summaries", "federation"
     ),
+    "federation_fetch_peer_summaries": TaskTypeInfo(
+        "Fetch Federation Peer Summaries", "federation"
+    ),
     "federation_import_album": TaskTypeInfo("Import Federated Album", "federation"),
     "federation_directory_refresh": TaskTypeInfo(
         "Federation Directory Refresh", "federation"
