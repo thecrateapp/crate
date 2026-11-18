@@ -20,7 +20,7 @@ from urllib.parse import quote
 
 from crate.db.repositories import federation as repo
 from crate.task_progress import TaskProgress, emit_progress
-from crate.worker_handlers import TaskHandler
+from crate.worker_handlers import TaskHandler, is_cancelled
 
 log = logging.getLogger(__name__)
 
@@ -890,6 +890,15 @@ def _handle_directory_refresh(task_id: str, params: dict, config: dict) -> dict:
     }
 
 
+def _handle_federation_build_catalog_summaries(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    """Rebuild the per-scope catalog summaries peers fetch (never in a request)."""
+    from crate.federation.summary_builder import refresh_catalog_summaries
+
+    return refresh_catalog_summaries(should_stop=lambda: is_cancelled(task_id))
+
+
 FEDERATION_TASK_HANDLERS: dict[str, TaskHandler] = {
     "federation_catalog_sync": _handle_catalog_sync,
     "federation_sync_catalog": _handle_catalog_sync,
@@ -897,4 +906,5 @@ FEDERATION_TASK_HANDLERS: dict[str, TaskHandler] = {
     "federation_import_album": _handle_federation_import,
     "federation_health_poll": _handle_health_poll,
     "federation_directory_refresh": _handle_directory_refresh,
+    "federation_build_catalog_summaries": _handle_federation_build_catalog_summaries,
 }
