@@ -15,7 +15,7 @@ from crate.federation.summary_bloom import SUMMARY_CONTRACT, TOKENIZER, BloomFil
 log = logging.getLogger(__name__)
 
 SUMMARY_PATH = "/api/federation/v1/catalog/summary"
-SUMMARY_CAPABILITY = "catalog.search"
+SUMMARY_CAPABILITY = "catalog.summary"
 
 RefreshResult = Literal["updated", "unchanged", "unavailable"]
 
@@ -25,7 +25,7 @@ class InvalidSummary(ValueError):
 
 
 def peer_advertises_summary(peer: dict) -> bool:
-    """True only when the peer lists the search capability; unknown means no."""
+    """True only when the peer lists the summary capability; unknown means no."""
     capabilities = peer.get("capabilities_json")
     if isinstance(capabilities, dict):
         return bool(capabilities.get(SUMMARY_CAPABILITY))
