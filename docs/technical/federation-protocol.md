@@ -80,8 +80,11 @@ bits to a restricted peer's filter.
   artist keys to album counts. No names or query text are stored.
 - `304`: `If-None-Match` carries the current etag (bare or quoted). The body is
   empty and the `ETag` header is repeated.
-- `403`: the peer has no `catalog.search` grant, or search is disabled for the
-  scope.
+- `403`: the peer has no `catalog.search` grant, search is disabled for the
+  scope, or an active role or subject grant permits `catalog.search` for some
+  of the peer's users. Such a grant can give those users more than the
+  node-level scope a summary is built from, so no summary is offered and the
+  peer is always asked.
 - `404` `{"code": "summary_pending"}`: no summary is built yet. The request
   enqueues a deduplicated build and the peer retries later.
 
@@ -91,12 +94,59 @@ and a summary exists for its scope; otherwise the key is absent. A peer
 compares the etag with its stored copy and fetches the summary only when it
 differs.
 
-Tokenizer `fts-simple-v1`: lowercase `\w+` tokens of artist, album and track
-names. Each token is inserted whole, plus its prefixes of length 3 up to the
-token length minus one. Probe rule: drop query tokens shorter than 3
+Tokenizer `fts-simple-v2`: lowercase `[^\W_]+` tokens (letters and digits;
+underscores split words, as in PostgreSQL's `simple` parser) of artist, album
+and track names. Each token is inserted whole, plus its prefixes of length 3 up
+to the token length minus one. Probe rule: drop query tokens shorter than 3
 characters, probe the other tokens whole and the last token as a prefix; a
-query with no probe left is not routable and must fan out. A summary has no
-false negatives for word-prefix queries and targets a 1 % false-positive rate.
+query with no probe left is not routable and must fan out. Receivers reject a
+summary whose `params` do not name this tokenizer, `hash: "blake2b-128-km"` and
+`min_prefix: 3`, or whose sizes are out of bounds (`1 <= k <= 32`,
+`64 <= m <= 67,108,864` bits with a bloom of exactly `ceil(m/8)` bytes, at most
+200,000 artist counts keyed by 16 lowercase hex characters, non-negative
+integer counts and `source_sequence`).
+
+Guarantee. A word-prefix query over the owner's FTS tokens is never routed away
+from a peer while the receiver holds a fresh summary of that peer, and the
+filter targets a 1 % false-positive rate. "Fresh" has two parts:
+
+- Content lag: the owner rebuilds summaries every 300 s, and the receiver
+  learns of a new etag on its next delta sync (every 120 s) or summary poll
+  (every 900 s). Content added on the owner within that window can be missed
+  by routing until the new summary arrives; the local results and other peers
+  are unaffected.
+- Maximum age: a stored summary routes only while it was fetched or confirmed
+  within the last 1800 s (twice the poll). A `304`, or a delta page announcing
+  the same etag, confirms it. Older rows are ignored and the peer is asked.
+
+The receiver deletes its stored summary of a peer when the peer answers `403`,
+any `404` (including `summary_pending`), or a summary it cannot accept (unknown
+contract or tokenizer, malformed or out-of-bounds fields). Network errors, `429`
+and `5xx` keep the row, which then ages out. An older summary (lower
+`source_sequence`) never replaces a newer one.
+
+Known gaps, each one a routing miss, never a wrong result:
+
+- Mid-word queries ("ivision" for "Division") are not covered; the owner's FTS
+  does not match them either, but its fuzzy fallback can.
+- Locale casing: Python lowercases `İ` to `i` plus a combining dot, which
+  splits the word (`İstanbul` gives `i`, `stanbul`); PostgreSQL gives
+  `istanbul`. A query for "istanbul" can be routed away from a peer that has
+  "İstanbul".
+
+Names PostgreSQL keeps as one file or host lexeme, such as `AC/DC` (`ac/dc`)
+or `R.E.M.` (`r.e.m`), are not a routing gap: the receiver splits them into
+words and inserts each whole, and the owner's FTS only matches them by a prefix
+of the first word, which the filter holds. They can only make a peer be asked
+for a later word ("dc") that its FTS does not match, a false positive.
+
+`tests/test_federation_summary_bloom.py::test_tokens_agree_with_postgres_simple_parser`
+pins the agreement with PostgreSQL for the other names, and
+`test_wire_format_golden_vector` pins the filter bytes.
+
+Size: for the production-sized reference catalogue the filter is 185,204 bytes
+(about 181 KiB) raw and 246,940 bytes (about 241 KiB, 247 kB) as base64 in the
+JSON body, plus the artist counts. See [Federation capacity](federation-capacity.md).
 
 ## Playback relay
 

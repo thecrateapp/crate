@@ -107,12 +107,13 @@ def test_tokens_split_on_underscores_like_postgres():
 
 
 # Names whose Python tokens the owner's FTS (PostgreSQL 'simple' parser) also
-# finds. Left out on purpose, as known gaps documented in federation-protocol.md:
+# finds. Left out on purpose (see federation-protocol.md, "Known gaps"):
 # - "AC/DC", "R.E.M.": the parser keeps them as one file/host lexeme ('ac/dc',
-#   'r.e.m'), so a later word ("dc", "m") is not a lexeme prefix there either.
+#   'r.e.m'), so a later word ("dc", "m") matches no lexeme prefix. Harmless for
+#   routing (a false positive at most): the first word is in the filter whole.
 # - "İstanbul": Python lowercases İ to "i" + U+0307 (a combining mark that splits
-#   the word), PostgreSQL to a plain "i" ('istanbul'); locale casing, not fixable
-#   in the tokenizer without diverging elsewhere.
+#   the word), PostgreSQL to a plain "i" ('istanbul'). A real routing gap for the
+#   query "istanbul"; locale casing, documented rather than special-cased.
 _PG_AGREEMENT_NAMES = [
     "my_song_title",
     "hip-hop",
