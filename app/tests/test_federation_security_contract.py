@@ -14,6 +14,7 @@ def test_protocol_contract_is_explicit_and_versioned():
         {
             "catalog.search",
             "catalog.sync",
+            "catalog.summary",
             "catalog.artist.read",
             "catalog.album.read",
             "catalog.track.read",
