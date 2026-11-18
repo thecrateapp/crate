@@ -12,7 +12,7 @@ from crate.federation.summary_bloom import SUMMARY_CONTRACT, TOKENIZER, BloomFil
 PEER = {
     "node_uid": "11111111-1111-1111-1111-111111111111",
     "api_base_url": "https://peer.invalid",
-    "capabilities_json": {"catalog.search": True},
+    "capabilities_json": {"catalog.search": True, "catalog.summary": True},
 }
 LOCAL = {"node_uid": "local", "active_key_id": "key", "private_key_ref": "ref"}
 
