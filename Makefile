@@ -586,8 +586,13 @@ regression-min: regression-api regression-smoke ## Minimum regression suite befo
 # ===========================================================================
 
 UV_VERSION        := 0.13.9
+PIP_AUDIT_VERSION := 2.10.1
+PYTHON_LOCKS      := requirements-test.txt requirements.txt requirements-worker.txt \
+	requirements-worker-core.txt requirements-api.txt requirements-beat-this.txt
 UV_COMPILE        := uvx uv@$(UV_VERSION) pip compile --quiet --universal --python-version 3.13 \
 	--generate-hashes --custom-compile-command "make python-lock" $(LOCK_ARGS)
+PIP_AUDIT         = uvx pip-audit@$(PIP_AUDIT_VERSION) --progress-spinner off --disable-pip \
+	$(addprefix --ignore-vuln ,$(shell sed -e 's/\#.*//' app/pip-audit-ignore.txt))
 
 .PHONY: python-lock
 python-lock: ## Compile app/requirements*.txt from the .in files (LOCK_ARGS="--upgrade-package fastapi" or "--upgrade")
@@ -597,6 +602,13 @@ python-lock: ## Compile app/requirements*.txt from the .in files (LOCK_ARGS="--u
 	@cd app && $(UV_COMPILE) -c requirements-test.txt requirements-worker-core.in -o requirements-worker-core.txt
 	@cd app && $(UV_COMPILE) -c requirements-test.txt requirements-api.in -o requirements-api.txt
 	@cd app && $(UV_COMPILE) -c requirements-worker.txt requirements-beat-this.in -o requirements-beat-this.txt
+
+.PHONY: python-audit
+python-audit: ## Audit the Python lock files for known vulnerabilities (accepted advisories: app/pip-audit-ignore.txt)
+	@cd app && $(PIP_AUDIT) --require-hashes $(addprefix -r ,$(PYTHON_LOCKS))
+	@pins=$$(mktemp) && \
+		sed -nE 's|^(torch[a-z]*) @ .*-([0-9.]+)%2Bcpu-.*|\1==\2|p' app/requirements-beat-this.in | sort -u > $$pins && \
+		$(PIP_AUDIT) --no-deps -r $$pins; status=$$?; rm -f $$pins; exit $$status
 
 # ===========================================================================
 # CRATE CLI (Rust native toolbox)

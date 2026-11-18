@@ -81,8 +81,16 @@ def test_ci_installs_the_backend_from_hashed_locks() -> None:
         assert re.search(r"-r requirements[a-z-]*\.txt$", line), line
 
 
-def test_ci_checks_the_locks_match_their_inputs() -> None:
+def test_ci_checks_the_locks_and_audits_them() -> None:
     workflow = (WORKFLOWS / "test-backend.yml").read_text()
 
     assert "make python-lock" in workflow
-    assert "--exit-code -- 'app/requirements*.txt'" in workflow
+    assert "git diff --exit-code -- 'app/requirements*.txt'" in workflow
+    assert "make python-audit" in workflow
+    assert '- "app/pip-audit-ignore.txt"' in workflow
+
+
+def test_accepted_advisories_are_ids_with_a_justification() -> None:
+    for line in (APP_ROOT / "pip-audit-ignore.txt").read_text().splitlines():
+        if line.strip() and not line.startswith("#"):
+            assert re.match(r"^(PYSEC|GHSA|CVE)-[\w-]+\s+#\s*\S", line), line

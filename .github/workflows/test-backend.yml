@@ -8,6 +8,7 @@ on:
       - "app/crate/**"
       - "app/tests/**"
       - "app/requirements*"
+      - "app/pip-audit-ignore.txt"
       - ".github/autofix/**"
       - ".github/workflows/error-autofix.yml"
       - ".github/workflows/test-backend.yml"
@@ -17,6 +18,7 @@ on:
       - "app/crate/**"
       - "app/tests/**"
       - "app/requirements*"
+      - "app/pip-audit-ignore.txt"
       - ".github/autofix/**"
       - ".github/workflows/error-autofix.yml"
       - ".github/workflows/test-backend.yml"
@@ -72,7 +74,7 @@ jobs:
           retention-days: 30
 
   dependencies:
-    name: dependency locks
+    name: dependency locks and audit
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -94,6 +96,9 @@ jobs:
             echo "::error::app/requirements*.txt are stale: run make python-lock and commit the result."
             exit 1
           fi
+
+      - name: Audit the locks for known vulnerabilities
+        run: make python-audit
 
   quality:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
