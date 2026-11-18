@@ -5,9 +5,9 @@ import time
 
 import pytest
 
-from crate.db.queries.browse_media_search import build_fts_query
 from crate.federation.summary_bloom import (
     MIN_PREFIX,
+    TOKENIZER,
     BloomFilter,
     artist_key,
     name_tokens,
@@ -96,14 +96,70 @@ def test_round_trip_bytes():
         assert (t in g) == (t in f)
 
 
-def test_tokens_agree_with_fts_query():
-    for n in _fixture_names() + ["!!!", "", "  ", "AC/DC"]:
-        fts = build_fts_query(n)
-        expected = (
-            [] if fts is None else [p.removesuffix(":*") for p in fts.split(" & ")]
-        )
-        assert name_tokens(n) == expected, n
-    assert name_tokens(None) == []
+def test_tokens_split_on_underscores_like_postgres():
+    assert TOKENIZER == "fts-simple-v2"
+    assert name_tokens("my_song_title") == ["my", "song", "title"]
+    assert name_tokens("__init__") == ["init"]
+    assert name_tokens("AC/DC") == ["ac", "dc"]
+    assert name_tokens("Sigur Rós") == ["sigur", "rós"]
+    assert name_tokens(None) == [] and name_tokens("!!!") == []
+    assert query_probe_terms("song_title") == ["song", "title"]
+
+
+# Names whose Python tokens the owner's FTS (PostgreSQL 'simple' parser) also
+# finds. Left out on purpose, as known gaps documented in federation-protocol.md:
+# - "AC/DC", "R.E.M.": the parser keeps them as one file/host lexeme ('ac/dc',
+#   'r.e.m'), so a later word ("dc", "m") is not a lexeme prefix there either.
+# - "İstanbul": Python lowercases İ to "i" + U+0307 (a combining mark that splits
+#   the word), PostgreSQL to a plain "i" ('istanbul'); locale casing, not fixable
+#   in the tokenizer without diverging elsewhere.
+_PG_AGREEMENT_NAMES = [
+    "my_song_title",
+    "hip-hop",
+    "Sigur Rós",
+    "Björk",
+    "坂本龍一",
+    "don't",
+    "Joy Division",
+    "Ágætis byrjun",
+    "Svefn-g-englar",
+    "Me and Giuliani",
+    "U2",
+    "snake_case_band feat. Someone",
+]
+
+
+def test_tokens_agree_with_postgres_simple_parser(pg_db):
+    from sqlalchemy import text
+
+    from crate.db.tx import read_scope
+
+    with read_scope() as session:
+        for name in _PG_AGREEMENT_NAMES:
+            tokens = name_tokens(name)
+            assert tokens, name
+            for token in tokens:
+                matched = session.execute(
+                    text(
+                        "SELECT to_tsvector('simple', :name) "
+                        "@@ to_tsquery('simple', :token || ':*')"
+                    ),
+                    {"name": name, "token": token},
+                ).scalar_one()
+                assert matched, (name, token)
+            # The other direction is the one that prevents false negatives: a
+            # word the owner's FTS indexes must be a token the filter holds.
+            # Hyphenated compounds ('hip-hop') are skipped: their parts are
+            # indexed too, and a query for the compound probes those parts.
+            lexemes = session.execute(
+                text(
+                    "SELECT unnest(lexemes) FROM ts_debug('simple', :name) "
+                    "WHERE alias NOT IN ('asciihword', 'hword', 'numhword')"
+                ),
+                {"name": name},
+            ).scalars()
+            for lexeme in lexemes:
+                assert lexeme in tokens, (name, lexeme)
 
 
 def test_unroutable_queries_return_none():
