@@ -43,6 +43,7 @@ from crate.db.cache_store import (
     get_smart_mix_plan_caches,
     set_smart_mix_plan_caches,
 )
+from crate.db.queries.decks_cues import get_decks_corrections
 from crate.db.queries.smart_mix_compatible import get_compatible_track_inputs
 from crate.db.queries.smart_mix_genres import get_track_genres
 from crate.db.repositories.access_tokens import (
@@ -73,6 +74,7 @@ from crate.smart_mix.stems import (
     duration_matches,
     stem_phrase_layer,
 )
+from crate.smart_mix.user_corrections import UserCorrection, apply_user_correction
 from crate.smart_mix.versions import PLANNER_IDENTIFIER, planner_reads_structure
 
 
@@ -410,17 +412,28 @@ def _plan_transition_edges(
     profiles = get_track_mix_profiles_by_entity_uids(
         entity_uids, include_structure=False
     )
+    # The user's own corrections of the tracks of decks edges (F8.SM): one read,
+    # applied before the cache key and before planning.
+    corrections = _user_corrections(unique_edges, user)
     stems = _applicable_stem_analyses(entity_uids, profiles, policy, edges=unique_edges)
     genre_priors = _genre_priors(unique_edges, stems, policy)
-    edge_profiles = _edge_profiles(unique_edges, entity_uids, profiles)
+    edge_profiles = _corrected_edge_profiles(
+        _edge_profiles(unique_edges, entity_uids, profiles), corrections
+    )
     cache_keys = [
         _plan_cache_key(
-            edge, outgoing, incoming, policy, stems=stems, genre_priors=genre_priors
+            edge,
+            outgoing,
+            incoming,
+            policy,
+            stems=stems,
+            genre_priors=genre_priors,
+            corrections=_edge_corrections(edge, corrections),
         )
         for edge, outgoing, incoming in edge_profiles
     ]
     refinements = (
-        _refinement_batch(edge_profiles, user)
+        _refinement_batch(edge_profiles, user, corrections)
         if user is not None and planner_reads_structure(policy.identifier)
         else None
     )
@@ -440,14 +453,23 @@ def _plan_transition_edges(
         layered = _stems_of_edges(
             missed_edges, stems, genre_priors=genre_priors, policy=policy
         )
-        structured = _edge_profiles(
-            missed_edges, missed_uids, _structured_profiles(missed_uids, layered)
+        structured = _corrected_edge_profiles(
+            _edge_profiles(
+                missed_edges, missed_uids, _structured_profiles(missed_uids, layered)
+            ),
+            corrections,
         )
         for index, (edge, outgoing, incoming) in zip(missed, structured, strict=True):
             edge_profiles[index] = (edge, outgoing, incoming)
             # A profile republished between the two reads keys its new plan.
             cache_keys[index] = _plan_cache_key(
-                edge, outgoing, incoming, policy, stems=stems, genre_priors=genre_priors
+                edge,
+                outgoing,
+                incoming,
+                policy,
+                stems=stems,
+                genre_priors=genre_priors,
+                corrections=_edge_corrections(edge, corrections),
             )
     computed: dict[str, dict] = {}
     plans = []
@@ -470,6 +492,67 @@ def _plan_transition_edges(
         plans.append(TransitionPlanResponse.model_validate(serialized))
     set_smart_mix_plan_caches(computed)
     return plans
+
+
+def _user_corrections(
+    edges: list[TransitionEdgeRequest], user: dict | None
+) -> dict[str, UserCorrection]:
+    """The signed-in user's corrections (S7) of the tracks of the decks edges, by
+    entity UID; one bounded read, none without a user or a decks edge. A cleared
+    correction applies nothing and is left out (F8.SM)."""
+    if user is None or user.get("id") is None:
+        return {}
+    uids = _ordered_entity_uids(
+        [edge for edge in edges if _applies_user_corrections(edge.context)]
+    )
+    if not uids:
+        return {}
+    found = get_decks_corrections(int(user["id"]), uids).found
+    return {
+        uid: correction
+        for uid, row in found.items()
+        if not (correction := UserCorrection.from_row(row)).cleared
+    }
+
+
+def _edge_corrections(
+    edge: TransitionEdgeRequest, corrections: Mapping[str, UserCorrection]
+) -> tuple[UserCorrection | None, UserCorrection | None]:
+    """The corrections that apply to the outgoing and incoming track of an edge:
+    only on decks edges (Listen, Android and VirtualDJ keep the shared profile)."""
+    if not corrections or not _applies_user_corrections(edge.context):
+        return None, None
+    return (
+        corrections.get(str(edge.outgoing_track_entity_uid)),
+        corrections.get(str(edge.incoming_track_entity_uid)),
+    )
+
+
+def _corrected_edge_profiles(
+    edge_profiles: list[
+        tuple[TransitionEdgeRequest, TrackMixProfile | None, TrackMixProfile | None]
+    ],
+    corrections: Mapping[str, UserCorrection],
+) -> list[tuple[TransitionEdgeRequest, TrackMixProfile | None, TrackMixProfile | None]]:
+    """Each edge's profiles with the corrections that apply to it. Per edge, not per
+    track: a batch may hold the same track in a decks edge and in another."""
+    if not corrections:
+        return edge_profiles
+    result = []
+    for edge, outgoing, incoming in edge_profiles:
+        outgoing_correction, incoming_correction = _edge_corrections(edge, corrections)
+        result.append(
+            (
+                edge,
+                None
+                if outgoing is None
+                else apply_user_correction(outgoing, outgoing_correction),
+                None
+                if incoming is None
+                else apply_user_correction(incoming, incoming_correction),
+            )
+        )
+    return result
 
 
 def _applicable_stem_analyses(
@@ -596,8 +679,14 @@ def _refinement_batch(
         tuple[TransitionEdgeRequest, TrackMixProfile | None, TrackMixProfile | None]
     ],
     user: dict,
+    corrections: Mapping[str, UserCorrection] | None = None,
 ) -> smart_mix_ai.RefinementBatch | None:
-    """The refinements a v3 request asked for, or None when no edge did."""
+    """The refinements a v3 request asked for, or None when no edge did.
+
+    An edge a user correction applies to is not refined: the refinement would be
+    keyed and prompted on the shared profiles (F8.SM). AI refinement is off since
+    SG3, so these edges simply carry no ``refinement``.
+    """
     requests = [
         smart_mix_ai.RefinementRequest(
             position=index,
@@ -616,6 +705,7 @@ def _refinement_batch(
         )
         for index, (edge, outgoing, incoming) in enumerate(edge_profiles)
         if edge.context.ai_refinement
+        and not any(_edge_corrections(edge, corrections or {}))
     ]
     if not requests:
         return None
@@ -803,6 +893,11 @@ def _serves_policy_limits(payload: TransitionContextRequest) -> bool:
     return payload.source == "decks"
 
 
+def _applies_user_corrections(payload: TransitionContextRequest) -> bool:
+    """Only Crate Decks plans read the user's corrections (F8.SM)."""
+    return payload.source == "decks"
+
+
 def _local_refinement(payload: TransitionContextRequest) -> bool:
     """Crate Decks asked for the menu and the limits (STEM-D10)."""
     return payload.source == "decks" and payload.local_refinement
@@ -839,6 +934,7 @@ def _plan_cache_key(
     *,
     stems: Mapping[str, StemAnalysis] | None = None,
     genre_priors: Mapping[str, float | None] | None = None,
+    corrections: tuple[UserCorrection | None, UserCorrection | None] = (None, None),
 ) -> str:
     policy = policy or PLANNER_POLICY
     cache_identity: dict[str, object] = {
@@ -880,6 +976,13 @@ def _plan_cache_key(
         # beatmatch family changes it.
         cache_identity["outgoingStems"] = _stem_identity(outgoing_stems)
         cache_identity["incomingStems"] = _stem_identity(incoming_stems)
+    # A user's correction (F8.SM) keys the plans it changes by what it changes;
+    # uncorrected edges keep their keys, so the shared plans stay shared.
+    outgoing_correction, incoming_correction = corrections
+    if outgoing_correction is not None:
+        cache_identity["outgoingCorrection"] = outgoing_correction.identity()
+    if incoming_correction is not None:
+        cache_identity["incomingCorrection"] = incoming_correction.identity()
     canonical = json.dumps(
         cache_identity,
         sort_keys=True,
