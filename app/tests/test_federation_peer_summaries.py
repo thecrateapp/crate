@@ -29,7 +29,7 @@ def _payload(**overrides) -> dict:
         "built_at": "2026-11-18T10:00:00Z",
         "params": params,
         "bloom": base64.b64encode(bloom.to_bytes()).decode(),
-        "artist_album_counts": {"deadbeef": 3},
+        "artist_album_counts": {"00000000deadbeef": 3},
     }
     payload.update(overrides)
     return payload
@@ -102,7 +102,7 @@ def test_new_etag_is_stored(monkeypatch):
     assert kw["etag"] == "abc123"
     assert kw["contract"] == SUMMARY_CONTRACT
     assert kw["source_sequence"] == 42
-    assert kw["artist_album_counts"] == {"deadbeef": 3}
+    assert kw["artist_album_counts"] == {"00000000deadbeef": 3}
     assert kw["params"] == payload["params"]
     assert kw["bloom"] == base64.b64decode(payload["bloom"])
 
@@ -139,6 +139,77 @@ def test_wrong_tokenizer_and_bloom_length_are_rejected():
         peer_summaries.parse_summary_payload(bad_len)
     with pytest.raises(peer_summaries.InvalidSummary):
         peer_summaries.parse_summary_payload({"contract": SUMMARY_CONTRACT})
+
+
+def _with_params(**params):
+    payload = _payload()
+    payload["params"] = {**payload["params"], **params}
+    return payload
+
+
+def _sized_payload(m: int, k: int = 3) -> dict:
+    payload = _with_params(m=m, k=k)
+    payload["bloom"] = base64.b64encode(b"\x00" * ((m + 7) // 8)).decode()
+    return payload
+
+
+_HEX_KEY = "0123456789abcdef"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param(_with_params(hash="sha1-km"), id="hash"),
+        pytest.param(_with_params(min_prefix=2), id="min_prefix"),
+        pytest.param(_with_params(tokenizer="fts-simple-v1"), id="tokenizer-v1"),
+        pytest.param(_with_params(k=0), id="k-zero"),
+        pytest.param(_with_params(k=33), id="k-too-big"),
+        pytest.param(_with_params(k=True), id="k-bool"),
+        pytest.param(_with_params(k="5"), id="k-string"),
+        pytest.param(_sized_payload(63), id="m-too-small"),
+        pytest.param(_sized_payload(64 * 1024 * 1024 + 8), id="m-too-big"),
+        pytest.param(_with_params(m=2.5), id="m-float"),
+        pytest.param(_with_params(m=None), id="m-missing"),
+        pytest.param(
+            _payload(bloom=base64.b64encode(b"\x00\x01").decode()), id="bloom-length"
+        ),
+        pytest.param(_payload(bloom="not base64!"), id="bloom-not-base64"),
+        pytest.param(_payload(source_sequence=-1), id="sequence-negative"),
+        pytest.param(_payload(source_sequence=True), id="sequence-bool"),
+        pytest.param(_payload(source_sequence="42"), id="sequence-string"),
+        pytest.param(_payload(artist_album_counts=[]), id="counts-not-object"),
+        pytest.param(_payload(artist_album_counts={_HEX_KEY: -1}), id="count-negative"),
+        pytest.param(_payload(artist_album_counts={_HEX_KEY: True}), id="count-bool"),
+        pytest.param(_payload(artist_album_counts={_HEX_KEY: "3"}), id="count-string"),
+        pytest.param(_payload(artist_album_counts={"deadbeef": 3}), id="key-short"),
+        pytest.param(
+            _payload(artist_album_counts={"0123456789ABCDEF": 3}), id="key-upper"
+        ),
+        pytest.param(
+            _payload(artist_album_counts={"0123456789abcdeg": 3}), id="key-not-hex"
+        ),
+        pytest.param(
+            _payload(artist_album_counts={f"{i:016x}": 1 for i in range(200_001)}),
+            id="too-many-counts",
+        ),
+    ],
+)
+def test_out_of_bounds_summaries_are_rejected(payload):
+    with pytest.raises(peer_summaries.InvalidSummary):
+        peer_summaries.parse_summary_payload(payload)
+
+
+def test_bounds_accept_the_edges():
+    for m, k in ((64, 1), (64 * 1024 * 1024, 32)):
+        parsed = peer_summaries.parse_summary_payload(_sized_payload(m, k))
+        assert len(parsed["bloom"]) == (m + 7) // 8
+    edge = _payload(
+        source_sequence=0,
+        artist_album_counts={f"{i:016x}": 0 for i in range(200_000)},
+    )
+    parsed = peer_summaries.parse_summary_payload(edge)
+    assert parsed["source_sequence"] == 0
+    assert len(parsed["artist_album_counts"]) == 200_000
 
 
 @pytest.mark.parametrize(

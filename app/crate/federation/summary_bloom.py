@@ -14,6 +14,7 @@ from hashlib import blake2b
 
 SUMMARY_CONTRACT = "crate.federation.summary/1"
 TOKENIZER = "fts-simple-v2"
+SUMMARY_HASH = "blake2b-128-km"
 MIN_PREFIX = 3
 FP_TARGET = 0.01
 
@@ -109,7 +110,7 @@ class BloomFilter:
             "k": self._k,
             "n": self._n,
             "fp_target": self._fp_target,
-            "hash": "blake2b-128-km",
+            "hash": SUMMARY_HASH,
             "tokenizer": TOKENIZER,
             "min_prefix": MIN_PREFIX,
         }
