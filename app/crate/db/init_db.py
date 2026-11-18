@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
@@ -19,6 +20,7 @@ from crate.db.engine import get_engine
 log = logging.getLogger(__name__)
 
 _MIGRATION_LOCK_ID = 820149  # arbitrary unique advisory lock ID for init_db
+INITIAL_ADMIN_PASSWORD_FILE = "initial-admin-password"
 
 
 def _env_float(name: str, default: float) -> float:
@@ -140,6 +142,27 @@ def _init_db_inner():
     with transaction_scope() as session:
         from crate.genre_taxonomy import seed_genre_taxonomy
         from crate.db.repositories.auth import _seed_admin
+        from crate.db.repositories.auth_user_accounts import BOOTSTRAP_ADMIN_EMAIL
 
         seed_genre_taxonomy(session)
-        _seed_admin(session)
+        generated_password = _seed_admin(session)
+        if generated_password:
+            path = _write_initial_admin_password(generated_password)
+            log.warning(
+                "Generated a random initial password for %s and stored it in %s "
+                "(owner-only). Sign in with it and choose a new password; Crate "
+                "requires the change before anything else. Delete the file "
+                "afterwards, or set DEFAULT_ADMIN_PASSWORD before the first start.",
+                BOOTSTRAP_ADMIN_EMAIL,
+                path,
+            )
+
+
+def _write_initial_admin_password(password: str) -> Path:
+    path = Path(os.environ.get("DATA_DIR", "/data")) / INITIAL_ADMIN_PASSWORD_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(f"{password}\n")
+    path.chmod(0o600)
+    return path

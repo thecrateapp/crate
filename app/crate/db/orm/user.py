@@ -29,6 +29,9 @@ class User(Base):
         Boolean, nullable=False, server_default="true"
     )
     password_hash: Mapped[str | None] = mapped_column(Text)
+    password_change_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
     avatar: Mapped[str | None] = mapped_column(Text)
     role: Mapped[str] = mapped_column(Text, nullable=False, server_default="user")
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")

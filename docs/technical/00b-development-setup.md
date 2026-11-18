@@ -104,7 +104,10 @@ Caddy data volume does not change the certificate authority used by browsers.
 the active Caddyfile and local resolver when cookies or TLS are relevant to
 your change.
 
-The seeded development account is `admin@cratemusic.app` / `admin`.
+The seeded development account is `admin@cratemusic.app` / `admin`. The dev
+Compose files set `CRATE_DEV_ADMIN_SEED=true`, which keeps that weak password
+and skips the first sign-in password change; never set it on a reachable
+instance.
 
 The Cast receiver can be previewed without a physical device or CAF runtime:
 

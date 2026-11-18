@@ -128,7 +128,12 @@ domain-based installs; override it with the actual reachable Listen URL for a
 local or port-based installation.
 
 The admin account is `admin@cratemusic.app`, with the password chosen in the
-wizard or generated and shown at the end. Admin starts the library scan. Use
+wizard or generated and shown at the end. Crate asks for a new password at the
+first Admin sign-in and blocks other API actions until it is changed. Manual
+installs that leave `DEFAULT_ADMIN_PASSWORD` empty, or set it to fewer than 8
+characters or a default such as `admin`, get a random initial password in
+`$DATA_DIR/initial-admin-password` (owner-only); delete the file after signing
+in. Admin starts the library scan. Use
 Listen for playback and user-facing library features. Files received by uploads
 or owned-purchase import are staged and published by workers; the API never
 writes the music filesystem directly.

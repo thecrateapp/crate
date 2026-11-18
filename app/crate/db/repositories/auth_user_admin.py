@@ -32,6 +32,7 @@ _USER_UPDATABLE_FIELDS = frozenset(
         "deleted_at",
         "deleted_by",
         "password_hash",
+        "password_change_required",
         "google_id",
         "avatar",
         "subsonic_token",

@@ -1591,6 +1591,28 @@ def _has_machine_credential(request: Request) -> bool:
     return any("crate_mcp_" in value for value in credentials)
 
 
+PASSWORD_CHANGE_REQUIRED_DETAIL = "Password change required"
+_PASSWORD_CHANGE_ALLOWED_REQUESTS = frozenset(
+    {
+        ("GET", "/api/auth/me"),
+        ("POST", "/api/auth/change-password"),
+        ("PUT", "/api/me/password"),
+        ("POST", "/api/auth/logout"),
+        ("POST", "/api/auth/heartbeat"),
+        ("POST", "/api/auth/refresh"),
+    }
+)
+
+
+def _password_change_blocks(user: dict | None, method: str, path: str) -> bool:
+    return (
+        bool(user and user.get("password_change_required"))
+        and method != "OPTIONS"
+        and path.startswith("/api/")
+        and (method, path.rstrip("/")) not in _PASSWORD_CHANGE_ALLOWED_REQUESTS
+    )
+
+
 class AuthMiddleware:
     """Resolve auth via Bearer header, media ticket, or cookie (in that order).
 
@@ -1628,6 +1650,9 @@ class AuthMiddleware:
             "username": current_user.get("username"),
             "name": current_user.get("name"),
             "session_id": session_id,
+            "password_change_required": bool(
+                current_user.get("password_change_required")
+            ),
         }
 
     def _resolve_token_user(self, token: str) -> dict | None:
@@ -1789,6 +1814,12 @@ class AuthMiddleware:
         if user and user.get("auth_type") == "access_token":
             if not _is_access_token_request(user, request.method, request.url.path):
                 user = None
+        if _password_change_blocks(user, request.method, request.url.path):
+            response = JSONResponse(
+                {"detail": PASSWORD_CHANGE_REQUIRED_DETAIL}, status_code=403
+            )
+            await response(scope, receive, send)
+            return
         scope["state"]["user"] = user
         await self.app(scope, receive, send)
 
@@ -2128,6 +2159,8 @@ def auth_me(request: Request):
         return payload
     if db_user:
         payload = _user_public(db_user)
+        if db_user.get("password_change_required"):
+            payload["password_change_required"] = True
         payload["username"] = db_user.get("username")
         payload["bio"] = db_user.get("bio")
         payload["instagram_handle"] = db_user.get("instagram_handle")
@@ -2394,9 +2427,23 @@ def change_password(request: Request, body: ChangePasswordRequest):
         raise HTTPException(
             status_code=400, detail="Password must be at least 8 characters"
         )
+    _ensure_required_password_change_differs(db_user, body.new_password)
     new_hash = hash_password(body.new_password)
-    update_user(user["id"], password_hash=new_hash)
+    update_user(user["id"], password_hash=new_hash, password_change_required=False)
+    _invalidate_auth_user(user["id"])
     return {"ok": True}
+
+
+def _ensure_required_password_change_differs(db_user: dict, new_password: str) -> None:
+    if (
+        db_user.get("password_change_required")
+        and db_user.get("password_hash")
+        and verify_password(new_password, db_user["password_hash"])
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Choose a password different from the initial one",
+        )
 
 
 @router.post(
