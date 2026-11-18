@@ -20,7 +20,7 @@ from typing import Any, Literal, cast
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from crate.api import browse_artist as browse_artist_api
@@ -38,6 +38,10 @@ from crate.db.jobs.federation_catalog_changes import (
     catalog_retention_floor,
     list_catalog_changes,
 )
+from crate.db.queries.federation_catalog_summaries import (
+    get_catalog_summary,
+    list_catalog_summary_heads,
+)
 from crate.db.queries.federation_manifest import (
     get_federation_manifest_revision_row,
     list_federation_manifest_rows,
@@ -46,6 +50,7 @@ from crate.db.repositories import federation as repo
 from crate.db.repositories import federation_trust as trust_repo
 from crate.db.repositories.federation_pairing_approval import complete_outbound_pairing
 from crate.db.repositories.streaming import get_track_delivery_row_by_entity_uid
+from crate.db.repositories.tasks import create_task_dedup
 from crate.federation.assertions import verify_signed_assertion
 from crate.federation.authorization import AuthorizationDecision, authorize
 from crate.federation.catalog_scope import (
@@ -56,6 +61,7 @@ from crate.federation.catalog_scope import (
     catalog_scope_allows_item,
     catalog_scope_digest,
     catalog_share_policy,
+    peer_search_policy,
 )
 from crate.federation.contracts import CAPABILITIES
 from crate.federation.identity import build_signed_descriptor, load_private_key
@@ -1506,6 +1512,81 @@ async def catalog_manifest(
     return payload
 
 
+def _catalog_summary_descriptor(peer: dict[str, Any]) -> dict[str, Any] | None:
+    """Head of the summary matching this peer's search scope, if one is built.
+
+    The descriptor is advisory: a failure here must never break the delta feed.
+    """
+    try:
+        policy = peer_search_policy(peer)
+        if policy is None:
+            return None
+        digest = catalog_scope_digest(policy)
+        for head in list_catalog_summary_heads():
+            if head["scope_digest"] == digest:
+                return {
+                    "contract": head["contract"],
+                    "etag": head["etag"],
+                    "source_sequence": int(head["source_sequence"]),
+                }
+    except Exception:
+        log.warning("catalog summary descriptor unavailable", exc_info=True)
+    return None
+
+
+def _catalog_summary_for_peer(
+    peer: dict[str, Any],
+) -> tuple[bool, dict[str, Any] | None]:
+    """(allowed, row): allowed is False without a search grant; the row may be None."""
+    policy = peer_search_policy(peer)
+    if policy is None:
+        return False, None
+    row = get_catalog_summary(catalog_scope_digest(policy))
+    if row is None:
+        create_task_dedup(
+            "federation_build_catalog_summaries",
+            {},
+            dedup_key="federation:catalog-summaries",
+        )
+    return True, row
+
+
+@router.get("/catalog/summary")
+async def catalog_summary(request: Request):
+    peer = await _require_signed_node_request(request)
+    allowed, row = await asyncio.to_thread(_catalog_summary_for_peer, peer)
+    if not allowed:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "grant_denied", "message": "Catalog search not granted"},
+        )
+    if row is None:
+        return JSONResponse(status_code=404, content={"code": "summary_pending"})
+    etag = str(row["etag"])
+    headers = {"ETag": f'"{etag}"'}
+    presented = {
+        value.strip().removeprefix("W/").strip('"')
+        for value in request.headers.get("if-none-match", "").split(",")
+    }
+    if etag in presented:
+        return Response(status_code=304, headers=headers)
+    built_at = row["built_at"]
+    return JSONResponse(
+        headers=headers,
+        content={
+            "contract": row["contract"],
+            "etag": etag,
+            "source_sequence": int(row["source_sequence"]),
+            "built_at": built_at.isoformat()
+            if hasattr(built_at, "isoformat")
+            else str(built_at),
+            "params": row["params"],
+            "bloom": base64.b64encode(row["bloom"]).decode("ascii"),
+            "artist_album_counts": row["artist_album_counts"],
+        },
+    )
+
+
 @router.get("/catalog/delta")
 async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
     peer = await _require_signed_node_request(request)
@@ -1641,7 +1722,8 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
     digest_input = _json.dumps(
         items, sort_keys=True, separators=(",", ":"), default=str
     )
-    return {
+    summary = await asyncio.to_thread(_catalog_summary_descriptor, peer)
+    page = {
         "items": items,
         "operations": items,
         "next_cursor": next_cursor,
@@ -1653,6 +1735,9 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
         "scanned_sequence": scanned_sequence,
         "digest": f"sha256:{hashlib.sha256(digest_input.encode()).hexdigest()}",
     }
+    if summary is not None:
+        page["summary"] = summary
+    return page
 
 
 def _catalog_manifest_items(

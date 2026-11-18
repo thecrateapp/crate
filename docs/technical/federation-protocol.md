@@ -62,6 +62,42 @@ Catalog read responses surface an explicit serving mode. Local fallback,
 global-ready, refreshing and degraded behavior are an API contract; callers
 must not invent a `catalog_warming` failure state.
 
+### Catalog summaries (`crate.federation.summary/1`)
+
+An owner publishes one Bloom summary per permission scope so a peer can skip
+live search fan-out to owners that cannot match. The summary is built by a
+worker task (`federation_build_catalog_summaries`); a request never builds it.
+
+`GET /api/federation/v1/catalog/summary` is a signed node request authorised by
+the existing `catalog.search` grant and advertised as the `catalog.summary`
+capability. It serves the summary of the caller's own search scope; two peers
+with different scopes get different filters, and a denied entity contributes no
+bits to a restricted peer's filter.
+
+- `200`: `{"contract", "etag", "source_sequence", "built_at", "params",
+  "bloom", "artist_album_counts"}` with a quoted `ETag` header. `bloom` is the
+  base64 filter, `params` holds `m` and `k`, `artist_album_counts` maps hashed
+  artist keys to album counts. No names or query text are stored.
+- `304`: `If-None-Match` carries the current etag (bare or quoted). The body is
+  empty and the `ETag` header is repeated.
+- `403`: the peer has no `catalog.search` grant, or search is disabled for the
+  scope.
+- `404` `{"code": "summary_pending"}`: no summary is built yet. The request
+  enqueues a deduplicated build and the peer retries later.
+
+Every `GET /api/federation/v1/catalog/delta` page carries
+`"summary": {"contract", "etag", "source_sequence"}` when the peer may search
+and a summary exists for its scope; otherwise the key is absent. A peer
+compares the etag with its stored copy and fetches the summary only when it
+differs.
+
+Tokenizer `fts-simple-v1`: lowercase `\w+` tokens of artist, album and track
+names. Each token is inserted whole, plus its prefixes of length 3 up to the
+token length minus one. Probe rule: drop query tokens shorter than 3
+characters, probe the other tokens whole and the last token as a prefix; a
+query with no probe left is not routable and must fan out. A summary has no
+false negatives for word-prefix queries and targets a 1 % false-positive rate.
+
 ## Playback relay
 
 The consumer asks the owner for a short-lived, subject-bound remote stream
