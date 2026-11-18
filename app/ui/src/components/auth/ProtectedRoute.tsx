@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Button } from "@crate/ui/shadcn/button";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { PasswordChangeRequired } from "@/components/auth/PasswordChangeRequired";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, canAccessAdmin } = useAuth();
@@ -17,6 +18,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
       />
     );
   }
+  if (user.password_change_required) return <PasswordChangeRequired />;
   if (!canAccessAdmin) {
     return (
       <ErrorState
