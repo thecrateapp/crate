@@ -43,6 +43,7 @@ from crate.db.queries.federation_catalog_summaries import (
     list_catalog_summary_heads,
 )
 from crate.db.queries.federation_manifest import (
+    federation_search_excluded_uids,
     get_federation_manifest_revision_row,
     list_federation_manifest_rows,
 )
@@ -591,8 +592,10 @@ def _scoped_remote_search(
 ) -> tuple[dict[str, list[dict]], dict[str, bool]]:
     """Run the local search and keep only what the grant and catalog scope share.
 
-    Also reports, per group, whether the raw search reached its limit: scoping
-    must not hide that more results may exist.
+    The scope is the manifest's (and so the summary's): items without an
+    entity_uid, quarantined albums and hidden artists are dropped too, with
+    one batched read. Also reports, per group, whether the raw search reached
+    its limit: scoping must not hide that more results may exist.
     """
     payload = handle_remote_search(query=query, limit=limit)
     scoped = dict(payload)
@@ -600,11 +603,21 @@ def _scoped_remote_search(
         group: len(payload.get(group) or []) >= limit
         for group in _SEARCH_GROUP_ENTITY_TYPES
     }
+    with_uids = {
+        group: [item for item in payload.get(group) or [] if item.get("entity_uid")]
+        for group in _SEARCH_GROUP_ENTITY_TYPES
+    }
+    excluded = federation_search_excluded_uids(
+        [str(item["entity_uid"]) for item in with_uids["albums"]],
+        [str(item["entity_uid"]) for item in with_uids["artists"]],
+        [str(item["entity_uid"]) for item in with_uids["tracks"]],
+    )
     for group, entity_type in _SEARCH_GROUP_ENTITY_TYPES.items():
         scoped[group] = [
             item
-            for item in payload.get(group) or []
-            if catalog_policy_allows_item(
+            for item in with_uids[group]
+            if str(item["entity_uid"]) not in excluded
+            and catalog_policy_allows_item(
                 {
                     **item,
                     "entity_type": entity_type,
