@@ -93,6 +93,17 @@ def _load_context() -> tuple[dict | None, list[dict]]:
     return local_node, _get_approved_peers_for_search()
 
 
+def _load_summaries(node_uids: list[str]) -> dict[str, Any]:
+    from crate.federation.peer_summaries import load_peer_summaries
+
+    try:
+        return load_peer_summaries(node_uids)
+    except Exception:
+        # Routing is an optimisation: without summaries every peer is asked.
+        log.warning("Peer summaries unavailable; asking every peer", exc_info=True)
+        return {}
+
+
 def _local_total(results: dict[str, list[dict]]) -> int:
     return sum(len(results.get(group) or []) for group in SEARCH_GROUPS)
 
@@ -107,6 +118,7 @@ async def federated_search_events(
     settings: FanoutSettings = DEFAULT_SETTINGS,
     cache: FanoutCache | None = None,
     stale_node_uids: Callable[[list[str]], set[str]] | None = None,
+    summaries: Callable[[list[str]], dict[str, Any]] | None = None,
 ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
     window_ms = int(settings.deadline_s * 1000)
     local = await asyncio.to_thread(local_search)
@@ -132,6 +144,8 @@ async def federated_search_events(
             query,
             local_total=_local_total(local),
             peers=peers,
+            local_artists=local.get("artists") or [],
+            summaries=summaries or _load_summaries,
             stale_node_uids=stale_node_uids or _stale_replica_node_uids,
             settings=settings,
         )
