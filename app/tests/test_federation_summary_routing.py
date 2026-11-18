@@ -238,3 +238,23 @@ def test_summary_store_failure_asks_every_peer(monkeypatch, asked):
 
     monkeypatch.setattr(peer_summaries, "load_peer_summaries", boom)
     assert search_stream._load_summaries(["a"]) == {}
+
+
+@pytest.mark.parametrize("unknown", [None, "many", True, "__missing__"])
+def test_unknown_local_album_count_never_triggers(unknown):
+    key = artist_key("Joy Division")
+    sums = {"a": _summary("a", ["Joy Division"], {key: 5})}
+    artist = {"name": "Joy Division"}
+    if unknown != "__missing__":
+        artist["album_count"] = unknown
+    decision = decide_fanout(
+        "joy division",
+        local_total=6,
+        peers=PEERS,
+        local_artists=[artist],
+        summaries=lambda uids: sums,
+        stale_node_uids=lambda uids: set(),
+    )
+
+    assert decision.reason == "enough_local_results"
+    assert decision.peers == []
