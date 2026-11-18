@@ -142,9 +142,13 @@ def decide_fanout(
         return FanoutDecision("enough_local_results", [])
     more_uids: set[str] = set()
     for artist in list(local_artists)[:3]:
-        local_count = artist.get("album_count")
-        if not isinstance(local_count, int):
-            local_count = int(local_count or 0)
+        raw_count = artist.get("album_count")
+        if isinstance(raw_count, bool) or raw_count is None:
+            continue
+        try:
+            local_count = int(raw_count)
+        except (TypeError, ValueError):
+            continue
         for peer in candidates:
             summary = stored.get(str(peer["node_uid"]))
             remote_count = summary.album_count(artist.get("name")) if summary else None
