@@ -557,7 +557,10 @@ async def federated_search(body: SearchBody, request: Request):
             )
         return _empty_search_response()
     payload = await asyncio.to_thread(
-        handle_remote_search, query=body.q, limit=body.limit
+        _scoped_remote_search,
+        query=body.q,
+        limit=body.limit,
+        policy=catalog_policy_for_grant(policy, decision, include_genres=False),
     )
     limited = apply_result_limit(
         payload,
@@ -572,6 +575,31 @@ async def federated_search(body: SearchBody, request: Request):
         )
         return await asyncio.to_thread(_search_envelope, limited, truncated=truncated)
     return _strip_paths(limited)
+
+
+_SEARCH_GROUP_ENTITY_TYPES = {"artists": "artist", "albums": "album", "tracks": "track"}
+
+
+def _scoped_remote_search(
+    *, query: str, limit: int, policy: dict[str, Any]
+) -> dict[str, list[dict]]:
+    """Run the local search and keep only what the grant and catalog scope share."""
+    payload = handle_remote_search(query=query, limit=limit)
+    scoped = dict(payload)
+    for group, entity_type in _SEARCH_GROUP_ENTITY_TYPES.items():
+        scoped[group] = [
+            item
+            for item in payload.get(group) or []
+            if catalog_policy_allows_item(
+                {
+                    **item,
+                    "entity_type": entity_type,
+                    "remote_entity_uid": item.get("entity_uid"),
+                },
+                policy,
+            )
+        ]
+    return scoped
 
 
 def _require_search_quota(request: Request, peer: dict, assertion: dict | None) -> None:
