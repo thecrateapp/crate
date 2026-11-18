@@ -95,3 +95,67 @@ def test_peer_search_policy_carries_grant_scope(monkeypatch):
 
     assert policy is not None
     assert policy["_grant_scope"]["allowed_entity_types"] == ["album"]
+
+
+# --- background checks never record risk observations (I7) -----------------
+
+
+def _record_risk(monkeypatch) -> list[dict]:
+    from crate.federation import abuse
+
+    seen: list[dict] = []
+    monkeypatch.setattr(
+        abuse, "observe_risk_signal", lambda *args, **kwargs: seen.append(kwargs)
+    )
+    return seen
+
+
+def test_peer_search_policy_records_no_risk_observation(monkeypatch):
+    seen = _record_risk(monkeypatch)
+    _patch_node(monkeypatch, {})
+    monkeypatch.setattr(
+        catalog_scope.repo,
+        "get_peer_grants",
+        lambda _uid: [_grant(capabilities_json=["catalog.sync"])],
+    )
+
+    assert catalog_scope.peer_search_policy(_peer()) is None
+    assert catalog_scope.peer_search_policy(_peer(trust_state="pending")) is None
+    assert seen == []
+
+
+def test_authorize_still_records_denials_by_default(monkeypatch):
+    from crate.federation.authorization import authorize
+
+    seen = _record_risk(monkeypatch)
+
+    decision = authorize(
+        peer=_peer(),
+        grants=[_grant(capabilities_json=["catalog.sync"])],
+        capability="catalog.search",
+        subject_hash=None,
+        roles=set(),
+    )
+
+    assert not decision.allowed and decision.denial_code == "capability_denied"
+    assert [s["reason_code"] for s in seen] == ["capability_denied"]
+
+
+def test_authorize_without_observation_keeps_the_decision(monkeypatch):
+    from crate.federation.authorization import authorize
+
+    seen = _record_risk(monkeypatch)
+    kwargs = {
+        "peer": _peer(),
+        "grants": [_grant(capabilities_json=["catalog.sync"])],
+        "capability": "catalog.search",
+        "subject_hash": None,
+        "roles": set(),
+    }
+
+    observed = authorize(**kwargs)
+    seen.clear()
+    quiet = authorize(**kwargs, observe=False)
+
+    assert quiet == observed
+    assert seen == []
