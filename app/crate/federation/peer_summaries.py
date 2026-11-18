@@ -5,12 +5,20 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+import threading
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import httpx
 
 from crate.db.repositories import federation_peer_summaries as summaries_repo
-from crate.federation.summary_bloom import SUMMARY_CONTRACT, TOKENIZER, BloomFilter
+from crate.federation.summary_bloom import (
+    SUMMARY_CONTRACT,
+    TOKENIZER,
+    BloomFilter,
+    artist_key,
+    query_probe_terms,
+)
 
 log = logging.getLogger(__name__)
 
@@ -119,3 +127,67 @@ def fetch_peer_summaries(peers: list[dict], local_node: dict) -> dict[str, Any]:
             result = "unavailable"
         counts[result] += 1
     return {"peers": len(targets), **counts}
+
+
+@dataclass(frozen=True)
+class PeerSummary:
+    node_uid: str
+    etag: str
+    bloom: BloomFilter
+    artist_album_counts: dict[str, int]
+
+    def may_match(self, query: str) -> bool:
+        """False only when the filter proves the query cannot match this peer."""
+        probes = query_probe_terms(query)
+        if probes is None:
+            return True
+        return all(term in self.bloom for term in probes)
+
+    def album_count(self, artist_name: str) -> int | None:
+        key = artist_key(artist_name)
+        if key is None:
+            return None
+        return self.artist_album_counts.get(key)
+
+
+_CACHE_LIMIT = 64
+_SUMMARY_CACHE: dict[tuple[str, str], PeerSummary] = {}
+_CACHE_LOCK = threading.Lock()
+
+
+def _build_summary(row: dict) -> PeerSummary:
+    params = row["params"]
+    return PeerSummary(
+        node_uid=str(row["node_uid"]),
+        etag=str(row["etag"]),
+        bloom=BloomFilter.from_bytes(
+            bytes(row["bloom"]), m=int(params["m"]), k=int(params["k"])
+        ),
+        artist_album_counts=dict(row.get("artist_album_counts") or {}),
+    )
+
+
+def load_peer_summaries(node_uids: list[str]) -> dict[str, PeerSummary]:
+    """Stored summaries of the peers; bodies load only for new etags."""
+    etags = summaries_repo.list_peer_summary_etags(node_uids)
+    with _CACHE_LOCK:
+        missing = [
+            uid for uid, etag in etags.items() if (uid, etag) not in _SUMMARY_CACHE
+        ]
+    if missing:
+        for row in summaries_repo.get_peer_summaries(missing):
+            try:
+                summary = _build_summary(row)
+            except Exception:
+                log.debug("Peer summary could not be built", exc_info=True)
+                continue
+            with _CACHE_LOCK:
+                _SUMMARY_CACHE[(summary.node_uid, summary.etag)] = summary
+                while len(_SUMMARY_CACHE) > _CACHE_LIMIT:
+                    _SUMMARY_CACHE.pop(next(iter(_SUMMARY_CACHE)))
+    with _CACHE_LOCK:
+        return {
+            uid: _SUMMARY_CACHE[(uid, etag)]
+            for uid, etag in etags.items()
+            if (uid, etag) in _SUMMARY_CACHE
+        }

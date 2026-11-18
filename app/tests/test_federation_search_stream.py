@@ -65,6 +65,7 @@ def _events(
             settings=QUICK,
             cache=MemoryFanoutCache(),
             stale_node_uids=lambda _uids: set(),
+            summaries=lambda _uids: {},
         ):
             collected.append((time.monotonic() - started, name, payload))
         return collected
@@ -185,6 +186,7 @@ def test_the_endpoint_streams_server_sent_events(monkeypatch, peers):
     monkeypatch.setattr(catalog, "search_global_catalog", lambda q, **kw: EMPTY)
     monkeypatch.setattr(search_stream, "_load_context", lambda: (LOCAL_NODE, PEERS[:1]))
     monkeypatch.setattr(search_stream, "_stale_replica_node_uids", lambda _uids: set())
+    monkeypatch.setattr(search_stream, "_load_summaries", lambda _uids: {})
     monkeypatch.setattr(search_fanout, "DEFAULT_CACHE", MemoryFanoutCache())
 
     response = catalog.catalog_search_stream(object(), q="joy division", limit=20)
