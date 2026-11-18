@@ -1,8 +1,38 @@
 from __future__ import annotations
 
+import os
 import uuid
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
+
+
+class UnsafeMutationPathError(ValueError):
+    pass
+
+
+def upload_staging_root() -> Path:
+    return Path(os.environ.get("DATA_DIR", "/data")) / "uploads"
+
+
+def ensure_within_roots(
+    path: str | Path,
+    roots: Iterable[str | Path],
+    *,
+    allow_root: bool = False,
+) -> Path:
+    if path is None or not str(path).strip():
+        raise UnsafeMutationPathError("Refusing to modify an empty path")
+    resolved = Path(path).resolve(strict=False)
+    resolved_roots = [Path(root).resolve(strict=False) for root in roots if root]
+    if resolved in resolved_roots:
+        if allow_root:
+            return resolved
+        raise UnsafeMutationPathError(f"Refusing to modify an allowed root: {path}")
+    if not any(resolved.is_relative_to(root) for root in resolved_roots):
+        raise UnsafeMutationPathError(
+            f"Refusing to modify a path outside the allowed roots: {path}"
+        )
+    return resolved
 
 
 def artist_dir(library_root: str | Path, artist_entity_uid: str) -> Path:

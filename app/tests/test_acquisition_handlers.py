@@ -821,7 +821,8 @@ def test_library_upload_syncs_each_album_and_emits_grouped_completion(
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.is_cancelled", lambda _task_id: False
     )
-    staging_dir = tmp_path / "staging"
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    staging_dir = tmp_path / "uploads" / "abc123def456"
     raw_dir = staging_dir / "raw"
     extracted_dir = staging_dir / "extracted"
     grouped_dir = staging_dir / "grouped"
@@ -950,7 +951,8 @@ def test_library_upload_syncs_each_album_and_emits_grouped_completion(
 
 
 def test_library_upload_skips_albums_that_already_exist(monkeypatch, tmp_path):
-    staging_dir = tmp_path / "staging"
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    staging_dir = tmp_path / "uploads" / "abc123def456"
     raw_dir = staging_dir / "raw"
     extracted_dir = staging_dir / "extracted"
     grouped_dir = staging_dir / "grouped"
@@ -1039,7 +1041,8 @@ def test_library_upload_skips_albums_that_already_exist(monkeypatch, tmp_path):
 
 
 def test_library_upload_skips_duplicate_albums_in_same_upload(monkeypatch, tmp_path):
-    staging_dir = tmp_path / "staging"
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    staging_dir = tmp_path / "uploads" / "abc123def456"
     raw_dir = staging_dir / "raw"
     extracted_dir = staging_dir / "extracted"
     grouped_dir = staging_dir / "grouped"

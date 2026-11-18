@@ -34,6 +34,7 @@ from crate.db.repositories.library import (
 )
 from crate.db.repositories.library_quarantine import quarantine_album
 from crate.repair_catalog import REPAIR_CATALOG, REPAIR_CATALOG_BY_CHECK
+from crate.storage_layout import UnsafeMutationPathError, ensure_within_roots
 from crate.worker_handlers.migration import _fix_artist, preview_fix_artist
 
 log = logging.getLogger(__name__)
@@ -56,6 +57,10 @@ class LibraryRepair:
         self.extensions = set(
             config.get("audio_extensions", [".flac", ".mp3", ".m4a", ".ogg", ".opus"])
         )
+
+    def _ensure_in_library(self, *paths: Path) -> None:
+        for path in paths:
+            ensure_within_roots(path, (self.library_path,))
 
     def _normalized_issues(
         self,
@@ -665,6 +670,7 @@ class LibraryRepair:
 
         for other_name in sorted_folders[1:]:
             other_dir = self.library_path / other_name
+            self._ensure_in_library(primary, other_dir)
             if not other_dir.is_dir():
                 continue
             for item in other_dir.iterdir():
@@ -1015,7 +1021,9 @@ class LibraryRepair:
 
         loose_dir = sorted(loose_candidates, key=lambda path: len(path.parts))[0]
         verdict = classify_duplicate_album(loose_dir, self.library_path)
-        action_result = apply_duplicate_resolution(verdict, dry_run=dry_run)
+        action_result = apply_duplicate_resolution(
+            verdict, library_root=self.library_path, dry_run=dry_run
+        )
         result = {
             "action": action_result.get("action", "fix_duplicate_albums"),
             "target": f"{artist}/{album_name}",
@@ -1331,6 +1339,7 @@ class LibraryRepair:
             path = Path(path_str)
             if path.exists():
                 try:
+                    self._ensure_in_library(path)
                     relative_path = path.resolve(strict=False).relative_to(
                         self.library_path.resolve()
                     )
@@ -1473,9 +1482,10 @@ class LibraryRepair:
             path = Path(path_str)
             if path.exists():
                 try:
+                    self._ensure_in_library(path)
                     path.unlink()
                     removed_paths.append(path_str)
-                except OSError as exc:
+                except (OSError, UnsafeMutationPathError) as exc:
                     result["details"]["error"] = f"Failed to delete {path_str}: {exc}"
                     result["message"] = (
                         f"Failed to delete shadow quality track file for {artist}/{album}"
@@ -1588,6 +1598,7 @@ class LibraryRepair:
                 # Duplicate residue — merge into correct dir and remove
                 src_files = {f.name for f in unindexed_dir.iterdir() if f.is_file()}
                 dst_files = {f.name for f in correct_dir.iterdir() if f.is_file()}
+                self._ensure_in_library(unindexed_dir, correct_dir)
                 for name in src_files - dst_files:
                     shutil.move(str(unindexed_dir / name), str(correct_dir / name))
                 shutil.rmtree(str(unindexed_dir))
@@ -1618,7 +1629,9 @@ class LibraryRepair:
 
                 verdict = classify_duplicate_album(unindexed_dir, self.library_path)
                 if verdict.action in ("delete_loose", "merge_into_canonical"):
-                    action_result = apply_duplicate_resolution(verdict, dry_run=dry_run)
+                    action_result = apply_duplicate_resolution(
+                        verdict, library_root=self.library_path, dry_run=dry_run
+                    )
                     result["action"] = verdict.action
                     result["details"].update(
                         {
@@ -1802,6 +1815,7 @@ class LibraryRepair:
             return result
 
         if not dry_run:
+            self._ensure_in_library(current_dir, expected_dir)
             if not current_dir.is_dir():
                 result["applied"] = False
                 result["details"]["error"] = "Source folder not found"

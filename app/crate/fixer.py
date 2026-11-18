@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 
 from crate.models import Issue, IssueType
+from crate.storage_layout import UnsafeMutationPathError, ensure_within_roots
 
 log = logging.getLogger(__name__)
 
@@ -11,7 +12,8 @@ class LibraryFixer:
     def __init__(self, config: dict):
         self.config = config
         self.threshold = config.get("confidence_threshold", 90)
-        self.trash_dir = Path(config.get("library_path", "/music")) / ".crate-trash"
+        self.library_root = Path(config.get("library_path", "/music"))
+        self.trash_dir = self.library_root / ".crate-trash"
 
     def fix(self, issues: list[Issue], dry_run: bool = True):
         auto = [i for i in issues if i.confidence >= self.threshold]
@@ -31,7 +33,10 @@ class LibraryFixer:
         for issue in auto:
             handler = self._get_handler(issue.type)
             if handler:
-                handler(issue, dry_run)
+                try:
+                    handler(issue, dry_run)
+                except UnsafeMutationPathError as error:
+                    log.warning("Skipping %s: %s", issue.type.value, error)
 
         if manual:
             log.info("--- Issues requiring manual review ---")
@@ -44,6 +49,10 @@ class LibraryFixer:
                     issue.suggestion,
                 )
 
+    def _ensure_in_library(self, *paths: Path) -> None:
+        for path in paths:
+            ensure_within_roots(path, (self.library_root,))
+
     def _get_handler(self, issue_type: IssueType):
         return {
             IssueType.NESTED_LIBRARY: self._fix_nested,
@@ -54,6 +63,7 @@ class LibraryFixer:
 
     def _safe_move_to_trash(self, path: Path, dry_run: bool):
         """Move to .crate-trash instead of deleting."""
+        self._ensure_in_library(path)
         dest = self.trash_dir / path.relative_to(Path(self.config["library_path"]))
         if dry_run:
             log.info("  [DRY] Would move to trash: %s -> %s", path, dest)
@@ -68,12 +78,14 @@ class LibraryFixer:
         library_root = Path(self.config["library_path"])
 
         log.info("Fixing nested library: %s", nested_path)
+        self._ensure_in_library(nested_path)
 
         for artist_dir in sorted(nested_path.iterdir()):
             if not artist_dir.is_dir():
                 continue
 
             target = library_root / artist_dir.name
+            self._ensure_in_library(artist_dir, target)
 
             if target.exists():
                 # Merge: move album dirs into existing artist
@@ -113,6 +125,7 @@ class LibraryFixer:
         sources = [Path(s) for s in issue.details["sources"]]
 
         log.info("Merging into: %s", target)
+        self._ensure_in_library(target, *sources)
 
         for source in sources:
             for f in sorted(source.iterdir()):
@@ -136,6 +149,7 @@ class LibraryFixer:
         current = Path(issue.paths[0])
         proposed = issue.details["proposed"]
         new_path = current.parent / proposed
+        self._ensure_in_library(current, new_path)
 
         if new_path.exists():
             log.info("  [SKIP] Target already exists: %s", new_path)

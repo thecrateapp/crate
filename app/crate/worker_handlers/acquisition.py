@@ -70,6 +70,11 @@ from crate.storage_import import (
     resolve_import_album_target,
     resolve_managed_track_destination,
 )
+from crate.storage_layout import (
+    UnsafeMutationPathError,
+    ensure_within_roots,
+    upload_staging_root,
+)
 from crate.worker_handlers import TaskHandler, is_cancelled, start_scan
 
 log = logging.getLogger(__name__)
@@ -254,6 +259,7 @@ def _align_tidal_staged_artist_dirs(
         )
         if current_dir.name != target_name:
             target_dir = processing_root / target_name
+            ensure_within_roots(target_dir, (processing_root,))
             if not target_dir.exists():
                 current_dir.rename(target_dir)
                 artist_dirs = [target_dir]
@@ -312,9 +318,12 @@ def _uploaded_album_identity_key(artist: str, album: str) -> tuple[str, str]:
 def _safe_extract_zip(zip_path: Path, dest_dir: Path):
     with zipfile.ZipFile(zip_path, "r") as archive:
         for member in archive.infolist():
-            member_path = (dest_dir / member.filename).resolve()
-            if not str(member_path).startswith(str(dest_dir.resolve())):
-                raise ValueError(f"Unsafe zip entry: {member.filename}")
+            try:
+                ensure_within_roots(
+                    dest_dir / member.filename, (dest_dir,), allow_root=True
+                )
+            except UnsafeMutationPathError as error:
+                raise ValueError(f"Unsafe zip entry: {member.filename}") from error
         archive.extractall(dest_dir)
 
 
@@ -516,6 +525,7 @@ def _tidal_download_inner(
     from crate.library_sync import LibrarySync
     from crate.m4a_fix import repair_tidal_artifacts
     from crate.tidal import (
+        PROCESSING_DIR,
         download,
         get_album_track_count,
         get_album_tracks,
@@ -670,6 +680,7 @@ def _tidal_download_inner(
         fallback["quality_fallback"] = "normal"
         fallback["repair_summary"] = fallback_repair
         try:
+            ensure_within_roots(current_result.get("path", ""), (PROCESSING_DIR,))
             shutil.rmtree(current_result.get("path", ""), ignore_errors=True)
         except Exception:
             log.debug(
@@ -765,6 +776,7 @@ def _tidal_download_inner(
                 retry_audio = retry_result.get("audio_file_count", 0)
                 if retry_audio > actual_audio:
                     try:
+                        ensure_within_roots(result.get("path", ""), (PROCESSING_DIR,))
                         shutil.rmtree(result.get("path", ""), ignore_errors=True)
                     except Exception:
                         log.debug(
@@ -2225,6 +2237,7 @@ def _move_soulseek_completed_files(
             else ManagedTrackPlacement(target_dir / found.name)
         )
         if placement is None:
+            ensure_within_roots(found, (slsk_download_dir,))
             found.unlink(missing_ok=True)
             continue
         try:
@@ -2447,11 +2460,19 @@ def _handle_cleanup_incomplete_downloads(
     cleaned = 0
     details = []
 
+    def _inside_downloads(path: Path) -> bool:
+        try:
+            ensure_within_roots(path, (downloads_dir,))
+        except UnsafeMutationPathError:
+            log.warning("Skipping download dir outside %s: %s", downloads_dir, path)
+            return False
+        return True
+
     for user_dir in downloads_dir.iterdir():
-        if not user_dir.is_dir():
+        if not user_dir.is_dir() or not _inside_downloads(user_dir):
             continue
         for album_dir in user_dir.iterdir():
-            if not album_dir.is_dir():
+            if not album_dir.is_dir() or not _inside_downloads(album_dir):
                 continue
             audio_files = [
                 file_path
@@ -2493,6 +2514,10 @@ def _handle_library_upload(task_id: str, params: dict, config: dict) -> dict:
 
     staging_dir = Path(params.get("staging_dir", ""))
     uploader_user_id = params.get("uploader_user_id")
+    try:
+        ensure_within_roots(staging_dir, (upload_staging_root(),))
+    except UnsafeMutationPathError:
+        return {"error": "Upload staging is outside the uploads directory"}
     if not staging_dir.exists():
         return {"error": "Upload staging not found"}
 
