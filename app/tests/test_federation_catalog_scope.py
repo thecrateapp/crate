@@ -159,3 +159,95 @@ def test_authorize_without_observation_keeps_the_decision(monkeypatch):
 
     assert quiet == observed
     assert seen == []
+
+
+# --- user-scoped grants can permit more than the node grant (I5) ------------
+
+
+def _role_grant(**overrides):
+    return _grant(
+        **{
+            "grant_uid": "33333333-3333-4333-8333-333333333333",
+            "subject_selector": "role:curators",
+            "capabilities_json": ["catalog.search"],
+            "priority": 10,
+            **overrides,
+        }
+    )
+
+
+def _patch_grants(monkeypatch, grants):
+    monkeypatch.setattr(catalog_scope.repo, "get_peer_grants", lambda _uid: grants)
+
+
+def test_role_grant_with_search_means_no_summary(monkeypatch):
+    _patch_node(monkeypatch, {})
+    _patch_grants(monkeypatch, [_grant(), _role_grant()])
+
+    assert catalog_scope.peer_search_policy(_peer()) is None
+
+    subject = _role_grant(subject_selector="subject:abc123")
+    _patch_grants(monkeypatch, [_grant(), subject])
+    assert catalog_scope.peer_search_policy(_peer()) is None
+
+
+def test_inactive_or_unrelated_user_grants_keep_the_summary(monkeypatch):
+    _patch_node(monkeypatch, {})
+    for user_grant in (
+        _role_grant(revoked_at=NOW),
+        _role_grant(disabled_at=NOW),
+        _role_grant(valid_until=datetime(2026, 2, 1, tzinfo=UTC)),
+        _role_grant(capabilities_json=["catalog.album.read"]),
+    ):
+        _patch_grants(monkeypatch, [_grant(), user_grant])
+        assert catalog_scope.peer_search_policy(_peer()) is not None, user_grant
+
+
+def test_builder_skips_a_peer_with_a_user_scoped_search_grant(monkeypatch):
+    from crate.federation import summary_builder
+
+    _patch_node(monkeypatch, {})
+    _patch_grants(monkeypatch, [_grant(), _role_grant()])
+    monkeypatch.setattr(
+        summary_builder.repo,
+        "list_peers",
+        lambda trust_state=None: [_peer()],
+    )
+
+    assert summary_builder._live_scopes() == {}
+
+
+def test_summary_endpoint_refuses_a_peer_with_a_user_scoped_search_grant(
+    monkeypatch,
+):
+    import pytest
+    from fastapi import HTTPException
+
+    from crate.api import federation
+
+    async def signed(_request):
+        return _peer()
+
+    _patch_node(monkeypatch, {})
+    _patch_grants(monkeypatch, [_grant(), _role_grant()])
+    monkeypatch.setattr(federation, "_require_signed_node_request", signed)
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(federation.catalog_summary(object()))
+
+    assert exc.value.status_code == 403
+
+
+def test_user_scoped_grant_permits_ignores_node_level_selectors():
+    from crate.federation.authorization import user_scoped_grant_permits
+
+    for selector in ("*", "peer", f"peer:{PEER_UID}", f"peer_users:{PEER_UID}"):
+        assert not user_scoped_grant_permits(
+            [_grant(subject_selector=selector)],
+            peer_uid=PEER_UID,
+            capability="catalog.search",
+            now=NOW,
+        ), selector
+    assert user_scoped_grant_permits(
+        [_role_grant()], peer_uid=PEER_UID, capability="catalog.search", now=NOW
+    )
