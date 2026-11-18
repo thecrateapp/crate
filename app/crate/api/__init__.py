@@ -467,7 +467,9 @@ def create_app() -> FastAPI:
         install_trace_id_log_record_factory,
     )
     from crate.api.cast_cors import CastReceiverCorsMiddleware
+    from crate.api.csrf import CookieCsrfMiddleware
 
+    app.add_middleware(CookieCsrfMiddleware, allowed_origins=allowed_origins)
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CacheInvalidationMiddleware)
     app.add_middleware(MetricsMiddleware)

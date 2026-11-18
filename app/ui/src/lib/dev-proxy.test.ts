@@ -5,12 +5,63 @@ import { createApiProxyOptions } from "../../dev-proxy";
 
 describe("Admin development API proxy", () => {
   it("strips upstream cookie domains so local login sessions persist", () => {
-    expect(createApiProxyOptions("https://api.lespedants.org")).toEqual({
+    expect(createApiProxyOptions("https://api.lespedants.org")).toMatchObject({
       target: "https://api.lespedants.org",
       changeOrigin: true,
       secure: false,
       cookieDomainRewrite: "",
     });
+  });
+
+  it("does not forward the local dev Origin to the API", async () => {
+    let receivedOrigin: string | undefined = "unset";
+    const upstream = createHttpServer((request, response) => {
+      receivedOrigin = request.headers.origin;
+      response.end("ok");
+    });
+    await new Promise<void>((resolve) =>
+      upstream.listen(0, "127.0.0.1", resolve),
+    );
+    const upstreamAddress = upstream.address();
+    if (!upstreamAddress || typeof upstreamAddress === "string") {
+      throw new Error("Test API did not bind to a TCP port");
+    }
+
+    const vite = await createViteServer({
+      configFile: false,
+      appType: "custom",
+      logLevel: "silent",
+      server: {
+        host: "127.0.0.1",
+        port: 0,
+        proxy: {
+          "/api": createApiProxyOptions(
+            `http://127.0.0.1:${upstreamAddress.port}`,
+          ),
+        },
+      },
+    });
+
+    try {
+      await vite.listen();
+      const viteAddress = vite.httpServer?.address();
+      if (!viteAddress || typeof viteAddress === "string") {
+        throw new Error("Test Vite server did not bind to a TCP port");
+      }
+
+      const response = await fetch(
+        `http://127.0.0.1:${viteAddress.port}/api/auth/logout`,
+        { method: "POST", headers: { Origin: "http://localhost:5173" } },
+      );
+
+      expect(response.status).toBe(200);
+      expect(receivedOrigin).toBeUndefined();
+    } finally {
+      await vite.close();
+      await new Promise<void>((resolve, reject) =>
+        upstream.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
   });
 
   it("rewrites a hosted session cookie to a host-only local cookie", async () => {

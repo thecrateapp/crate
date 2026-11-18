@@ -4,7 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import path from "path";
 import { createSentrySourcePathRewriter } from "../shared/web/sentry-source-paths";
-import { loopbackProxyCookies } from "./dev/proxy-cookies";
+import {
+  loopbackProxyCookies,
+  withoutBrowserOrigin,
+} from "./dev/proxy-cookies";
 
 import { translationDevPlugin } from "./src/i18n/dev/translation-dev-plugin";
 
@@ -108,6 +111,7 @@ export default defineConfig({
         secure: false,
         ws: true,
         configure(proxy) {
+          proxy.on("proxyReq", withoutBrowserOrigin);
           proxy.on("proxyRes", (response, request) => {
             response.headers["set-cookie"] = loopbackProxyCookies(
               response.headers["set-cookie"],

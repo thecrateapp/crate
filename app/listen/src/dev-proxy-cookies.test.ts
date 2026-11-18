@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { loopbackProxyCookies } from "../dev/proxy-cookies";
+import {
+  loopbackProxyCookies,
+  withoutBrowserOrigin,
+} from "../dev/proxy-cookies";
 
 describe("development API proxy cookie scope", () => {
   const cookie =
@@ -31,5 +34,16 @@ describe("development API proxy cookie scope", () => {
         false,
       ),
     ).toEqual(["crate_listen_token=; Max-Age=0; SameSite=Lax"]);
+  });
+});
+
+describe("development API proxy request origin", () => {
+  it("drops the local dev Origin before the request reaches the API", () => {
+    const headers = new Map([
+      ["origin", "http://localhost:5174"],
+      ["cookie", "crate_session_listen=fixture"],
+    ]);
+    withoutBrowserOrigin({ removeHeader: (name) => headers.delete(name) });
+    expect([...headers.keys()]).toEqual(["cookie"]);
   });
 });

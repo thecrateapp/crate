@@ -642,17 +642,13 @@ def _is_secure() -> bool:
     return domain != "localhost"
 
 
-def _cookie_samesite(secure: bool | None = None) -> Literal["lax", "strict", "none"]:
-    override = os.environ.get("CRATE_AUTH_COOKIE_SAMESITE")
-    if override:
-        normalized = override.strip().lower()
-        if normalized == "lax":
-            return "lax"
-        if normalized == "strict":
-            return "strict"
-        if normalized == "none":
-            return "none"
-    return "none" if (_is_secure() if secure is None else secure) else "lax"
+def _cookie_samesite() -> Literal["lax", "strict", "none"]:
+    override = (os.environ.get("CRATE_AUTH_COOKIE_SAMESITE") or "").strip().lower()
+    if override == "strict":
+        return "strict"
+    if override == "none":
+        return "none"
+    return "lax"
 
 
 _LOCAL_COOKIE_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
@@ -700,7 +696,7 @@ def _cookie_attributes(request: Request | None) -> _CookieAttributes:
         }
 
     secure = _request_is_https(request)
-    samesite = _cookie_samesite(secure)
+    samesite = _cookie_samesite()
     if samesite == "none" and not secure:
         samesite = "lax"
     return {"secure": secure, "samesite": samesite, "domain": None}
@@ -1741,6 +1737,7 @@ class AuthMiddleware:
                     continue
                 user = await run_in_threadpool(self._resolve_token_user, cookie_token)
                 if user:
+                    request.state.cookie_authenticated = True
                     break
 
         if not user:

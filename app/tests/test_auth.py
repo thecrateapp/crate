@@ -1825,6 +1825,58 @@ class TestLoginEndpoint:
             set_cookie = resp.headers.get("set-cookie", "")
             assert "crate_session" in set_cookie
 
+    def test_login_sets_a_secure_lax_session_cookie_by_default(
+        self, test_app, monkeypatch
+    ):
+        monkeypatch.setenv("DOMAIN", "lespedants.org")
+        for key in (
+            "CRATE_AUTH_COOKIE_DOMAIN",
+            "CRATE_AUTH_COOKIE_SECURE",
+            "CRATE_AUTH_COOKIE_SAMESITE",
+        ):
+            monkeypatch.delenv(key, raising=False)
+        fake_user = {
+            "id": 1,
+            "email": "test@test.com",
+            "name": "Test",
+            "avatar": None,
+            "role": "admin",
+            "username": "admin",
+            "password_hash": "$2b$12$realhashdoesntmatterhere",
+        }
+        fake_session = {
+            "id": "sess-123",
+            "expires_at": datetime.now(timezone.utc).isoformat(),
+        }
+        with (
+            patch("crate.api.auth.get_user_by_email", return_value=fake_user),
+            patch("crate.api.auth.get_setting", return_value=None),
+            patch("crate.api.auth.verify_password", return_value=True),
+            patch("crate.api.auth.update_user_last_login"),
+            patch(
+                "crate.api.auth._create_login_session",
+                return_value=("fake-jwt", fake_session, None),
+            ),
+        ):
+            resp = test_app.post(
+                "/api/auth/login",
+                json={"email": "test@test.com", "password": "pass"},
+                headers={
+                    "x-forwarded-host": "admin.lespedants.org",
+                    "x-forwarded-proto": "https",
+                },
+            )
+
+        assert resp.status_code == 200
+        session_cookies = [
+            value
+            for value in resp.headers.get_list("set-cookie")
+            if value.startswith("crate_session=fake-jwt")
+        ]
+        assert len(session_cookies) == 1
+        assert "Secure" in session_cookies[0]
+        assert "SameSite=lax" in session_cookies[0]
+
     def test_set_login_cookies_clears_stale_auth_cookie_variants(self):
         from crate.api import auth
 
@@ -2849,6 +2901,21 @@ class TestRequestAwareAuthCookies:
 
         (cookie,) = _set_cookie_headers(response)
         assert "Domain=.dev.lespedants.org" in cookie
+        assert "Secure" in cookie
+        assert "SameSite=lax" in cookie
+
+    def test_secure_cookies_use_none_only_when_explicitly_configured(self, monkeypatch):
+        from crate.api import auth
+
+        monkeypatch.setenv("CRATE_AUTH_COOKIE_SAMESITE", "none")
+        response = Response()
+        auth._set_auth_cookie(
+            response,
+            "token",
+            request=_cookie_request("listen.dev.lespedants.org", proto="https"),
+        )
+
+        (cookie,) = _set_cookie_headers(response)
         assert "Secure" in cookie
         assert "SameSite=none" in cookie
 
