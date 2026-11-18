@@ -238,3 +238,25 @@ def test_reference_catalog_size():
         f"fp={rate:.5f} build_seconds={elapsed:.2f}"
     )
     assert rate <= 0.015
+
+
+def test_wire_format_golden_vector():
+    """Pins the bytes peers exchange: hashing, bit order, sizing and params.
+
+    The Bloom hashing does not depend on the tokenizer; if this changes, every
+    peer's summaries change meaning, so bump the contract instead.
+    """
+    f = BloomFilter.sized(3)
+    for term in ("joy", "division", "björk"):
+        f.add(term)
+
+    assert f.to_bytes().hex() == "25c55cf7a518ebba"
+    assert f.params == {
+        "m": 64,
+        "k": 15,
+        "n": 3,
+        "fp_target": 0.01,
+        "hash": "blake2b-128-km",
+        "tokenizer": "fts-simple-v2",
+        "min_prefix": 3,
+    }
