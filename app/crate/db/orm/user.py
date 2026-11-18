@@ -127,6 +127,7 @@ class Session(Base):
     app_id: Mapped[str | None] = mapped_column(Text)
     device_label: Mapped[str | None] = mapped_column(Text)
     device_fingerprint: Mapped[str | None] = mapped_column(Text)
+    authenticated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped["User"] = relationship(back_populates="sessions")
 

@@ -273,6 +273,8 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "warmup_stream_variants": TaskTypeInfo("Warm Playback Cache", "playback"),
     "cleanup_stream_variants": TaskTypeInfo("Clean Playback Cache", "playback"),
     "crate_download": TaskTypeInfo("Crate Download", "playback"),
+    "export_user_data": TaskTypeInfo("Account Data Export", "library"),
+    "cleanup_user_data_exports": TaskTypeInfo("Clean Account Data Exports", "library"),
     "generate_cast_spectrum": TaskTypeInfo("Cast Spectrum", "playback"),
     "prime_jam_auto_dj": TaskTypeInfo("Jam Room Auto DJ", "playback"),
     "generate_system_playlist": TaskTypeInfo("Playlist Generation", "playlists"),

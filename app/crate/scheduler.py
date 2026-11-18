@@ -38,6 +38,7 @@ DEFAULT_SCHEDULES = {
     "backup_dump": 86400,  # 24h — local database dump, then its retention (BK1)
     "backup_policies_tick": 300,  # 5min — start due backup policies, verify, drill (BK3)
     "backup_alerts": 300,  # 5min — push backup alerts and refresh backup metrics (BK6)
+    "cleanup_user_data_exports": 3600,  # 1h — expire account data exports (M10)
 }
 
 SCHEDULED_TASKS = [

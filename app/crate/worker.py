@@ -1082,6 +1082,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("crate_download",),
     ),
     (
+        "crate.worker_handlers.user_data_export",
+        "USER_DATA_EXPORT_TASK_HANDLERS",
+        ("export_user_data", "cleanup_user_data_exports"),
+    ),
+    (
         "crate.worker_handlers.cast_spectrum",
         "CAST_SPECTRUM_TASK_HANDLERS",
         ("generate_cast_spectrum",),
