@@ -20,7 +20,7 @@ def test_async_federation_routes_do_not_call_blocking_services_directly() -> Non
         "_catalog_manifest_items",
         "_catalog_manifest_items_after",
         "_catalog_manifest_snapshot",
-        "_catalog_share_policy",
+        "catalog_share_policy",
         "_federated_artist_sidecar_image",
         "_peer_has_capability",
         "_public_album_detail",
