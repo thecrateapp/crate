@@ -538,6 +538,7 @@ def create_app() -> FastAPI:
     from crate.api.catalog import router as catalog_router
     from crate.api.capabilities import router as capabilities_router
     from crate.api.decks import router as decks_router
+    from crate.api.decks_cues import router as decks_cues_router
     from crate.api.decks_stems import router as decks_stems_router
     from crate.api.smart_mix import router as smart_mix_router
     from crate.api.smart_mix_admin import router as smart_mix_admin_router
@@ -557,6 +558,7 @@ def create_app() -> FastAPI:
     app.include_router(access_tokens_router)
     app.include_router(capabilities_router)
     app.include_router(decks_router)
+    app.include_router(decks_cues_router)
     app.include_router(media_access_router)
     app.include_router(admin_auth_router)
     app.include_router(me_router)

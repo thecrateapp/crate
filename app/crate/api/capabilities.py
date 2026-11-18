@@ -227,15 +227,17 @@ def decks_bass_handoff_available() -> bool:
 def _decks_features(request: Request) -> list[DecksFeature]:
     # Each feature is added by the server change that serves its contract: S3
     # library_cursor (/api/decks), S4 profiles_batch, S5
-    # beatmatch/bass_handoff/long_beatmatch (the decks planner context), S7 cues,
-    # Smart Mix Stems ST1 stems/stem_upload and ST3 local_refinement. S7 is not
-    # served yet. Do not derive them from the Android Smart Mix flags.
+    # beatmatch/bass_handoff/long_beatmatch (the decks planner context), S7 cues
+    # (/api/decks/cues and /api/decks/corrections), Smart Mix Stems ST1
+    # stems/stem_upload and ST3 local_refinement. Do not derive them from the
+    # Android Smart Mix flags.
     features: list[DecksFeature] = ["library_cursor", "profiles_batch"]
     if decks_beatmatch_available():
         features.append("beatmatch")
         if decks_bass_handoff_available():
             features.append("bass_handoff")
         features.append("long_beatmatch")
+    features.append("cues")
     features.append("stems")
     if _may_upload_stems(request):
         features.append("stem_upload")

@@ -116,6 +116,10 @@ def test_traefik_v3_method_matchers_keep_get_and_head_routers_enabled():
 _DECKS_PATHS = (
     "/api/decks/containers",
     "/api/decks/containers/playlist/1/tracks",
+    "/api/decks/cues/query",
+    "/api/decks/cues/0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10",
+    "/api/decks/corrections/query",
+    "/api/decks/corrections/0b6f2c1e-5d6a-4c1b-9a51-2f0c8a3c9e10",
 )
 
 
