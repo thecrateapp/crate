@@ -61,8 +61,30 @@ def test_catalog_summary_round_trip_and_upsert(pg_db):
             "contract": "bloom-v1",
             "source_sequence": 41,
             "etag": "new",
+            "tokenizer": None,
+            "hash": None,
+            "min_prefix": None,
         }
     ]
+    upsert_catalog_summary(
+        _summary(
+            "a",
+            params={
+                "m": 64,
+                "k": 3,
+                "tokenizer": "fts-simple-v2",
+                "hash": "blake2b-128-km",
+                "min_prefix": 3,
+            },
+            source_sequence=42,
+        )
+    )
+    [head] = list_catalog_summary_heads()
+    assert (head["tokenizer"], head["hash"], head["min_prefix"]) == (
+        "fts-simple-v2",
+        "blake2b-128-km",
+        3,
+    )
 
 
 def test_delete_catalog_summaries_except_keeps_listed(pg_db):
