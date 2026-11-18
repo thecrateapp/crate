@@ -99,7 +99,10 @@ def _has(bloom: BloomFilter, text: str) -> bool:
 
 
 OPEN = {}
-DENY = lambda uid: {"catalog_filter": {"deny_entity_uids": [uid]}}
+
+
+def DENY(uid):  # noqa: N802
+    return {"catalog_filter": {"deny_entity_uids": [uid]}}
 
 
 def test_summary_has_no_false_negatives_on_catalog(pg_db, world):
