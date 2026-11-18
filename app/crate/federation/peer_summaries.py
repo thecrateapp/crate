@@ -5,6 +5,8 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+import math
+import re
 import threading
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -13,7 +15,9 @@ import httpx
 
 from crate.db.repositories import federation_peer_summaries as summaries_repo
 from crate.federation.summary_bloom import (
+    MIN_PREFIX,
     SUMMARY_CONTRACT,
+    SUMMARY_HASH,
     TOKENIZER,
     BloomFilter,
     artist_key,
@@ -45,8 +49,27 @@ def peer_advertises_summary(peer: dict) -> bool:
     return False
 
 
+MAX_BLOOM_BITS = 64 * 1024 * 1024
+MAX_HASHES = 32
+MAX_ARTIST_COUNTS = 200_000
+_ARTIST_KEY_RE = re.compile(r"[0-9a-f]{16}")
+
+
+def _strict_int(value: Any, *, lo: int, hi: int | None = None) -> int:
+    """An int (never a bool, float or string) within [lo, hi]."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError("expected an integer")
+    if value < lo or (hi is not None and value > hi):
+        raise ValueError("integer out of range")
+    return value
+
+
 def parse_summary_payload(payload: dict) -> dict:
-    """Validate a summary body and return the fields to store."""
+    """Validate a summary body and return the fields to store.
+
+    Every size a peer controls is bounded, so a hostile or broken summary can
+    never make a search slow: it is rejected (and, by the caller, dropped).
+    """
     if not isinstance(payload, dict):
         raise InvalidSummary("summary is not an object")
     if payload.get("contract") != SUMMARY_CONTRACT:
@@ -54,23 +77,38 @@ def parse_summary_payload(payload: dict) -> dict:
     params = payload.get("params")
     if not isinstance(params, dict) or params.get("tokenizer") != TOKENIZER:
         raise InvalidSummary("unsupported summary tokenizer")
+    if params.get("hash") != SUMMARY_HASH:
+        raise InvalidSummary("unsupported summary hash")
+    if params.get("min_prefix") != MIN_PREFIX:
+        raise InvalidSummary("unsupported summary min_prefix")
     etag = payload.get("etag")
     if not isinstance(etag, str) or not etag:
         raise InvalidSummary("summary is missing its etag")
-    counts = payload.get("artist_album_counts")
-    if not isinstance(counts, dict):
-        raise InvalidSummary("summary is missing artist_album_counts")
     try:
-        source_sequence = int(payload["source_sequence"])
+        m = _strict_int(params.get("m"), lo=64, hi=MAX_BLOOM_BITS)
+        k = _strict_int(params.get("k"), lo=1, hi=MAX_HASHES)
+        source_sequence = _strict_int(payload.get("source_sequence"), lo=0)
+        raw_counts = payload.get("artist_album_counts")
+        if not isinstance(raw_counts, dict):
+            raise TypeError("artist_album_counts is not an object")
+        if len(raw_counts) > MAX_ARTIST_COUNTS:
+            raise ValueError("too many artist_album_counts")
+        counts: dict[str, int] = {}
+        for key, value in raw_counts.items():
+            if not isinstance(key, str) or not _ARTIST_KEY_RE.fullmatch(key):
+                raise ValueError("artist key is not 16 lowercase hex characters")
+            counts[key] = _strict_int(value, lo=0)
         bloom = base64.b64decode(str(payload.get("bloom") or ""), validate=True)
-        BloomFilter.from_bytes(bloom, m=int(params["m"]), k=int(params["k"]))
+        if len(bloom) != math.ceil(m / 8):
+            raise ValueError("bloom length does not match m")
+        BloomFilter.from_bytes(bloom, m=m, k=k)
     except (TypeError, ValueError, KeyError, binascii.Error) as exc:
-        raise InvalidSummary("summary bloom or params are malformed") from exc
+        raise InvalidSummary("summary bloom, params or counts are malformed") from exc
     return {
         "contract": SUMMARY_CONTRACT,
         "params": params,
         "bloom": bloom,
-        "artist_album_counts": {str(k): int(v) for k, v in counts.items()},
+        "artist_album_counts": counts,
         "source_sequence": source_sequence,
         "etag": etag,
     }
