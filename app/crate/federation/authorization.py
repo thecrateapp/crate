@@ -77,8 +77,10 @@ def _deny(
     revision: int = 0,
     peer_uid: str | None = None,
     subject_hash: str | None = None,
+    observe: bool = True,
 ) -> AuthorizationDecision:
-    if peer_uid is not None:
+    # observe=False: a background check (no request), so no risk signal/metric.
+    if observe and peer_uid is not None:
         from crate.federation.abuse import observe_risk_signal
 
         observe_risk_signal(
@@ -106,14 +108,35 @@ def authorize(
     roles: set[str],
     subject_blocked: bool = False,
     now: datetime | None = None,
+    observe: bool = True,
 ) -> AuthorizationDecision:
+    """Decide one capability for one peer (and subject).
+
+    ``observe=False`` is for background checks: a denial is returned the same
+    way but records no risk observation and no metric.
+    """
     peer_uid = str(peer.get("node_uid") or "") or None
     if peer.get("trust_state") != "approved":
-        return _deny("peer_not_approved", peer_uid=peer_uid, subject_hash=subject_hash)
+        return _deny(
+            "peer_not_approved",
+            peer_uid=peer_uid,
+            subject_hash=subject_hash,
+            observe=observe,
+        )
     if peer.get("disabled_at") is not None:
-        return _deny("peer_disabled", peer_uid=peer_uid, subject_hash=subject_hash)
+        return _deny(
+            "peer_disabled",
+            peer_uid=peer_uid,
+            subject_hash=subject_hash,
+            observe=observe,
+        )
     if subject_blocked:
-        return _deny("subject_blocked", peer_uid=peer_uid, subject_hash=subject_hash)
+        return _deny(
+            "subject_blocked",
+            peer_uid=peer_uid,
+            subject_hash=subject_hash,
+            observe=observe,
+        )
 
     current_time = now or datetime.now(UTC)
     peer_uid = str(peer["node_uid"])
@@ -129,7 +152,12 @@ def authorize(
         )
     ]
     if not matching:
-        return _deny("no_matching_grant", peer_uid=peer_uid, subject_hash=subject_hash)
+        return _deny(
+            "no_matching_grant",
+            peer_uid=peer_uid,
+            subject_hash=subject_hash,
+            observe=observe,
+        )
     matching.sort(
         key=lambda grant: (
             int(grant.get("priority") or 0),
@@ -149,6 +177,7 @@ def authorize(
             revision=revision,
             peer_uid=peer_uid,
             subject_hash=subject_hash,
+            observe=observe,
         )
 
     grant = permitted[0]
@@ -164,6 +193,7 @@ def authorize(
             revision=int(grant.get("policy_revision") or 0),
             peer_uid=peer_uid,
             subject_hash=subject_hash,
+            observe=observe,
         )
     raw_uid = grant.get("grant_uid")
     return AuthorizationDecision(

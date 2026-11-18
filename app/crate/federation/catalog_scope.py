@@ -147,6 +147,7 @@ def peer_search_policy(peer: dict[str, Any]) -> dict[str, Any] | None:
         capability="catalog.search",
         subject_hash=None,
         roles=set(),
+        observe=False,
     )
     if not decision.allowed:
         return None
