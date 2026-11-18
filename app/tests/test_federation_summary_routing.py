@@ -259,3 +259,119 @@ def test_unknown_local_album_count_never_triggers(unknown):
 
     assert decision.reason == "enough_local_results"
     assert decision.peers == []
+
+
+# --- local album counts for the global-catalog search (I3) -----------------
+
+
+def _global_catalog_artist(name: str) -> dict:
+    """An artist row as search_global_catalog returns it: no album_count."""
+    return {
+        "id": 12,
+        "entity_uid": "0b7c3f0e-0000-4000-8000-000000000012",
+        "local_artist_entity_uid": "0b7c3f0e-0000-4000-8000-000000000012",
+        "global_uid": "9a1d2c3b-0000-4000-8000-000000000012",
+        "global_artist_uid": "9a1d2c3b-0000-4000-8000-000000000012",
+        "slug": name.lower().replace(" ", "-"),
+        "name": name,
+        "has_photo": True,
+        "availability": {"local": True, "remote": False},
+    }
+
+
+def _events_with_counts(query, summaries, local, counts):
+    async def run():
+        out = []
+        async for name, payload in federated_search_events(
+            query,
+            limit=20,
+            user={"id": 7},
+            local_search=lambda: local,
+            load_context=lambda: (LOCAL_NODE, PEERS),
+            settings=QUICK,
+            cache=MemoryFanoutCache(),
+            stale_node_uids=lambda uids: set(),
+            summaries=summaries,
+            local_album_counts=counts,
+        ):
+            out.append((name, payload))
+        return out
+
+    return asyncio.run(run())
+
+
+def test_global_catalog_artists_get_local_album_counts(asked):
+    key = artist_key("Joy Division")
+    sums = {
+        "a": _summary("a", ["Joy Division"], {key: 5}),
+        "b": _summary("b", ["Joy Division"], {key: 2}),
+    }
+    local = {
+        **EMPTY,
+        "artists": [_global_catalog_artist("Joy Division")],
+        "tracks": [{"title": f"t{i}"} for i in range(6)],
+    }
+    lookups: list[list[str]] = []
+
+    def counts(names):
+        lookups.append(list(names))
+        return {"joy division": 2}
+
+    events = _events_with_counts("joy division", lambda uids: sums, local, counts)
+
+    assert lookups == [["Joy Division"]]
+    assert asked == ["a"]
+    cov = next(p for n, p in events if n == "coverage")
+    assert cov["reason"] == "peer_has_more"
+    local_event = next(p for n, p in events if n == "local")
+    assert "album_count" not in local_event["results"]["artists"][0]
+
+
+def test_album_count_lookup_covers_only_the_top_three_without_counts(asked):
+    artists = [
+        {"name": "Known", "album_count": 4},
+        _global_catalog_artist("First"),
+        _global_catalog_artist("Second"),
+        _global_catalog_artist("Third"),
+    ]
+    local = {**EMPTY, "artists": artists, "tracks": [{"title": "t"}] * 6}
+    lookups: list[list[str]] = []
+
+    def counts(names):
+        lookups.append(list(names))
+        return {}
+
+    _events_with_counts("joy division", lambda uids: {}, local, counts)
+
+    assert lookups == [["First", "Second"]]
+
+
+def test_album_count_lookup_failure_keeps_routing(asked):
+    key = artist_key("Joy Division")
+    sums = {"a": _summary("a", ["Joy Division"], {key: 5})}
+    local = {
+        **EMPTY,
+        "artists": [_global_catalog_artist("Joy Division")],
+        "tracks": [{"title": "t"}] * 6,
+    }
+
+    def counts(_names):
+        raise RuntimeError("db down")
+
+    events = _events_with_counts("joy division", lambda uids: sums, local, counts)
+
+    assert asked == []
+    assert events[-1][1]["coverage"]["reason"] == "enough_local_results"
+
+
+def test_local_artist_album_counts_reads_library_artists(pg_db):
+    from crate.db.queries.federation_search import local_artist_album_counts
+
+    pg_db.upsert_artist({"name": "Joy Division", "album_count": 3})
+    pg_db.upsert_artist({"name": "Björk", "album_count": 9})
+
+    assert local_artist_album_counts(["joy division", "björk", "nobody"]) == {
+        "joy division": 3,
+        "björk": 9,
+    }
+    assert local_artist_album_counts([]) == {}
