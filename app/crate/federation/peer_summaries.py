@@ -24,6 +24,9 @@ log = logging.getLogger(__name__)
 
 SUMMARY_PATH = "/api/federation/v1/catalog/summary"
 SUMMARY_CAPABILITY = "catalog.summary"
+# Twice the 900 s poll: a summary neither re-fetched nor confirmed (304, or the
+# same etag announced in the delta feed) for this long no longer routes.
+PEER_SUMMARY_MAX_AGE_S = 1800
 
 RefreshResult = Literal["updated", "unchanged", "unavailable"]
 
@@ -94,13 +97,20 @@ def refresh_peer_summary(
         log.debug("Peer summary fetch failed for %s: %s", node_uid, exc)
         return "unavailable"
     if response.status_code == 304:
+        summaries_repo.touch_peer_summary(node_uid)
         return "unchanged"
+    if response.status_code in (403, 404):
+        # The peer no longer shares a summary with us: stop routing on the old one.
+        summaries_repo.delete_peer_summary(node_uid)
+        return "unavailable"
     if response.status_code != 200:
+        # Transient (5xx, 429): keep the row; it ages out after the max age.
         return "unavailable"
     try:
         parsed = parse_summary_payload(response.json())
-    except (ValueError, InvalidSummary) as exc:
+    except ValueError as exc:  # InvalidSummary or a body that is not JSON
         log.debug("Peer %s sent an unusable summary: %s", node_uid, exc)
+        summaries_repo.delete_peer_summary(node_uid)
         return "unavailable"
     summaries_repo.upsert_peer_summary(node_uid, **parsed)
     return "updated"
@@ -168,8 +178,13 @@ def _build_summary(row: dict) -> PeerSummary:
 
 
 def load_peer_summaries(node_uids: list[str]) -> dict[str, PeerSummary]:
-    """Stored summaries of the peers; bodies load only for new etags."""
-    etags = summaries_repo.list_peer_summary_etags(node_uids)
+    """Fresh stored summaries of the peers; bodies load only for new etags.
+
+    A summary older than PEER_SUMMARY_MAX_AGE_S is ignored, so the peer is asked.
+    """
+    etags = summaries_repo.list_peer_summary_etags(
+        node_uids, max_age_s=PEER_SUMMARY_MAX_AGE_S
+    )
     with _CACHE_LOCK:
         missing = [
             uid for uid, etag in etags.items() if (uid, etag) not in _SUMMARY_CACHE

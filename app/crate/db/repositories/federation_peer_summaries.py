@@ -24,6 +24,7 @@ _UPSERT_SQL = text(
         source_sequence = EXCLUDED.source_sequence,
         etag = EXCLUDED.etag,
         fetched_at = NOW()
+    WHERE federation_peer_summaries.source_sequence <= EXCLUDED.source_sequence
     """
 ).bindparams(
     bindparam("params_json", type_=JSONB),
@@ -42,7 +43,10 @@ def upsert_peer_summary(
     etag: str,
     session: Session | None = None,
 ) -> None:
-    """Insert or refresh the summary fetched from one peer."""
+    """Insert or refresh the summary fetched from one peer.
+
+    An older summary (lower ``source_sequence``) never replaces a newer one.
+    """
 
     values = {
         "node_uid": str(node_uid),
@@ -75,10 +79,33 @@ def delete_peer_summary(node_uid: str, *, session: Session | None = None) -> Non
         _impl(current)
 
 
+def touch_peer_summary(node_uid: str, *, session: Session | None = None) -> None:
+    """Mark the stored summary as confirmed current (`fetched_at = NOW()`)."""
+
+    def _impl(current: Session) -> None:
+        current.execute(
+            text(
+                "UPDATE federation_peer_summaries SET fetched_at = NOW() "
+                "WHERE node_uid = CAST(:node_uid AS uuid)"
+            ),
+            {"node_uid": str(node_uid)},
+        )
+
+    with optional_scope(session) as current:
+        _impl(current)
+
+
 def list_peer_summary_etags(
-    node_uids: list[str], *, session: Session | None = None
+    node_uids: list[str],
+    *,
+    max_age_s: int | None = None,
+    session: Session | None = None,
 ) -> dict[str, str]:
-    """Return `{node_uid: etag}` for the listed peers that have a summary."""
+    """Return `{node_uid: etag}` for the listed peers that have a summary.
+
+    With ``max_age_s``, rows not fetched or confirmed within that many seconds
+    are left out, as if the peer had no summary.
+    """
 
     def _impl(current: Session) -> dict[str, str]:
         rows = current.execute(
@@ -87,9 +114,18 @@ def list_peer_summary_etags(
                 SELECT node_uid::text AS node_uid, etag
                 FROM federation_peer_summaries
                 WHERE node_uid = ANY(CAST(:uids AS uuid[]))
+                  AND (
+                    CAST(:max_age_s AS integer) IS NULL
+                    OR fetched_at > NOW() - make_interval(
+                        secs => CAST(:max_age_s AS integer)
+                    )
+                  )
                 """
             ),
-            {"uids": [str(uid) for uid in node_uids]},
+            {
+                "uids": [str(uid) for uid in node_uids],
+                "max_age_s": None if max_age_s is None else int(max_age_s),
+            },
         ).mappings()
         return {row["node_uid"]: row["etag"] for row in rows}
 
@@ -143,5 +179,6 @@ __all__ = [
     "delete_peer_summary",
     "get_peer_summaries",
     "list_peer_summary_etags",
+    "touch_peer_summary",
     "upsert_peer_summary",
 ]
