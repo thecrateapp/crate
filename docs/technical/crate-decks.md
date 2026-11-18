@@ -1093,15 +1093,45 @@ ANY(:entity_uids)` on the primary keys, the cues by a left join on theirs.
   library check, the locked read, the write, and the clock reading.
 - Nothing aggregates over `library_tracks` and nothing touches audio files.
 
-### Smart Mix profiles are not affected
+### Corrections in Smart Mix (F8.SM)
 
-User corrections do not change the Smart Mix profiles, the planner or the plans
-in this phase: Decks applies a correction on top of the profile on the machine
-that loads the track (F8.C-PR2), and every other client keeps the analyser's
-values. Gate G5 (Diego, 2026-11-16) approved this contract and decided that
-corrections will feed Smart Mix later: the planner will prefer the user's
-correction over the profile for that user's plans. That work is planned as
-F8.SM in the Decks plan and is not part of this contract.
+User corrections do not change the shared Smart Mix profiles. Decks applies a
+correction on top of the profile on the machine that loads the track (F8.C-PR2),
+and since F8.SM the planner does the same for the plans Decks requests: in
+`POST /api/playback/transition-plans`, an edge whose `context.source` is `decks`
+plans both of its tracks with the signed-in user's corrections. Listen, the Android
+continuation (`POST /api/playback/continuation`, which plans without a user) and
+VirtualDJ keep the analyser's values. The rules live in
+`app/crate/smart_mix/user_corrections.py` (`apply_user_correction`):
+
+- A cleared correction (all three values `null`) applies nothing.
+- Grid: `beatAnchorMs` becomes the first corrected beat. The downbeat anchor and
+  the intro and outro beat and downbeat anchors snap to the corrected beat
+  nearest the profile's value, which keeps the analysed bar phase; an anchor the
+  profile did not have stays `null`. A loaded `beatGridMs` becomes the corrected
+  grid.
+- BPM: the correction's, or the median beat of the corrected grid when only the
+  grid was corrected. It replaces `bpm`, `introBpm` and `outroBpm`. A BPM
+  corrected without a grid leaves the anchors as analysed.
+- Confidence: a corrected BPM or grid sets `bpmConfidence` to 1, so the plan no
+  longer falls back with `low_confidence` for the tempo; a corrected key sets
+  `camelot` and `keyConfidence` to 1.
+- Phrases: when the corrected BPM is within 2 % of the analysed one, each phrase
+  start snaps to the nearest corrected downbeat (every `timeSignature` beats of the
+  corrected grid from the snapped downbeat anchor), or stays put without a grid.
+  A larger correction, or snapped phrases that would overlap, drops the track's
+  phrases (with their voice and stems layers), so smart-mix-v3 plans it with the
+  bar heuristic.
+
+The plan request reads the user's corrections of the decks edges' tracks once
+(`get_decks_corrections`, one statement for up to 64 UIDs) and applies them
+before the plan cache key, the plan, the v3 candidate menu (`localRefinement`)
+and `policyLimits` are computed. The plan cache key of a corrected edge adds a
+digest of each correction's content (`outgoingCorrection`,
+`incomingCorrection`), so a corrected plan is never served to a user without
+that same correction; uncorrected edges keep their keys and share plans as
+before. Corrected edges are not sent to AI refinement, which keys and prompts on
+the shared profiles: they carry no `refinement` (AI refinement is off since SG3).
 
 ## Audio availability and plan fields (S9)
 

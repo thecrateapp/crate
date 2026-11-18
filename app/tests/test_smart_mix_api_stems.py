@@ -13,10 +13,13 @@ of those edges with stems on both, once, and both tracks' gate priors must be at
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from dataclasses import replace
 
 import pytest
 
+from crate.db.queries.decks_cues import DecksBatchRead
 from crate.api import smart_mix
 from crate.api.schemas.smart_mix import TransitionEdgeRequest
 from crate.db.queries.smart_mix_genres import TrackGenres
@@ -151,6 +154,14 @@ def batch(test_app, monkeypatch):
 
     monkeypatch.setattr(smart_mix, "get_track_mix_profiles_by_entity_uids", profiles)
     monkeypatch.setattr(smart_mix, "get_stem_analyses_by_entity_uids", analyses)
+    # No user corrections (F8.SM): the decks plans use the shared profiles.
+    monkeypatch.setattr(
+        smart_mix,
+        "get_decks_corrections",
+        lambda _user_id, _uids, **_kwargs: DecksBatchRead(
+            found={}, server_time=datetime(2026, 11, 18, tzinfo=UTC)
+        ),
+    )
 
     def genres(entity_uids):
         state["genre_reads"].append(list(entity_uids))

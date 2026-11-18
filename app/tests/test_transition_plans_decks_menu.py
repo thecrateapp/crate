@@ -9,12 +9,15 @@ the Android and VirtualDJ plans and their cache keys do not change.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import hashlib
 import json
 from dataclasses import replace
 
 import pytest
 
+from crate.db.queries.decks_cues import DecksBatchRead
 from crate.api import smart_mix
 from crate.api.schemas.smart_mix import TransitionEdgeRequest
 from crate.smart_mix.evaluation import (
@@ -94,6 +97,14 @@ def plans(test_app, monkeypatch):
         lambda uids, **_kwargs: [tracks.get(uid) for uid in uids],
     )
     monkeypatch.setattr(smart_mix, "get_stem_analyses_by_entity_uids", lambda _u: {})
+    # No user corrections (F8.SM): the decks plans use the shared profiles.
+    monkeypatch.setattr(
+        smart_mix,
+        "get_decks_corrections",
+        lambda _user_id, _uids, **_kwargs: DecksBatchRead(
+            found={}, server_time=datetime(2026, 11, 18, tzinfo=UTC)
+        ),
+    )
     monkeypatch.setattr(
         smart_mix,
         "get_smart_mix_plan_caches",
