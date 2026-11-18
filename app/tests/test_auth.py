@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone, timedelta
 
 import pytest
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.testclient import TestClient
 
 from tests.conftest import PG_AVAILABLE
@@ -380,6 +380,67 @@ class TestOAuthRedirectHelpers:
         assert parsed["invite_key"] == "invite-key"
         assert "invite_token" not in parsed
         mock_store.assert_called_once_with("invite-key", "invite-token")
+
+    def test_oauth_state_rejects_the_former_public_fallback_secret(self, monkeypatch):
+        import jwt as pyjwt
+
+        from crate.api.auth import _parse_oauth_state
+
+        monkeypatch.delenv("JWT_SECRET", raising=False)
+        stored: dict[str, str] = {}
+        monkeypatch.setattr("crate.auth.get_setting", lambda key: stored.get(key))
+        monkeypatch.setattr(
+            "crate.auth.set_setting", lambda key, value: stored.__setitem__(key, value)
+        )
+        forged = pyjwt.encode(
+            {"provider": "google", "mode": "login", "verifier": "v"},
+            "crate-oauth-state",
+            algorithm="HS256",
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            _parse_oauth_state(forged)
+
+        assert exc.value.status_code == 400
+        assert stored.get("jwt_secret")
+
+    @patch.dict(
+        "os.environ", {"JWT_SECRET": "test-secret-key-1234-12345678901234"}, clear=False
+    )
+    def test_oauth_state_is_not_accepted_as_a_session_token(self):
+        from crate.api.auth import _build_oauth_state, _parse_oauth_state
+        from crate.auth import verify_jwt
+
+        with patch("crate.api.auth._store_oauth_invite_token"):
+            state = _build_oauth_state(
+                provider="google",
+                return_to=None,
+                mode="link",
+                user_id=7,
+                invite_token=None,
+            )
+
+        assert _parse_oauth_state(state)["user_id"] == 7
+        assert verify_jwt(state) is None
+
+    def test_oauth_state_fails_closed_without_a_secret_store(self, monkeypatch):
+        from crate.api.auth import _build_oauth_state
+
+        monkeypatch.delenv("JWT_SECRET", raising=False)
+
+        def _unavailable(*_args, **_kwargs):
+            raise RuntimeError("settings unavailable")
+
+        monkeypatch.setattr("crate.auth.get_setting", _unavailable)
+
+        with pytest.raises(RuntimeError):
+            _build_oauth_state(
+                provider="google",
+                return_to=None,
+                mode="login",
+                user_id=None,
+                invite_token=None,
+            )
 
     def test_oauth_invite_storage_falls_back_to_memory(self):
         from crate.api import auth

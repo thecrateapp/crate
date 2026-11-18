@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import hmac
 import logging
 import os
 import re
@@ -113,6 +114,7 @@ from crate.api.schemas.auth import (
 )
 from crate.api.schemas.common import OkResponse
 from crate.auth import (
+    _get_jwt_secret,
     JWT_EXPIRY_HOURS,
     LISTEN_ACCESS_TOKEN_EXPIRY_HOURS,
     LISTEN_REFRESH_TOKEN_EXPIRY_DAYS,
@@ -183,6 +185,7 @@ FORWARD_AUTH_SECRET_HEADER = "X-Forward-Auth-Secret"
 _LOGIN_FAILURE_PREFIX = "crate:auth:login_failures"
 _OAUTH_INVITE_PREFIX = "crate:auth:oauth_invite"
 _OAUTH_INVITE_TTL_SECONDS = 900
+_OAUTH_STATE_KEY_CONTEXT = b"crate:oauth-state:v1"
 _login_failure_memory: dict[str, tuple[int, datetime]] = {}
 _oauth_invite_memory: dict[str, tuple[str, datetime]] = {}
 _login_failure_lock = RLock()
@@ -1241,14 +1244,7 @@ def _build_oauth_state(
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
     }
-    token = jwt.encode(
-        payload,
-        os.environ.get("JWT_SECRET")
-        or get_setting("jwt_secret")
-        or "crate-oauth-state",
-        algorithm="HS256",
-    )
-    return token
+    return jwt.encode(payload, _oauth_state_secret(), algorithm="HS256")
 
 
 def _store_oauth_invite_token(key: str, token: str) -> None:
@@ -1292,12 +1288,15 @@ def _retrieve_oauth_invite_token(key: str | None) -> str | None:
     return token
 
 
+def _oauth_state_secret() -> bytes:
+    return hmac.new(
+        _get_jwt_secret().encode("utf-8"), _OAUTH_STATE_KEY_CONTEXT, hashlib.sha256
+    ).digest()
+
+
 def _parse_oauth_state(state: str) -> dict:
-    secret = (
-        os.environ.get("JWT_SECRET") or get_setting("jwt_secret") or "crate-oauth-state"
-    )
     try:
-        return jwt.decode(state, secret, algorithms=["HS256"])
+        return jwt.decode(state, _oauth_state_secret(), algorithms=["HS256"])
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=400, detail="Invalid OAuth state") from exc
 
