@@ -159,7 +159,8 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("165").down_revision == "164"
     assert scripts.get_revision("166").down_revision == "165"
     assert scripts.get_revision("167").down_revision == "166"
-    assert scripts.get_heads() == ["167"]
+    assert scripts.get_revision("168").down_revision == "167"
+    assert scripts.get_heads() == ["168"]
 
 
 def test_metric_minute_migration_uses_immutable_schema_definition(monkeypatch):
@@ -345,6 +346,18 @@ def test_error_inbox_tables_are_part_of_the_bootstrap_schema() -> None:
     assert "create_error_inbox_grant_v144_schema(cur)" in source
     assert "create_error_inbox_auto_triage_v146_schema(cur)" in source
     assert "create_error_fix_runs_v154_schema(cur)" in source
+
+
+def test_account_hardening_schema_is_part_of_the_bootstrap_schema() -> None:
+    source = (
+        Path(__file__).resolve().parents[1] / "crate/db/schema_bootstrap.py"
+    ).read_text()
+
+    assert "create_users_password_change_required_v167_schema(cur)" in source
+    assert "create_account_data_v168_schema(cur)" in source
+    assert source.index("create_users_password_change_required_v167_schema(cur)") < (
+        source.index("create_account_data_v168_schema(cur)")
+    )
 
 
 def test_error_inbox_auto_triage_migration_uses_immutable_schema_definition(

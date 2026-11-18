@@ -204,8 +204,13 @@ def create_schema(cur):
     )
 
     create_decks_cues_v166_schema(cur)
-    from crate.db.schema_sections.account_data_v167 import (
-        create_account_data_v167_schema,
+    from crate.db.schema_sections.auth_v167 import (
+        create_users_password_change_required_v167_schema,
     )
 
-    create_account_data_v167_schema(cur)
+    create_users_password_change_required_v167_schema(cur)
+    from crate.db.schema_sections.account_data_v168 import (
+        create_account_data_v168_schema,
+    )
+
+    create_account_data_v168_schema(cur)

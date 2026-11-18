@@ -1,4 +1,4 @@
-"""Self-service account data export and deletion (M10).
+"""Self-service account data export and deletion.
 
 `user_data_exports` tracks one export request per row. A worker task builds
 the archive into the download cache under the row id and marks the row
@@ -41,18 +41,18 @@ ACCOUNT_DATA_STATEMENTS = (
 )
 
 
-def create_account_data_v167_schema(cur) -> None:
+def create_account_data_v168_schema(cur) -> None:
     for statement in ACCOUNT_DATA_STATEMENTS:
         cur.execute(statement)
 
 
-def drop_account_data_v167_schema(cur) -> None:
+def drop_account_data_v168_schema(cur) -> None:
     cur.execute("DROP TABLE IF EXISTS user_data_exports")
     cur.execute("ALTER TABLE sessions DROP COLUMN IF EXISTS authenticated_at")
 
 
 __all__ = [
     "ACCOUNT_DATA_STATEMENTS",
-    "create_account_data_v167_schema",
-    "drop_account_data_v167_schema",
+    "create_account_data_v168_schema",
+    "drop_account_data_v168_schema",
 ]

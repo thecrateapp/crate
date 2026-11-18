@@ -23,9 +23,9 @@ from crate.db.repositories.auth_sessions import create_session
 from crate.db.repositories.auth_user_accounts import create_user
 from crate.db.repositories.user_data_exports import queue_user_data_export
 from crate.db.schema_bootstrap import create_schema
-from crate.db.schema_sections.account_data_v167 import (
-    create_account_data_v167_schema,
-    drop_account_data_v167_schema,
+from crate.db.schema_sections.account_data_v168 import (
+    create_account_data_v168_schema,
+    drop_account_data_v168_schema,
 )
 from crate.db.tx import transaction_scope
 from crate.download_cache import cached_download_artifact_path
@@ -42,7 +42,7 @@ from crate.worker_handlers.user_data_export import (
 from tests.conftest import PG_AVAILABLE
 from tests.test_agent_access_migration import RecordingExecutor
 
-MIGRATION = "crate.db.migrations.versions.167_account_data"
+MIGRATION = "crate.db.migrations.versions.168_account_data"
 
 pg = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
@@ -56,10 +56,10 @@ def test_migration_and_bootstrap_use_the_same_schema(monkeypatch):
     )
     monkeypatch.setattr(migration, "op", migrated)
     migration.upgrade()
-    create_account_data_v167_schema(section)
+    create_account_data_v168_schema(section)
     create_schema(bootstrap)
 
-    assert migration.revision == "167" and migration.down_revision == "166"
+    assert migration.revision == "168" and migration.down_revision == "167"
     assert migrated.statements == section.statements
     joined = "\n".join(bootstrap.statements)
     assert all(statement in joined for statement in section.statements)
@@ -67,7 +67,7 @@ def test_migration_and_bootstrap_use_the_same_schema(monkeypatch):
     downgrade, expected = RecordingExecutor(), RecordingExecutor()
     monkeypatch.setattr(migration, "op", downgrade)
     migration.downgrade()
-    drop_account_data_v167_schema(expected)
+    drop_account_data_v168_schema(expected)
     assert downgrade.statements == expected.statements
 
 
