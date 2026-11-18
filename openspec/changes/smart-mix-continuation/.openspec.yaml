@@ -1,0 +1,8 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Cerrar Smart Mix, el crossfade nativo de Android y VirtualDJ con sus gates físicos y de host."
+affected_areas:
+  - "app/crate/smart_mix"
+  - "app/listen/android"
+  - "tools/vdj-plugin"
+  - "app/listen/ios"

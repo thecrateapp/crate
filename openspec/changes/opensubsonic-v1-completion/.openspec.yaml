@@ -1,0 +1,6 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Retirar el motor OpenSubsonic legacy y la columna de token en claro."
+affected_areas:
+  - "app/crate/api/subsonic"
+  - "app/crate/db/migrations"

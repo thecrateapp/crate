@@ -1,0 +1,7 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Retirar Crate Connect v1 ahora que v2 (WebSocket) es el transporte."
+affected_areas:
+  - "app/crate/api/connect.py"
+  - "app/listen/src/contexts"
+  - "migraciones"

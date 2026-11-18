@@ -1,0 +1,8 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Completar el plan de implementación de Crate V3: contratos backend, instrumentos y cierre de calidad."
+affected_areas:
+  - "app/crate"
+  - "app/ui"
+  - "app/listen"
+  - "app/shared/ui"

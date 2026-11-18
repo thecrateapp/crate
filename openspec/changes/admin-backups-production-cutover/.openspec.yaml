@@ -1,0 +1,7 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Migrar producción a los backups gestionados desde Admin y retirar los sidecars."
+affected_areas:
+  - "docker-compose.yaml"
+  - "deploy"
+skip_specs: true

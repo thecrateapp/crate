@@ -1,0 +1,7 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Suggested del ExtendedPlayer sin duplicados, con diversidad, tope por artista y afinidad de género."
+affected_areas:
+  - "app/crate/bliss.py"
+  - "app/crate/api/browse_media.py"
+  - "app/listen"

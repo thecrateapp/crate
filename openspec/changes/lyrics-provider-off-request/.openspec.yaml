@@ -1,0 +1,8 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Ninguna petición HTTP consulta a LRCLIB: las letras se resuelven en un worker con dedup y se sirven desde PostgreSQL."
+affected_areas:
+  - "app/crate/api/lyrics.py"
+  - "app/crate/lyrics.py"
+  - "app/crate/worker_handlers"
+  - "app/listen"

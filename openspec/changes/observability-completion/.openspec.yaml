@@ -1,0 +1,7 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Cerrar la observabilidad v1: QoE nativo, activar alertas tras el shadow y acciones de Operator."
+affected_areas:
+  - "app/listen/android"
+  - "deploy/operator"
+  - "deploy/observability"
