@@ -33,6 +33,7 @@ import {
   PasswordChangeForm,
 } from "../../../app/listen/src/components/settings/AccountSectionForms";
 import { AccountSettingsView } from "../../../app/listen/src/components/settings/AccountSettingsView";
+import { AccountDataView } from "../../../app/listen/src/components/settings/AccountDataView";
 import {
   ConnectDevicesView,
   type ConnectDeviceViewItem,
@@ -329,6 +330,24 @@ function Scene() {
                     saving={pending}
                     onChangePassword={() =>
                       setEvent("Password change requested locally")
+                    }
+                  />
+                }
+                data={
+                  <AccountDataView
+                    exportStatus={pending ? "pending" : "ready"}
+                    exportExpiresAt="2026-11-19T10:00:00Z"
+                    onRequestExport={() =>
+                      setEvent("Data export requested locally")
+                    }
+                    onDownloadExport={() =>
+                      setEvent("Data export download requested locally")
+                    }
+                    deletionRequiresPassword
+                    deletionAvailable
+                    deletionWindowMinutes={10}
+                    onDeleteAccount={() =>
+                      setEvent("Account deletion requested locally")
                     }
                   />
                 }

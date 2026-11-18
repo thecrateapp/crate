@@ -9,12 +9,14 @@ export function AccountSettingsView({
   listening,
   providers,
   security,
+  data,
 }: {
   ruled?: boolean;
   profile: ReactNode;
   listening: ReactNode;
   providers: ReactNode;
   security: ReactNode;
+  data?: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
@@ -27,6 +29,9 @@ export function AccountSettingsView({
       </Section>
       {providers}
       <Section title={t("settings.account.securityTitle")}>{security}</Section>
+      {data ? (
+        <Section title={t("settings.account.dataTitle")}>{data}</Section>
+      ) : null}
     </>
   );
 }

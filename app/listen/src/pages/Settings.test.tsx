@@ -255,6 +255,13 @@ describe("Settings", () => {
     expect(
       within(security).getByRole("button", { name: "Change password" }),
     ).toBeVisible();
+    const data = screen.getByRole("region", { name: "Your data" });
+    expect(
+      await within(data).findByRole("button", { name: "Export my data" }),
+    ).toBeVisible();
+    expect(
+      within(data).getByRole("button", { name: "Delete account" }),
+    ).toBeVisible();
   });
 
   it("keeps the automatically detected timezone out of Account settings", () => {
