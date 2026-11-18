@@ -8,6 +8,12 @@ from crate.api.schemas.metrics import (
     ProductKpiResponse,
 )
 
+from crate.api.schemas.account import (
+    AccountDeletionRequirementsResponse,
+    DeleteAccountRequest,
+    UserDataExportResponse,
+    UserDataExportStatusResponse,
+)
 from crate.api.schemas import ai_agents as ai_agents
 from crate.api.schemas import backups as backups
 from crate.api.schemas import error_inbox as error_inbox

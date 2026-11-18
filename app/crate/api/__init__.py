@@ -510,6 +510,7 @@ def create_app() -> FastAPI:
     from crate.api.bandcamp import router as bandcamp_router
     from crate.api.acquisition import router as acquisition_router
     from crate.api.me import router as me_router
+    from crate.api.me_account import router as me_account_router
     from crate.api.playback_state import router as playback_state_router
     from crate.api.connect import router as connect_router
     from crate.api.connect_ws import router as connect_ws_router
@@ -563,6 +564,7 @@ def create_app() -> FastAPI:
     app.include_router(decks_cues_router)
     app.include_router(media_access_router)
     app.include_router(admin_auth_router)
+    app.include_router(me_account_router)
     app.include_router(me_router)
     app.include_router(playback_state_router)
     app.include_router(connect_router)

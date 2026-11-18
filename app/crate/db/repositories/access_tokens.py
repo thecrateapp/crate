@@ -422,6 +422,23 @@ def revoke_access_token(user_id: int, token_id: int, *, session=None) -> bool:
         return bool(getattr(result, "rowcount", 0))
 
 
+def revoke_user_access_tokens(user_id: int, *, session=None) -> int:
+    now = datetime.now(timezone.utc)
+    with optional_scope(session) as current:
+        result = current.execute(
+            text(
+                """
+                UPDATE user_access_tokens
+                SET revoked_at = :now
+                WHERE user_id = :user_id
+                  AND revoked_at IS NULL
+                """
+            ),
+            {"now": now, "user_id": user_id},
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
+
 def rotate_access_token(user_id: int, token_id: int) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     with transaction_scope() as session:
@@ -486,5 +503,6 @@ __all__ = [
     "resolve_access_token",
     "resolve_access_token_by_id",
     "revoke_access_token",
+    "revoke_user_access_tokens",
     "rotate_access_token",
 ]

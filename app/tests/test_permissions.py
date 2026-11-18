@@ -346,17 +346,23 @@ def test_admin_delete_user_is_soft_delete(monkeypatch):
         "status": "active",
     }
     status_updates: list[tuple[int, str]] = []
+    create_task = MagicMock()
+    revoke_sessions = MagicMock(return_value=2)
+    revoke_tokens = MagicMock(return_value=1)
+    revoke_subsonic = MagicMock(return_value=True)
 
     monkeypatch.setattr("crate.api.auth.get_user_by_id", lambda _user_id: target)
     monkeypatch.setattr("crate.api.auth.list_user_album_contributions", lambda _id: [])
-    monkeypatch.setattr("crate.api.auth.create_task", MagicMock())
+    monkeypatch.setattr("crate.api.auth.create_task", create_task)
     monkeypatch.setattr(
         "crate.api.auth.update_user_status",
         lambda user_id, status, **_kwargs: (
             status_updates.append((user_id, status)) or {**target, "status": status}
         ),
     )
-    monkeypatch.setattr("crate.api.auth._revoke_user_sessions", lambda *_args: 0)
+    monkeypatch.setattr("crate.api.auth._revoke_user_sessions", revoke_sessions)
+    monkeypatch.setattr("crate.api.auth.revoke_user_access_tokens", revoke_tokens)
+    monkeypatch.setattr("crate.subsonic.auth.revoke_user_credential", revoke_subsonic)
     monkeypatch.setattr("crate.api.auth._invalidate_auth_user", lambda _id: None)
     monkeypatch.setattr("crate.api.auth.log_audit", MagicMock())
 
@@ -366,6 +372,10 @@ def test_admin_delete_user_is_soft_delete(monkeypatch):
 
     assert result == {"ok": True}
     assert status_updates == [(2, "deleted")]
+    revoke_sessions.assert_called_once_with(2, None)
+    revoke_tokens.assert_called_once_with(2)
+    revoke_subsonic.assert_called_once_with(2)
+    create_task.assert_called_once_with("cleanup_user_data_exports", {"user_id": 2})
 
 
 def test_admin_list_users_rejects_regular_user():

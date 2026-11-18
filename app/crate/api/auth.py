@@ -156,6 +156,7 @@ from crate.db.repositories.auth import (
     update_user_status,
     upsert_user_external_identity,
 )
+from crate.db.repositories.access_tokens import revoke_user_access_tokens
 from crate.db.repositories.auth_identities import link_oauth_user_identity
 from crate.db.repositories.library_contributions import list_user_album_contributions
 from crate.db.instance_stats_dashboard_surface import (
@@ -172,6 +173,7 @@ from crate.user_avatars import (
     is_proxyable_avatar_url,
 )
 from crate.config import vdj_enabled
+from crate.user_data_export import USER_DATA_EXPORT_CLEANUP_TASK_TYPE
 
 log = logging.getLogger(__name__)
 
@@ -886,13 +888,8 @@ def _ensure_role_change_is_safe(
         )
 
 
-def _ensure_status_change_is_safe(actor: dict, target: dict, next_status: str) -> None:
-    current_status = _user_status(target)
-    if current_status == next_status:
-        return
-    if actor.get("id") == target.get("id") and next_status != "active":
-        raise HTTPException(status_code=400, detail="Cannot disable your own account")
-    if next_status == "active" or not _is_active_admin_capable(target):
+def _ensure_admin_remains(target: dict, *, status_code: int = 400) -> None:
+    if not _is_active_admin_capable(target):
         return
     remaining_admins = [
         user
@@ -901,8 +898,19 @@ def _ensure_status_change_is_safe(actor: dict, target: dict, next_status: str) -
     ]
     if not remaining_admins:
         raise HTTPException(
-            status_code=400, detail="At least one owner or admin must remain"
+            status_code=status_code, detail="At least one owner or admin must remain"
         )
+
+
+def _ensure_status_change_is_safe(actor: dict, target: dict, next_status: str) -> None:
+    current_status = _user_status(target)
+    if current_status == next_status:
+        return
+    if actor.get("id") == target.get("id") and next_status != "active":
+        raise HTTPException(status_code=400, detail="Cannot disable your own account")
+    if next_status == "active":
+        return
+    _ensure_admin_remains(target)
 
 
 def _invalidate_auth_user(user_id: int) -> None:
@@ -927,6 +935,53 @@ def _revoke_user_sessions(user_id: int, current_session_id: str | None = None) -
     for session_id in open_session_ids:
         _invalidate_auth_session(session_id)
     return revoked
+
+
+def _revoke_user_credentials(user_id: int) -> dict[str, int]:
+    from crate.subsonic.auth import revoke_user_credential
+
+    return {
+        "sessions": _revoke_user_sessions(user_id, None),
+        "access_tokens": revoke_user_access_tokens(user_id),
+        "subsonic": int(revoke_user_credential(user_id)),
+    }
+
+
+def _delete_user_account(
+    actor: dict, target: dict, *, source: str, reason: str
+) -> dict | None:
+    user_id = int(target["id"])
+    contributions = list_user_album_contributions(user_id)
+    if contributions:
+        create_task(
+            "library_cleanup_user_contributions",
+            {"user_id": user_id, "contributions": contributions},
+        )
+    updated = update_user_status(
+        user_id,
+        "deleted",
+        reason=reason,
+        actor_user_id=actor.get("id"),
+    )
+    revoked = _revoke_user_credentials(user_id)
+    _invalidate_auth_user(user_id)
+    create_task(USER_DATA_EXPORT_CLEANUP_TASK_TYPE, {"user_id": user_id})
+    log_audit(
+        "delete_user",
+        "user",
+        target["email"],
+        details={
+            "before": {"status": _user_status(target)},
+            "after": {"status": "deleted"},
+            "changed_fields": ["status"],
+            "source": source,
+            "soft_delete": True,
+            "contributions": len(contributions),
+            "revoked": revoked,
+        },
+        user_id=actor.get("id"),
+    )
+    return updated
 
 
 def _is_proxyable_avatar_url(value: str) -> bool:
@@ -3714,33 +3769,8 @@ def admin_delete_user(request: Request, user_id: int):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     _ensure_status_change_is_safe(admin_user, user, "deleted")
-    contributions = list_user_album_contributions(user_id)
-    if contributions:
-        create_task(
-            "library_cleanup_user_contributions",
-            {"user_id": user_id, "contributions": contributions},
-        )
-    updated = update_user_status(
-        user_id,
-        "deleted",
-        reason="Deleted by administrator",
-        actor_user_id=admin_user.get("id"),
-    )
-    _revoke_user_sessions(user_id, None)
-    _invalidate_auth_user(user_id)
-    log_audit(
-        "delete_user",
-        "user",
-        user["email"],
-        details={
-            "before": {"status": _user_status(user)},
-            "after": {"status": "deleted"},
-            "changed_fields": ["status"],
-            "source": "admin",
-            "soft_delete": True,
-            "contributions": len(contributions),
-        },
-        user_id=admin_user.get("id"),
+    updated = _delete_user_account(
+        admin_user, user, source="admin", reason="Deleted by administrator"
     )
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
