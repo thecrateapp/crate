@@ -1526,24 +1526,18 @@ async def catalog_manifest(
 
 
 def _catalog_summary_descriptor(peer: dict[str, Any]) -> dict[str, Any] | None:
-    """Head of the summary matching this peer's search scope, if one is built.
-
-    The descriptor is advisory: a failure here must never break the delta feed.
-    """
-    try:
-        policy = peer_search_policy(peer)
-        if policy is None:
-            return None
-        digest = catalog_scope_digest(policy)
-        for head in list_catalog_summary_heads():
-            if head["scope_digest"] == digest:
-                return {
-                    "contract": head["contract"],
-                    "etag": head["etag"],
-                    "source_sequence": int(head["source_sequence"]),
-                }
-    except Exception:
-        log.warning("catalog summary descriptor unavailable", exc_info=True)
+    """Head of the summary matching this peer's search scope, if one is built."""
+    policy = peer_search_policy(peer)
+    if policy is None:
+        return None
+    digest = catalog_scope_digest(policy)
+    for head in list_catalog_summary_heads():
+        if head["scope_digest"] == digest:
+            return {
+                "contract": head["contract"],
+                "etag": head["etag"],
+                "source_sequence": int(head["source_sequence"]),
+            }
     return None
 
 

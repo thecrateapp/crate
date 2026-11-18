@@ -129,6 +129,7 @@ def test_delta_returns_full_tombstones_and_rejects_expired_cursor(monkeypatch):
     monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
     monkeypatch.setattr(federation, "catalog_share_policy", dict)
+    monkeypatch.setattr(federation, "_catalog_summary_descriptor", lambda _peer: None)
     monkeypatch.setattr(federation, "catalog_retention_floor", lambda: 10)
     monkeypatch.setattr(federation, "catalog_high_water_mark", lambda: 12)
     monkeypatch.setattr(
