@@ -872,6 +872,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "federation_import_album",
             "federation_directory_refresh",
             "federation_build_catalog_summaries",
+            "federation_fetch_peer_summaries",
         ),
     ),
     (

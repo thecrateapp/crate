@@ -108,6 +108,23 @@ def _looks_like_opaque_cursor(value: object) -> bool:
     return len(cursor) >= 40 and not cursor.startswith("{")
 
 
+def _refresh_summary_if_announced(
+    peer: dict, local_node: dict, descriptor: dict | None
+) -> None:
+    """Fetch the peer's summary when the delta feed announced a new etag."""
+    if not descriptor or not descriptor.get("etag"):
+        return
+    try:
+        from crate.federation import peer_summaries
+
+        uid = str(peer["node_uid"])
+        known = peer_summaries.summaries_repo.list_peer_summary_etags([uid]).get(uid)
+        if str(descriptor["etag"]) != known:
+            peer_summaries.refresh_peer_summary(peer, local_node, known_etag=known)
+    except Exception:
+        log.debug("Peer summary refresh after delta failed", exc_info=True)
+
+
 def _sync_peer_catalog_delta(
     *,
     peer: dict,
@@ -126,6 +143,7 @@ def _sync_peer_catalog_delta(
     total_applied = 0
     pages = 0
     previous_sequence = None
+    summary_descriptor = None
     while max_pages is None or pages < max(1, max_pages):
         path = (
             "/api/federation/v1/catalog/delta"
@@ -146,6 +164,9 @@ def _sync_peer_catalog_delta(
             }
         response.raise_for_status()
         data = response.json()
+        descriptor = data.get("summary")
+        if isinstance(descriptor, dict):
+            summary_descriptor = descriptor
         next_cursor = str(data.get("next_cursor") or "")
         if not next_cursor:
             raise RuntimeError("peer delta response is missing next_cursor")
@@ -170,6 +191,7 @@ def _sync_peer_catalog_delta(
         previous_sequence = scanned_sequence
         if not data.get("has_more"):
             break
+    _refresh_summary_if_announced(peer, local_node, summary_descriptor)
     return {
         "status": "completed",
         "mode": "delta",
@@ -899,6 +921,20 @@ def _handle_federation_build_catalog_summaries(
     return refresh_catalog_summaries(should_stop=lambda: is_cancelled(task_id))
 
 
+def _handle_federation_fetch_peer_summaries(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    """Refresh the summaries of approved peers that advertise one."""
+    from crate.federation import peer_summaries
+
+    local_node = repo.get_local_node()
+    if not local_node:
+        return {"peers": 0, "updated": 0, "unchanged": 0, "unavailable": 0}
+    return peer_summaries.fetch_peer_summaries(
+        repo.list_peers(trust_state="approved"), local_node
+    )
+
+
 FEDERATION_TASK_HANDLERS: dict[str, TaskHandler] = {
     "federation_catalog_sync": _handle_catalog_sync,
     "federation_sync_catalog": _handle_catalog_sync,
@@ -907,4 +943,5 @@ FEDERATION_TASK_HANDLERS: dict[str, TaskHandler] = {
     "federation_health_poll": _handle_health_poll,
     "federation_directory_refresh": _handle_directory_refresh,
     "federation_build_catalog_summaries": _handle_federation_build_catalog_summaries,
+    "federation_fetch_peer_summaries": _handle_federation_fetch_peer_summaries,
 }

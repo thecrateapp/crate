@@ -131,6 +131,7 @@ class SignedFederationClient:
         *,
         json_body: dict | None = None,
         user_assertion: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         prepared = prepare_outbound_resource(
             self._base_url,
@@ -142,7 +143,7 @@ class SignedFederationClient:
             if json_body is not None
             else b""
         )
-        headers = build_signed_headers(
+        request_headers = build_signed_headers(
             method=method,
             url=prepared.external_url,
             node_id=self._node_id,
@@ -152,11 +153,14 @@ class SignedFederationClient:
             content_type="application/json" if json_body is not None else "",
         )
         if user_assertion:
-            headers["X-Crate-User-Assertion"] = user_assertion
+            request_headers["X-Crate-User-Assertion"] = user_assertion
+        # Extra headers (conditional GET) travel outside the signature.
+        for name, value in (headers or {}).items():
+            request_headers.setdefault(name, value)
         response = self._client.request(
             method=method,
             url=prepared.connection_url,
-            headers=headers,
+            headers=request_headers,
             content=body if json_body is not None else None,
             extensions={"sni_hostname": prepared.sni_hostname},
             follow_redirects=False,
@@ -385,6 +389,7 @@ def federated_get(
     timeout: httpx.Timeout = DEFAULT_TIMEOUT,
     user_assertion: str | None = None,
     policy: FederationURLPolicy | None = None,
+    headers: dict[str, str] | None = None,
 ) -> httpx.Response:
     with SignedFederationClient(
         base_url=base_url,
@@ -399,6 +404,7 @@ def federated_get(
             "GET",
             path,
             user_assertion=user_assertion,
+            headers=headers,
         )
 
 
