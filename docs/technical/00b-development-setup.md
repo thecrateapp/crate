@@ -6,7 +6,14 @@ audience: [developer]
 status: canonical
 order: 20
 verified: 2026-07-21
-sources: [Makefile, docker-compose.dev.yaml, docker-compose.readplane.dev.yaml]
+sources:
+  [
+    Makefile,
+    docker-compose.dev.yaml,
+    docker-compose.readplane.dev.yaml,
+    app/requirements-test.in,
+    app/pip-audit-ignore.txt,
+  ]
 ---
 
 # Development setup
@@ -144,6 +151,54 @@ Node A exposes API/readplane/Admin/Listen on 18585/18686/15173/15174; Node B
 uses 28585/28686. There are focused acceptance targets for global catalog,
 playback prepare, imports, singleton parity and zero-downtime catalog reads.
 Read [Federation overview](federation-overview.md) before changing those flows.
+
+## Python dependencies
+
+The backend images and CI install Python packages only from hashed lock files.
+Each requirements set has a human-edited input and a compiled lock in `app/`:
+
+| Input (edit this)             | Lock (generated)               | Installed by                                                 |
+| ----------------------------- | ------------------------------ | ------------------------------------------------------------ |
+| `requirements-api.in`         | `requirements-api.txt`         | `api` and `worker-playback` images                           |
+| `requirements-worker-core.in` | `requirements-worker-core.txt` | `worker-core` image                                          |
+| `requirements-worker.in`      | `requirements-worker.txt`      | analysis image (core plus `requirements-worker-analysis.in`) |
+| `requirements-beat-this.in`   | `requirements-beat-this.txt`   | analysis image with torch (`PANNS=on/auto`)                  |
+| `requirements.in`             | `requirements.txt`             | CI type check and lint                                       |
+| `requirements-test.in`        | `requirements-test.txt`        | CI tests and the local virtualenv                            |
+
+`make python-lock` compiles every lock with a pinned `uv pip compile --universal
+--generate-hashes` for Python 3.13, so one lock serves Linux amd64/arm64 images and
+macOS development. `requirements-test.txt` is the superset and is compiled first;
+the other locks are compiled against it (and `requirements-beat-this.txt` against
+`requirements-worker.txt`), so a package has the same version in every lock and the
+analysis image can install its layers on top of each other. Existing pins are kept
+unless an input changes or an upgrade is requested.
+
+- Add, remove or constrain a dependency: edit the `.in` file, run
+  `make python-lock` and commit the `.in` and every changed `.txt` together.
+- Upgrade one package: `make python-lock LOCK_ARGS="--upgrade-package fastapi"`.
+- Upgrade everything: `make python-lock LOCK_ARGS="--upgrade"`, then build the
+  images (`docker build --target worker-analysis --build-arg PANNS=on app`) and
+  run the backend tests before merging.
+- Install locally: `uv pip install --require-hashes -r app/requirements-test.txt`
+  into the repository `.venv` (or `pip install --require-hashes ...`).
+- Never edit a `.txt` lock by hand; CI regenerates the locks and fails if they
+  differ from the committed files.
+
+torch and torchaudio come from the PyTorch CPU index, pinned by wheel URL per
+architecture in `requirements-beat-this.in`; bump them together and check Beat
+This! on the new pair (see the Dockerfile). `essentia-tensorflow` is pinned to
+`2.1b6.dev1389`, the last build with Python 3.13 wheels; later dev builds ship only
+Python 3.14 wheels and would not install in the images.
+
+`make python-audit` runs `pip-audit` against every lock and fails on any known
+vulnerability. The backend workflow runs it, with the lock check, in the
+`dependency locks and audit` job. Fix a finding by upgrading the package. When an
+advisory cannot be fixed yet or does not apply, add its ID to
+`app/pip-audit-ignore.txt` with a comment naming the package, the reason, who
+accepted it and when to review it; remove the line once a fixed release is locked.
+`pip-audit` skips URL requirements, so the target audits the torch and torchaudio
+versions from `requirements-beat-this.in` in a second pass.
 
 ## Tests and migrations
 
