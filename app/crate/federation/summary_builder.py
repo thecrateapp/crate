@@ -26,7 +26,10 @@ from crate.federation.catalog_scope import (
     peer_search_policy,
 )
 from crate.federation.summary_bloom import (
+    MIN_PREFIX,
     SUMMARY_CONTRACT,
+    SUMMARY_HASH,
+    TOKENIZER,
     BloomFilter,
     artist_key,
     summary_terms,
@@ -127,6 +130,21 @@ def _live_scopes() -> dict[str, dict]:
     return scopes
 
 
+def _head_is_current(head: dict, sequence: int) -> bool:
+    """Same contract, catalog sequence and wire format as this build would make.
+
+    A summary in an older format (tokenizer, hash, min_prefix) is rebuilt even
+    when the catalog is unchanged: receivers reject it.
+    """
+    return (
+        head["contract"] == SUMMARY_CONTRACT
+        and int(head["source_sequence"]) == sequence
+        and head.get("tokenizer") == TOKENIZER
+        and head.get("hash") == SUMMARY_HASH
+        and head.get("min_prefix") == MIN_PREFIX
+    )
+
+
 def refresh_catalog_summaries(*, should_stop: Callable[[], bool] | None = None) -> dict:
     """Rebuild stale scope summaries and drop the ones no peer uses any more."""
     scopes = _live_scopes()
@@ -139,11 +157,7 @@ def refresh_catalog_summaries(*, should_stop: Callable[[], bool] | None = None) 
             stopped = True
             break
         head = heads.get(digest)
-        if (
-            head
-            and head["contract"] == SUMMARY_CONTRACT
-            and int(head["source_sequence"]) == sequence
-        ):
+        if head and _head_is_current(head, sequence):
             skipped += 1
             continue
         summary = build_scope_summary(

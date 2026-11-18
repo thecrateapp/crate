@@ -9,13 +9,17 @@ from crate.db.tx import read_scope
 
 
 def list_catalog_summary_heads(*, session: Session | None = None) -> list[dict]:
-    """Return the identity (digest, contract, sequence, etag) of every summary."""
+    """Return the identity of every summary: digest, contract, sequence, etag,
+    and the format params a receiver validates (tokenizer, hash, min_prefix)."""
 
     def _impl(current: Session) -> list[dict]:
         rows = current.execute(
             text(
                 """
-                SELECT scope_digest, contract, source_sequence, etag
+                SELECT scope_digest, contract, source_sequence, etag,
+                       params_json->>'tokenizer' AS tokenizer,
+                       params_json->>'hash' AS hash,
+                       params_json->'min_prefix' AS min_prefix
                 FROM federation_catalog_summaries
                 ORDER BY scope_digest
                 """

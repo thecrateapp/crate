@@ -101,7 +101,7 @@ def _has(bloom: BloomFilter, text: str) -> bool:
 OPEN = {}
 
 
-def DENY(uid):  # noqa: N802
+def DENY(uid):
     return {"catalog_filter": {"deny_entity_uids": [uid]}}
 
 
@@ -259,3 +259,37 @@ def test_handler_reports_and_cancels(monkeypatch):
     out = handlers._handle_federation_build_catalog_summaries("t1", {}, {})
     assert out["built"] == 1 and out["stopped"] is True
     assert "federation_build_catalog_summaries" in handlers.FEDERATION_TASK_HANDLERS
+
+
+@pytest.mark.parametrize(
+    "field,stale",
+    [("tokenizer", "fts-simple-v1"), ("hash", "blake2b-64-km"), ("min_prefix", 2)],
+)
+def test_out_of_date_format_rebuilds(pg_db, world, field, stale):
+    import json
+
+    from sqlalchemy import text
+
+    from crate.db.tx import transaction_scope
+    from crate.federation.summary_bloom import MIN_PREFIX, SUMMARY_HASH, TOKENIZER
+
+    _seed(pg_db, "Formatter", ["Format Album"])
+    world.peers["p1"] = OPEN
+    summary_builder.refresh_catalog_summaries()
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE federation_catalog_summaries "
+                "SET params_json = params_json || CAST(:patch AS jsonb)"
+            ),
+            {"patch": json.dumps({field: stale})},
+        )
+    assert get_catalog_summary(_digest(OPEN))["source_sequence"] == world.hwm
+
+    result = summary_builder.refresh_catalog_summaries()
+
+    assert result["built"] == 1 and result["skipped"] == 0
+    params = get_catalog_summary(_digest(OPEN))["params"]
+    assert params["tokenizer"] == TOKENIZER == "fts-simple-v2"
+    assert params["hash"] == SUMMARY_HASH
+    assert params["min_prefix"] == MIN_PREFIX
