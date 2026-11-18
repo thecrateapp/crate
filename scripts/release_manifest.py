@@ -76,7 +76,7 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
         patterns=(
             *BACKEND_PATTERNS,
             "app/requirements-worker-core.txt",
-            "app/requirements-worker-analysis.txt",
+            "app/requirements-worker.txt",
             "app/requirements-beat-this.txt",
             "tools/crate-cli/**",
         ),

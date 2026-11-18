@@ -91,7 +91,7 @@ jobs:
           CRATE_REQUIRE_CRATE_CLI: "1"
           CRATE_REQUIRE_FFMPEG: "1"
         run: |
-          pip install -r requirements-test.txt "librosa>=0.10"
+          pip install --require-hashes -r requirements-test.txt
           python -m pytest tests/test_smart_mix_rust_parity.py -q
           python -m pytest ../tools/smart-mix-lab/tests -q
           python -m pytest ../tools/smart-mix-eval/tests -q

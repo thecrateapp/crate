@@ -11,7 +11,8 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 DOCKERFILE = (APP_ROOT / "Dockerfile").read_text()
-BEAT_THIS_REQUIREMENTS = (APP_ROOT / "requirements-beat-this.txt").read_text()
+BEAT_THIS_REQUIREMENTS = (APP_ROOT / "requirements-beat-this.in").read_text()
+BEAT_THIS_LOCK = (APP_ROOT / "requirements-beat-this.txt").read_text()
 
 
 def _stage(name: str) -> str:
@@ -28,16 +29,27 @@ def _version(pattern: str, text: str) -> tuple[int, ...]:
     return tuple(int(part) for part in match.group(1).split("."))
 
 
-def test_torch_is_pinned_with_the_torchaudio_beat_this_runs_on() -> None:
-    deps = _stage("worker-analysis-deps")
-    torch = _version(r"^ARG TORCH_VERSION=(\d+\.\d+\.\d+)$", deps)
-    torchaudio = _version(r"^torchaudio==(\d+\.\d+\.\d+)$", BEAT_THIS_REQUIREMENTS)
+CPU_WHEEL = r"https://download\.pytorch\.org/whl/cpu/{name}-(\d+\.\d+\.\d+)%2Bcpu-\S+_{arch}\.whl"
 
-    # Both are pinned, so a new torch on the CPU index never pairs itself with a
+
+def _cpu_wheel_versions(name: str) -> set[tuple[int, ...]]:
+    versions = set()
+    for arch in ("x86_64", "aarch64"):
+        line = rf"^{name} @ {CPU_WHEEL.format(name=name, arch=arch)} ; "
+        versions.add(_version(line, BEAT_THIS_REQUIREMENTS))
+        versions.add(_version(line, BEAT_THIS_LOCK))
+    return versions
+
+
+def test_torch_is_pinned_with_the_torchaudio_beat_this_runs_on() -> None:
+    # Both are pinned to the PyTorch CPU wheels, the same version on each Linux
+    # architecture and in the lock, so a new torch never pairs itself with a
     # torchaudio nobody ran Beat This! on.
-    assert re.search(r'pip install [^\n]*"torch==\$\{TORCH_VERSION\}"', deps)
+    (torch,) = _cpu_wheel_versions("torch")
+    (torchaudio,) = _cpu_wheel_versions("torchaudio")
     # torchaudio 2.9+ declares torch >= its own minor version.
     assert torch[:2] >= torchaudio[:2]
+    assert "--index-url" not in _stage("worker-analysis-deps")
 
 
 MADMOM_COMMIT = "27f032e8947204902c675e5e341a3faf5dc86dae"
@@ -58,16 +70,19 @@ def test_madmom_is_built_from_a_pinned_commit_against_the_image_numpy() -> None:
 def test_the_analysis_image_installs_the_madmom_wheel_without_compilers() -> None:
     deps = _stage("worker-analysis-deps")
     analysis = _stage("worker-analysis") + _stage("worker-analysis-python")
-    install = deps.split("ARG TORCH_VERSION", 1)[1].split("\n\n", 1)[0]
+    install = deps.split("ARG PANNS\n", 1)[1].split("\n\n", 1)[0]
 
     assert not [tool for tool in COMPILERS if tool in deps + analysis]
     # Same PANNS condition as torch and Beat This!, and the wheel never lands in a layer.
     assert "--mount=type=bind,from=madmom-wheel" in install
     assert 'if [ "$PANNS" = "on" ]' in install
-    assert "/tmp/madmom-wheels/" in install.split("-r requirements-beat-this.txt", 1)[1]
-    # Neither torch nor numpy may move after the wheel was built against them.
-    assert "grep -iE '^(numpy|torch)=='" in install
-    assert "cmp -s" in install
+    locked, madmom = install.split("--require-hashes -r requirements-beat-this.txt", 1)
+    # The wheel installs after the lock and without dependencies, which the lock holds.
+    assert "pip install --no-deps /tmp/madmom-wheels/madmom-*.whl" in madmom
+    assert re.search(r"^mido\b", BEAT_THIS_REQUIREMENTS, re.M)
+    # numpy may not move after the wheel was built against it.
+    assert "grep -i '^numpy==' > /tmp/analysis-numpy.txt" in locked
+    assert "cmp -s - /tmp/analysis-numpy.txt" in madmom
     assert "madmom.features.downbeats" in install
 
 
@@ -144,7 +159,7 @@ def test_images_with_torch_build_madmom() -> None:
 
 def test_madmom_licence_ships_only_with_madmom() -> None:
     deps = _stage("worker-analysis-deps")
-    install = deps.split("ARG TORCH_VERSION", 1)[1].split("\n\n", 1)[0]
+    install = deps.split("ARG PANNS\n", 1)[1].split("\n\n", 1)[0]
 
     # Copied by the install under the torch condition, never by a COPY of its own.
     assert not re.search(r"^COPY --from=madmom", DOCKERFILE, re.M)
@@ -159,7 +174,7 @@ HTDEMUCS_ONNX_URL = (
     "https://github.com/thecrateapp/crate-decks/releases/download/"
     "models-htdemucs-onnx-1/htdemucs-onnx-1.onnx"
 )
-ANALYSIS_REQUIREMENTS = (APP_ROOT / "requirements-worker-analysis.txt").read_text()
+ANALYSIS_REQUIREMENTS = (APP_ROOT / "requirements-worker-analysis.in").read_text()
 
 
 def test_the_htdemucs_graph_is_pinned_and_checked_from_either_source() -> None:

@@ -582,6 +582,23 @@ pg-perf-snapshot: ## Read-only PostgreSQL performance snapshot as JSON
 regression-min: regression-api regression-smoke ## Minimum regression suite before touching Listen
 
 # ===========================================================================
+# PYTHON DEPENDENCIES (hashed lock files, docs/technical/00b-development-setup.md)
+# ===========================================================================
+
+UV_VERSION        := 0.13.9
+UV_COMPILE        := uvx uv@$(UV_VERSION) pip compile --quiet --universal --python-version 3.13 \
+	--generate-hashes --custom-compile-command "make python-lock" $(LOCK_ARGS)
+
+.PHONY: python-lock
+python-lock: ## Compile app/requirements*.txt from the .in files (LOCK_ARGS="--upgrade-package fastapi" or "--upgrade")
+	@cd app && $(UV_COMPILE) requirements-test.in -o requirements-test.txt
+	@cd app && $(UV_COMPILE) -c requirements-test.txt requirements.in -o requirements.txt
+	@cd app && $(UV_COMPILE) -c requirements-test.txt requirements-worker.in -o requirements-worker.txt
+	@cd app && $(UV_COMPILE) -c requirements-test.txt requirements-worker-core.in -o requirements-worker-core.txt
+	@cd app && $(UV_COMPILE) -c requirements-test.txt requirements-api.in -o requirements-api.txt
+	@cd app && $(UV_COMPILE) -c requirements-worker.txt requirements-beat-this.in -o requirements-beat-this.txt
+
+# ===========================================================================
 # CRATE CLI (Rust native toolbox)
 # ===========================================================================
 

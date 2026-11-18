@@ -7,7 +7,7 @@ on:
     paths:
       - "app/crate/**"
       - "app/tests/**"
-      - "app/requirements*.txt"
+      - "app/requirements*"
       - ".github/autofix/**"
       - ".github/workflows/error-autofix.yml"
       - ".github/workflows/test-backend.yml"
@@ -16,7 +16,7 @@ on:
     paths:
       - "app/crate/**"
       - "app/tests/**"
-      - "app/requirements*.txt"
+      - "app/requirements*"
       - ".github/autofix/**"
       - ".github/workflows/error-autofix.yml"
       - ".github/workflows/test-backend.yml"
@@ -71,6 +71,30 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  dependencies:
+    name: dependency locks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: pip install uv==0.13.9
+
+      - name: Check the locks match the requirements inputs
+        run: |
+          make python-lock
+          if ! git diff --exit-code -- 'app/requirements*.txt'; then
+            echo "::error::app/requirements*.txt are stale: run make python-lock and commit the result."
+            exit 1
+          fi
+
   quality:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     name: quality
@@ -86,7 +110,9 @@ jobs:
           cache-dependency-path: app/requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pyright==1.1.411 ruff==0.15.22
+        run: |
+          pip install --require-hashes -r requirements.txt
+          pip install pyright==1.1.411 ruff==0.15.22
         working-directory: app
 
       - name: Type check
@@ -145,7 +171,7 @@ jobs:
           cache-dependency-path: app/requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements-test.txt
+        run: pip install --require-hashes -r requirements-test.txt
         working-directory: app
 
       # ffmpeg and tesseract pull 88 packages (76 MB). The runner's apt mirror sometimes

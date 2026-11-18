@@ -27,7 +27,7 @@ FROM base AS api
 
 COPY requirements-api.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefer-binary --retries 10 --timeout 60 -r requirements-api.txt
+    pip install --prefer-binary --retries 10 --timeout 60 --require-hashes -r requirements-api.txt
 
 COPY alembic.ini .
 COPY crate ./crate
@@ -46,9 +46,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-api.txt requirements-worker-core.txt .
+COPY requirements-worker-core.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefer-binary -r requirements-worker-core.txt
+    pip install --prefer-binary --require-hashes -r requirements-worker-core.txt
 
 
 # restic and rclone for the backups engine (admin backups, BK1): pinned release
@@ -154,7 +154,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements-api.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefer-binary -r requirements-api.txt
+    pip install --prefer-binary --require-hashes -r requirements-api.txt
 
 COPY alembic.ini .
 COPY crate ./crate
@@ -267,9 +267,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-worker-analysis.txt .
+COPY requirements-worker.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefer-binary -r requirements-worker-analysis.txt
+    pip install --prefer-binary --require-hashes -r requirements-worker.txt
 
 
 # madmom (CPJKU) for the DBN that post-processes the Beat This! beats and downbeats
@@ -322,35 +322,27 @@ FROM worker-analysis-python AS worker-analysis-deps
 # PyTorch CPU-only + PANNs for audio classification, and Beat This! for the Smart
 # Mix beats. PANNS=on installs them on every architecture (release images); auto
 # keeps local ARM builds light by installing them on x86_64 only; off skips them.
-# Beat This! installs against the torch just installed (pinned by constraint), with
-# torchaudio from the same CPU index, so it never moves torch, and with the madmom
-# wheel built above for its DBN. numpy is held from the start, so it stays the one
-# madmom was built against. The imports at the end catch a broken set at build time.
-# torch is pinned because Beat This! needs torchaudio, which stopped at 2.11 while
-# torch moved on: torchaudio 2.11.1 (requirements-beat-this.txt) declares only
-# torch>=2.11, so an unpinned torch would pair itself with a torchaudio nobody ran on
-# it. Bump both together and check Beat This! on the new pair. madmom's licence ships
-# with madmom, so images without torch carry neither.
+# requirements-beat-this.txt locks torch and torchaudio to the PyTorch CPU wheels
+# and every other package to the worker lock, so it never moves numpy, the one the
+# madmom wheel built above was built against; the check after the install holds it.
+# madmom is installed without dependencies (its own are in the lock). The imports at
+# the end catch a broken set at build time. Beat This! needs torchaudio, which stopped
+# at 2.11 while torch moved on: bump torch and torchaudio together in
+# requirements-beat-this.in and check Beat This! on the new pair. madmom's licence
+# ships with madmom, so images without torch carry neither.
 ARG PANNS
-ARG TORCH_VERSION=2.15.0
 COPY requirements-beat-this.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=bind,from=madmom-wheel,source=/wheels,target=/tmp/madmom-wheels \
     if [ "$PANNS" = "on" ] || { [ "$PANNS" = "auto" ] && [ "$(uname -m)" = "x86_64" ]; }; then \
-        pip freeze | grep -i '^numpy==' > /tmp/analysis-constraint.txt && \
-        pip install -c /tmp/analysis-constraint.txt "torch==${TORCH_VERSION}" \
-            --index-url https://download.pytorch.org/whl/cpu && \
-        pip install -c /tmp/analysis-constraint.txt panns_inference && \
-        pip freeze | grep -i '^torch==' >> /tmp/analysis-constraint.txt && \
-        pip install --prefer-binary -c /tmp/analysis-constraint.txt \
-            --extra-index-url https://download.pytorch.org/whl/cpu \
-            -r requirements-beat-this.txt /tmp/madmom-wheels/madmom-*.whl && \
-        pip freeze | grep -iE '^(numpy|torch)==' | sort > /tmp/analysis-installed.txt && \
-        sort /tmp/analysis-constraint.txt | cmp -s - /tmp/analysis-installed.txt && \
+        pip freeze | grep -i '^numpy==' > /tmp/analysis-numpy.txt && \
+        pip install --prefer-binary --require-hashes -r requirements-beat-this.txt && \
+        pip install --no-deps /tmp/madmom-wheels/madmom-*.whl && \
+        pip freeze | grep -i '^numpy==' | cmp -s - /tmp/analysis-numpy.txt && \
         python -c "import torchaudio, beat_this.inference, madmom.features.downbeats" && \
         mkdir -p /app/models && \
         cp /tmp/madmom-wheels/madmom.LICENSE /app/models/madmom.LICENSE && \
-        rm /tmp/analysis-constraint.txt /tmp/analysis-installed.txt; \
+        rm /tmp/analysis-numpy.txt; \
     fi
 
 # Download PANNs CNN14 checkpoint before mutable source COPY so Docker layer

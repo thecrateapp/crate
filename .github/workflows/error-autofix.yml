@@ -112,7 +112,9 @@ jobs:
           python-version: "3.13"
 
       - name: Install backend dependencies
-        run: pip install -r requirements-test.txt ruff==0.15.22
+        run: |
+          pip install --require-hashes -r requirements-test.txt
+          pip install ruff==0.15.22
         working-directory: app
 
       - name: Fetch the Sentry context
