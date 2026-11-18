@@ -556,7 +556,7 @@ async def federated_search(body: SearchBody, request: Request):
                 complete=False,
             )
         return _empty_search_response()
-    payload = await asyncio.to_thread(
+    payload, raw_capped = await asyncio.to_thread(
         _scoped_remote_search,
         query=body.q,
         limit=body.limit,
@@ -569,7 +569,7 @@ async def federated_search(body: SearchBody, request: Request):
     )
     if wants_envelope:
         truncated = any(
-            len(payload.get(group) or []) >= body.limit
+            raw_capped.get(group, False)
             or len(limited.get(group) or []) < len(payload.get(group) or [])
             for group in ("artists", "albums", "tracks")
         )
@@ -582,10 +582,18 @@ _SEARCH_GROUP_ENTITY_TYPES = {"artists": "artist", "albums": "album", "tracks": 
 
 def _scoped_remote_search(
     *, query: str, limit: int, policy: dict[str, Any]
-) -> dict[str, list[dict]]:
-    """Run the local search and keep only what the grant and catalog scope share."""
+) -> tuple[dict[str, list[dict]], dict[str, bool]]:
+    """Run the local search and keep only what the grant and catalog scope share.
+
+    Also reports, per group, whether the raw search reached its limit: scoping
+    must not hide that more results may exist.
+    """
     payload = handle_remote_search(query=query, limit=limit)
     scoped = dict(payload)
+    raw_capped = {
+        group: len(payload.get(group) or []) >= limit
+        for group in _SEARCH_GROUP_ENTITY_TYPES
+    }
     for group, entity_type in _SEARCH_GROUP_ENTITY_TYPES.items():
         scoped[group] = [
             item
@@ -599,7 +607,7 @@ def _scoped_remote_search(
                 policy,
             )
         ]
-    return scoped
+    return scoped, raw_capped
 
 
 def _require_search_quota(request: Request, peer: dict, assertion: dict | None) -> None:

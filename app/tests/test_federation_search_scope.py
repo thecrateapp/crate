@@ -98,3 +98,18 @@ def test_search_drops_disallowed_entity_types(owner):
     assert result["artists"] == []
     assert result["albums"] == []
     assert [t["entity_uid"] for t in result["tracks"]] == ["track-1"]
+
+
+def test_truncated_stays_true_when_scope_drops_rows_of_a_capped_search(owner):
+    owner.state["policy"] = {"catalog_filter": {"deny_entity_uids": ["album-b"]}}
+
+    result = _search(owner, contracts=[RESULTS_CONTRACT], limit=2)
+
+    assert "album-b" not in [i["remote_entity_uid"] for i in result["items"]]
+    assert result["coverage"]["truncated"] is True
+
+
+def test_truncated_is_false_when_nothing_was_capped_or_dropped(owner):
+    result = _search(owner, contracts=[RESULTS_CONTRACT], limit=20)
+
+    assert result["coverage"]["truncated"] is False
