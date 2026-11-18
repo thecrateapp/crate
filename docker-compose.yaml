@@ -622,6 +622,9 @@ services:
     container_name: crate-worker
     restart: unless-stopped
     user: ${PUID}:${PGID}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
       - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
@@ -790,6 +793,9 @@ services:
     container_name: crate-projector
     restart: unless-stopped
     user: ${PUID}:${PGID}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=projector
@@ -844,6 +850,9 @@ services:
     container_name: crate-maintenance-worker
     restart: unless-stopped
     user: ${PUID}:${PGID}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
       - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
@@ -992,6 +1001,9 @@ services:
     container_name: crate-analysis-worker
     restart: unless-stopped
     user: ${PUID}:${PGID}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
       - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
@@ -1087,6 +1099,9 @@ services:
     container_name: crate-playback-worker
     restart: unless-stopped
     user: ${PUID}:${PGID}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
@@ -1165,6 +1180,9 @@ services:
     container_name: crate-media-worker
     restart: unless-stopped
     user: ${PUID}:${PGID}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       - TZ=${TZ}
       - DATA_DIR=/data

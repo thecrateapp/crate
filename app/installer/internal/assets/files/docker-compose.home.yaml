@@ -248,6 +248,9 @@ services:
     container_name: crate-media-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       TZ: ${TZ:-UTC}
       DATA_DIR: /data
@@ -489,6 +492,9 @@ services:
     container_name: crate-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<:
         [
@@ -578,6 +584,9 @@ services:
     container_name: crate-projector
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<: *crate-env
       CRATE_RUNTIME: projector
@@ -611,6 +620,9 @@ services:
     container_name: crate-maintenance-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<:
         [
@@ -665,6 +677,9 @@ services:
     container_name: crate-analysis-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<:
         [
@@ -711,6 +726,9 @@ services:
     container_name: crate-playback-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<: [*crate-env, *worker-native-env]
       CRATE_RUNTIME: worker
