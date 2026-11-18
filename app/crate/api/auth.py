@@ -1592,7 +1592,7 @@ def _has_machine_credential(request: Request) -> bool:
 
 
 class AuthMiddleware:
-    """Resolve auth via Bearer header, query param, or cookie (in that order).
+    """Resolve auth via Bearer header, media ticket, or cookie (in that order).
 
     Falls back to Remote-User headers from trusted reverse proxy.
     """
@@ -1686,9 +1686,7 @@ class AuthMiddleware:
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[7:]
-        # 2. Query param token (audio/image streams where headers can't be set)
-        if not token:
-            token = request.query_params.get("token")
+        # 2. Media ticket (audio/image streams where headers can't be set)
         # 3. Cookie auth — try app-specific cookie first, then default
         if token:
             resolver = (

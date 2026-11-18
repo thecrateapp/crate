@@ -44,7 +44,7 @@ return {"task_id": task_id}
 
 (`tags.py`; `create_task` / `create_task_dedup` come from `crate.db.repositories.tasks`. `create_task_dedup` returns `None` when deduplicated.)
 
-- Auth: `AuthMiddleware` only resolves `request.state.user` (Bearer -> `?token=` -> `media_ticket` -> cookies -> trusted `Remote-User`). It never rejects anything. Every non-public handler MUST call a guard itself.
+- Auth: `AuthMiddleware` only resolves `request.state.user` (Bearer -> `media_ticket` -> cookies -> trusted `Remote-User`). Session JWTs and access tokens are never read from the query string. It never rejects anything. Every non-public handler MUST call a guard itself.
   - Logged-in user: `_require_auth(request)`
   - Privileged action: `require_permission(request, "<capability>")` with a capability from `permissions.ALL_CAPABILITIES`
   - `_require_admin` is just `require_permission(request, "admin.access")`. Prefer the narrowest capability (`library.metadata.write`, `ops.tasks.manage`, ...).

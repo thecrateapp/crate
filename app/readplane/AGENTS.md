@@ -12,7 +12,7 @@ and federation authorization. Operator detail: `app/readplane/README.md`.
 - `cmd/readplane-contract-smoke/` — compares readplane vs FastAPI responses.
 - `cmd/readplane-benchmark/`, `cmd/federation-benchmark-proxy/` — latency tooling.
 - `internal/config/` — all env vars (`config.go` `Load`), defaults and CORS origins.
-- `internal/auth/` — token extraction (Bearer > `?token=` > `crate_session_listen` >
+- `internal/auth/` — token extraction (Bearer > `crate_session_listen` >
   `crate_session` cookie), HS JWT validation (`jwt.go`), session/user lookup,
   bounded identity cache, `media_ticket.go`.
 - `internal/snapshots/` — `ui_snapshots` reader with LRU and fresh/stale/expired policy.

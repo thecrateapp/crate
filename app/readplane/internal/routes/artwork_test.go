@@ -25,22 +25,22 @@ type stubArtworkCatalog struct {
 	err error
 }
 
-type queryTokenAuthenticator struct{}
+type mediaTicketAuthenticator struct{}
 
-func (queryTokenAuthenticator) Authenticate(r *http.Request, allowQueryToken bool) (*auth.User, error) {
-	if allowQueryToken && r.URL.Query().Get("token") == "native-token" {
+func (mediaTicketAuthenticator) Authenticate(r *http.Request, allowMediaTicket bool) (*auth.User, error) {
+	if allowMediaTicket && r.URL.Query().Get("media_ticket") == "native-ticket" {
 		return &auth.User{ID: 1, Email: "native@example.test", Role: "user"}, nil
 	}
 	return nil, auth.ErrUnauthorized
 }
 
-func (queryTokenAuthenticator) AuthenticateProfile(r *http.Request, allowQueryToken bool) (*auth.User, error) {
-	return queryTokenAuthenticator{}.Authenticate(r, allowQueryToken)
+func (mediaTicketAuthenticator) AuthenticateProfile(r *http.Request, allowMediaTicket bool) (*auth.User, error) {
+	return mediaTicketAuthenticator{}.Authenticate(r, allowMediaTicket)
 }
 
-func (queryTokenAuthenticator) InvalidateScope(string) {}
+func (mediaTicketAuthenticator) InvalidateScope(string) {}
 
-func (queryTokenAuthenticator) Stats() auth.IdentityCacheStats {
+func (mediaTicketAuthenticator) Stats() auth.IdentityCacheStats {
 	return auth.IdentityCacheStats{}
 }
 
@@ -133,20 +133,20 @@ func TestNewServerResolvesArtworkFromCacheRoot(t *testing.T) {
 	assert.Equal(t, expected, asset.Path)
 }
 
-func TestAlbumArtworkAcceptsNativeQueryToken(t *testing.T) {
+func TestAlbumArtworkAcceptsMediaTicket(t *testing.T) {
 	cacheRoot := t.TempDir()
 	writeRouteArtworkFixture(t, cacheRoot, "album-cover", "album-uid")
 	server := &Server{
 		cfg:             config.Config{Version: "test"},
 		logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
-		auth:            queryTokenAuthenticator{},
+		auth:            mediaTicketAuthenticator{},
 		catalog:         catalog.NewStore(nil, time.Second),
 		artworkCatalog:  stubArtworkCatalog{key: "album-uid"},
 		artworkResolver: media.NewArtworkResolver(cacheRoot),
 	}
 	request := httptest.NewRequest(
 		http.MethodGet,
-		"/api/albums/1/cover?size=128&token=native-token",
+		"/api/albums/1/cover?size=128&media_ticket=native-ticket",
 		nil,
 	)
 	response := httptest.NewRecorder()
@@ -157,16 +157,16 @@ func TestAlbumArtworkAcceptsNativeQueryToken(t *testing.T) {
 	assert.Equal(t, "webp", response.Body.String())
 }
 
-func TestCatalogJSONRejectsQueryToken(t *testing.T) {
+func TestCatalogJSONRejectsMediaTicket(t *testing.T) {
 	server := &Server{
 		cfg:     config.Config{Version: "test"},
 		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-		auth:    queryTokenAuthenticator{},
+		auth:    mediaTicketAuthenticator{},
 		catalog: catalog.NewStore(nil, time.Second),
 	}
 	request := httptest.NewRequest(
 		http.MethodGet,
-		"/api/catalog/search?q=high+vis&token=native-token",
+		"/api/catalog/search?q=high+vis&media_ticket=native-ticket",
 		nil,
 	)
 	response := httptest.NewRecorder()

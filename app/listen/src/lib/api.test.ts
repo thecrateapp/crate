@@ -1103,6 +1103,11 @@ describe("native (configurable server) mode", () => {
         ),
       ).toBe(true);
       expect(
+        apiMod.isUsableMediaAssetUrl(
+          "https://api.example.com/api/albums/1/cover?size=256&token=legacy",
+        ),
+      ).toBe(false);
+      expect(
         apiMod.isUsableMediaAssetUrl("https://cdn.example.net/cover.webp"),
       ).toBe(true);
       expect(

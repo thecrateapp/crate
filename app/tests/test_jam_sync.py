@@ -716,6 +716,37 @@ class TestJamWebSocketAuth:
         with pytest.raises(HTTPException):
             jam._auth_ws(FakeWebSocket())
 
+    @pytest.mark.parametrize(
+        ("query_params", "headers", "accepted"),
+        [
+            ({"token": "valid-token"}, {}, False),
+            ({}, {"authorization": "Bearer valid-token"}, True),
+        ],
+    )
+    def test_session_jwt_is_only_read_from_headers_or_cookies(
+        self, monkeypatch, query_params, headers, accepted
+    ):
+        from fastapi import HTTPException
+        from crate.api import jam
+
+        class FakeWebSocket:
+            pass
+
+        websocket = FakeWebSocket()
+        websocket.query_params = query_params
+        websocket.headers = headers
+        websocket.cookies = {}
+        monkeypatch.setattr(
+            jam, "verify_jwt", lambda token: {"user_id": 42} if token else None
+        )
+
+        if accepted:
+            assert jam._auth_ws(websocket)["user_id"] == 42
+        else:
+            with pytest.raises(HTTPException) as exc:
+                jam._auth_ws(websocket)
+            assert exc.value.status_code == 401
+
     def test_rejects_access_token_media_ticket(self, monkeypatch):
         from fastapi import HTTPException
         from crate import media_access

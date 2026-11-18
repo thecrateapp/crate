@@ -146,9 +146,9 @@ func (a *Authenticator) SetSessionTouchInterval(interval time.Duration) {
 }
 
 // AuthenticateIdentity verifies revocation and returns only hot-path identity fields.
-func (a *Authenticator) AuthenticateIdentity(r *http.Request, allowQueryToken bool) (*User, error) {
+func (a *Authenticator) AuthenticateIdentity(r *http.Request, allowMediaTicket bool) (*User, error) {
 	var mediaTicketErr error
-	if allowQueryToken && !hasAuthoritativeToken(r) && strings.TrimSpace(r.URL.Query().Get("media_ticket")) != "" {
+	if allowMediaTicket && !hasAuthoritativeToken(r) && strings.TrimSpace(r.URL.Query().Get("media_ticket")) != "" {
 		user, err := a.authenticateMediaTicket(r)
 		if err == nil {
 			return user, nil
@@ -156,7 +156,7 @@ func (a *Authenticator) AuthenticateIdentity(r *http.Request, allowQueryToken bo
 		mediaTicketErr = err
 	}
 
-	tokens := ExtractTokenCandidates(r, allowQueryToken)
+	tokens := ExtractTokenCandidates(r)
 	if len(tokens) == 0 {
 		if mediaTicketErr != nil {
 			return nil, mediaTicketErr
@@ -299,8 +299,8 @@ func (a *Authenticator) updateSessionLastSeen(ctx context.Context, sessionID str
 }
 
 // AuthenticateProfile hydrates connected accounts only for profile responses.
-func (a *Authenticator) AuthenticateProfile(r *http.Request, allowQueryToken bool) (*User, error) {
-	user, err := a.AuthenticateIdentity(r, allowQueryToken)
+func (a *Authenticator) AuthenticateProfile(r *http.Request, allowMediaTicket bool) (*User, error) {
+	user, err := a.AuthenticateIdentity(r, allowMediaTicket)
 	if err != nil {
 		return nil, err
 	}
@@ -318,8 +318,8 @@ func (a *Authenticator) AuthenticateProfile(r *http.Request, allowQueryToken boo
 }
 
 // Authenticate is the backward-compatible minimal-identity entry point.
-func (a *Authenticator) Authenticate(r *http.Request, allowQueryToken bool) (*User, error) {
-	return a.AuthenticateIdentity(r, allowQueryToken)
+func (a *Authenticator) Authenticate(r *http.Request, allowMediaTicket bool) (*User, error) {
+	return a.AuthenticateIdentity(r, allowMediaTicket)
 }
 
 // InvalidateScope evicts cached revocable identities for auth/session changes.
@@ -351,9 +351,9 @@ func (a *Authenticator) Stats() IdentityCacheStats {
 	}
 }
 
-// ExtractToken extracts a bearer token from the Authorization header, query string, or cookies.
-func ExtractToken(r *http.Request, allowQueryToken bool) string {
-	tokens := ExtractTokenCandidates(r, allowQueryToken)
+// ExtractToken extracts a bearer token from the Authorization header or cookies.
+func ExtractToken(r *http.Request) string {
+	tokens := ExtractTokenCandidates(r)
 	if len(tokens) == 0 {
 		return ""
 	}
@@ -362,9 +362,10 @@ func ExtractToken(r *http.Request, allowQueryToken bool) string {
 
 // ExtractTokenCandidates extracts auth candidates in the same priority order as FastAPI.
 //
-// Bearer and query-string tokens are authoritative. Cookies can have stale app-specific
-// values, so return both the Listen cookie and the default cookie as fallbacks.
-func ExtractTokenCandidates(r *http.Request, allowQueryToken bool) []string {
+// Bearer tokens are authoritative. Session JWTs are never read from the query string.
+// Cookies can have stale app-specific values, so return both the Listen cookie and the
+// default cookie as fallbacks.
+func ExtractTokenCandidates(r *http.Request) []string {
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 	if authHeader != "" {
 		scheme, token, ok := strings.Cut(authHeader, " ")
@@ -373,11 +374,6 @@ func ExtractTokenCandidates(r *http.Request, allowQueryToken bool) []string {
 			if token != "" {
 				return []string{token}
 			}
-		}
-	}
-	if allowQueryToken {
-		if token := strings.TrimSpace(r.URL.Query().Get("token")); token != "" {
-			return []string{token}
 		}
 	}
 	tokens := make([]string, 0, 2)

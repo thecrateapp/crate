@@ -508,24 +508,24 @@ func (s *Server) requireCatalogAuth(w http.ResponseWriter, r *http.Request) bool
 }
 
 func (s *Server) requireCatalogAssetAuth(w http.ResponseWriter, r *http.Request) bool {
-	_, ok := s.requireCatalogUserWithQueryToken(w, r, true)
+	_, ok := s.requireCatalogUserWithMediaTicket(w, r, true)
 	return ok
 }
 
 func (s *Server) requireCatalogUser(w http.ResponseWriter, r *http.Request) (*auth.User, bool) {
-	return s.requireCatalogUserWithQueryToken(w, r, false)
+	return s.requireCatalogUserWithMediaTicket(w, r, false)
 }
 
-func (s *Server) requireCatalogUserWithQueryToken(
+func (s *Server) requireCatalogUserWithMediaTicket(
 	w http.ResponseWriter,
 	r *http.Request,
-	allowQueryToken bool,
+	allowMediaTicket bool,
 ) (*auth.User, bool) {
 	if s.catalog == nil || s.auth == nil {
 		s.catalogUnavailable(w, r, "Readplane catalog unavailable")
 		return nil, false
 	}
-	user, err := s.auth.Authenticate(r, allowQueryToken)
+	user, err := s.auth.Authenticate(r, allowMediaTicket)
 	if err != nil {
 		if errors.Is(err, auth.ErrUnauthorized) {
 			httpx.MarkReadplane(w, "miss")
