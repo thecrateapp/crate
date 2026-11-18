@@ -26,6 +26,7 @@ def manifest_api(monkeypatch):
     )
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
     monkeypatch.setattr(federation, "catalog_share_policy", dict)
+    monkeypatch.setattr(federation, "_catalog_summary_descriptor", lambda _peer: None)
     monkeypatch.setattr(
         federation,
         "_catalog_manifest_snapshot",
@@ -281,6 +282,7 @@ def test_genre_metadata_respects_its_own_grant_scope(
     monkeypatch.setattr(federation, "_require_capability", decision)
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: True)
     monkeypatch.setattr(federation, "catalog_share_policy", dict)
+    monkeypatch.setattr(federation, "_catalog_summary_descriptor", lambda _peer: None)
     monkeypatch.setattr(
         federation,
         "_catalog_manifest_snapshot",

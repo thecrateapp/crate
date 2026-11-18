@@ -57,6 +57,7 @@ def test_scope_digest_matches_delta_cursor(monkeypatch):
     monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
     monkeypatch.setattr(federation, "catalog_share_policy", lambda: policy)
+    monkeypatch.setattr(federation, "_catalog_summary_descriptor", lambda _peer: None)
     monkeypatch.setattr(federation, "catalog_retention_floor", lambda: 0)
     monkeypatch.setattr(federation, "catalog_high_water_mark", lambda: 5)
     monkeypatch.setattr(federation, "list_catalog_changes", lambda **_kwargs: [])
@@ -251,3 +252,35 @@ def test_user_scoped_grant_permits_ignores_node_level_selectors():
     assert user_scoped_grant_permits(
         [_role_grant()], peer_uid=PEER_UID, capability="catalog.search", now=NOW
     )
+
+
+def test_a_summary_descriptor_db_failure_fails_the_delta_page(monkeypatch):
+    import pytest
+
+    from crate.api import federation
+    from crate.federation.catalog import encode_catalog_cursor
+
+    async def peer(_request):
+        return {"node_uid": "peer-a"}
+
+    def broken_heads():
+        raise RuntimeError("database is down")
+
+    monkeypatch.setenv(
+        "CRATE_FEDERATION_CURSOR_SECRET", "test-secret-at-least-32-bytes-long"
+    )
+    monkeypatch.setattr(federation, "_require_signed_node_request", peer)
+    monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
+    monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
+    monkeypatch.setattr(federation, "catalog_share_policy", dict)
+    monkeypatch.setattr(federation, "catalog_retention_floor", lambda: 0)
+    monkeypatch.setattr(federation, "catalog_high_water_mark", lambda: 5)
+    monkeypatch.setattr(federation, "list_catalog_changes", lambda **_kwargs: [])
+    monkeypatch.setattr(federation, "peer_search_policy", lambda _peer: {})
+    monkeypatch.setattr(federation, "list_catalog_summary_heads", broken_heads)
+    cursor = encode_catalog_cursor(
+        peer_uid="peer-a", mode="delta", position={"sequence": 1}
+    )
+
+    with pytest.raises(RuntimeError, match="database is down"):
+        asyncio.run(federation.catalog_delta(object(), cursor=cursor, limit=10))
