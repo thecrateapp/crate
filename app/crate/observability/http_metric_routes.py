@@ -471,6 +471,7 @@ HTTP_ROUTES = frozenset(
         "/api/federation/v1/capabilities",
         "/api/federation/v1/catalog/delta",
         "/api/federation/v1/catalog/manifest",
+        "/api/federation/v1/catalog/summary",
         "/api/federation/v1/facets/:param/:param/:param",
         "/api/federation/v1/health",
         "/api/federation/v1/import-files/:param",
