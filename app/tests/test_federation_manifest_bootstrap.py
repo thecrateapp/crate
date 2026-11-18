@@ -25,7 +25,7 @@ def manifest_api(monkeypatch):
         lambda *_args: SimpleNamespace(constraints=GrantConstraints(max_results=20)),
     )
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
-    monkeypatch.setattr(federation, "_catalog_share_policy", dict)
+    monkeypatch.setattr(federation, "catalog_share_policy", dict)
     monkeypatch.setattr(
         federation,
         "_catalog_manifest_snapshot",
@@ -90,7 +90,7 @@ def test_manifest_continuation_rejects_a_changed_sharing_policy(
     first = asyncio.run(manifest_api.catalog_manifest(object(), page_size=200))
     monkeypatch.setattr(
         manifest_api,
-        "_catalog_share_policy",
+        "catalog_share_policy",
         lambda: {"catalog_filter": {"deny_entity_uids": ["last"]}},
     )
 
@@ -213,16 +213,16 @@ def test_delta_filters_selected_grant_and_binds_its_scope(manifest_api, monkeypa
 def test_manifest_sql_intersects_share_and_grant_scope(pg_db, allowed_type, expected):
     from uuid import uuid4
 
-    from crate.api.federation import _catalog_manifest_policy_params
     from crate.db.queries.federation_manifest import (
         get_federation_manifest_revision_row,
         list_federation_manifest_rows,
     )
+    from crate.federation.catalog_scope import catalog_policy_params
 
     uid_a, uid_b = str(uuid4()), str(uuid4())
     pg_db.upsert_artist({"name": "Grant Scope A", "entity_uid": uid_a})
     pg_db.upsert_artist({"name": "Grant Scope B", "entity_uid": uid_b})
-    params = _catalog_manifest_policy_params(
+    params = catalog_policy_params(
         {
             "catalog_filter": {"entity_uids": [uid_a, uid_b]},
             "_grant_scope": {
@@ -280,7 +280,7 @@ def test_genre_metadata_respects_its_own_grant_scope(
     monkeypatch.setattr(federation, "_require_signed_node_request", peer)
     monkeypatch.setattr(federation, "_require_capability", decision)
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: True)
-    monkeypatch.setattr(federation, "_catalog_share_policy", dict)
+    monkeypatch.setattr(federation, "catalog_share_policy", dict)
     monkeypatch.setattr(
         federation,
         "_catalog_manifest_snapshot",

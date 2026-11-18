@@ -48,6 +48,15 @@ from crate.db.repositories.federation_pairing_approval import complete_outbound_
 from crate.db.repositories.streaming import get_track_delivery_row_by_entity_uid
 from crate.federation.assertions import verify_signed_assertion
 from crate.federation.authorization import AuthorizationDecision, authorize
+from crate.federation.catalog_scope import (
+    catalog_policy_allows_item,
+    catalog_policy_allows_live_search,
+    catalog_policy_for_grant,
+    catalog_policy_params,
+    catalog_scope_allows_item,
+    catalog_scope_digest,
+    catalog_share_policy,
+)
 from crate.federation.contracts import CAPABILITIES
 from crate.federation.identity import build_signed_descriptor, load_private_key
 from crate.federation.pairing import (
@@ -433,53 +442,6 @@ def _require_user_assertion(
     return assertion
 
 
-def _catalog_share_policy() -> dict[str, Any]:
-    node = repo.get_local_node()
-    if not node:
-        return {}
-    raw_policy = node.get("policy_json") or {}
-    if isinstance(raw_policy, str):
-        try:
-            return dict(_json.loads(raw_policy or "{}"))
-        except ValueError:
-            return {}
-    return dict(raw_policy)
-
-
-def _catalog_scope_allows_item(item: dict[str, Any], scope: dict[str, Any]) -> bool:
-    allowed_types = scope.get("allowed_entity_types") or []
-    if allowed_types and item.get("entity_type") not in allowed_types:
-        return False
-    allowed_uids = scope.get("allowed_entity_uids") or []
-    return not allowed_uids or item.get("remote_entity_uid") in allowed_uids
-
-
-def _catalog_policy_allows_item(item: dict[str, Any], policy: dict[str, Any]) -> bool:
-    if not _catalog_scope_allows_item(item, policy.get("_grant_scope") or {}):
-        return False
-    catalog_filter = policy.get("catalog_filter") or {}
-    expected_scope = catalog_filter.get("share_scope")
-    if expected_scope:
-        item_scope = item.get("_share_scope") or item.get("share_scope") or "library"
-        if item_scope != expected_scope:
-            return False
-
-    allowed_entity_uids = set(catalog_filter.get("entity_uids") or [])
-    type_key = f"{item.get('entity_type')}_entity_uids"
-    allowed_entity_uids.update(catalog_filter.get(type_key) or [])
-    if allowed_entity_uids and item.get("remote_entity_uid") not in allowed_entity_uids:
-        return False
-
-    denied_entity_uids = set(catalog_filter.get("deny_entity_uids") or [])
-    return item.get("remote_entity_uid") not in denied_entity_uids
-
-
-def _catalog_policy_allows_live_search(policy: dict[str, Any]) -> bool:
-    catalog_filter = policy.get("catalog_filter") or {}
-    expected_scope = catalog_filter.get("share_scope")
-    return expected_scope in (None, "", "library")
-
-
 def _empty_search_response() -> dict[str, list[dict]]:
     return {"artists": [], "albums": [], "tracks": []}
 
@@ -584,8 +546,8 @@ async def federated_search(body: SearchBody, request: Request):
     )
     await asyncio.to_thread(_require_search_quota, request, peer, assertion)
     wants_envelope = RESULTS_CONTRACT in body.contracts
-    policy = await asyncio.to_thread(_catalog_share_policy)
-    if not _catalog_policy_allows_live_search(policy):
+    policy = await asyncio.to_thread(catalog_share_policy)
+    if not catalog_policy_allows_live_search(policy):
         if wants_envelope:
             return await asyncio.to_thread(
                 _search_envelope,
@@ -672,13 +634,13 @@ async def federated_album_detail(remote_entity_uid: str, request: Request):
         _require_capability, peer, "catalog.album.read", assertion=assertion
     )
     _require_entity_allowed(decision, entity_type="album", entity_uid=remote_entity_uid)
-    if not _catalog_policy_allows_item(
+    if not catalog_policy_allows_item(
         {
             "entity_type": "album",
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        await asyncio.to_thread(_catalog_share_policy),
+        await asyncio.to_thread(catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Album not found")
     album = await asyncio.to_thread(_public_album_detail, remote_entity_uid)
@@ -703,13 +665,13 @@ async def federated_artist_detail(remote_entity_uid: str, request: Request):
     _require_entity_allowed(
         decision, entity_type="artist", entity_uid=remote_entity_uid
     )
-    if not _catalog_policy_allows_item(
+    if not catalog_policy_allows_item(
         {
             "entity_type": "artist",
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        await asyncio.to_thread(_catalog_share_policy),
+        await asyncio.to_thread(catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Artist not found")
     artist = await asyncio.to_thread(_public_artist_detail, remote_entity_uid)
@@ -732,13 +694,13 @@ async def federated_track_detail(remote_entity_uid: str, request: Request):
         _require_capability, peer, "catalog.track.read", assertion=assertion
     )
     _require_entity_allowed(decision, entity_type="track", entity_uid=remote_entity_uid)
-    if not _catalog_policy_allows_item(
+    if not catalog_policy_allows_item(
         {
             "entity_type": "track",
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        await asyncio.to_thread(_catalog_share_policy),
+        await asyncio.to_thread(catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Track not found")
     track = await asyncio.to_thread(_public_track_detail, remote_entity_uid)
@@ -829,13 +791,13 @@ async def federated_artist_photo(
     _require_entity_allowed(
         decision, entity_type="artist", entity_uid=remote_entity_uid
     )
-    if not _catalog_policy_allows_item(
+    if not catalog_policy_allows_item(
         {
             "entity_type": "artist",
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        await asyncio.to_thread(_catalog_share_policy),
+        await asyncio.to_thread(catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Artist photo not found")
 
@@ -871,13 +833,13 @@ async def federated_artist_background(
     _require_entity_allowed(
         decision, entity_type="artist", entity_uid=remote_entity_uid
     )
-    if not _catalog_policy_allows_item(
+    if not catalog_policy_allows_item(
         {
             "entity_type": "artist",
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        await asyncio.to_thread(_catalog_share_policy),
+        await asyncio.to_thread(catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Artist background not found")
 
@@ -919,13 +881,13 @@ async def federated_asset(
         entity_type=normalized_type,
         entity_uid=remote_entity_uid,
     )
-    if not _catalog_policy_allows_item(
+    if not catalog_policy_allows_item(
         {
             "entity_type": normalized_type,
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        await asyncio.to_thread(_catalog_share_policy),
+        await asyncio.to_thread(catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Asset not found")
 
@@ -1074,13 +1036,13 @@ async def federated_json_facet(
         entity_type=entity_type,
         entity_uid=remote_entity_uid,
     )
-    if not _catalog_policy_allows_item(
+    if not catalog_policy_allows_item(
         {
             "entity_type": entity_type,
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        await asyncio.to_thread(_catalog_share_policy),
+        await asyncio.to_thread(catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Facet not found")
 
@@ -1373,20 +1335,14 @@ async def catalog_manifest(
         if genres_allowed
         else None
     )
-    policy = await asyncio.to_thread(_catalog_share_policy)
-    policy = _catalog_policy_for_grant(
+    policy = await asyncio.to_thread(catalog_share_policy)
+    policy = catalog_policy_for_grant(
         policy,
         decision,
         include_genres=genres_allowed,
         metadata_decision=metadata_decision,
     )
-    policy_digest = hashlib.sha256(
-        _json.dumps(
-            _catalog_manifest_policy_params(policy),
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
-    ).hexdigest()
+    policy_digest = catalog_scope_digest(policy)
     peer_uid = str(peer["node_uid"])
     after_entity_type = ""
     after_entity_uid = ""
@@ -1526,20 +1482,14 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
         if genres_allowed
         else None
     )
-    policy = await asyncio.to_thread(_catalog_share_policy)
-    policy = _catalog_policy_for_grant(
+    policy = await asyncio.to_thread(catalog_share_policy)
+    policy = catalog_policy_for_grant(
         policy,
         decision,
         include_genres=genres_allowed,
         metadata_decision=metadata_decision,
     )
-    policy_digest = hashlib.sha256(
-        _json.dumps(
-            _catalog_manifest_policy_params(policy),
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
-    ).hexdigest()
+    policy_digest = catalog_scope_digest(policy)
     from crate.federation.catalog import (
         InvalidCatalogCursor,
         decode_catalog_cursor,
@@ -1607,9 +1557,9 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
             "entity_type": change["entity_type"],
             "remote_entity_uid": change["entity_uid"],
         }
-        if not _catalog_policy_allows_item(candidate, policy):
+        if not catalog_policy_allows_item(candidate, policy):
             continue
-        if not genres_allowed or not _catalog_scope_allows_item(
+        if not genres_allowed or not catalog_scope_allows_item(
             candidate, policy.get("_genre_scope") or {}
         ):
             for key in (
@@ -1702,8 +1652,8 @@ def _catalog_manifest_items_after(
     include_genres: bool = True,
     policy: dict[str, Any] | None = None,
 ) -> list[dict]:
-    policy = policy if policy is not None else _catalog_share_policy()
-    policy_params = _catalog_manifest_policy_params(policy)
+    policy = policy if policy is not None else catalog_share_policy()
+    policy_params = catalog_policy_params(policy)
     rows = list_federation_manifest_rows(
         after_entity_type=after_entity_type,
         after_entity_uid=after_entity_uid,
@@ -1721,7 +1671,7 @@ def _catalog_manifest_items_after(
                 secondary_types=list(item.get("release_group_secondary_types") or []),
                 title=str(item.get("title") or ""),
             )
-        if include_genres and _catalog_scope_allows_item(
+        if include_genres and catalog_scope_allows_item(
             item, policy.get("_genre_scope") or {}
         ):
             item["genres"] = _manifest_genres(item)
@@ -1729,7 +1679,7 @@ def _catalog_manifest_items_after(
         _normalize_manifest_audio(item)
         _normalize_manifest_quality(item)
         item["facets"] = _manifest_facets(item)
-        if not _catalog_policy_allows_item(item, policy):
+        if not catalog_policy_allows_item(item, policy):
             continue
         item.pop("_share_scope", None)
         item.pop("updated_at", None)
@@ -1743,7 +1693,7 @@ def _catalog_manifest_items_after(
 
 def _catalog_manifest_snapshot(policy: dict[str, Any]) -> dict[str, Any]:
     """Return a deterministic revision and exact size for one manifest view."""
-    policy_params = _catalog_manifest_policy_params(policy)
+    policy_params = catalog_policy_params(policy)
     row = get_federation_manifest_revision_row(policy_params)
 
     total_items = int(row["total_items"] or 0)
@@ -1760,7 +1710,7 @@ def _catalog_manifest_revision(
 ) -> str:
     revision_input = _json.dumps(
         {
-            "policy": _catalog_manifest_policy_params(policy),
+            "policy": catalog_policy_params(policy),
             "total_items": total_items,
             "snapshot_sequence": snapshot_sequence,
         },
@@ -1768,77 +1718,6 @@ def _catalog_manifest_revision(
         separators=(",", ":"),
     )
     return f"sha256:{hashlib.sha256(revision_input.encode()).hexdigest()}"
-
-
-def _catalog_policy_for_grant(
-    policy: dict[str, Any],
-    decision: AuthorizationDecision | None,
-    *,
-    include_genres: bool,
-    metadata_decision: AuthorizationDecision | None = None,
-) -> dict[str, Any]:
-    constraints = decision.constraints if decision is not None else None
-    metadata_constraints = (
-        metadata_decision.constraints if metadata_decision is not None else None
-    )
-    return {
-        **policy,
-        "_grant_scope": {
-            "allowed_entity_types": sorted(constraints.allowed_entity_types)
-            if constraints
-            else [],
-            "allowed_entity_uids": sorted(constraints.allowed_entity_uids)
-            if constraints
-            else [],
-            "include_genres": include_genres,
-        },
-        "_genre_scope": {
-            "allowed_entity_types": sorted(metadata_constraints.allowed_entity_types)
-            if metadata_constraints
-            else [],
-            "allowed_entity_uids": sorted(metadata_constraints.allowed_entity_uids)
-            if metadata_constraints
-            else [],
-        },
-    }
-
-
-def _catalog_manifest_policy_params(policy: dict[str, Any]) -> dict[str, Any]:
-    catalog_filter = policy.get("catalog_filter") or {}
-    expected_scope = catalog_filter.get("share_scope")
-    grant_scope = policy.get("_grant_scope") or {}
-    genre_scope = policy.get("_genre_scope") or {}
-    return {
-        "share_allowed": expected_scope in (None, "", "library"),
-        "allowed_entity_uids": sorted(
-            str(value) for value in catalog_filter.get("entity_uids") or []
-        ),
-        "allowed_artist_uids": sorted(
-            str(value) for value in catalog_filter.get("artist_entity_uids") or []
-        ),
-        "allowed_album_uids": sorted(
-            str(value) for value in catalog_filter.get("album_entity_uids") or []
-        ),
-        "allowed_track_uids": sorted(
-            str(value) for value in catalog_filter.get("track_entity_uids") or []
-        ),
-        "denied_entity_uids": sorted(
-            str(value) for value in catalog_filter.get("deny_entity_uids") or []
-        ),
-        "grant_allowed_entity_types": sorted(
-            grant_scope.get("allowed_entity_types") or []
-        ),
-        "grant_allowed_entity_uids": sorted(
-            grant_scope.get("allowed_entity_uids") or []
-        ),
-        "grant_include_genres": bool(grant_scope.get("include_genres")),
-        "genre_allowed_entity_types": sorted(
-            genre_scope.get("allowed_entity_types") or []
-        ),
-        "genre_allowed_entity_uids": sorted(
-            genre_scope.get("allowed_entity_uids") or []
-        ),
-    }
 
 
 def _normalize_manifest_audio(item: dict[str, Any]) -> None:

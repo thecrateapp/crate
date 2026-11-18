@@ -84,7 +84,7 @@ def owner(monkeypatch):
         lambda *args: {"sub": "subject-hash"},
     )
     monkeypatch.setattr(federation_api, "_require_capability", lambda *a, **k: decision)
-    monkeypatch.setattr(federation_api, "_catalog_share_policy", lambda: {})
+    monkeypatch.setattr(federation_api, "catalog_share_policy", lambda: {})
     monkeypatch.setattr(federation_api, "handle_remote_search", lambda **kw: LOCAL_ROWS)
     monkeypatch.setattr(
         federation_api.repo,
@@ -140,7 +140,7 @@ def test_a_catalog_closed_to_live_search_answers_incomplete_not_empty(
 ):
     monkeypatch.setattr(
         owner,
-        "_catalog_share_policy",
+        "catalog_share_policy",
         lambda: {"catalog_filter": {"share_scope": "selected"}},
     )
 
