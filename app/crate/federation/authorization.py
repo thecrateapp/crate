@@ -71,6 +71,36 @@ def _is_active(grant: dict, *, now: datetime) -> bool:
     return not (valid_until is not None and valid_until <= now)
 
 
+def user_scoped_grant_permits(
+    grants: list[dict],
+    *,
+    peer_uid: str,
+    capability: str,
+    now: datetime | None = None,
+) -> bool:
+    """True when an active grant that is not node-level permits the capability.
+
+    Node-level selectors are the ones that match with no subject and no roles
+    (``*``, ``peer``, ``peer:<uid>``, ``peer_users:<uid>``). Any other grant
+    (``role:``, ``subject:``) applies to some users only and can give them
+    more than the node-level decision does.
+    """
+    current_time = now or datetime.now(UTC)
+    for grant in grants:
+        selector = str(
+            grant.get("subject_selector") or grant.get("principal_selector") or ""
+        )
+        if _selector_matches(
+            selector, peer_uid=peer_uid, subject_hash=None, roles=set()
+        ):
+            continue
+        if not _is_active(grant, now=current_time):
+            continue
+        if capability in _json_value(grant.get("capabilities_json"), []):
+            return True
+    return False
+
+
 def _deny(
     code: str,
     *,

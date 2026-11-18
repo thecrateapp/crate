@@ -7,7 +7,11 @@ import json as _json
 from typing import Any
 
 from crate.db.repositories import federation as repo
-from crate.federation.authorization import AuthorizationDecision, authorize
+from crate.federation.authorization import (
+    AuthorizationDecision,
+    authorize,
+    user_scoped_grant_permits,
+)
 
 
 def catalog_share_policy() -> dict[str, Any]:
@@ -140,16 +144,25 @@ def catalog_scope_digest(policy: dict[str, Any]) -> str:
 
 
 def peer_search_policy(peer: dict[str, Any]) -> dict[str, Any] | None:
-    """Scope a peer may live-search under, or None when it may not search."""
+    """Scope a peer may live-search under, or None when it may not search.
+
+    Also None when a role or subject grant permits catalog.search: those users
+    may see more than the node-level scope, so one summary would hide results.
+    """
+    grants = repo.get_peer_grants(str(peer["node_uid"]))
     decision = authorize(
         peer=peer,
-        grants=repo.get_peer_grants(str(peer["node_uid"])),
+        grants=grants,
         capability="catalog.search",
         subject_hash=None,
         roles=set(),
         observe=False,
     )
     if not decision.allowed:
+        return None
+    if user_scoped_grant_permits(
+        grants, peer_uid=str(peer["node_uid"]), capability="catalog.search"
+    ):
         return None
     policy = catalog_share_policy()
     if not catalog_policy_allows_live_search(policy):
