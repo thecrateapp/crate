@@ -1,5 +1,9 @@
+import itertools
 import random
 import re
+import time
+
+import pytest
 
 from crate.db.queries.browse_media_search import build_fts_query
 from crate.federation.summary_bloom import (
@@ -123,3 +127,58 @@ def test_summary_terms_prefixes_and_artist_key():
     assert artist_key(None) is None and artist_key("!!!") is None
     assert artist_key("AC/DC") == artist_key("ac dc")
     assert len(artist_key("AC/DC")) == 16
+
+
+@pytest.mark.slow
+def test_reference_catalog_size():
+    """Production-sized catalogue: 1,050 artists, 10,900 albums, 138,000 tracks."""
+    rng = random.Random(20261118)
+    syll = [
+        a + b
+        for a in ("b", "c", "d", "f", "g", "k", "l", "m", "n", "p", "r", "s", "t", "v")
+        for b in ("a", "e", "i", "o", "u", "ar", "en", "il", "or", "un")
+    ]
+    vocab = sorted(
+        {
+            "".join(rng.choice(syll) for _ in range(rng.randint(1, 4)))
+            for _ in range(90_000)
+        }
+    )
+    # Zipf-like word choice: a few common words, a long tail of rare ones.
+    cum_weights = list(itertools.accumulate(1.0 / (i + 10) for i in range(len(vocab))))
+
+    def title(lo: int, hi: int) -> str:
+        words = rng.choices(vocab, cum_weights=cum_weights, k=rng.randint(lo, hi))
+        return " ".join(words)
+
+    artists = [title(1, 3) for _ in range(1_050)]
+    albums = [(title(1, 4), rng.choice(artists)) for _ in range(10_900)]
+    tracks = []
+    for _ in range(138_000):
+        album, artist = rng.choice(albums)
+        tracks.append((title(1, 5), artist, album))
+
+    started = time.perf_counter()
+    terms: set[str] = set()
+    for name in artists:
+        terms |= summary_terms(name)
+    for album, artist in albums:
+        terms |= summary_terms(album, artist)
+    for track, artist, album in tracks:
+        terms |= summary_terms(track, artist, album)
+    bloom = BloomFilter.sized(len(terms))
+    for term in sorted(terms):
+        bloom.add(term)
+    elapsed = time.perf_counter() - started
+    size = len(bloom.to_bytes())
+
+    assert all(t in bloom for t in rng.sample(sorted(terms), 5_000))
+    probes = [f"zz{rng.getrandbits(48):012x}" for _ in range(100_000)]
+    assert not terms.intersection(probes)
+    rate = sum(1 for p in probes if p in bloom) / len(probes)
+    print(
+        f"reference catalogue: terms={len(terms)} bytes={size} "
+        f"m={bloom.params['m']} k={bloom.params['k']} "
+        f"fp={rate:.5f} build_seconds={elapsed:.2f}"
+    )
+    assert rate <= 0.015
