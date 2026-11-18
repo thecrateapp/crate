@@ -13,16 +13,18 @@ import re
 from hashlib import blake2b
 
 SUMMARY_CONTRACT = "crate.federation.summary/1"
-TOKENIZER = "fts-simple-v1"
+TOKENIZER = "fts-simple-v2"
 MIN_PREFIX = 3
 FP_TARGET = 0.01
 
 _PERSON = b"crate-sum-v1"
-_TOKEN_RE = re.compile(r"\w+", re.UNICODE)
+# Letters and digits only: PostgreSQL's 'simple' parser splits on "_" too
+# ('my_song_title' -> my, song, title), so the filter must hold those words.
+_TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
 
 
 def name_tokens(text: str | None) -> list[str]:
-    """Lowercased word tokens, the same rule as ``build_fts_query``."""
+    """Lowercased word tokens as PostgreSQL's 'simple' FTS parser splits them."""
     if not text:
         return []
     return _TOKEN_RE.findall(text.strip().lower())
