@@ -121,6 +121,9 @@ def _refresh_summary_if_announced(
         known = peer_summaries.summaries_repo.list_peer_summary_etags([uid]).get(uid)
         if str(descriptor["etag"]) != known:
             peer_summaries.refresh_peer_summary(peer, local_node, known_etag=known)
+        else:
+            # The owner confirmed the stored summary is current: keep it fresh.
+            peer_summaries.summaries_repo.touch_peer_summary(uid)
     except Exception:
         log.debug("Peer summary refresh after delta failed", exc_info=True)
 

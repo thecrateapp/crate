@@ -198,7 +198,8 @@ def test_summary_cache_reloads_on_new_etag(monkeypatch):
     bloom = BloomFilter.sized(10)
     bloom.add("joy")
 
-    def fake_etags(uids):
+    def fake_etags(uids, *, max_age_s=None):
+        assert max_age_s == peer_summaries.PEER_SUMMARY_MAX_AGE_S
         return {u: etags[u] for u in uids if u in etags}
 
     def fake_bodies(uids):
