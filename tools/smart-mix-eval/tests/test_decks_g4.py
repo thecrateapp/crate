@@ -155,3 +155,26 @@ def test_alignment_is_zero_where_the_plan_puts_the_decks():
     assert result["offsetMedianMs"] == pytest.approx(3.0)
     assert result["offsetDriftMs"] == pytest.approx(0.0, abs=1e-6)
     assert result["startVsPlanOutgoingMs"] == pytest.approx(4.0)
+
+
+def test_short_by_is_the_handover_past_the_plans_start():
+    import compare_runs
+
+    report = {
+        "plannedStartOutgoingMs": 100_000,
+        "events": [{"state": "Armed", "outgoingMs": 145_800}, {"state": "Running", "outgoingMs": 145_800}],
+    }
+    assert compare_runs.short_by(report) == pytest.approx(45.8)
+    report["events"][0]["outgoingMs"] = 90_000
+    assert compare_runs.short_by(report) == 0.0
+    assert compare_runs.short_by({"plannedStartOutgoingMs": 0, "events": []}) == 0.0
+
+
+def test_offsets_collect_the_decks_starts():
+    import compare_runs
+
+    measures = {
+        "p01": {"decks-v3": {"alignment": {"offsetAtStartMs": 17.4}}, "decks-v2": {"alignment": {}}},
+        "p02": {"decks-v3": {"alignment": None}, "decks-v2": {"alignment": {"offsetAtStartMs": 0.0}}},
+    }
+    assert compare_runs.offsets(measures, ["p01", "p02"]) == [17.4, 0.0]
