@@ -378,6 +378,7 @@ def pending_oauth_verifier(monkeypatch):
     from crate.api import auth
 
     monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("CRATE_ENV", "test")
     auth._store_oauth_verifier("oauth-nonce", "provider-verifier")
     yield "provider-verifier"
     auth._take_oauth_verifier("oauth-nonce")

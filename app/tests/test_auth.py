@@ -435,6 +435,7 @@ class TestOAuthRedirectHelpers:
         )
 
         monkeypatch.delenv("REDIS_URL", raising=False)
+        monkeypatch.setenv("CRATE_ENV", "test")
         state, verifier = _build_oauth_state(
             provider="google",
             return_to=None,
@@ -463,9 +464,10 @@ class TestOAuthRedirectHelpers:
         )
         redis_client.getdel.assert_called_once_with("crate:auth:oauth_verifier:nonce-1")
 
-    def test_expired_oauth_verifier_is_rejected(self):
+    def test_expired_oauth_verifier_is_rejected(self, monkeypatch):
         from crate.api import auth
 
+        monkeypatch.setenv("CRATE_ENV", "test")
         with patch("crate.api.auth._get_rate_limit_redis", return_value=None):
             auth._store_oauth_verifier("nonce-expired", "stored-verifier")
             with auth._oauth_pending_lock:
@@ -497,9 +499,10 @@ class TestOAuthRedirectHelpers:
                 invite_token=None,
             )
 
-    def test_oauth_invite_storage_falls_back_to_memory(self):
+    def test_oauth_invite_storage_falls_back_to_memory(self, monkeypatch):
         from crate.api import auth
 
+        monkeypatch.setenv("CRATE_ENV", "test")
         with auth._oauth_pending_lock:
             auth._oauth_pending_memory.clear()
 
@@ -507,6 +510,48 @@ class TestOAuthRedirectHelpers:
             auth._store_oauth_invite_token("invite-key", "invite-token")
             assert auth._retrieve_oauth_invite_token("invite-key") == "invite-token"
             assert auth._retrieve_oauth_invite_token("invite-key") is None
+
+    @pytest.mark.parametrize("environment", ["production", ""])
+    def test_oauth_pending_data_needs_redis_outside_dev(self, monkeypatch, environment):
+        from crate.api import auth
+
+        monkeypatch.setenv("CRATE_ENV", environment)
+        with patch("crate.api.auth._get_rate_limit_redis", return_value=None):
+            for call in (
+                lambda: auth._store_oauth_verifier("nonce-prod", "stored-verifier"),
+                lambda: auth._take_oauth_verifier("nonce-prod"),
+                lambda: auth._store_oauth_invite_token("invite-key", "invite-token"),
+                lambda: auth._retrieve_oauth_invite_token("invite-key"),
+            ):
+                with pytest.raises(HTTPException) as exc_info:
+                    call()
+                assert exc_info.value.status_code == 503
+
+        with auth._oauth_pending_lock:
+            assert "crate:auth:oauth_verifier:nonce-prod" not in (
+                auth._oauth_pending_memory
+            )
+
+    @pytest.mark.parametrize("environment", ["production", "test"])
+    def test_redis_errors_never_fall_back_to_memory(self, monkeypatch, environment):
+        from crate.api import auth
+
+        monkeypatch.setenv("CRATE_ENV", environment)
+        redis_client = MagicMock()
+        redis_client.setex.side_effect = ConnectionError("redis down")
+        redis_client.getdel.side_effect = ConnectionError("redis down")
+        with patch("crate.api.auth._get_rate_limit_redis", return_value=redis_client):
+            with pytest.raises(HTTPException) as store_error:
+                auth._store_oauth_verifier("nonce-down", "stored-verifier")
+            with pytest.raises(HTTPException) as take_error:
+                auth._take_oauth_verifier("nonce-down")
+
+        assert store_error.value.status_code == 503
+        assert take_error.value.status_code == 503
+        with auth._oauth_pending_lock:
+            assert "crate:auth:oauth_verifier:nonce-down" not in (
+                auth._oauth_pending_memory
+            )
 
 
 class TestOAuthStart:
@@ -526,6 +571,75 @@ class TestOAuthStart:
                 "server": ("listen.lespedants.org", 80),
             }
         )
+
+    @patch.dict(
+        "os.environ",
+        {
+            "JWT_SECRET": "test-secret-key-1234-12345678901234",
+            "GOOGLE_CLIENT_ID": "google-client",
+            "CRATE_ENV": "production",
+        },
+        clear=False,
+    )
+    def test_oauth_start_fails_closed_in_production_without_redis(self, monkeypatch):
+        from crate.api.auth import oauth_start
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        monkeypatch.delenv("REDIS_URL", raising=False)
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            _run(
+                oauth_start(
+                    self._request(),
+                    "google",
+                    OAuthStartRequest(
+                        return_to="https://listen.lespedants.org/auth/callback"
+                    ),
+                )
+            )
+
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.detail == "OAuth sign-in is temporarily unavailable"
+
+    @patch.dict(
+        "os.environ",
+        {
+            "JWT_SECRET": "test-secret-key-1234-12345678901234",
+            "GOOGLE_CLIENT_ID": "google-client",
+            "CRATE_ENV": "test",
+        },
+        clear=False,
+    )
+    def test_oauth_start_uses_memory_in_test_without_redis(self, monkeypatch):
+        from urllib.parse import parse_qs, urlparse
+
+        from crate.api.auth import (
+            _parse_oauth_state,
+            _pkce_challenge,
+            _take_oauth_verifier,
+            oauth_start,
+        )
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        monkeypatch.delenv("REDIS_URL", raising=False)
+        with patch("crate.api.auth._provider_available", return_value=True):
+            result = _run(
+                oauth_start(
+                    self._request(),
+                    "google",
+                    OAuthStartRequest(
+                        return_to="https://listen.lespedants.org/auth/callback"
+                    ),
+                )
+            )
+
+        query = parse_qs(urlparse(result["login_url"]).query)
+        nonce = _parse_oauth_state(query["state"][0])["nonce"]
+        verifier = _take_oauth_verifier(nonce)
+        assert verifier
+        assert query["code_challenge"] == [_pkce_challenge(verifier)]
 
     def test_public_google_login_uses_identity_scopes_without_offline_access(self):
         from urllib.parse import parse_qs, urlparse

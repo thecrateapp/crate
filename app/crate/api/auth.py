@@ -22,6 +22,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from crate.api import native_oauth_auth
 from crate.api.auth_dependencies import require_auth as _require_auth
+from crate.api.native_auth_store import local_memory_allowed
 from crate.api.native_oauth import (
     InvalidNativeOAuthHandoff,
     NativeOAuthCompletionUnknown,
@@ -1302,15 +1303,24 @@ def _build_oauth_state(
     return state, verifier
 
 
+def _oauth_pending_unavailable() -> HTTPException:
+    return HTTPException(
+        status_code=503, detail="OAuth sign-in is temporarily unavailable"
+    )
+
+
 def _store_oauth_pending(prefix: str, key: str, value: str) -> None:
     redis_key = f"{prefix}:{key}"
-    try:
-        r = _get_rate_limit_redis()
-        if r is not None:
+    r = _get_rate_limit_redis()
+    if r is not None:
+        try:
             r.setex(redis_key, _OAUTH_PENDING_TTL_SECONDS, value)
-            return
-    except Exception:
-        log.warning("Failed to store pending OAuth data in Redis", exc_info=True)
+        except Exception as exc:
+            log.warning("Failed to store pending OAuth data in Redis", exc_info=True)
+            raise _oauth_pending_unavailable() from exc
+        return
+    if not local_memory_allowed():
+        raise _oauth_pending_unavailable()
     now = datetime.now(timezone.utc)
     with _oauth_pending_lock:
         for expired_key in [
@@ -1329,16 +1339,18 @@ def _take_oauth_pending(prefix: str, key: str | None) -> str | None:
     if not key:
         return None
     redis_key = f"{prefix}:{key}"
-    try:
-        r = _get_rate_limit_redis()
-        if r is not None:
+    r = _get_rate_limit_redis()
+    if r is not None:
+        try:
             value = r.getdel(redis_key)
-            if value:
-                if isinstance(value, bytes):
-                    return value.decode("utf-8")
-                return str(value)
-    except Exception:
-        log.warning("Failed to read pending OAuth data from Redis", exc_info=True)
+        except Exception as exc:
+            log.warning("Failed to read pending OAuth data from Redis", exc_info=True)
+            raise _oauth_pending_unavailable() from exc
+        if isinstance(value, bytes):
+            return value.decode("utf-8")
+        return str(value) if value else None
+    if not local_memory_allowed():
+        raise _oauth_pending_unavailable()
     with _oauth_pending_lock:
         record = _oauth_pending_memory.pop(redis_key, None)
     if not record:
