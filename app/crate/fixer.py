@@ -3,7 +3,11 @@ import shutil
 from pathlib import Path
 
 from crate.models import Issue, IssueType
-from crate.storage_layout import UnsafeMutationPathError, ensure_within_roots
+from crate.storage_layout import (
+    UnsafeMutationPathError,
+    ensure_within_roots,
+    library_mutation_roots,
+)
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +55,7 @@ class LibraryFixer:
 
     def _ensure_in_library(self, *paths: Path) -> None:
         for path in paths:
-            ensure_within_roots(path, (self.library_root,))
+            ensure_within_roots(path, library_mutation_roots(self.library_root))
 
     def _get_handler(self, issue_type: IssueType):
         return {

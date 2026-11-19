@@ -20,6 +20,7 @@ from crate.storage_layout import album_dir as managed_album_dir
 from crate.storage_layout import (
     ensure_within_roots,
     entity_uid_for,
+    library_mutation_roots,
     looks_like_entity_uid,
 )
 
@@ -200,7 +201,7 @@ def resolve_import_album_target(
 
 
 def move_file(src: Path, dest: Path, *, library_root: str | Path):
-    ensure_within_roots(dest, (library_root,))
+    ensure_within_roots(dest, library_mutation_roots(library_root))
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
         if dest.is_dir():
@@ -420,9 +421,9 @@ def install_managed_track(
     failed write never leaves the library without the track."""
     root = Path(library_root)
     dest = placement.dest
-    ensure_within_roots(dest, (root,))
+    ensure_within_roots(dest, library_mutation_roots(root))
     if placement.replaces is not None:
-        ensure_within_roots(placement.replaces, (root,))
+        ensure_within_roots(placement.replaces, library_mutation_roots(root))
     parked = _quarantine_replaced_copy(dest, root) if dest.exists() else None
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -468,7 +469,7 @@ def move_album_tree(
             effect()
 
     root = Path(library_root) if library_root else target_album_dir.parent.parent
-    ensure_within_roots(target_album_dir, (root,))
+    ensure_within_roots(target_album_dir, library_mutation_roots(root))
 
     if managed_track_names:
         apply(lambda: target_album_dir.mkdir(parents=True, exist_ok=True))

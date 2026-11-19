@@ -26,7 +26,11 @@ from crate.organizer import (
     preview_organize,
     suggest_folder_name,
 )
-from crate.storage_layout import UnsafeMutationPathError, ensure_within_roots
+from crate.storage_layout import (
+    UnsafeMutationPathError,
+    ensure_within_roots,
+    library_mutation_roots,
+)
 
 router = APIRouter(tags=["organizer"])
 
@@ -59,7 +63,7 @@ def _album_dir_or_404(album: dict) -> Path:
     lib = library_path()
     album_dir = album_directory(lib, album)
     try:
-        ensure_within_roots(album_dir, (lib,))
+        ensure_within_roots(album_dir, library_mutation_roots(lib))
     except UnsafeMutationPathError:
         raise HTTPException(status_code=404, detail="Not found")
     if not album_dir.is_dir():

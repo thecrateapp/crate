@@ -17,6 +17,7 @@ x-crate-env: &crate-env
   CRATE_CONFIG: /app/config.yaml
   DATA_DIR: /data
   CACHE_DIR: /cache
+  CRATE_LIBRARY_EXTRA_ROOTS: ${CRATE_LIBRARY_EXTRA_ROOTS:-}
   DOMAIN: ${DOMAIN:-localhost}
   CRATE_LISTEN_PUBLIC_BASE_URL: ${CRATE_LISTEN_PUBLIC_BASE_URL:-https://listen.${DOMAIN:-localhost}}
   CRATE_PUBLIC_API_BASE_URL: ${CRATE_PUBLIC_API_BASE_URL:-}

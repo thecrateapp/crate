@@ -38,6 +38,7 @@ from crate.release_track_matching import match_release_track
 from crate.storage_layout import (
     UnsafeMutationPathError,
     ensure_within_roots,
+    library_mutation_roots,
     looks_like_entity_uid,
     resolve_artist_dir,
 )
@@ -514,7 +515,7 @@ def _handle_reset_enrichment(task_id: str, params: dict, config: dict) -> dict:
         photo_path = artist_dir / photo
         if photo_path.exists():
             try:
-                ensure_within_roots(artist_dir, (lib,))
+                ensure_within_roots(artist_dir, library_mutation_roots(lib))
                 photo_path.unlink()
             except (OSError, UnsafeMutationPathError):
                 log.debug("Failed to delete photo %s", photo_path, exc_info=True)
@@ -959,7 +960,7 @@ def _reorganize_artist_folders(
     if not artist_dir or not artist_dir.is_dir():
         return
     try:
-        ensure_within_roots(artist_dir, (lib,))
+        ensure_within_roots(artist_dir, library_mutation_roots(lib))
     except UnsafeMutationPathError:
         log.warning("Skip folder reorganization outside the library: %s", artist_dir)
         return

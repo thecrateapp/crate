@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import shutil
 from collections.abc import Mapping
@@ -54,7 +55,11 @@ from crate.db.repositories.playlists_generation_state import (
     enqueue_system_playlist_generation,
 )
 from crate.db.repositories.tasks import create_task
-from crate.storage_layout import UnsafeMutationPathError, ensure_within_roots
+from crate.storage_layout import (
+    UnsafeMutationPathError,
+    ensure_within_roots,
+    library_mutation_roots,
+)
 from crate.task_progress import TaskProgress, emit_progress
 from crate.utils import PHOTO_NAMES
 from crate.worker_handlers import (
@@ -780,7 +785,7 @@ def _handle_delete_artist(task_id: str, params: dict, config: dict) -> dict:
     artist_dir = lib / folder
     if mode == "full":
         try:
-            ensure_within_roots(artist_dir, (lib,))
+            ensure_within_roots(artist_dir, library_mutation_roots(lib))
         except UnsafeMutationPathError as error:
             return {"error": str(error)}
 
@@ -826,7 +831,7 @@ def _handle_delete_album(task_id: str, params: dict, config: dict) -> dict:
     album_dir = Path(db_path) if db_path else lib / artist_name / album_name
     if mode == "full":
         try:
-            ensure_within_roots(album_dir, (lib,))
+            ensure_within_roots(album_dir, library_mutation_roots(lib))
         except UnsafeMutationPathError as error:
             return {"error": str(error)}
 
@@ -871,16 +876,7 @@ def _handle_delete_album(task_id: str, params: dict, config: dict) -> dict:
 
 
 def _resolve_library_track_path(lib: Path, track_path: str) -> tuple[Path, Path] | None:
-    if not track_path:
-        return None
-    source = Path(track_path)
-    if not source.is_absolute():
-        source = lib / source
-    try:
-        source_resolved = ensure_within_roots(source, (lib,))
-    except UnsafeMutationPathError:
-        return None
-    return source_resolved, source_resolved.relative_to(lib.resolve())
+    return _resolve_library_path(lib, track_path)
 
 
 def _crate_trash_root(lib: Path) -> Path:
@@ -893,11 +889,15 @@ def _resolve_library_path(lib: Path, raw_path: str) -> tuple[Path, Path] | None:
     path = Path(raw_path)
     if not path.is_absolute():
         path = lib / path
+    path = Path(os.path.normpath(path))
     try:
-        resolved = ensure_within_roots(path, (lib,))
+        resolved = ensure_within_roots(path, library_mutation_roots(lib))
     except UnsafeMutationPathError:
         return None
-    return resolved, resolved.relative_to(lib.resolve())
+    for candidate, base in ((path, lib), (resolved, lib.resolve())):
+        if candidate.is_relative_to(base):
+            return candidate, candidate.relative_to(base)
+    return None
 
 
 def _resolve_quarantined_track_path(
@@ -1686,8 +1686,8 @@ def _handle_move_album_to_artist(task_id: str, params: dict, config: dict) -> di
     target_artist_dir = lib / (target_artist_folder or target_artist_name)
     destination = target_artist_dir / source_dir.name
     try:
-        ensure_within_roots(target_artist_dir, (lib,))
-        ensure_within_roots(destination, (lib,))
+        ensure_within_roots(target_artist_dir, library_mutation_roots(lib))
+        ensure_within_roots(destination, library_mutation_roots(lib))
     except UnsafeMutationPathError as error:
         return {"error": str(error)}
     if destination.exists():
@@ -1758,7 +1758,7 @@ def _handle_organize_album(task_id: str, params: dict, config: dict) -> dict:
 
     album_dir = album_directory(lib, album)
     try:
-        ensure_within_roots(album_dir, (lib,))
+        ensure_within_roots(album_dir, library_mutation_roots(lib))
     except UnsafeMutationPathError as error:
         return {"error": str(error)}
     if not album_dir.is_dir():
@@ -1778,7 +1778,7 @@ def _handle_organize_album(task_id: str, params: dict, config: dict) -> dict:
             set(config.get("audio_extensions") or DEFAULT_AUDIO_EXTENSIONS),
             params.get("pattern"),
             params.get("rename_folder"),
-            roots=(lib,),
+            roots=library_mutation_roots(lib),
             on_track=report,
         )
     except UnsafeMutationPathError as error:
@@ -2009,8 +2009,8 @@ def _handle_move_artist(task_id: str, params: dict, config: dict) -> dict:
     old_dir = lib / folder
     new_dir = lib / new_name
     try:
-        ensure_within_roots(old_dir, (lib,))
-        ensure_within_roots(new_dir, (lib,))
+        ensure_within_roots(old_dir, library_mutation_roots(lib))
+        ensure_within_roots(new_dir, library_mutation_roots(lib))
     except UnsafeMutationPathError as error:
         return {"error": str(error)}
 
@@ -2281,7 +2281,7 @@ def _handle_resolve_duplicates(task_id: str, params: dict, config: dict) -> dict
     for path_str in remove_list:
         album_dir = lib / path_str
         try:
-            ensure_within_roots(album_dir, (lib,))
+            ensure_within_roots(album_dir, library_mutation_roots(lib))
         except UnsafeMutationPathError:
             log.warning("Skipping duplicate outside the library: %s", path_str)
             continue

@@ -34,7 +34,11 @@ from crate.db.repositories.library import (
 )
 from crate.db.repositories.library_quarantine import quarantine_album
 from crate.repair_catalog import REPAIR_CATALOG, REPAIR_CATALOG_BY_CHECK
-from crate.storage_layout import UnsafeMutationPathError, ensure_within_roots
+from crate.storage_layout import (
+    UnsafeMutationPathError,
+    ensure_within_roots,
+    library_mutation_roots,
+)
 from crate.worker_handlers.migration import _fix_artist, preview_fix_artist
 
 log = logging.getLogger(__name__)
@@ -60,7 +64,7 @@ class LibraryRepair:
 
     def _ensure_in_library(self, *paths: Path) -> None:
         for path in paths:
-            ensure_within_roots(path, (self.library_path,))
+            ensure_within_roots(path, library_mutation_roots(self.library_path))
 
     def _normalized_issues(
         self,

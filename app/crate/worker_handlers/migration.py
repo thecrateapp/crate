@@ -36,6 +36,7 @@ from crate.storage_layout import (
     UnsafeMutationPathError,
     ensure_within_roots,
     entity_uid_for,
+    library_mutation_roots,
     looks_like_entity_uid,
 )
 from crate.worker_handlers import TaskHandler, is_cancelled
@@ -93,8 +94,8 @@ def _migrate_album(
 
     target_album_dir = target_artist_dir / album_entity_uid
     try:
-        ensure_within_roots(old_album_path, (lib,))
-        ensure_within_roots(target_album_dir, (lib,))
+        ensure_within_roots(old_album_path, library_mutation_roots(lib))
+        ensure_within_roots(target_album_dir, library_mutation_roots(lib))
     except UnsafeMutationPathError as error:
         log.warning("Not migrating album %s: %s", album_id, error)
         return {"status": "error", "reason": "outside_library", "album_id": album_id}
@@ -144,7 +145,7 @@ def _migrate_album(
         new_track_path = target_album_dir / new_filename
 
         try:
-            ensure_within_roots(old_track_path, (lib,))
+            ensure_within_roots(old_track_path, library_mutation_roots(lib))
         except UnsafeMutationPathError:
             tracks_failed += 1
             log.warning(
@@ -208,7 +209,7 @@ def _rmdir_if_empty(path: Path, lib: Path):
     """Remove directory and empty parents up to 2 levels."""
     for _ in range(3):
         try:
-            ensure_within_roots(path, (lib,))
+            ensure_within_roots(path, library_mutation_roots(lib))
         except UnsafeMutationPathError:
             break
         if not path.is_dir():
@@ -226,7 +227,7 @@ def _rmtree_if_no_audio(path: Path, lib: Path):
     """Remove directory tree if it contains no audio files."""
     if not path.is_dir():
         return
-    ensure_within_roots(path, (lib,))
+    ensure_within_roots(path, library_mutation_roots(lib))
     has_audio = any(
         f.suffix.lower() in AUDIO_EXTS for f in path.rglob("*") if f.is_file()
     )
@@ -586,7 +587,7 @@ def _fix_artist(
     target_artist_dir = Path(str(preview.get("target_artist_dir")))
     candidate_dirs = [Path(path) for path in preview.get("candidate_dirs", [])]
     for path in (target_artist_dir, *candidate_dirs):
-        ensure_within_roots(path, (lib,))
+        ensure_within_roots(path, library_mutation_roots(lib))
 
     set_cache(f"processing:{artist_name.lower()}", True, ttl=3600)
 
@@ -729,7 +730,7 @@ def _migrate_artist(
     old_folder = artist.get("folder_name") or artist_name
     old_artist_dir = lib / old_folder
     for path in (target_artist_dir, old_artist_dir, lib / artist_name):
-        ensure_within_roots(path, (lib,))
+        ensure_within_roots(path, library_mutation_roots(lib))
 
     # Suppress the library watcher for this artist during migration
     set_cache(f"processing:{artist_name.lower()}", True, ttl=3600)
@@ -899,7 +900,7 @@ def _handle_migrate_storage_v2(task_id: str, params: dict, config: dict) -> dict
                     continue
                 # This is a legacy name-based directory
                 try:
-                    ensure_within_roots(item, (lib,))
+                    ensure_within_roots(item, library_mutation_roots(lib))
                 except UnsafeMutationPathError:
                     orphaned_dirs.append(item.name)
                     continue

@@ -32,7 +32,7 @@ from pathlib import Path
 from collections.abc import Iterable
 
 from crate.audio import read_tags
-from crate.storage_layout import ensure_within_roots
+from crate.storage_layout import ensure_within_roots, library_mutation_roots
 from crate.utils import AUDIO_EXTENSIONS
 
 log = logging.getLogger(__name__)
@@ -351,7 +351,7 @@ def apply_duplicate_resolution(
     if verdict.action == "delete_loose":
         result["fs_write"] = True
         if not dry_run:
-            ensure_within_roots(verdict.loose_dir, (library_root,))
+            ensure_within_roots(verdict.loose_dir, library_mutation_roots(library_root))
             shutil.rmtree(str(verdict.loose_dir))
             log.info("Deleted duplicate loose folder: %s", verdict.loose_dir)
             result["applied"] = True
@@ -362,8 +362,10 @@ def apply_duplicate_resolution(
         result["fs_write"] = True
         moved: list[str] = []
         if not dry_run:
-            ensure_within_roots(verdict.loose_dir, (library_root,))
-            ensure_within_roots(verdict.canonical_dir, (library_root,))
+            ensure_within_roots(verdict.loose_dir, library_mutation_roots(library_root))
+            ensure_within_roots(
+                verdict.canonical_dir, library_mutation_roots(library_root)
+            )
             # Copy each loose-only track into the canonical dir, then remove
             # the loose folder.
             loose_keys_only = verdict.comparison.loose_only
