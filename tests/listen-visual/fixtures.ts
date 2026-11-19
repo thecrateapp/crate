@@ -881,6 +881,16 @@ function responseFor(pathname: string): unknown {
   ) {
     return { total: 0, items: [] };
   }
+  if (pathname === "/api/me/export") {
+    return { export: null };
+  }
+  if (pathname === "/api/me/account/deletion") {
+    return {
+      requires_password: true,
+      recent_sign_in: false,
+      recent_sign_in_window_seconds: 600,
+    };
+  }
   throw new Error(`Unhandled JSON API fixture: ${pathname}`);
 }
 
