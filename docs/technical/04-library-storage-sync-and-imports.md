@@ -224,6 +224,13 @@ The scanner/fixer stack is configured in [app/config.yaml](https://github.com/th
 
 These tools let Crate act not just as an indexer, but as an opinionated library maintenance system.
 
+The organizer preview (`GET /api/organize/albums/{album_id}/preview`) only reads files. Applying it
+(`POST /api/organize/albums/{album_id}/apply`) queues a `library_album_organize` task, deduplicated
+per album, and returns its `task_id`; the API never renames files itself because it mounts `/music`
+read-only. The worker reads the album folder from the database, refuses the library root and any
+path that resolves outside the allowed library roots, renames the tracks (and optionally the
+folder) and reports per-track progress and the result through the task.
+
 ## Storage migration
 
 Storage migration is a first-class background capability:

@@ -2,10 +2,16 @@
 
 import logging
 import re
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-
+from typing import Any
 
 from crate.audio import get_audio_files, read_tags
+from crate.storage_layout import (
+    UnsafeMutationPathError,
+    ensure_within_roots,
+    resolve_album_dir,
+)
 
 log = logging.getLogger(__name__)
 
@@ -16,6 +22,13 @@ PRESETS = {
 }
 
 DEFAULT_PATTERN = PRESETS["standard"]
+
+
+def album_directory(library_root: Path, album: Mapping[str, Any]) -> Path:
+    stored = resolve_album_dir(library_root, album)
+    if stored is not None:
+        return stored if stored.is_absolute() else library_root / stored
+    return library_root / str(album.get("artist") or "") / str(album.get("name") or "")
 
 
 def preview_organize(
@@ -54,14 +67,21 @@ def organize_album(
     extensions: set[str],
     pattern: str | None = None,
     rename_folder: str | None = None,
+    *,
+    roots: Iterable[str | Path],
+    on_track: Callable[[int, int, str], None] | None = None,
 ) -> dict:
     """Rename tracks in an album according to pattern. Optionally rename album folder."""
+    allowed_roots = tuple(roots)
+    ensure_within_roots(album_dir, allowed_roots)
     pattern = pattern or DEFAULT_PATTERN
     tracks = get_audio_files(album_dir, extensions)
     renamed = 0
     errors = []
 
-    for track in tracks:
+    for index, track in enumerate(tracks, start=1):
+        if on_track:
+            on_track(index, len(tracks), track.name)
         tags = read_tags(track)
         new_name = _format_filename(pattern, tags, track)
         new_name = _sanitize(new_name) + track.suffix.lower()
@@ -70,6 +90,12 @@ def organize_album(
             continue
 
         new_path = track.parent / new_name
+        try:
+            ensure_within_roots(track, allowed_roots)
+            ensure_within_roots(new_path, allowed_roots)
+        except UnsafeMutationPathError as e:
+            errors.append({"file": track.name, "error": str(e)})
+            continue
         if new_path.exists() and new_path != track:
             errors.append({"file": track.name, "error": f"Target exists: {new_name}"})
             continue
@@ -84,6 +110,11 @@ def organize_album(
 
     if rename_folder and rename_folder != album_dir.name:
         new_dir = album_dir.parent / _sanitize(rename_folder)
+        try:
+            ensure_within_roots(new_dir, allowed_roots)
+        except UnsafeMutationPathError as e:
+            result["folder_error"] = str(e)
+            return result
         if new_dir.exists() and new_dir != album_dir:
             result["folder_error"] = f"Target folder exists: {rename_folder}"
         else:

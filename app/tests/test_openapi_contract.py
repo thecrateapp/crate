@@ -973,7 +973,7 @@ def test_openapi_types_imports_organizer_and_stack_routes(test_app):
     ]["anyOf"][0]["$ref"].endswith("/OrganizeApplyRequest")
     assert organize_apply_operation["responses"]["200"]["content"]["application/json"][
         "schema"
-    ]["$ref"].endswith("/OrganizeApplyResponse")
+    ]["$ref"].endswith("/TaskEnqueueResponse")
 
     assert stack_status_operation["security"] == [
         {"cookieAuth": []},

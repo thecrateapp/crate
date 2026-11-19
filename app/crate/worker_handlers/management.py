@@ -1747,6 +1747,74 @@ def _handle_move_album_to_artist(task_id: str, params: dict, config: dict) -> di
     }
 
 
+def _handle_organize_album(task_id: str, params: dict, config: dict) -> dict:
+    from crate.organizer import album_directory, organize_album
+
+    lib = Path(config["library_path"])
+    album_id = params.get("album_id")
+    album = get_library_album_by_id(int(album_id)) if album_id else None
+    if not album:
+        return {"error": "Album not found"}
+
+    album_dir = album_directory(lib, album)
+    try:
+        ensure_within_roots(album_dir, (lib,))
+    except UnsafeMutationPathError as error:
+        return {"error": str(error)}
+    if not album_dir.is_dir():
+        return {"error": f"Album directory not found: {album_dir}"}
+
+    progress = TaskProgress(phase="organize", phase_count=1)
+
+    def report(done: int, total: int, item: str) -> None:
+        progress.done = done
+        progress.total = total
+        progress.item = item
+        emit_progress(task_id, progress)
+
+    try:
+        result = organize_album(
+            album_dir,
+            set(config.get("audio_extensions") or DEFAULT_AUDIO_EXTENSIONS),
+            params.get("pattern"),
+            params.get("rename_folder"),
+            roots=(lib,),
+            on_track=report,
+        )
+    except UnsafeMutationPathError as error:
+        return {"error": str(error)}
+
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": (
+                f"Renamed {result['renamed_tracks']} of {result['total']} tracks: "
+                f"{album.get('artist')}/{album.get('name')}"
+            ),
+            "errors": len(result["errors"]),
+        },
+    )
+    log_audit(
+        "organize_album",
+        "album",
+        f"{album.get('artist')}/{album.get('name')}",
+        details={
+            "album_id": album.get("id"),
+            "album_entity_uid": album.get("entity_uid"),
+            "path": str(album_dir),
+            "pattern": params.get("pattern"),
+            "rename_folder": params.get("rename_folder"),
+            "renamed_tracks": result["renamed_tracks"],
+            "folder_renamed": result.get("folder_renamed"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation({"album_id": album.get("id")})
+    return {**result, "album_id": album.get("id")}
+
+
 def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
     lib = Path(config["library_path"])
     source_artist_id = params.get("source_artist_id")
@@ -2918,6 +2986,7 @@ MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     ),
     "library_track_move": _handle_move_track,
     "library_album_move_to_artist": _handle_move_album_to_artist,
+    "library_album_organize": _handle_organize_album,
     "library_album_merge": _handle_merge_album,
     "library_album_split": _handle_split_album,
     "library_artist_merge": _handle_merge_artist,
