@@ -410,7 +410,7 @@ USER_DATA_EXPORT_SECTIONS: tuple[tuple[str, str], ...] = (
     ),
 )
 
-_SECTION_SQL = dict(USER_DATA_EXPORT_SECTIONS)
+_SECTION_SQL: dict[str, str] = dict(USER_DATA_EXPORT_SECTIONS)
 
 
 def iter_user_data_export_rows(
