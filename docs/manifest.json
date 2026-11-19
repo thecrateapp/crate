@@ -516,7 +516,7 @@
     "route": "/reference/crate-decks",
     "section": "reference",
     "title": "Crate Decks server contract",
-    "summary": "What the server offers the Crate Decks desktop DJ client - session, capabilities and the fields it relies on.",
+    "summary": "What the server offers the Crate Decks desktop DJ client - session, capabilities, synchronised cues and the fields it relies on.",
     "keywords": [
       "crate decks",
       "mixxx",
