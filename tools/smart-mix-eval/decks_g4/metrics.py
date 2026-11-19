@@ -165,16 +165,16 @@ def measure_decks(run: Path, beat_model: Any, voice_model: Any, ffmpeg: str) -> 
     report_duration = report["durationMs"] if report.get("mixed") else duration
     progress = (centres - start) * rate1 / max(report_duration, 1.0)
     within = (centres >= start) & (centres < end)
+    incoming_db = float(report.get("incomingStagingDb", min(0.0, plan.incoming_gain_db)))
     fade_gain = {}
     for index, role in ((1, 0), (2, 1)):
         applied = at(f"xfGain{index}") * at(f"pregain{index}")
         if report.get("mixed"):
             staging = np.asarray(
                 [
-                    # The director only attenuates (curves::stagingGain)
-                    staging_gains(
-                        float(p), min(0.0, plan.outgoing_gain_db), min(0.0, plan.incoming_gain_db)
-                    )[role]
+                    # The director only attenuates (curves::stagingGain), and with
+                    # ReplayGain stages the incoming deck's residual (G4 finding 3)
+                    staging_gains(float(p), min(0.0, plan.outgoing_gain_db), incoming_db)[role]
                     for p in progress
                 ]
             )
