@@ -2669,24 +2669,6 @@ def test_artist_enrich_rejects_regular_user():
     assert exc.value.status_code == 403
 
 
-def test_organizer_presets_allow_metadata_editor_without_admin_access():
-    from crate.api.organizer import api_organize_presets
-    from crate.organizer import PRESETS
-
-    response = api_organize_presets(_request_for("editor"))  # type: ignore[arg-type]
-
-    assert response == PRESETS
-
-
-def test_organizer_presets_reject_regular_user():
-    from crate.api.organizer import api_organize_presets
-
-    with pytest.raises(HTTPException) as exc:
-        api_organize_presets(_request_for("user"))  # type: ignore[arg-type]
-
-    assert exc.value.status_code == 403
-
-
 def test_batch_retag_allows_metadata_editor_without_admin_access(monkeypatch):
     from crate.api.batch import api_batch_retag
     from crate.api.schemas.operations import BatchAlbumItem, BatchRetagRequest

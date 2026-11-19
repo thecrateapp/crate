@@ -138,11 +138,6 @@ _TAG_METADATA = [
         "description": "Library scan status and issue fixing.",
     },
     {
-        "name": "organizer",
-        "x-displayName": "File Organizer",
-        "description": "File-organization preview and apply workflows.",
-    },
-    {
         "name": "matcher",
         "x-displayName": "Album Matching",
         "description": "Album matching and metadata assistance.",
@@ -250,7 +245,6 @@ _TAG_GROUPS = [
             "metadata",
             "imports",
             "scanner",
-            "organizer",
             "matcher",
             "duplicates",
             "batch",
@@ -371,7 +365,6 @@ _AUTH_REQUIRED_PREFIXES = frozenset(
         "/api/acquisition",
         "/api/tidal",
         "/api/imports",
-        "/api/organize",
         "/api/stack",
         "/api/events",
         "/api/lyrics",

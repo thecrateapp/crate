@@ -1038,7 +1038,6 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "library_quarantined_tracks_hard_delete_all",
             "library_track_move",
             "library_album_move_to_artist",
-            "library_album_organize",
             "library_album_merge",
             "library_album_split",
             "library_artist_merge",

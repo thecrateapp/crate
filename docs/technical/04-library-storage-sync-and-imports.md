@@ -46,7 +46,7 @@ This file is mounted into API and worker and is the root of several behaviors:
 
 ### Mutation roots and folders on another disk
 
-Workers check every destructive library operation (delete, move, merge, split, organize, storage
+Workers check every destructive library operation (delete, move, merge, split, storage
 migration, repair) with `ensure_within_roots()` in `app/crate/storage_layout.py`. The path is
 resolved, symlinks included, and must sit strictly inside an allowed root; the root itself is
 always refused. By default the only library root is `library_path`, so an artist or album folder
@@ -255,11 +255,10 @@ Acquisition code does several important normalization steps:
 
 This is especially important for artist names that would otherwise create hidden directories or invalid paths.
 
-## Organizer and repair layer
+## Repair layer
 
 Beyond sync, Crate contains maintenance tooling for library shape:
 
-- organizer logic
 - duplicate detection
 - naming checks
 - incomplete albums
@@ -269,17 +268,10 @@ Beyond sync, Crate contains maintenance tooling for library shape:
 The scanner/fixer stack is configured in [app/config.yaml](https://github.com/thecrateapp/crate/blob/main/app/config.yaml) and implemented across:
 
 - `https://github.com/thecrateapp/crate/blob/main/app/crate/scanners`
-- organizer and repair modules
+- repair modules
 - related worker handlers
 
 These tools let Crate act not just as an indexer, but as an opinionated library maintenance system.
-
-The organizer preview (`GET /api/organize/albums/{album_id}/preview`) only reads files. Applying it
-(`POST /api/organize/albums/{album_id}/apply`) queues a `library_album_organize` task, deduplicated
-per album, and returns its `task_id`; the API never renames files itself because it mounts `/music`
-read-only. The worker reads the album folder from the database, refuses the library root and any
-path that resolves outside the allowed library roots, renames the tracks (and optionally the
-folder) and reports per-track progress and the result through the task.
 
 ## Storage migration
 

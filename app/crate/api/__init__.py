@@ -362,7 +362,6 @@ def create_app() -> FastAPI:
                 "metadata",
                 "imports",
                 "scanner",
-                "organizer",
                 "matcher",
                 "duplicates",
                 "batch",
@@ -487,7 +486,6 @@ def create_app() -> FastAPI:
     from crate.api.matcher import router as matcher_router
     from crate.api.duplicates import router as duplicates_router
     from crate.api.artwork import router as artwork_router
-    from crate.api.organizer import router as organizer_router
     from crate.api.imports import router as imports_router
     from crate.api.batch import router as batch_router
     from crate.api.analytics import router as analytics_router
@@ -611,7 +609,6 @@ def create_app() -> FastAPI:
     app.include_router(artist_research_router)
     app.include_router(browse_router)
     app.include_router(tags_router)
-    app.include_router(organizer_router)
     app.include_router(imports_router)
     app.include_router(batch_router)
     app.include_router(events_router)

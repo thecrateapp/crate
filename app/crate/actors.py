@@ -126,7 +126,6 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "library_quarantined_tracks_hard_delete_all": TaskPoolConfig("default", 0, 1800, 0),
     "library_track_move": TaskPoolConfig("default", 0, 300, 0),
     "library_album_move_to_artist": TaskPoolConfig("default", 0, 600, 0),
-    "library_album_organize": TaskPoolConfig("default", 0, 300, 0),
     "library_album_merge": TaskPoolConfig("default", 0, 600, 0),
     "library_album_split": TaskPoolConfig("default", 0, 600, 0),
     "library_artist_merge": TaskPoolConfig("default", 0, 900, 0),

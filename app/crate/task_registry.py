@@ -91,7 +91,6 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     ),
     "library_track_move": TaskTypeInfo("Move Track", "library"),
     "library_album_move_to_artist": TaskTypeInfo("Move Album to Artist", "library"),
-    "library_album_organize": TaskTypeInfo("Organize Album Files", "library"),
     "library_album_merge": TaskTypeInfo("Merge Albums", "library"),
     "library_album_split": TaskTypeInfo("Split Album", "library"),
     "library_artist_merge": TaskTypeInfo("Merge Artists", "library"),
