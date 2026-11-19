@@ -1,6 +1,8 @@
 import json
+import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -167,3 +169,89 @@ def test_decks_library_routes_stay_on_fastapi():
 
     server = (ROOT / "app/readplane/internal/routes/server.go").read_text()
     assert '"/api/decks' not in server
+
+
+# ---------------------------------------------------------------------------
+# Production and home Traefik: every readplane router matches read methods only.
+#
+# The readplane never answers a mutation natively (app/readplane/AGENTS.md
+# "Hard rules"), so no `crate-readplane-*` router may match POST/PUT/PATCH/DELETE
+# in any form. These guards parse every `Method(...)` matcher of the rule.
+# ---------------------------------------------------------------------------
+
+_COMPOSE_FILES = ("docker-compose.yaml", "docker-compose.home.yaml")
+_READPLANE_ROUTERS = ("interactive", "sse", "stream")
+_READ_METHODS = frozenset({"GET", "HEAD"})
+_TRAEFIK_METHOD_MATCHER = re.compile(r"\bMethod\s*\(([^)]*)\)", re.IGNORECASE)
+_TRAEFIK_QUOTED_ARGUMENT = re.compile(r"[`\"']([^`\"']*)[`\"']")
+
+
+def _readplane_router_rules(compose_name: str) -> dict[str, str]:
+    compose = yaml.safe_load((ROOT / compose_name).read_text())
+    labels = compose["services"]["crate-readplane"]["labels"]
+    return {
+        router: labels[f"traefik.http.routers.crate-readplane-{router}.rule"]
+        for router in _READPLANE_ROUTERS
+    }
+
+
+def _traefik_rule_methods(rule: str) -> set[str]:
+    """Union of the methods named by every ``Method(...)`` matcher of ``rule``."""
+    methods: set[str] = set()
+    for matcher in _TRAEFIK_METHOD_MATCHER.finditer(rule):
+        arguments = _TRAEFIK_QUOTED_ARGUMENT.findall(matcher.group(1))
+        assert arguments, f"Method matcher without arguments: {matcher.group(0)!r}"
+        methods.update(argument.strip().upper() for argument in arguments)
+    return methods
+
+
+def _assert_traefik_rule_read_only(rule: str, where: str) -> None:
+    """R3: the rule names GET and only methods from {GET, HEAD}."""
+    methods = _traefik_rule_methods(rule)
+    assert methods, f"{where}: no Method matcher, every method would be routed"
+    assert "GET" in methods, f"{where}: GET is not matched ({sorted(methods)})"
+    forbidden = methods - _READ_METHODS
+    assert not forbidden, f"{where}: non read-only methods {sorted(forbidden)}"
+
+
+@pytest.mark.parametrize("compose_name", _COMPOSE_FILES)
+def test_traefik_readplane_routers_match_only_read_methods(compose_name):
+    rules = _readplane_router_rules(compose_name)
+
+    for router, rule in rules.items():
+        _assert_traefik_rule_read_only(rule, f"{compose_name} crate-readplane-{router}")
+
+    assert _traefik_rule_methods(rules["interactive"]) == {"GET", "HEAD"}
+    assert _traefik_rule_methods(rules["sse"]) == {"GET"}
+    assert _traefik_rule_methods(rules["stream"]) == {"GET", "HEAD"}
+
+
+_TRAEFIK_MUTATIONS = {
+    "appended-post": lambda rule: rule + " || Method(`POST`)",
+    "v2-list-post": lambda rule: rule.replace("Method(`GET`)", "Method(`GET`, `POST`)", 1),
+    "lowercase-put": lambda rule: rule.replace("Method(`GET`)", "method(`get`, `put`)", 1),
+    "whitespace-patch": lambda rule: rule.replace(
+        "Method(`GET`)", "Method( `GET` ,  `PATCH` )", 1
+    ),
+    "delete-only": lambda rule: rule.replace("Method(`GET`)", "Method(`DELETE`)", 1),
+    "double-quoted-post": lambda rule: rule.replace(
+        "Method(`GET`)", 'Method("POST") || Method(`GET`)', 1
+    ),
+    "head-only": lambda rule: rule.replace("Method(`GET`)", "Method(`HEAD`)", 1),
+    "no-method": lambda rule: _TRAEFIK_METHOD_MATCHER.sub("PathPrefix(`/`)", rule),
+}
+
+
+@pytest.mark.parametrize("compose_name", _COMPOSE_FILES)
+@pytest.mark.parametrize("router", _READPLANE_ROUTERS)
+@pytest.mark.parametrize("mutation", sorted(_TRAEFIK_MUTATIONS))
+def test_traefik_method_guard_rejects_mutated_readplane_rules(
+    compose_name, router, mutation
+):
+    # R4: in-memory mutated copies of the real router rules are rejected.
+    rule = _readplane_router_rules(compose_name)[router]
+    mutated = _TRAEFIK_MUTATIONS[mutation](rule)
+    assert mutated != rule
+
+    with pytest.raises(AssertionError):
+        _assert_traefik_rule_read_only(mutated, f"{compose_name} {router} {mutation}")
