@@ -186,12 +186,13 @@ COOKIE_NAME_LISTEN_REFRESH = "crate_refresh_listen"
 FORWARD_AUTH_SECRET_HEADER = "X-Forward-Auth-Secret"
 _LOGIN_FAILURE_PREFIX = "crate:auth:login_failures"
 _OAUTH_INVITE_PREFIX = "crate:auth:oauth_invite"
-_OAUTH_INVITE_TTL_SECONDS = 900
+_OAUTH_VERIFIER_PREFIX = "crate:auth:oauth_verifier"
+_OAUTH_PENDING_TTL_SECONDS = 900
 _OAUTH_STATE_KEY_CONTEXT = b"crate:oauth-state:v1"
 _login_failure_memory: dict[str, tuple[int, datetime]] = {}
-_oauth_invite_memory: dict[str, tuple[str, datetime]] = {}
+_oauth_pending_memory: dict[str, tuple[str, datetime]] = {}
 _login_failure_lock = RLock()
-_oauth_invite_lock = RLock()
+_oauth_pending_lock = RLock()
 
 
 _ENTITY_SEGMENT = r"[^/]+"
@@ -1275,7 +1276,8 @@ def _build_oauth_state(
     native_code_challenge: str | None = None,
     native_state: str | None = None,
     session_id: str | None = None,
-) -> str:
+) -> tuple[str, str]:
+    nonce = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(48)
     invite_key = None
     if invite_token:
@@ -1291,52 +1293,78 @@ def _build_oauth_state(
         "native_code_challenge": native_code_challenge,
         "native_state": native_state,
         "session_id": session_id,
-        "verifier": verifier,
+        "nonce": nonce,
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
     }
-    return jwt.encode(payload, _oauth_state_secret(), algorithm="HS256")
+    state = jwt.encode(payload, _oauth_state_secret(), algorithm="HS256")
+    _store_oauth_verifier(nonce, verifier)
+    return state, verifier
+
+
+def _store_oauth_pending(prefix: str, key: str, value: str) -> None:
+    redis_key = f"{prefix}:{key}"
+    try:
+        r = _get_rate_limit_redis()
+        if r is not None:
+            r.setex(redis_key, _OAUTH_PENDING_TTL_SECONDS, value)
+            return
+    except Exception:
+        log.warning("Failed to store pending OAuth data in Redis", exc_info=True)
+    now = datetime.now(timezone.utc)
+    with _oauth_pending_lock:
+        for expired_key in [
+            k
+            for k, (_, expires_at) in _oauth_pending_memory.items()
+            if expires_at <= now
+        ]:
+            del _oauth_pending_memory[expired_key]
+        _oauth_pending_memory[redis_key] = (
+            value,
+            now + timedelta(seconds=_OAUTH_PENDING_TTL_SECONDS),
+        )
+
+
+def _take_oauth_pending(prefix: str, key: str | None) -> str | None:
+    if not key:
+        return None
+    redis_key = f"{prefix}:{key}"
+    try:
+        r = _get_rate_limit_redis()
+        if r is not None:
+            value = r.getdel(redis_key)
+            if value:
+                if isinstance(value, bytes):
+                    return value.decode("utf-8")
+                return str(value)
+    except Exception:
+        log.warning("Failed to read pending OAuth data from Redis", exc_info=True)
+    with _oauth_pending_lock:
+        record = _oauth_pending_memory.pop(redis_key, None)
+    if not record:
+        return None
+    value, expires_at = record
+    if expires_at <= datetime.now(timezone.utc):
+        return None
+    return value
 
 
 def _store_oauth_invite_token(key: str, token: str) -> None:
     """Store an invite token server-side so it never appears in OAuth redirect URLs."""
-    expires_at = datetime.now(timezone.utc) + timedelta(
-        seconds=_OAUTH_INVITE_TTL_SECONDS
-    )
-    try:
-        r = _get_rate_limit_redis()
-        if r is not None:
-            r.setex(f"{_OAUTH_INVITE_PREFIX}:{key}", _OAUTH_INVITE_TTL_SECONDS, token)
-            return
-    except Exception:
-        log.warning("Failed to store OAuth invite token in Redis", exc_info=True)
-    with _oauth_invite_lock:
-        _oauth_invite_memory[key] = (token, expires_at)
+    _store_oauth_pending(_OAUTH_INVITE_PREFIX, key, token)
 
 
 def _retrieve_oauth_invite_token(key: str | None) -> str | None:
     """Retrieve an invite token stored server-side during OAuth flow."""
-    if not key:
-        return None
-    try:
-        r = _get_rate_limit_redis()
-        if r is not None:
-            token = r.get(f"{_OAUTH_INVITE_PREFIX}:{key}")
-            if token:
-                r.delete(f"{_OAUTH_INVITE_PREFIX}:{key}")
-                if isinstance(token, bytes):
-                    return token.decode("utf-8")
-                return str(token)
-    except Exception:
-        log.warning("Failed to retrieve OAuth invite token from Redis", exc_info=True)
-    with _oauth_invite_lock:
-        token_record = _oauth_invite_memory.pop(key, None)
-    if not token_record:
-        return None
-    token, expires_at = token_record
-    if expires_at <= datetime.now(timezone.utc):
-        return None
-    return token
+    return _take_oauth_pending(_OAUTH_INVITE_PREFIX, key)
+
+
+def _store_oauth_verifier(nonce: str, verifier: str) -> None:
+    _store_oauth_pending(_OAUTH_VERIFIER_PREFIX, nonce, verifier)
+
+
+def _take_oauth_verifier(nonce: str | None) -> str | None:
+    return _take_oauth_pending(_OAUTH_VERIFIER_PREFIX, nonce)
 
 
 def _oauth_state_secret() -> bytes:
@@ -2591,7 +2619,7 @@ def _oauth_start_response(
             challenge=body.native_code_challenge,
             state=body.native_state,
         )
-    state = _build_oauth_state(
+    state, verifier = _build_oauth_state(
         provider=provider,
         return_to=body.return_to,
         mode=mode,
@@ -2602,8 +2630,6 @@ def _oauth_start_response(
         native_state=body.native_state if native_exchange else None,
         session_id=session_id if mode == "native_link" else None,
     )
-    parsed_state = _parse_oauth_state(state)
-    verifier = parsed_state["verifier"]
     common_params = {
         "redirect_uri": _oauth_callback_url(provider, body.return_to, app_id=app_id),
         "response_type": "code",
@@ -2776,7 +2802,10 @@ def oauth_callback(
     redirect_uri = _oauth_callback_url(
         provider, parsed_state.get("return_to"), app_id=app_id
     )
-    verifier = parsed_state["verifier"]
+    verifier = _take_oauth_verifier(parsed_state.get("nonce"))
+    if not verifier:
+        _record_failed_login(rate_key, request)
+        raise HTTPException(status_code=400, detail="OAuth state expired or reused")
     try:
         external_payload = (
             _google_userinfo(code, redirect_uri, verifier)

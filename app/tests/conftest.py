@@ -373,6 +373,16 @@ def test_app(monkeypatch):
         yield client
 
 
+@pytest.fixture
+def pending_oauth_verifier(monkeypatch):
+    from crate.api import auth
+
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    auth._store_oauth_verifier("oauth-nonce", "provider-verifier")
+    yield "provider-verifier"
+    auth._take_oauth_verifier("oauth-nonce")
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--benchmark",
