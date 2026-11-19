@@ -1,12 +1,12 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 9294,
-  "vitest": 7396,
-  "goTests": 436,
-  "rustTests": 371,
-  "taskTypes": 171,
-  "migrations": 165,
+  "pytest": 9616,
+  "vitest": 7565,
+  "goTests": 441,
+  "rustTests": 459,
+  "taskTypes": 173,
+  "migrations": 168,
   "taskQueues": {
     "ai": [
       "ai_catalog_refresh",
@@ -67,7 +67,8 @@
       "bandcamp_withdraw_contribution",
       "bandcamp_cleanup_user_contributions",
       "cleanup_incomplete_downloads",
-      "crate_download"
+      "crate_download",
+      "export_user_data"
     ],
     "fast": [
       "fetch_cover",
@@ -181,7 +182,8 @@
       "compute_completeness",
       "warmup_stream_variants",
       "cleanup_stream_variants",
-      "refresh_system_smart_playlists"
+      "refresh_system_smart_playlists",
+      "cleanup_user_data_exports"
     ],
     "heavy": [
       "generate_cast_spectrum",
