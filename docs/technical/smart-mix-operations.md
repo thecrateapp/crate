@@ -383,7 +383,8 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   them on the right beat (86 against 65). The analysis image fetches the checkpoint and
   the licence in its `beat-this-weights` stage, checks their sha256 and bakes them in as
   `/app/models/beat_this-small0.ckpt` and `/app/models/beat_this.LICENSE`; `beat-this` is
-  installed next to torch against the installed version (`requirements-beat-this.txt`).
+  pinned with torch in `requirements-beat-this.in` and installed from its hashed lock
+  (`requirements-beat-this.txt`).
   `CRATE_BEAT_THIS_CHECKPOINT` names the checkpoint (`final0` needs the build arguments
   documented in the Dockerfile) and `CRATE_BEAT_THIS_WEIGHTS` overrides the path. Nothing is
   downloaded at run time. `small0` stays: its raw downbeats agree with All-In-One as often

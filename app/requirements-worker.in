@@ -1,0 +1,2 @@
+-r requirements-worker-core.in
+-r requirements-worker-analysis.in

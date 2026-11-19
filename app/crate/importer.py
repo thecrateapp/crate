@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Lock
 
 from crate.audio import get_audio_files, read_tags
+from crate.storage_layout import ensure_within_roots
 from crate.storage_import import (
     DEFAULT_AUDIO_EXTENSIONS,
     ManagedTrackPlacement,
@@ -197,6 +198,7 @@ class ImportQueue:
     def remove_source(self, source_path: str) -> bool:
         """Remove imported source directory."""
         src = Path(source_path)
+        ensure_within_roots(src, [source["path"] for source in self.sources])
         if not src.exists():
             return False
         shutil.rmtree(str(src))

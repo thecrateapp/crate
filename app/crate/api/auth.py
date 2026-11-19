@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import hmac
 import logging
 import os
 import re
@@ -21,6 +22,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from crate.api import native_oauth_auth
 from crate.api.auth_dependencies import require_auth as _require_auth
+from crate.api.native_auth_store import local_memory_allowed
 from crate.api.native_oauth import (
     InvalidNativeOAuthHandoff,
     NativeOAuthCompletionUnknown,
@@ -113,6 +115,7 @@ from crate.api.schemas.auth import (
 )
 from crate.api.schemas.common import OkResponse
 from crate.auth import (
+    _get_jwt_secret,
     JWT_EXPIRY_HOURS,
     LISTEN_ACCESS_TOKEN_EXPIRY_HOURS,
     LISTEN_REFRESH_TOKEN_EXPIRY_DAYS,
@@ -154,6 +157,7 @@ from crate.db.repositories.auth import (
     update_user_status,
     upsert_user_external_identity,
 )
+from crate.db.repositories.access_tokens import revoke_user_access_tokens
 from crate.db.repositories.auth_identities import link_oauth_user_identity
 from crate.db.repositories.library_contributions import list_user_album_contributions
 from crate.db.instance_stats_dashboard_surface import (
@@ -170,6 +174,7 @@ from crate.user_avatars import (
     is_proxyable_avatar_url,
 )
 from crate.config import vdj_enabled
+from crate.user_data_export import USER_DATA_EXPORT_CLEANUP_TASK_TYPE
 
 log = logging.getLogger(__name__)
 
@@ -182,11 +187,13 @@ COOKIE_NAME_LISTEN_REFRESH = "crate_refresh_listen"
 FORWARD_AUTH_SECRET_HEADER = "X-Forward-Auth-Secret"
 _LOGIN_FAILURE_PREFIX = "crate:auth:login_failures"
 _OAUTH_INVITE_PREFIX = "crate:auth:oauth_invite"
-_OAUTH_INVITE_TTL_SECONDS = 900
+_OAUTH_VERIFIER_PREFIX = "crate:auth:oauth_verifier"
+_OAUTH_PENDING_TTL_SECONDS = 900
+_OAUTH_STATE_KEY_CONTEXT = b"crate:oauth-state:v1"
 _login_failure_memory: dict[str, tuple[int, datetime]] = {}
-_oauth_invite_memory: dict[str, tuple[str, datetime]] = {}
+_oauth_pending_memory: dict[str, tuple[str, datetime]] = {}
 _login_failure_lock = RLock()
-_oauth_invite_lock = RLock()
+_oauth_pending_lock = RLock()
 
 
 _ENTITY_SEGMENT = r"[^/]+"
@@ -639,17 +646,13 @@ def _is_secure() -> bool:
     return domain != "localhost"
 
 
-def _cookie_samesite(secure: bool | None = None) -> Literal["lax", "strict", "none"]:
-    override = os.environ.get("CRATE_AUTH_COOKIE_SAMESITE")
-    if override:
-        normalized = override.strip().lower()
-        if normalized == "lax":
-            return "lax"
-        if normalized == "strict":
-            return "strict"
-        if normalized == "none":
-            return "none"
-    return "none" if (_is_secure() if secure is None else secure) else "lax"
+def _cookie_samesite() -> Literal["lax", "strict", "none"]:
+    override = (os.environ.get("CRATE_AUTH_COOKIE_SAMESITE") or "").strip().lower()
+    if override == "strict":
+        return "strict"
+    if override == "none":
+        return "none"
+    return "lax"
 
 
 _LOCAL_COOKIE_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
@@ -697,7 +700,7 @@ def _cookie_attributes(request: Request | None) -> _CookieAttributes:
         }
 
     secure = _request_is_https(request)
-    samesite = _cookie_samesite(secure)
+    samesite = _cookie_samesite()
     if samesite == "none" and not secure:
         samesite = "lax"
     return {"secure": secure, "samesite": samesite, "domain": None}
@@ -887,13 +890,8 @@ def _ensure_role_change_is_safe(
         )
 
 
-def _ensure_status_change_is_safe(actor: dict, target: dict, next_status: str) -> None:
-    current_status = _user_status(target)
-    if current_status == next_status:
-        return
-    if actor.get("id") == target.get("id") and next_status != "active":
-        raise HTTPException(status_code=400, detail="Cannot disable your own account")
-    if next_status == "active" or not _is_active_admin_capable(target):
+def _ensure_admin_remains(target: dict, *, status_code: int = 400) -> None:
+    if not _is_active_admin_capable(target):
         return
     remaining_admins = [
         user
@@ -902,8 +900,19 @@ def _ensure_status_change_is_safe(actor: dict, target: dict, next_status: str) -
     ]
     if not remaining_admins:
         raise HTTPException(
-            status_code=400, detail="At least one owner or admin must remain"
+            status_code=status_code, detail="At least one owner or admin must remain"
         )
+
+
+def _ensure_status_change_is_safe(actor: dict, target: dict, next_status: str) -> None:
+    current_status = _user_status(target)
+    if current_status == next_status:
+        return
+    if actor.get("id") == target.get("id") and next_status != "active":
+        raise HTTPException(status_code=400, detail="Cannot disable your own account")
+    if next_status == "active":
+        return
+    _ensure_admin_remains(target)
 
 
 def _invalidate_auth_user(user_id: int) -> None:
@@ -928,6 +937,53 @@ def _revoke_user_sessions(user_id: int, current_session_id: str | None = None) -
     for session_id in open_session_ids:
         _invalidate_auth_session(session_id)
     return revoked
+
+
+def _revoke_user_credentials(user_id: int) -> dict[str, int]:
+    from crate.subsonic.auth import revoke_user_credential
+
+    return {
+        "sessions": _revoke_user_sessions(user_id, None),
+        "access_tokens": revoke_user_access_tokens(user_id),
+        "subsonic": int(revoke_user_credential(user_id)),
+    }
+
+
+def _delete_user_account(
+    actor: dict, target: dict, *, source: str, reason: str
+) -> dict | None:
+    user_id = int(target["id"])
+    contributions = list_user_album_contributions(user_id)
+    if contributions:
+        create_task(
+            "library_cleanup_user_contributions",
+            {"user_id": user_id, "contributions": contributions},
+        )
+    updated = update_user_status(
+        user_id,
+        "deleted",
+        reason=reason,
+        actor_user_id=actor.get("id"),
+    )
+    revoked = _revoke_user_credentials(user_id)
+    _invalidate_auth_user(user_id)
+    create_task(USER_DATA_EXPORT_CLEANUP_TASK_TYPE, {"user_id": user_id})
+    log_audit(
+        "delete_user",
+        "user",
+        target["email"],
+        details={
+            "before": {"status": _user_status(target)},
+            "after": {"status": "deleted"},
+            "changed_fields": ["status"],
+            "source": source,
+            "soft_delete": True,
+            "contributions": len(contributions),
+            "revoked": revoked,
+        },
+        user_id=actor.get("id"),
+    )
+    return updated
 
 
 def _is_proxyable_avatar_url(value: str) -> bool:
@@ -1221,7 +1277,8 @@ def _build_oauth_state(
     native_code_challenge: str | None = None,
     native_state: str | None = None,
     session_id: str | None = None,
-) -> str:
+) -> tuple[str, str]:
+    nonce = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(48)
     invite_key = None
     if invite_token:
@@ -1237,67 +1294,100 @@ def _build_oauth_state(
         "native_code_challenge": native_code_challenge,
         "native_state": native_state,
         "session_id": session_id,
-        "verifier": verifier,
+        "nonce": nonce,
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
     }
-    token = jwt.encode(
-        payload,
-        os.environ.get("JWT_SECRET")
-        or get_setting("jwt_secret")
-        or "crate-oauth-state",
-        algorithm="HS256",
+    state = jwt.encode(payload, _oauth_state_secret(), algorithm="HS256")
+    _store_oauth_verifier(nonce, verifier)
+    return state, verifier
+
+
+def _oauth_pending_unavailable() -> HTTPException:
+    return HTTPException(
+        status_code=503, detail="OAuth sign-in is temporarily unavailable"
     )
-    return token
+
+
+def _store_oauth_pending(prefix: str, key: str, value: str) -> None:
+    redis_key = f"{prefix}:{key}"
+    r = _get_rate_limit_redis()
+    if r is not None:
+        try:
+            r.setex(redis_key, _OAUTH_PENDING_TTL_SECONDS, value)
+        except Exception as exc:
+            log.warning("Failed to store pending OAuth data in Redis", exc_info=True)
+            raise _oauth_pending_unavailable() from exc
+        return
+    if not local_memory_allowed():
+        raise _oauth_pending_unavailable()
+    now = datetime.now(timezone.utc)
+    with _oauth_pending_lock:
+        for expired_key in [
+            k
+            for k, (_, expires_at) in _oauth_pending_memory.items()
+            if expires_at <= now
+        ]:
+            del _oauth_pending_memory[expired_key]
+        _oauth_pending_memory[redis_key] = (
+            value,
+            now + timedelta(seconds=_OAUTH_PENDING_TTL_SECONDS),
+        )
+
+
+def _take_oauth_pending(prefix: str, key: str | None) -> str | None:
+    if not key:
+        return None
+    redis_key = f"{prefix}:{key}"
+    r = _get_rate_limit_redis()
+    if r is not None:
+        try:
+            value = r.getdel(redis_key)
+        except Exception as exc:
+            log.warning("Failed to read pending OAuth data from Redis", exc_info=True)
+            raise _oauth_pending_unavailable() from exc
+        if isinstance(value, bytes):
+            return value.decode("utf-8")
+        return str(value) if value else None
+    if not local_memory_allowed():
+        raise _oauth_pending_unavailable()
+    with _oauth_pending_lock:
+        record = _oauth_pending_memory.pop(redis_key, None)
+    if not record:
+        return None
+    value, expires_at = record
+    if expires_at <= datetime.now(timezone.utc):
+        return None
+    return value
 
 
 def _store_oauth_invite_token(key: str, token: str) -> None:
     """Store an invite token server-side so it never appears in OAuth redirect URLs."""
-    expires_at = datetime.now(timezone.utc) + timedelta(
-        seconds=_OAUTH_INVITE_TTL_SECONDS
-    )
-    try:
-        r = _get_rate_limit_redis()
-        if r is not None:
-            r.setex(f"{_OAUTH_INVITE_PREFIX}:{key}", _OAUTH_INVITE_TTL_SECONDS, token)
-            return
-    except Exception:
-        log.warning("Failed to store OAuth invite token in Redis", exc_info=True)
-    with _oauth_invite_lock:
-        _oauth_invite_memory[key] = (token, expires_at)
+    _store_oauth_pending(_OAUTH_INVITE_PREFIX, key, token)
 
 
 def _retrieve_oauth_invite_token(key: str | None) -> str | None:
     """Retrieve an invite token stored server-side during OAuth flow."""
-    if not key:
-        return None
-    try:
-        r = _get_rate_limit_redis()
-        if r is not None:
-            token = r.get(f"{_OAUTH_INVITE_PREFIX}:{key}")
-            if token:
-                r.delete(f"{_OAUTH_INVITE_PREFIX}:{key}")
-                if isinstance(token, bytes):
-                    return token.decode("utf-8")
-                return str(token)
-    except Exception:
-        log.warning("Failed to retrieve OAuth invite token from Redis", exc_info=True)
-    with _oauth_invite_lock:
-        token_record = _oauth_invite_memory.pop(key, None)
-    if not token_record:
-        return None
-    token, expires_at = token_record
-    if expires_at <= datetime.now(timezone.utc):
-        return None
-    return token
+    return _take_oauth_pending(_OAUTH_INVITE_PREFIX, key)
+
+
+def _store_oauth_verifier(nonce: str, verifier: str) -> None:
+    _store_oauth_pending(_OAUTH_VERIFIER_PREFIX, nonce, verifier)
+
+
+def _take_oauth_verifier(nonce: str | None) -> str | None:
+    return _take_oauth_pending(_OAUTH_VERIFIER_PREFIX, nonce)
+
+
+def _oauth_state_secret() -> bytes:
+    return hmac.new(
+        _get_jwt_secret().encode("utf-8"), _OAUTH_STATE_KEY_CONTEXT, hashlib.sha256
+    ).digest()
 
 
 def _parse_oauth_state(state: str) -> dict:
-    secret = (
-        os.environ.get("JWT_SECRET") or get_setting("jwt_secret") or "crate-oauth-state"
-    )
     try:
-        return jwt.decode(state, secret, algorithms=["HS256"])
+        return jwt.decode(state, _oauth_state_secret(), algorithms=["HS256"])
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=400, detail="Invalid OAuth state") from exc
 
@@ -1596,8 +1686,30 @@ def _has_machine_credential(request: Request) -> bool:
     return any("crate_mcp_" in value for value in credentials)
 
 
+PASSWORD_CHANGE_REQUIRED_DETAIL = "Password change required"
+_PASSWORD_CHANGE_ALLOWED_REQUESTS = frozenset(
+    {
+        ("GET", "/api/auth/me"),
+        ("POST", "/api/auth/change-password"),
+        ("PUT", "/api/me/password"),
+        ("POST", "/api/auth/logout"),
+        ("POST", "/api/auth/heartbeat"),
+        ("POST", "/api/auth/refresh"),
+    }
+)
+
+
+def _password_change_blocks(user: dict | None, method: str, path: str) -> bool:
+    return (
+        bool(user and user.get("password_change_required"))
+        and method != "OPTIONS"
+        and path.startswith("/api/")
+        and (method, path.rstrip("/")) not in _PASSWORD_CHANGE_ALLOWED_REQUESTS
+    )
+
+
 class AuthMiddleware:
-    """Resolve auth via Bearer header, query param, or cookie (in that order).
+    """Resolve auth via Bearer header, media ticket, or cookie (in that order).
 
     Falls back to Remote-User headers from trusted reverse proxy.
     """
@@ -1633,6 +1745,9 @@ class AuthMiddleware:
             "username": current_user.get("username"),
             "name": current_user.get("name"),
             "session_id": session_id,
+            "password_change_required": bool(
+                current_user.get("password_change_required")
+            ),
         }
 
     def _resolve_token_user(self, token: str) -> dict | None:
@@ -1691,9 +1806,7 @@ class AuthMiddleware:
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[7:]
-        # 2. Query param token (audio/image streams where headers can't be set)
-        if not token:
-            token = request.query_params.get("token")
+        # 2. Media ticket (audio/image streams where headers can't be set)
         # 3. Cookie auth — try app-specific cookie first, then default
         if token:
             resolver = (
@@ -1742,6 +1855,7 @@ class AuthMiddleware:
                     continue
                 user = await run_in_threadpool(self._resolve_token_user, cookie_token)
                 if user:
+                    request.state.cookie_authenticated = True
                     break
 
         if not user:
@@ -1770,6 +1884,7 @@ class AuthMiddleware:
                     if role == "admin" or "admins" in groups
                     else "user",
                 }
+                request.state.proxy_authenticated = True
 
         if user and user.get("auth_type") == "access_token":
             if not _is_access_token_request(user, request.method, request.url.path):
@@ -1795,6 +1910,12 @@ class AuthMiddleware:
         if user and user.get("auth_type") == "access_token":
             if not _is_access_token_request(user, request.method, request.url.path):
                 user = None
+        if _password_change_blocks(user, request.method, request.url.path):
+            response = JSONResponse(
+                {"detail": PASSWORD_CHANGE_REQUIRED_DETAIL}, status_code=403
+            )
+            await response(scope, receive, send)
+            return
         scope["state"]["user"] = user
         await self.app(scope, receive, send)
 
@@ -2134,6 +2255,8 @@ def auth_me(request: Request):
         return payload
     if db_user:
         payload = _user_public(db_user)
+        if db_user.get("password_change_required"):
+            payload["password_change_required"] = True
         payload["username"] = db_user.get("username")
         payload["bio"] = db_user.get("bio")
         payload["instagram_handle"] = db_user.get("instagram_handle")
@@ -2400,9 +2523,23 @@ def change_password(request: Request, body: ChangePasswordRequest):
         raise HTTPException(
             status_code=400, detail="Password must be at least 8 characters"
         )
+    _ensure_required_password_change_differs(db_user, body.new_password)
     new_hash = hash_password(body.new_password)
-    update_user(user["id"], password_hash=new_hash)
+    update_user(user["id"], password_hash=new_hash, password_change_required=False)
+    _invalidate_auth_user(user["id"])
     return {"ok": True}
+
+
+def _ensure_required_password_change_differs(db_user: dict, new_password: str) -> None:
+    if (
+        db_user.get("password_change_required")
+        and db_user.get("password_hash")
+        and verify_password(new_password, db_user["password_hash"])
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Choose a password different from the initial one",
+        )
 
 
 @router.post(
@@ -2494,7 +2631,7 @@ def _oauth_start_response(
             challenge=body.native_code_challenge,
             state=body.native_state,
         )
-    state = _build_oauth_state(
+    state, verifier = _build_oauth_state(
         provider=provider,
         return_to=body.return_to,
         mode=mode,
@@ -2505,8 +2642,6 @@ def _oauth_start_response(
         native_state=body.native_state if native_exchange else None,
         session_id=session_id if mode == "native_link" else None,
     )
-    parsed_state = _parse_oauth_state(state)
-    verifier = parsed_state["verifier"]
     common_params = {
         "redirect_uri": _oauth_callback_url(provider, body.return_to, app_id=app_id),
         "response_type": "code",
@@ -2679,7 +2814,10 @@ def oauth_callback(
     redirect_uri = _oauth_callback_url(
         provider, parsed_state.get("return_to"), app_id=app_id
     )
-    verifier = parsed_state["verifier"]
+    verifier = _take_oauth_verifier(parsed_state.get("nonce"))
+    if not verifier:
+        _record_failed_login(rate_key, request)
+        raise HTTPException(status_code=400, detail="OAuth state expired or reused")
     try:
         external_payload = (
             _google_userinfo(code, redirect_uri, verifier)
@@ -3673,33 +3811,8 @@ def admin_delete_user(request: Request, user_id: int):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     _ensure_status_change_is_safe(admin_user, user, "deleted")
-    contributions = list_user_album_contributions(user_id)
-    if contributions:
-        create_task(
-            "library_cleanup_user_contributions",
-            {"user_id": user_id, "contributions": contributions},
-        )
-    updated = update_user_status(
-        user_id,
-        "deleted",
-        reason="Deleted by administrator",
-        actor_user_id=admin_user.get("id"),
-    )
-    _revoke_user_sessions(user_id, None)
-    _invalidate_auth_user(user_id)
-    log_audit(
-        "delete_user",
-        "user",
-        user["email"],
-        details={
-            "before": {"status": _user_status(user)},
-            "after": {"status": "deleted"},
-            "changed_fields": ["status"],
-            "source": "admin",
-            "soft_delete": True,
-            "contributions": len(contributions),
-        },
-        user_id=admin_user.get("id"),
+    updated = _delete_user_account(
+        admin_user, user, source="admin", reason="Deleted by administrator"
     )
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")

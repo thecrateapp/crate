@@ -131,6 +131,7 @@ services:
       - CRATE_AUTH_COOKIE_SAMESITE=lax
       - JWT_SECRET=fed-dev-node-a-jwt-secret-at-least-32-bytes
       - DEFAULT_ADMIN_PASSWORD=admin
+      - CRATE_DEV_ADMIN_SEED=true
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - REDIS_URL=redis://:redis-dev@node-a-redis:6379/0
       - REDIS_CACHE_URL=redis://:redis-dev@node-a-redis:6379/0
@@ -268,6 +269,7 @@ services:
       - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=900
       - JWT_SECRET=fed-dev-node-a-jwt-secret-at-least-32-bytes
       - DEFAULT_ADMIN_PASSWORD=admin
+      - CRATE_DEV_ADMIN_SEED=true
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - OMP_NUM_THREADS=1
       - OPENBLAS_NUM_THREADS=1
@@ -454,6 +456,7 @@ services:
       - CRATE_AUTH_COOKIE_SAMESITE=lax
       - JWT_SECRET=fed-dev-node-b-jwt-secret-at-least-32-bytes
       - DEFAULT_ADMIN_PASSWORD=admin
+      - CRATE_DEV_ADMIN_SEED=true
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - REDIS_URL=redis://:redis-dev@node-b-redis:6379/0
       - REDIS_CACHE_URL=redis://:redis-dev@node-b-redis:6379/0
@@ -585,6 +588,7 @@ services:
       - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=900
       - JWT_SECRET=fed-dev-node-b-jwt-secret-at-least-32-bytes
       - DEFAULT_ADMIN_PASSWORD=admin
+      - CRATE_DEV_ADMIN_SEED=true
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - OMP_NUM_THREADS=1
       - OPENBLAS_NUM_THREADS=1

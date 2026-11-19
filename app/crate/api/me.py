@@ -13,7 +13,11 @@ from starlette.responses import StreamingResponse
 from crate.api import native_oauth_auth
 from crate.api.show_location import resolve_show_location
 from crate.api.auth_dependencies import require_auth as _require_auth
-from crate.api.auth import _require_vdj_scope
+from crate.api.auth import (
+    _ensure_required_password_change_differs,
+    _invalidate_auth_user,
+    _require_vdj_scope,
+)
 from crate.api._deps import (
     artist_name_from_id,
     coerce_date as _coerce_date,
@@ -1717,9 +1721,11 @@ def change_password(request: Request, body: ChangePasswordRequest):
         )
     if not bcrypt.checkpw(current.encode(), db_user["password_hash"].encode()):
         raise HTTPException(status_code=403, detail="Current password is incorrect")
+    _ensure_required_password_change_differs(db_user, new_pw)
 
     new_hash = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
-    update_user(user["id"], password_hash=new_hash)
+    update_user(user["id"], password_hash=new_hash, password_change_required=False)
+    _invalidate_auth_user(user["id"])
     return {"ok": True}
 
 

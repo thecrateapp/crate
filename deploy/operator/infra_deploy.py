@@ -22,6 +22,7 @@ OPTIONAL = (
     ".deploy/release-manifest.json.candidate",
     ".deploy/agent-context.candidate.tar.gz",
     "deploy/traefik/federation-readplane.yml",
+    "deploy/docker-proxy/haproxy.cfg",
     "deploy/observability/compose.projector-prometheus.yaml",
     "deploy/observability/compose.traefik-metrics.yaml",
     "deploy/observability/compose.app-metrics.yaml",
@@ -52,6 +53,10 @@ BACKUP_FILES = (
     ".deploy/release-manifest.json",
     "deploy/traefik/federation-readplane.yml",
 )
+COMPANION_SERVICES = {
+    "worker": ("crate-fast-worker",),
+    "api": ("crate-docker-proxy",),
+}
 
 
 def file_digest(path):
@@ -269,14 +274,12 @@ def generated_backup_inputs(original, assets, environment, manifest, plan_id):
         if force or current != expected:
             images.add(expected)
             services.update(entry["services"])
-            if name == "worker":
-                services.add("crate-fast-worker")
+            services.update(COMPANION_SERVICES.get(name, ()))
     for name, key in SENTRY_RELEASE_ENVIRONMENTS.items():
         entry = manifest["images"][name]
         if old.get(key, "") != "crate-" + entry["source_sha"]:
             services.update(entry["services"])
-            if name == "worker":
-                services.add("crate-fast-worker")
+            services.update(COMPANION_SERVICES.get(name, ()))
     configured = dict(initial)
     for key, values in (("changed_image_refs", images), ("changed_services", services)):
         configured[key] = hashlib.sha256(

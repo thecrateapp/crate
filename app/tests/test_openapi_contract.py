@@ -876,7 +876,7 @@ def test_openapi_types_system_playlist_and_curation_routes(test_app):
     ]["schema"]["items"]["$ref"].endswith("/CuratedPlaylistSummaryResponse")
 
 
-def test_openapi_types_imports_organizer_and_stack_routes(test_app):
+def test_openapi_types_imports_and_stack_routes(test_app):
     data = test_app.get("/openapi.json").json()
     logs_snapshot_operation = data["paths"]["/api/admin/logs-snapshot"]["get"]
     admin_stack_snapshot_operation = data["paths"]["/api/admin/stack-snapshot"]["get"]
@@ -884,13 +884,6 @@ def test_openapi_types_imports_organizer_and_stack_routes(test_app):
     imports_import_operation = data["paths"]["/api/imports/import"]["post"]
     imports_all_operation = data["paths"]["/api/imports/import-all"]["post"]
     imports_remove_operation = data["paths"]["/api/imports/remove"]["post"]
-    organize_presets_operation = data["paths"]["/api/organize/presets"]["get"]
-    organize_preview_operation = data["paths"][
-        "/api/organize/albums/{album_id}/preview"
-    ]["get"]
-    organize_apply_operation = data["paths"]["/api/organize/albums/{album_id}/apply"][
-        "post"
-    ]
     stack_status_operation = data["paths"]["/api/stack/status"]["get"]
     stack_logs_operation = data["paths"]["/api/stack/container/{name}/logs"]["get"]
     stack_restart_operation = data["paths"]["/api/stack/container/{name}/restart"][
@@ -947,33 +940,6 @@ def test_openapi_types_imports_organizer_and_stack_routes(test_app):
     assert imports_remove_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/TaskEnqueueResponse")
-
-    assert organize_presets_operation["security"] == [
-        {"cookieAuth": []},
-        {"bearerAuth": []},
-    ]
-    assert organize_presets_operation["responses"]["200"]["content"][
-        "application/json"
-    ]["schema"]["$ref"].endswith("/OrganizePresetsResponse")
-
-    assert organize_preview_operation["security"] == [
-        {"cookieAuth": []},
-        {"bearerAuth": []},
-    ]
-    assert organize_preview_operation["responses"]["200"]["content"][
-        "application/json"
-    ]["schema"]["$ref"].endswith("/OrganizePreviewResponse")
-
-    assert organize_apply_operation["security"] == [
-        {"cookieAuth": []},
-        {"bearerAuth": []},
-    ]
-    assert organize_apply_operation["requestBody"]["content"]["application/json"][
-        "schema"
-    ]["anyOf"][0]["$ref"].endswith("/OrganizeApplyRequest")
-    assert organize_apply_operation["responses"]["200"]["content"]["application/json"][
-        "schema"
-    ]["$ref"].endswith("/OrganizeApplyResponse")
 
     assert stack_status_operation["security"] == [
         {"cookieAuth": []},

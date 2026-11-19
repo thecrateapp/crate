@@ -118,7 +118,7 @@ def test_auth_cookie_defaults_remain_secure_for_real_domain(monkeypatch):
     assert "crate_session=token" in set_cookie
     assert "Domain=.lespedants.org" in set_cookie
     assert "Secure" in set_cookie
-    assert "SameSite=none" in set_cookie
+    assert "SameSite=lax" in set_cookie
 
 
 def test_sanitize_base_url_blocks_private_ip_addresses():

@@ -299,6 +299,37 @@ def test_access_tokens_never_reach_token_profile_or_session_mutations(method, pa
     assert _resolve_with_access_token(method, path) is None
 
 
+@pytest.mark.parametrize("token", ["session.jwt.token", "crv_test-token"])
+def test_query_string_tokens_never_authenticate(token):
+    from crate.api.auth import AuthMiddleware
+
+    middleware = AuthMiddleware(lambda scope, receive, send: None)
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/albums/1/cover",
+            "headers": [],
+            "query_string": f"token={token}".encode(),
+            "scheme": "https",
+            "client": ("127.0.0.1", 1234),
+            "server": ("testserver", 443),
+        }
+    )
+    with (
+        patch.object(
+            AuthMiddleware, "_resolve_token_user", return_value={"id": 1}
+        ) as session_lookup,
+        patch.object(
+            AuthMiddleware, "_resolve_access_token_user", return_value={"id": 1}
+        ) as access_lookup,
+    ):
+        assert asyncio.run(middleware.resolve_user(request)) is None
+
+    session_lookup.assert_not_called()
+    access_lookup.assert_not_called()
+
+
 def test_automation_execute_scope_can_be_issued_without_legacy_equivalence():
     from crate.db.repositories.access_tokens import _normalize_scopes
 

@@ -470,11 +470,10 @@ def _auth_ws(websocket: WebSocket) -> dict:
                     "sid": validated.session_id,
                 }
 
-    token = websocket.query_params.get("token")
-    if not token:
-        auth_header = websocket.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
+    token = None
+    auth_header = websocket.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
     if not token:
         for cookie_name in (COOKIE_NAME_LISTEN, COOKIE_NAME):
             token = websocket.cookies.get(cookie_name)

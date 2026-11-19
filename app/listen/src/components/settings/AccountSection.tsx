@@ -10,6 +10,7 @@ import {
   PasswordChangeForm,
 } from "@/components/settings/AccountSectionForms";
 import { AccountPulseListingField } from "@/components/settings/AccountPulseListingField";
+import { AccountDataSection } from "@/components/settings/AccountDataSection";
 import { AccountSettingsView } from "./AccountSettingsView";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
@@ -300,6 +301,7 @@ export function AccountSection({ ruled }: { ruled?: boolean } = {}) {
           />
         </>
       }
+      data={<AccountDataSection />}
     />
   );
 }

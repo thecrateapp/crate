@@ -220,10 +220,7 @@ export function createApiUrlResolver(
         url,
         dependencies.getCurrentServer()?.url || "https://crate.local",
       );
-      return (
-        parsed.searchParams.has("media_ticket") ||
-        parsed.searchParams.has("token")
-      );
+      return parsed.searchParams.has("media_ticket");
     } catch {
       return false;
     }

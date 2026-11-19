@@ -25,6 +25,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from crate.storage_layout import UnsafeMutationPathError, ensure_within_roots
 from crate.smart_mix.stem_storage import (
     SCRATCH_NAME,
     StemsVolumeError,
@@ -140,8 +141,9 @@ def enforce_stem_quota(limit_bytes: int, *, root: Path | None = None) -> int:
         if directory is None:
             continue
         try:
+            ensure_within_roots(directory / path, (directory,))
             (directory / path).unlink(missing_ok=True)
-        except OSError:
+        except (OSError, UnsafeMutationPathError):
             log.warning(
                 "Could not delete the evicted stem file %s", path, exc_info=True
             )

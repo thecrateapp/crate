@@ -314,6 +314,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "refresh_system_smart_playlists": TaskPoolConfig("maintenance", 3, 1800, 0),
     "persist_playlist_cover": TaskPoolConfig("fast", 0, 120, 1),
     "crate_download": TaskPoolConfig("default", 0, 7200, 0),
+    "export_user_data": TaskPoolConfig("default", 0, 1800, 0),
+    "cleanup_user_data_exports": TaskPoolConfig("maintenance", 2, 600, 0),
     # Listen i18n: one draft call (i18n.listen.draft allows ≤ 90s).
     "draft_i18n_translation": TaskPoolConfig("ai", 3, 300, 0),
 }

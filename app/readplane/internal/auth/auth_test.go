@@ -146,50 +146,82 @@ func TestMediaAudienceForPathMatchesFastAPIContract(t *testing.T) {
 	}
 }
 
-func TestExtractToken(t *testing.T) {
-	t.Run("prefers bearer token", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/?token=query", nil)
-		req.Header.Set("Authorization", "Bearer header-token")
-		req.AddCookie(&http.Cookie{Name: listenCookieName, Value: "cookie-token"})
+func TestExtractTokenCandidates(t *testing.T) {
+	tests := []struct {
+		name    string
+		target  string
+		bearer  string
+		cookies map[string]string
+		want    []string
+	}{
+		{
+			name:    "prefers bearer token",
+			target:  "/?token=query",
+			bearer:  "header-token",
+			cookies: map[string]string{listenCookieName: "cookie-token"},
+			want:    []string{"header-token"},
+		},
+		{
+			name:   "ignores a session token in the query string",
+			target: "/?token=query-token",
+			want:   []string{},
+		},
+		{
+			name:    "falls back to cookies when only a query token is present",
+			target:  "/?token=query-token",
+			cookies: map[string]string{defaultCookieName: "default-cookie"},
+			want:    []string{"default-cookie"},
+		},
+		{
+			name:    "returns cookie candidates in fallback order",
+			target:  "/",
+			cookies: map[string]string{listenCookieName: "stale-listen-cookie", defaultCookieName: "valid-default-cookie"},
+			want:    []string{"stale-listen-cookie", "valid-default-cookie"},
+		},
+	}
 
-		token := ExtractToken(req, true)
-		assert.Equal(t, "header-token", token)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.target, nil)
+			if tt.bearer != "" {
+				req.Header.Set("Authorization", "Bearer "+tt.bearer)
+			}
+			for _, name := range []string{listenCookieName, defaultCookieName} {
+				if value, ok := tt.cookies[name]; ok {
+					req.AddCookie(&http.Cookie{Name: name, Value: value})
+				}
+			}
+
+			assert.Equal(t, tt.want, ExtractTokenCandidates(req))
+			wantFirst := ""
+			if len(tt.want) > 0 {
+				wantFirst = tt.want[0]
+			}
+			assert.Equal(t, wantFirst, ExtractToken(req))
+		})
+	}
+}
+
+func TestAuthenticateIdentityRejectsSessionTokenInQueryString(t *testing.T) {
+	token := signTestJWT(t, "secret", map[string]any{
+		"user_id": 12, "email": "diego@example.com", "exp": time.Now().Add(time.Hour).Unix(),
 	})
+	authenticator := NewAuthenticatorWithCache(nil, "secret", time.Second, time.Minute, 10)
+	authenticator.identityLookup = func(_ context.Context, payload JWTPayload) (*User, time.Time, error) {
+		return &User{ID: payload.UserID, Email: payload.Email, Role: "user"}, time.Now().Add(time.Hour), nil
+	}
 
-	t.Run("allows query only when enabled", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/?token=query-token", nil)
+	for _, allowMediaTicket := range []bool{false, true} {
+		request := httptest.NewRequest(http.MethodGet, "/api/albums/1/cover?token="+token, nil)
+		_, err := authenticator.AuthenticateIdentity(request, allowMediaTicket)
+		assert.ErrorIs(t, err, ErrUnauthorized)
+	}
 
-		assert.Equal(t, "", ExtractToken(req, false))
-		assert.Equal(t, "query-token", ExtractToken(req, true))
-	})
-
-	t.Run("falls back to default cookie", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.AddCookie(&http.Cookie{Name: defaultCookieName, Value: "default-cookie"})
-
-		token := ExtractToken(req, false)
-		assert.Equal(t, "default-cookie", token)
-	})
-
-	t.Run("returns cookie candidates in fallback order", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req.AddCookie(&http.Cookie{Name: listenCookieName, Value: "stale-listen-cookie"})
-		req.AddCookie(&http.Cookie{Name: defaultCookieName, Value: "valid-default-cookie"})
-
-		candidates := ExtractTokenCandidates(req, false)
-
-		assert.Equal(t, []string{"stale-listen-cookie", "valid-default-cookie"}, candidates)
-	})
-
-	t.Run("keeps bearer token authoritative", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/?token=query-token", nil)
-		req.Header.Set("Authorization", "Bearer header-token")
-		req.AddCookie(&http.Cookie{Name: listenCookieName, Value: "cookie-token"})
-
-		candidates := ExtractTokenCandidates(req, true)
-
-		assert.Equal(t, []string{"header-token"}, candidates)
-	})
+	request := httptest.NewRequest(http.MethodGet, "/api/albums/1/cover", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+	user, err := authenticator.AuthenticateIdentity(request, true)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(12), user.ID)
 }
 
 func TestAuthenticateIdentityCachesAndHydratesProfileLazily(t *testing.T) {

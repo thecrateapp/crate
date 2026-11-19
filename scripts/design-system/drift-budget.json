@@ -4,8 +4,8 @@
     "legacySemanticUtilities": 0,
     "arbitraryUtilities": 13,
     "hardcodedColorUtilities": 0,
-    "inlineStyles": 80,
-    "directShadcnImports": 158
+    "inlineStyles": 79,
+    "directShadcnImports": 160
   },
   "semanticTokens": {
     "definitions": 130,

@@ -43,6 +43,8 @@ def test_mcp_destination_resumes_after_real_provider_callback(
     mcp_login_config, provider, path
 ):
     monkeypatch = mcp_login_config
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("CRATE_ENV", "test")
     query = urlencode(
         {
             "response_type": "code",

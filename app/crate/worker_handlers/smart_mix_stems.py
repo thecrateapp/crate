@@ -59,6 +59,7 @@ from crate.smart_mix.stems import (
     StemAnalysis,
     stem_quota_gib,
 )
+from crate.storage_layout import UnsafeMutationPathError, ensure_within_roots
 from crate.task_dedup_keys import SMART_MIX_STEMS_DEDUP_KEY
 from crate.worker_handlers import TaskHandler, is_cancelled, run_again_later
 
@@ -192,7 +193,13 @@ def _separate(task_id: str, claim: StemJobClaim, library: str) -> dict:
         fail_stem_job(claim.track_id, str(error), max_attempts=MAX_ATTEMPTS)
         return {**result, "state": "failed", "reason": str(error)[:300]}
     if replaced:
-        (root / replaced).unlink(missing_ok=True)
+        try:
+            ensure_within_roots(root / replaced, (root,))
+            (root / replaced).unlink(missing_ok=True)
+        except UnsafeMutationPathError:
+            log.warning(
+                "Not deleting replaced stem file outside %s: %s", root, replaced
+            )
     freed = enforce_stem_quota(quota, root=root)
     emit_task_event(
         task_id,

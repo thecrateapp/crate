@@ -23,6 +23,7 @@ export interface AuthUser {
   bio?: string | null;
   capabilities?: string[];
   connected_accounts?: Array<{ provider: string; status: string }>;
+  password_change_required?: boolean;
 }
 
 export interface RolePreset {

@@ -29,6 +29,9 @@ class User(Base):
         Boolean, nullable=False, server_default="true"
     )
     password_hash: Mapped[str | None] = mapped_column(Text)
+    password_change_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
     avatar: Mapped[str | None] = mapped_column(Text)
     role: Mapped[str] = mapped_column(Text, nullable=False, server_default="user")
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
@@ -124,6 +127,7 @@ class Session(Base):
     app_id: Mapped[str | None] = mapped_column(Text)
     device_label: Mapped[str | None] = mapped_column(Text)
     device_fingerprint: Mapped[str | None] = mapped_column(Text)
+    authenticated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped["User"] = relationship(back_populates="sessions")
 

@@ -3,6 +3,8 @@ name: crate
 networks:
   crate:
     name: crate
+  docker-api:
+    internal: true
 
 x-logging: &default-logging
   driver: local
@@ -15,6 +17,7 @@ x-crate-env: &crate-env
   CRATE_CONFIG: /app/config.yaml
   DATA_DIR: /data
   CACHE_DIR: /cache
+  CRATE_LIBRARY_EXTRA_ROOTS: ${CRATE_LIBRARY_EXTRA_ROOTS:-}
   DOMAIN: ${DOMAIN:-localhost}
   CRATE_LISTEN_PUBLIC_BASE_URL: ${CRATE_LISTEN_PUBLIC_BASE_URL:-https://listen.${DOMAIN:-localhost}}
   CRATE_PUBLIC_API_BASE_URL: ${CRATE_PUBLIC_API_BASE_URL:-}
@@ -29,7 +32,7 @@ x-crate-env: &crate-env
   POSTGRES_SUPERUSER_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-crate}
   POSTGRES_SUPERUSER_DB: ${POSTGRES_SUPERUSER_DB:-crate}
   JWT_SECRET: ${JWT_SECRET:-change-me}
-  DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-admin}
+  DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-}
   REDIS_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
   REDIS_CACHE_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
   REDIS_DURABLE_URL: redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0
@@ -246,6 +249,9 @@ services:
     container_name: crate-media-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       TZ: ${TZ:-UTC}
       DATA_DIR: /data
@@ -263,17 +269,46 @@ services:
     mem_reservation: 64m
     cpus: "0.25"
 
+  crate-docker-proxy:
+    logging: *default-logging
+    image: haproxy:3.2.26-alpine@sha256:5893840576071e6217cd52ebdcc14f454c6f7a631056fa6f4e0f40d3cac4215b
+    container_name: crate-docker-proxy
+    restart: unless-stopped
+    group_add:
+      - "${DOCKER_GID:-988}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - "no-new-privileges:true"
+    mem_limit: 32m
+    cpus: 0.1
+    pids_limit: 32
+    command: [-f, /usr/local/etc/haproxy/haproxy.cfg]
+    volumes:
+      - ./deploy/docker-proxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    tmpfs:
+      - /tmp:size=1m,mode=1777
+    networks:
+      - docker-api
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:2375/_ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      traefik.enable: false
+
   crate-api:
     logging: *default-logging
     image: ${CRATE_API_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-api:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-api
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
-    group_add:
-      - "${DOCKER_GID:-988}"
     environment:
       <<: [*crate-env, *crate-enrichment-env, *ai-credential-env]
       CRATE_RUNTIME: api
+      DOCKER_HOST: tcp://crate-docker-proxy:2375
       CRATE_HOST_ID: ${CRATE_HOST_ID:-}
       CRATE_HOST_NAME: ${CRATE_HOST_NAME:-}
       CRATE_GRAFANA_URL: ${CRATE_GRAFANA_URL:-}
@@ -308,7 +343,6 @@ services:
       - ${MUSIC_DIR}:/music:ro
       - ${DATA_DIR}/crate:/data
       - ${CACHE_DIR:-./data/cache}:/cache:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "${CRATE_API_PORT:-8585}:8585"
     depends_on:
@@ -320,8 +354,11 @@ services:
         condition: service_healthy
       crate-media-worker:
         condition: service_started
+      crate-docker-proxy:
+        condition: service_started
     networks:
       - crate
+      - docker-api
     mem_limit: 768m
     mem_reservation: 256m
     cpus: "1.0"
@@ -456,6 +493,9 @@ services:
     container_name: crate-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<:
         [
@@ -545,6 +585,9 @@ services:
     container_name: crate-projector
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<: *crate-env
       CRATE_RUNTIME: projector
@@ -578,6 +621,9 @@ services:
     container_name: crate-maintenance-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<:
         [
@@ -632,6 +678,9 @@ services:
     container_name: crate-analysis-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<:
         [
@@ -678,6 +727,9 @@ services:
     container_name: crate-playback-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop: [ALL]
     environment:
       <<: [*crate-env, *worker-native-env]
       CRATE_RUNTIME: worker

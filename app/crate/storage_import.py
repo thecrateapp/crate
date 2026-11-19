@@ -17,7 +17,12 @@ from crate.db.repositories.library import (
 )
 from crate.entity_ids import album_entity_uid, artist_entity_uid, track_entity_uid
 from crate.storage_layout import album_dir as managed_album_dir
-from crate.storage_layout import entity_uid_for, looks_like_entity_uid
+from crate.storage_layout import (
+    ensure_within_roots,
+    entity_uid_for,
+    library_mutation_roots,
+    looks_like_entity_uid,
+)
 
 log = logging.getLogger(__name__)
 
@@ -195,7 +200,8 @@ def resolve_import_album_target(
     return artist, artist_root / album_folder, False
 
 
-def move_file(src: Path, dest: Path):
+def move_file(src: Path, dest: Path, *, library_root: str | Path):
+    ensure_within_roots(dest, library_mutation_roots(library_root))
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
         if dest.is_dir():
@@ -415,6 +421,9 @@ def install_managed_track(
     failed write never leaves the library without the track."""
     root = Path(library_root)
     dest = placement.dest
+    ensure_within_roots(dest, library_mutation_roots(root))
+    if placement.replaces is not None:
+        ensure_within_roots(placement.replaces, library_mutation_roots(root))
     parked = _quarantine_replaced_copy(dest, root) if dest.exists() else None
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -459,8 +468,10 @@ def move_album_tree(
         else:
             effect()
 
+    root = Path(library_root) if library_root else target_album_dir.parent.parent
+    ensure_within_roots(target_album_dir, library_mutation_roots(root))
+
     if managed_track_names:
-        root = Path(library_root) if library_root else target_album_dir.parent.parent
         apply(lambda: target_album_dir.mkdir(parents=True, exist_ok=True))
         album_entity_uid = target_album_dir.name
         staged_files = sorted(staged_album_dir.rglob("*"))
@@ -497,7 +508,7 @@ def move_album_tree(
 
                 def effect():
                     if placement is None:
-                        move_file(src, target_album_dir / src.name)
+                        move_file(src, target_album_dir / src.name, library_root=root)
                     else:
                         install_managed_track(src, placement, library_root=root)
 
@@ -523,7 +534,7 @@ def move_album_tree(
         try:
             if authorize:
                 authorize()
-            apply(lambda: move_file(src, dest))
+            apply(lambda: move_file(src, dest, library_root=root))
             moved += 1
         except Exception as exc:
             from crate.agent_diagnostics import DiagnosticError

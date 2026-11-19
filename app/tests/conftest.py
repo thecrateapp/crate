@@ -284,6 +284,8 @@ def pg_database_factory():
     original_admin_password = os.environ.get("DEFAULT_ADMIN_PASSWORD")
     if not original_admin_password:
         os.environ["DEFAULT_ADMIN_PASSWORD"] = "admin"
+    original_dev_admin_seed = os.environ.get("CRATE_DEV_ADMIN_SEED")
+    os.environ["CRATE_DEV_ADMIN_SEED"] = "true"
 
     def initialize(database_name: str) -> None:
         import crate.db as db_mod
@@ -315,6 +317,10 @@ def pg_database_factory():
             os.environ.pop("DEFAULT_ADMIN_PASSWORD", None)
         else:
             os.environ["DEFAULT_ADMIN_PASSWORD"] = original_admin_password
+        if original_dev_admin_seed is None:
+            os.environ.pop("CRATE_DEV_ADMIN_SEED", None)
+        else:
+            os.environ["CRATE_DEV_ADMIN_SEED"] = original_dev_admin_seed
         factory.close()
 
 
@@ -365,6 +371,17 @@ def test_app(monkeypatch):
         app = create_app()
         client = TestClient(app)
         yield client
+
+
+@pytest.fixture
+def pending_oauth_verifier(monkeypatch):
+    from crate.api import auth
+
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("CRATE_ENV", "test")
+    auth._store_oauth_verifier("oauth-nonce", "provider-verifier")
+    yield "provider-verifier"
+    auth._take_oauth_verifier("oauth-nonce")
 
 
 def pytest_addoption(parser):

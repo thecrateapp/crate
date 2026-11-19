@@ -1,8 +1,101 @@
 from __future__ import annotations
 
+import os
 import uuid
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
+
+
+class UnsafeMutationPathError(ValueError):
+    pass
+
+
+def upload_staging_root() -> Path:
+    return Path(os.environ.get("DATA_DIR", "/data")) / "uploads"
+
+
+def ensure_within_roots(
+    path: str | Path,
+    roots: Iterable[str | Path],
+    *,
+    allow_root: bool = False,
+) -> Path:
+    if path is None or not str(path).strip():
+        raise UnsafeMutationPathError("Refusing to modify an empty path")
+    resolved = Path(path).resolve(strict=False)
+    resolved_roots = [Path(root).resolve(strict=False) for root in roots if root]
+    if resolved in resolved_roots:
+        if allow_root:
+            return resolved
+        raise UnsafeMutationPathError(f"Refusing to modify an allowed root: {path}")
+    if not any(resolved.is_relative_to(root) for root in resolved_roots):
+        raise UnsafeMutationPathError(
+            f"Refusing to modify a path outside the allowed roots: {path}"
+        )
+    return resolved
+
+
+LIBRARY_EXTRA_ROOTS_ENV = "CRATE_LIBRARY_EXTRA_ROOTS"
+
+_SYSTEM_TREES = (
+    "/app",
+    "/bin",
+    "/boot",
+    "/dev",
+    "/etc",
+    "/lib",
+    "/lib32",
+    "/lib64",
+    "/libx32",
+    "/proc",
+    "/root",
+    "/run",
+    "/sbin",
+    "/sys",
+    "/usr",
+)
+_TOO_BROAD = ("/", "/home", "/media", "/mnt", "/opt", "/srv", "/tmp", "/var")
+
+
+def _resolved(paths: Iterable[str]) -> set[Path]:
+    return {Path(path).resolve(strict=False) for path in paths}
+
+
+def library_extra_roots(library_root: str | Path) -> tuple[Path, ...]:
+    raw = os.environ.get(LIBRARY_EXTRA_ROOTS_ENV, "")
+    entries = [entry.strip() for entry in raw.replace(os.pathsep, ",").split(",")]
+    library = Path(library_root).resolve(strict=False)
+    data_dir = Path(os.environ.get("DATA_DIR", "/data")).resolve(strict=False)
+    forbidden_trees = _resolved(_SYSTEM_TREES) | {data_dir}
+    too_broad = _resolved(_TOO_BROAD)
+    roots: list[Path] = []
+    for entry in filter(None, entries):
+        if not Path(entry).is_absolute():
+            raise UnsafeMutationPathError(
+                f"{LIBRARY_EXTRA_ROOTS_ENV} entry is not absolute: {entry}"
+            )
+        root = Path(entry).resolve(strict=False)
+        if not root.is_dir():
+            raise UnsafeMutationPathError(
+                f"{LIBRARY_EXTRA_ROOTS_ENV} entry is not an existing directory: {entry}"
+            )
+        if root in too_broad or any(
+            root.is_relative_to(tree) for tree in forbidden_trees
+        ):
+            raise UnsafeMutationPathError(
+                f"{LIBRARY_EXTRA_ROOTS_ENV} entry is a system directory: {entry}"
+            )
+        if library.is_relative_to(root) or data_dir.is_relative_to(root):
+            raise UnsafeMutationPathError(
+                f"{LIBRARY_EXTRA_ROOTS_ENV} entry contains the library or DATA_DIR: "
+                f"{entry}"
+            )
+        roots.append(root)
+    return tuple(roots)
+
+
+def library_mutation_roots(library_root: str | Path) -> tuple[Path, ...]:
+    return (Path(library_root), *library_extra_roots(library_root))
 
 
 def artist_dir(library_root: str | Path, artist_entity_uid: str) -> Path:

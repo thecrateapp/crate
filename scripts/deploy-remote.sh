@@ -129,7 +129,7 @@ declare -A RELEASE_ENV_REPOS=(
   [CRATE_RYOKU_SITE_IMAGE]="${IMAGE_PREFIX}/crate-ryoku-site"
 )
 declare -A RELEASE_ENV_SERVICES=(
-  [CRATE_API_IMAGE]="crate-api"
+  [CRATE_API_IMAGE]="crate-docker-proxy crate-api"
   [CRATE_READPLANE_IMAGE]="crate-readplane"
   [CRATE_WORKER_IMAGE]="crate-worker crate-fast-worker crate-projector crate-maintenance-worker"
   [CRATE_ANALYSIS_WORKER_IMAGE]="crate-analysis-worker"

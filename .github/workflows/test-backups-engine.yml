@@ -61,7 +61,7 @@ jobs:
           cache-dependency-path: app/requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements-test.txt
+        run: pip install --require-hashes -r requirements-test.txt
         working-directory: app
 
       - name: Install the worker image's PostgreSQL 15 client

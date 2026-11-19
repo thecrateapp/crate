@@ -48,6 +48,7 @@ def create_session(
             reusable.app_id = app_id
             reusable.device_label = label
             reusable.device_fingerprint = fingerprint
+            reusable.authenticated_at = now
             s.flush()
             return model_to_dict(reusable)
 
@@ -93,6 +94,7 @@ def create_session(
             app_id=app_id,
             device_label=label,
             device_fingerprint=fingerprint,
+            authenticated_at=now,
         )
         s.add(auth_session)
         s.flush()

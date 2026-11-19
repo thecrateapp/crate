@@ -123,12 +123,6 @@ func mediaAudienceForPath(value string) string {
 }
 
 func hasAuthoritativeToken(r *http.Request) bool {
-	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
-	if authHeader != "" {
-		scheme, token, ok := strings.Cut(authHeader, " ")
-		if ok && strings.EqualFold(scheme, "Bearer") && strings.TrimSpace(token) != "" {
-			return true
-		}
-	}
-	return strings.TrimSpace(r.URL.Query().Get("token")) != ""
+	scheme, token, ok := strings.Cut(strings.TrimSpace(r.Header.Get("Authorization")), " ")
+	return ok && strings.EqualFold(scheme, "Bearer") && strings.TrimSpace(token) != ""
 }

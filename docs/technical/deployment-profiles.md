@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 110
-verified: 2026-07-21
+verified: 2026-11-18
 sources:
   [
     Makefile,
@@ -13,6 +13,8 @@ sources:
     docker-compose.home.yaml,
     docker-compose.yaml,
     docker-compose.project.yaml,
+    deploy/docker-proxy/haproxy.cfg,
+    app/crate/secret_files.py,
     scripts/deploy.sh,
     scripts/deploy-remote.sh,
     scripts/worker_queue_contract.py,
@@ -108,6 +110,73 @@ database and durable-Redis recovery path.
 `make deploy-build` and `make deploy-sync` are exceptional/manual workflows.
 Do not replace the image-first flow with a repository-wide `rsync --delete`:
 the server owns media and data outside the checkout.
+
+## Docker API access
+
+In the home and project profiles `crate-api` does not mount the Docker socket.
+It reaches Docker through `crate-docker-proxy`, an HAProxy filter on the
+internal `docker-api` network that only `crate-api` joins
+(`DOCKER_HOST=tcp://crate-docker-proxy:2375`). The proxy is the only Crate
+service that mounts `/var/run/docker.sock`; it runs as the HAProxy user with the
+socket's group (`DOCKER_GID`), a read-only filesystem, no capabilities and no
+published port. Traefik keeps its own read-only socket mount for its provider.
+
+`deploy/docker-proxy/haproxy.cfg` allows only what the Stack page and the worker
+restart use:
+
+- `GET` `/_ping`, `/info`, `/containers/json`, `/containers/<name>/json` and
+  `/containers/<name>/logs`;
+- `POST` `/containers/<name>/restart|stop|start` for the containers Admin
+  manages (`librarian-*`, `tidalrr*`, `slskd*`, `soulsync*`, `traefik*`,
+  `nginx*`), and `POST /containers/crate-worker/restart`.
+
+Everything else, including container creation, exec, images, volumes and
+archives, gets `403`. Container inspection still returns environment values, so
+keep secrets in files where a service supports it (see Secrets from files).
+When the managed prefixes in `app/crate/api/stack.py` change, change the filter
+in the same commit; `app/tests/test_docker_proxy_compose.py` fails otherwise.
+A deploy that changes `crate-api` also starts the proxy, and `make deploy` ships
+its configuration. HAProxy reads it only at start, so restart
+`crate-docker-proxy` after changing it. `docker-compose.dev.yaml` still mounts
+the socket into the development API; without `DOCKER_HOST`, `docker_ctl` uses
+the Unix socket.
+
+## Secrets from files
+
+Both profiles pass secrets as environment variables by default, so anyone who
+can inspect a container can read them. Crate's Python services (API, workers,
+projector and their CLIs) also accept `<NAME>_FILE`: when it is set, the content
+of that file becomes `NAME` and wins over any `NAME` value; trailing line
+breaks are ignored. A file that cannot be read stops the process instead of
+falling back to the environment. The supported names are listed in
+`app/crate/secret_files.py` (`SECRET_NAMES`): the JWT, credential and federation
+secrets, the PostgreSQL passwords, the Redis URLs, the readplane service token,
+the default admin password and the external service keys (slskd API key,
+Last.fm, Spotify, Discogs, Google, Apple, AI providers and others).
+
+This is opt-in; neither compose file uses it yet. To move a secret into a file
+with an override file:
+
+```yaml
+services:
+  crate-api:
+    environment:
+      - JWT_SECRET_FILE=/run/secrets/jwt_secret
+    secrets: [jwt_secret]
+secrets:
+  jwt_secret:
+    file: ./secrets/jwt_secret
+```
+
+Give the file mode `0400`, owned by `PUID`. Add the same lines to every service
+that reads the secret (for `JWT_SECRET`: `crate-api`, the worker families and
+the projector), then remove the value from `.env` so Compose no longer
+interpolates it into the environment. Services that are not Crate's Python code
+read their own variables: the Go readplane, PostgreSQL (which has its own
+`POSTGRES_PASSWORD_FILE`), Redis, Traefik and slskd, including the Soulseek
+login in `SLSKD_SLSK_USERNAME` and `SLSKD_SLSK_PASSWORD`. A secret that one of
+them also reads stays in its environment until that service changes too, so plan
+such moves as one coordinated deploy.
 
 ## Preflight and post-deploy
 

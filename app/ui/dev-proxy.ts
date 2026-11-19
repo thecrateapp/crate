@@ -1,14 +1,19 @@
+import type { ProxyOptions } from "vite";
+
 /**
  * Keep upstream auth cookies usable from the local Vite origin. When API_URL
  * points at a hosted API, its cookies are scoped to that production domain;
  * browsers reject them on localhost/127.0.0.1 unless the dev proxy strips the
  * Domain attribute. The upstream Secure and HttpOnly flags are preserved.
  */
-export function createApiProxyOptions(target: string) {
+export function createApiProxyOptions(target: string): ProxyOptions {
   return {
     target,
     changeOrigin: true,
     secure: false,
     cookieDomainRewrite: "",
+    configure(proxy) {
+      proxy.on("proxyReq", (request) => request.removeHeader("origin"));
+    },
   };
 }

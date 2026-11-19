@@ -8,6 +8,7 @@ import pytest
 from fastapi import Request
 
 
+@pytest.mark.usefixtures("pending_oauth_verifier")
 class TestNativeOAuthLinkApi:
     @pytest.fixture(autouse=True)
     def _isolated_link_store(self):
@@ -79,12 +80,9 @@ class TestNativeOAuthLinkApi:
             patch(
                 "crate.api.auth._build_oauth_state",
                 side_effect=lambda **kwargs: (
-                    captured_state.update(kwargs) or "signed-state"
+                    captured_state.update(kwargs)
+                    or ("signed-state", "provider-verifier")
                 ),
-            ),
-            patch(
-                "crate.api.auth._parse_oauth_state",
-                return_value={"verifier": "provider-verifier"},
             ),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
         ):
@@ -172,7 +170,7 @@ class TestNativeOAuthLinkApi:
             "provider": "google",
             "return_to": "cratemusic://oauth/link-callback",
             "mode": "native_link",
-            "verifier": "provider-verifier",
+            "nonce": "oauth-nonce",
             "user_id": 7,
             "session_id": "session-7",
             "app_id": "listen-tauri",
@@ -240,7 +238,7 @@ class TestNativeOAuthLinkApi:
             "provider": "google",
             "return_to": "cratemusic://oauth/link-callback",
             "mode": "native_link",
-            "verifier": "provider-verifier",
+            "nonce": "oauth-nonce",
             "user_id": 7,
             "session_id": "session-7",
             "app_id": "listen-tauri",
@@ -276,7 +274,7 @@ class TestNativeOAuthLinkApi:
             "provider": "google",
             "return_to": "cratemusic://oauth/link-callback",
             "mode": "native_link",
-            "verifier": "provider-verifier",
+            "nonce": "oauth-nonce",
             "user_id": 7,
             "session_id": "session-7",
             "app_id": "listen-tauri",
@@ -309,7 +307,7 @@ class TestNativeOAuthLinkApi:
             "provider": "google",
             "return_to": "cratemusic://oauth/link-callback",
             "mode": "native_link",
-            "verifier": "provider-verifier",
+            "nonce": "oauth-nonce",
             "user_id": 7,
             "session_id": "session-7",
             "app_id": "listen-tauri",
@@ -340,7 +338,7 @@ class TestNativeOAuthLinkApi:
             "provider": "google",
             "return_to": "cratemusic://oauth/callback",
             "mode": "login",
-            "verifier": "provider-verifier",
+            "nonce": "oauth-nonce",
             "app_id": "listen-tauri",
             "native_code_challenge": "c" * 43,
             "native_state": "s" * 43,
@@ -378,7 +376,7 @@ class TestNativeOAuthLinkApi:
             "provider": "google",
             "return_to": "cratemusic://oauth/callback",
             "mode": "login",
-            "verifier": "provider-verifier",
+            "nonce": "oauth-nonce",
             "app_id": "listen-tauri",
             "native_code_challenge": "c" * 43,
             "native_state": "s" * 43,
@@ -411,7 +409,7 @@ class TestNativeOAuthLinkApi:
             "provider": "apple",
             "return_to": "cratemusic://oauth/callback",
             "mode": "login",
-            "verifier": "provider-verifier",
+            "nonce": "oauth-nonce",
             "app_id": "listen-tauri",
             "native_code_challenge": "c" * 43,
             "native_state": "s" * 43,

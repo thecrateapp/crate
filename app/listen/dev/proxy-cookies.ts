@@ -17,3 +17,9 @@ export function loopbackProxyCookies(
       .replace(/;\s*SameSite=None(?=;|$)/gi, "; SameSite=Lax");
   });
 }
+
+export function withoutBrowserOrigin(request: {
+  removeHeader(name: string): void;
+}): void {
+  request.removeHeader("origin");
+}

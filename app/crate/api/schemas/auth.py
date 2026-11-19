@@ -239,6 +239,9 @@ class AuthRefreshResponse(BaseModel):
 
 
 class AuthMeResponse(AuthUserPublicResponse):
+    password_change_required: bool | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     username: str | None = None
     auth_type: Literal["access_token"] | None = Field(
         default=None, exclude_if=lambda value: value is None

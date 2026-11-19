@@ -5,9 +5,14 @@ section: architecture
 audience: [developer]
 status: canonical
 order: 80
-verified: 2026-07-21
+verified: 2026-11-19
 sources:
-  [app/crate/library_sync.py, app/crate/worker_handlers, docker-compose.yaml]
+  [
+    app/crate/library_sync.py,
+    app/crate/storage_layout.py,
+    app/crate/worker_handlers,
+    docker-compose.yaml,
+  ]
 ---
 
 # Library, Storage, Sync, and Imports
@@ -38,6 +43,51 @@ This file is mounted into API and worker and is the root of several behaviors:
 - imports
 - scanners
 - repair and naming logic
+
+### Mutation roots and folders on another disk
+
+Workers check every destructive library operation (delete, move, merge, split, storage
+migration, repair) with `ensure_within_roots()` in `app/crate/storage_layout.py`. The path is
+resolved, symlinks included, and must sit strictly inside an allowed root; the root itself is
+always refused. By default the only library root is `library_path`, so an artist or album folder
+that is a symlink to another disk (`/music/Artist -> /mnt/disk2/Artist`) is refused.
+
+`CRATE_LIBRARY_EXTRA_ROOTS` opts in to such layouts. It holds absolute container paths separated
+by commas or colons, and `library_mutation_roots()` adds them to `library_path`. It is empty by
+default. Every entry must:
+
+- be absolute and an existing directory inside the container
+- not be `/`, a broad top-level directory (`/home`, `/media`, `/mnt`, `/opt`, `/srv`, `/tmp`,
+  `/var`) or inside a system tree (`/app`, `/bin`, `/boot`, `/dev`, `/etc`, `/lib*`, `/proc`,
+  `/root`, `/run`, `/sbin`, `/sys`, `/usr`)
+- not contain `library_path` or `DATA_DIR`
+
+One invalid entry fails closed: every library mutation is refused with the validation error until
+the value is fixed. Name the disk's mount point (`/mnt/disk2`), not the symlink target of a
+single folder: an extra root is itself never modified, so a folder whose symlink points exactly at
+it cannot be deleted or moved.
+
+The variable reaches `crate-api` and the read-write workers (`crate-worker`, `crate-fast-worker`,
+`crate-maintenance-worker`). Mount the disk at the same path in those containers with a compose
+override, read-write in the workers and read-only in the API, for example:
+
+```yaml
+services:
+  crate-worker:
+    volumes:
+      - /srv/disk2:/mnt/disk2
+  crate-fast-worker:
+    volumes:
+      - /srv/disk2:/mnt/disk2
+  crate-maintenance-worker:
+    volumes:
+      - /srv/disk2:/mnt/disk2
+  crate-api:
+    volumes:
+      - /srv/disk2:/mnt/disk2:ro
+```
+
+Read-only services that stream or analyse those files need the same read-only mount.
 
 ## Storage models
 
@@ -205,11 +255,10 @@ Acquisition code does several important normalization steps:
 
 This is especially important for artist names that would otherwise create hidden directories or invalid paths.
 
-## Organizer and repair layer
+## Repair layer
 
 Beyond sync, Crate contains maintenance tooling for library shape:
 
-- organizer logic
 - duplicate detection
 - naming checks
 - incomplete albums
@@ -219,7 +268,7 @@ Beyond sync, Crate contains maintenance tooling for library shape:
 The scanner/fixer stack is configured in [app/config.yaml](https://github.com/thecrateapp/crate/blob/main/app/config.yaml) and implemented across:
 
 - `https://github.com/thecrateapp/crate/blob/main/app/crate/scanners`
-- organizer and repair modules
+- repair modules
 - related worker handlers
 
 These tools let Crate act not just as an indexer, but as an opinionated library maintenance system.

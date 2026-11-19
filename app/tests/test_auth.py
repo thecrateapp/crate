@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone, timedelta
 
 import pytest
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.testclient import TestClient
 
 from tests.conftest import PG_AVAILABLE
@@ -363,11 +363,12 @@ class TestOAuthRedirectHelpers:
         with (
             patch(
                 "crate.api.auth.secrets.token_urlsafe",
-                side_effect=["verifier-token", "invite-key"],
+                side_effect=["state-nonce", "verifier-token", "invite-key"],
             ),
             patch("crate.api.auth._store_oauth_invite_token") as mock_store,
+            patch("crate.api.auth._store_oauth_verifier"),
         ):
-            state = _build_oauth_state(
+            state, _ = _build_oauth_state(
                 provider="google",
                 return_to="cratemusic://oauth/callback",
                 mode="login",
@@ -381,16 +382,176 @@ class TestOAuthRedirectHelpers:
         assert "invite_token" not in parsed
         mock_store.assert_called_once_with("invite-key", "invite-token")
 
-    def test_oauth_invite_storage_falls_back_to_memory(self):
+    def test_oauth_state_rejects_the_former_public_fallback_secret(self, monkeypatch):
+        import jwt as pyjwt
+
+        from crate.api.auth import _parse_oauth_state
+
+        monkeypatch.delenv("JWT_SECRET", raising=False)
+        stored: dict[str, str] = {}
+        monkeypatch.setattr("crate.auth.get_setting", lambda key: stored.get(key))
+        monkeypatch.setattr(
+            "crate.auth.set_setting", lambda key, value: stored.__setitem__(key, value)
+        )
+        forged = pyjwt.encode(
+            {"provider": "google", "mode": "login", "verifier": "v"},
+            "crate-oauth-state",
+            algorithm="HS256",
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            _parse_oauth_state(forged)
+
+        assert exc.value.status_code == 400
+        assert stored.get("jwt_secret")
+
+    @patch.dict(
+        "os.environ", {"JWT_SECRET": "test-secret-key-1234-12345678901234"}, clear=False
+    )
+    def test_oauth_state_is_not_accepted_as_a_session_token(self):
+        from crate.api.auth import _build_oauth_state, _parse_oauth_state
+        from crate.auth import verify_jwt
+
+        with patch("crate.api.auth._store_oauth_verifier"):
+            state, _ = _build_oauth_state(
+                provider="google",
+                return_to=None,
+                mode="link",
+                user_id=7,
+                invite_token=None,
+            )
+
+        assert _parse_oauth_state(state)["user_id"] == 7
+        assert verify_jwt(state) is None
+
+    @patch.dict(
+        "os.environ", {"JWT_SECRET": "test-secret-key-1234-12345678901234"}, clear=False
+    )
+    def test_oauth_state_keeps_the_pkce_verifier_server_side(self, monkeypatch):
+        from crate.api.auth import (
+            _build_oauth_state,
+            _parse_oauth_state,
+            _take_oauth_verifier,
+        )
+
+        monkeypatch.delenv("REDIS_URL", raising=False)
+        monkeypatch.setenv("CRATE_ENV", "test")
+        state, verifier = _build_oauth_state(
+            provider="google",
+            return_to=None,
+            mode="login",
+            user_id=None,
+            invite_token=None,
+        )
+
+        parsed = _parse_oauth_state(state)
+        assert "verifier" not in parsed
+        assert verifier not in json.dumps(parsed)
+        assert _take_oauth_verifier(parsed["nonce"]) == verifier
+        assert _take_oauth_verifier(parsed["nonce"]) is None
+
+    def test_oauth_verifier_is_taken_from_redis_once(self):
         from crate.api import auth
 
-        with auth._oauth_invite_lock:
-            auth._oauth_invite_memory.clear()
+        redis_client = MagicMock()
+        redis_client.getdel.return_value = b"stored-verifier"
+        with patch("crate.api.auth._get_rate_limit_redis", return_value=redis_client):
+            auth._store_oauth_verifier("nonce-1", "stored-verifier")
+            assert auth._take_oauth_verifier("nonce-1") == "stored-verifier"
+
+        redis_client.setex.assert_called_once_with(
+            "crate:auth:oauth_verifier:nonce-1", 900, "stored-verifier"
+        )
+        redis_client.getdel.assert_called_once_with("crate:auth:oauth_verifier:nonce-1")
+
+    def test_expired_oauth_verifier_is_rejected(self, monkeypatch):
+        from crate.api import auth
+
+        monkeypatch.setenv("CRATE_ENV", "test")
+        with patch("crate.api.auth._get_rate_limit_redis", return_value=None):
+            auth._store_oauth_verifier("nonce-expired", "stored-verifier")
+            with auth._oauth_pending_lock:
+                key = "crate:auth:oauth_verifier:nonce-expired"
+                value, _ = auth._oauth_pending_memory[key]
+                auth._oauth_pending_memory[key] = (
+                    value,
+                    datetime.now(timezone.utc) - timedelta(seconds=1),
+                )
+            assert auth._take_oauth_verifier("nonce-expired") is None
+            assert auth._take_oauth_verifier(None) is None
+
+    def test_oauth_state_fails_closed_without_a_secret_store(self, monkeypatch):
+        from crate.api.auth import _build_oauth_state
+
+        monkeypatch.delenv("JWT_SECRET", raising=False)
+
+        def _unavailable(*_args, **_kwargs):
+            raise RuntimeError("settings unavailable")
+
+        monkeypatch.setattr("crate.auth.get_setting", _unavailable)
+
+        with pytest.raises(RuntimeError):
+            _build_oauth_state(
+                provider="google",
+                return_to=None,
+                mode="login",
+                user_id=None,
+                invite_token=None,
+            )
+
+    def test_oauth_invite_storage_falls_back_to_memory(self, monkeypatch):
+        from crate.api import auth
+
+        monkeypatch.setenv("CRATE_ENV", "test")
+        with auth._oauth_pending_lock:
+            auth._oauth_pending_memory.clear()
 
         with patch("crate.api.auth._get_rate_limit_redis", return_value=None):
             auth._store_oauth_invite_token("invite-key", "invite-token")
             assert auth._retrieve_oauth_invite_token("invite-key") == "invite-token"
             assert auth._retrieve_oauth_invite_token("invite-key") is None
+
+    @pytest.mark.parametrize("environment", ["production", ""])
+    def test_oauth_pending_data_needs_redis_outside_dev(self, monkeypatch, environment):
+        from crate.api import auth
+
+        monkeypatch.setenv("CRATE_ENV", environment)
+        with patch("crate.api.auth._get_rate_limit_redis", return_value=None):
+            for call in (
+                lambda: auth._store_oauth_verifier("nonce-prod", "stored-verifier"),
+                lambda: auth._take_oauth_verifier("nonce-prod"),
+                lambda: auth._store_oauth_invite_token("invite-key", "invite-token"),
+                lambda: auth._retrieve_oauth_invite_token("invite-key"),
+            ):
+                with pytest.raises(HTTPException) as exc_info:
+                    call()
+                assert exc_info.value.status_code == 503
+
+        with auth._oauth_pending_lock:
+            assert "crate:auth:oauth_verifier:nonce-prod" not in (
+                auth._oauth_pending_memory
+            )
+
+    @pytest.mark.parametrize("environment", ["production", "test"])
+    def test_redis_errors_never_fall_back_to_memory(self, monkeypatch, environment):
+        from crate.api import auth
+
+        monkeypatch.setenv("CRATE_ENV", environment)
+        redis_client = MagicMock()
+        redis_client.setex.side_effect = ConnectionError("redis down")
+        redis_client.getdel.side_effect = ConnectionError("redis down")
+        with patch("crate.api.auth._get_rate_limit_redis", return_value=redis_client):
+            with pytest.raises(HTTPException) as store_error:
+                auth._store_oauth_verifier("nonce-down", "stored-verifier")
+            with pytest.raises(HTTPException) as take_error:
+                auth._take_oauth_verifier("nonce-down")
+
+        assert store_error.value.status_code == 503
+        assert take_error.value.status_code == 503
+        with auth._oauth_pending_lock:
+            assert "crate:auth:oauth_verifier:nonce-down" not in (
+                auth._oauth_pending_memory
+            )
 
 
 class TestOAuthStart:
@@ -411,6 +572,75 @@ class TestOAuthStart:
             }
         )
 
+    @patch.dict(
+        "os.environ",
+        {
+            "JWT_SECRET": "test-secret-key-1234-12345678901234",
+            "GOOGLE_CLIENT_ID": "google-client",
+            "CRATE_ENV": "production",
+        },
+        clear=False,
+    )
+    def test_oauth_start_fails_closed_in_production_without_redis(self, monkeypatch):
+        from crate.api.auth import oauth_start
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        monkeypatch.delenv("REDIS_URL", raising=False)
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            _run(
+                oauth_start(
+                    self._request(),
+                    "google",
+                    OAuthStartRequest(
+                        return_to="https://listen.lespedants.org/auth/callback"
+                    ),
+                )
+            )
+
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.detail == "OAuth sign-in is temporarily unavailable"
+
+    @patch.dict(
+        "os.environ",
+        {
+            "JWT_SECRET": "test-secret-key-1234-12345678901234",
+            "GOOGLE_CLIENT_ID": "google-client",
+            "CRATE_ENV": "test",
+        },
+        clear=False,
+    )
+    def test_oauth_start_uses_memory_in_test_without_redis(self, monkeypatch):
+        from urllib.parse import parse_qs, urlparse
+
+        from crate.api.auth import (
+            _parse_oauth_state,
+            _pkce_challenge,
+            _take_oauth_verifier,
+            oauth_start,
+        )
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        monkeypatch.delenv("REDIS_URL", raising=False)
+        with patch("crate.api.auth._provider_available", return_value=True):
+            result = _run(
+                oauth_start(
+                    self._request(),
+                    "google",
+                    OAuthStartRequest(
+                        return_to="https://listen.lespedants.org/auth/callback"
+                    ),
+                )
+            )
+
+        query = parse_qs(urlparse(result["login_url"]).query)
+        nonce = _parse_oauth_state(query["state"][0])["nonce"]
+        verifier = _take_oauth_verifier(nonce)
+        assert verifier
+        assert query["code_challenge"] == [_pkce_challenge(verifier)]
+
     def test_public_google_login_uses_identity_scopes_without_offline_access(self):
         from urllib.parse import parse_qs, urlparse
 
@@ -426,12 +656,8 @@ class TestOAuthStart:
             patch(
                 "crate.api.auth._build_oauth_state",
                 side_effect=lambda **kwargs: (
-                    captured_state.update(kwargs) or "state-token"
+                    captured_state.update(kwargs) or ("state-token", "verifier")
                 ),
-            ),
-            patch(
-                "crate.api.auth._parse_oauth_state",
-                return_value={"verifier": "verifier"},
             ),
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
@@ -465,11 +691,7 @@ class TestOAuthStart:
             patch("crate.api.auth._provider_available", return_value=True),
             patch(
                 "crate.api.auth._build_oauth_state",
-                return_value="state-token",
-            ),
-            patch(
-                "crate.api.auth._parse_oauth_state",
-                return_value={"verifier": "verifier"},
+                return_value=("state-token", "verifier"),
             ),
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict(
@@ -573,12 +795,9 @@ class TestOAuthStart:
             patch(
                 "crate.api.auth._build_oauth_state",
                 side_effect=lambda **kwargs: (
-                    captured_state.update(kwargs) or "state-token"
+                    captured_state.update(kwargs)
+                    or ("state-token", "provider-verifier")
                 ),
-            ),
-            patch(
-                "crate.api.auth._parse_oauth_state",
-                return_value={"verifier": "provider-verifier"},
             ),
             patch("crate.api.auth._pkce_challenge", return_value="provider-challenge"),
             patch.dict(
@@ -615,12 +834,9 @@ class TestOAuthStart:
             patch(
                 "crate.api.auth._build_oauth_state",
                 side_effect=lambda **kwargs: (
-                    captured_state.update(kwargs) or "state-token"
+                    captured_state.update(kwargs)
+                    or ("state-token", "provider-verifier")
                 ),
-            ),
-            patch(
-                "crate.api.auth._parse_oauth_state",
-                return_value={"verifier": "provider-verifier"},
             ),
             patch("crate.api.auth._pkce_challenge", return_value="provider-challenge"),
             patch.dict(
@@ -659,12 +875,8 @@ class TestOAuthStart:
             patch(
                 "crate.api.auth._build_oauth_state",
                 side_effect=lambda **kwargs: (
-                    captured_state.update(kwargs) or "state-token"
+                    captured_state.update(kwargs) or ("state-token", "verifier")
                 ),
-            ),
-            patch(
-                "crate.api.auth._parse_oauth_state",
-                return_value={"verifier": "verifier"},
             ),
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
@@ -738,12 +950,8 @@ class TestOAuthStart:
             patch(
                 "crate.api.auth._build_oauth_state",
                 side_effect=lambda **kwargs: (
-                    captured_state.update(kwargs) or "state-token"
+                    captured_state.update(kwargs) or ("state-token", "verifier")
                 ),
-            ),
-            patch(
-                "crate.api.auth._parse_oauth_state",
-                return_value={"verifier": "verifier"},
             ),
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
@@ -773,12 +981,8 @@ class TestOAuthStart:
             patch(
                 "crate.api.auth._build_oauth_state",
                 side_effect=lambda **kwargs: (
-                    captured_state.update(kwargs) or "state-token"
+                    captured_state.update(kwargs) or ("state-token", "verifier")
                 ),
-            ),
-            patch(
-                "crate.api.auth._parse_oauth_state",
-                return_value={"verifier": "verifier"},
             ),
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
@@ -892,12 +1096,8 @@ class TestOAuthStart:
             patch(
                 "crate.api.auth._build_oauth_state",
                 side_effect=lambda **kwargs: (
-                    captured_state.update(kwargs) or "state-token"
+                    captured_state.update(kwargs) or ("state-token", "verifier")
                 ),
-            ),
-            patch(
-                "crate.api.auth._parse_oauth_state",
-                return_value={"verifier": "verifier"},
             ),
             patch("crate.api.auth._pkce_challenge", return_value="challenge"),
             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
@@ -979,6 +1179,7 @@ class TestAuthUserAvatarProxy:
         assert exc_info.value.status_code == 404
 
 
+@pytest.mark.usefixtures("pending_oauth_verifier")
 class TestOAuthCallback:
     @staticmethod
     def _request(path: str = "/api/auth/oauth/google/callback") -> Request:
@@ -1003,7 +1204,7 @@ class TestOAuthCallback:
             "provider": "google",
             "return_to": "cratemusic://oauth/callback",
             "mode": "login",
-            "verifier": "provider-verifier",
+            "nonce": "oauth-nonce",
             "app_id": "listen-tauri",
             "native_code_challenge": "c" * 43,
             "native_state": "s" * 43,
@@ -1038,6 +1239,79 @@ class TestOAuthCallback:
             "https://listen.lespedants.org/auth/callback#desktop=tauri"
             "&code=one-time-handoff-code&state=" + "s" * 43
         )
+
+    @patch.dict("os.environ", {"DOMAIN": "lespedants.org"}, clear=False)
+    def test_callback_uses_the_stored_verifier_once(self, pending_oauth_verifier):
+        from crate.api.auth import oauth_callback
+
+        state = {
+            "provider": "google",
+            "return_to": "cratemusic://oauth/callback",
+            "mode": "login",
+            "nonce": "oauth-nonce",
+            "app_id": "listen-tauri",
+            "native_code_challenge": "c" * 43,
+            "native_state": "s" * 43,
+        }
+        with (
+            patch("crate.api.auth._enforce_login_rate_limit"),
+            patch("crate.api.auth._clear_failed_login"),
+            patch("crate.api.auth._record_failed_login") as record_failure,
+            patch("crate.api.auth._parse_oauth_state", return_value=state),
+            patch(
+                "crate.api.native_oauth_auth.native_oauth_exchange_enabled",
+                return_value=True,
+            ),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={"id": "google-user", "email": "user@example.test"},
+            ) as exchange_provider,
+            patch(
+                "crate.api.auth.get_user_by_external_identity",
+                return_value={"id": 7, "status": "active"},
+            ),
+            patch(
+                "crate.api.auth.issue_native_oauth_handoff",
+                return_value="one-time-handoff-code",
+            ),
+        ):
+            response = oauth_callback(
+                self._request(), "google", code="provider-code", state="signed-state"
+            )
+            with pytest.raises(HTTPException) as replay:
+                oauth_callback(
+                    self._request(),
+                    "google",
+                    code="provider-code",
+                    state="signed-state",
+                )
+
+        assert response.status_code in {302, 307}
+        exchange_provider.assert_called_once()
+        assert exchange_provider.call_args.args[2] == pending_oauth_verifier
+        assert replay.value.status_code == 400
+        record_failure.assert_called_once()
+
+    @pytest.mark.parametrize("nonce", [None, "unknown-nonce"])
+    def test_callback_without_a_stored_verifier_fails_closed(self, nonce):
+        from crate.api.auth import oauth_callback
+
+        state = {"provider": "google", "mode": "login", "return_to": None}
+        if nonce:
+            state["nonce"] = nonce
+        with (
+            patch("crate.api.auth._enforce_login_rate_limit"),
+            patch("crate.api.auth._record_failed_login"),
+            patch("crate.api.auth._parse_oauth_state", return_value=state),
+            patch("crate.api.auth._google_userinfo") as exchange_provider,
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            oauth_callback(
+                self._request(), "google", code="provider-code", state="signed-state"
+            )
+
+        assert exc_info.value.status_code == 400
+        exchange_provider.assert_not_called()
 
     def test_google_userinfo_does_not_expose_provider_refresh_token(self):
         from crate.api.auth import (
@@ -1119,7 +1393,7 @@ class TestOAuthCallback:
                     "provider": "google",
                     "return_to": "/",
                     "mode": "login",
-                    "verifier": "verifier",
+                    "nonce": "oauth-nonce",
                     "app_id": "listen-web",
                 },
             ),
@@ -1184,7 +1458,7 @@ class TestOAuthCallback:
                     "return_to": "https://listen.example.com/settings",
                     "mode": "link",
                     "user_id": target_user["id"],
-                    "verifier": "verifier",
+                    "nonce": "oauth-nonce",
                 },
             ),
             patch("crate.api.auth._google_userinfo", return_value=provider_profile),
@@ -1231,7 +1505,7 @@ class TestOAuthCallback:
                     "provider": "google",
                     "return_to": "cratemusic://oauth/callback",
                     "mode": "login",
-                    "verifier": "provider-verifier",
+                    "nonce": "oauth-nonce",
                     "app_id": "listen-web",
                 },
             ),
@@ -1288,7 +1562,7 @@ class TestOAuthCallback:
                     "provider": "google",
                     "return_to": "cratemusic://oauth/callback",
                     "mode": "login",
-                    "verifier": "provider-verifier",
+                    "nonce": "oauth-nonce",
                     "app_id": app_id,
                     "native_code_challenge": "c" * 43,
                     "native_state": "s" * 43,
@@ -1350,7 +1624,7 @@ class TestOAuthCallback:
                     "provider": "google",
                     "return_to": "cratemusic://oauth/callback",
                     "mode": "native_link",
-                    "verifier": "provider-verifier",
+                    "nonce": "oauth-nonce",
                     "app_id": "listen-macos",
                     "native_code_challenge": "c" * 43,
                     "native_state": "s" * 43,
@@ -1411,7 +1685,7 @@ class TestOAuthCallback:
                     "provider": "google",
                     "return_to": "cratemusic://oauth/callback",
                     "mode": "login",
-                    "verifier": "verifier",
+                    "nonce": "oauth-nonce",
                 },
             ),
             patch(
@@ -1464,7 +1738,7 @@ class TestOAuthCallback:
                     "provider": "google",
                     "return_to": "cratemusic://oauth/callback",
                     "mode": "login",
-                    "verifier": "verifier",
+                    "nonce": "oauth-nonce",
                 },
             ),
             patch(
@@ -1508,7 +1782,7 @@ class TestOAuthCallback:
                     "provider": "google",
                     "return_to": "cratemusic://oauth/callback",
                     "mode": "login",
-                    "verifier": "verifier",
+                    "nonce": "oauth-nonce",
                 },
             ),
             patch(
@@ -1562,7 +1836,7 @@ class TestOAuthCallback:
                     "provider": "google",
                     "return_to": "/",
                     "mode": "login",
-                    "verifier": "verifier",
+                    "nonce": "oauth-nonce",
                     "invite_key": "invite-key",
                     "app_id": "listen-web",
                 },
@@ -1763,6 +2037,58 @@ class TestLoginEndpoint:
             # check the Set-Cookie header directly
             set_cookie = resp.headers.get("set-cookie", "")
             assert "crate_session" in set_cookie
+
+    def test_login_sets_a_secure_lax_session_cookie_by_default(
+        self, test_app, monkeypatch
+    ):
+        monkeypatch.setenv("DOMAIN", "lespedants.org")
+        for key in (
+            "CRATE_AUTH_COOKIE_DOMAIN",
+            "CRATE_AUTH_COOKIE_SECURE",
+            "CRATE_AUTH_COOKIE_SAMESITE",
+        ):
+            monkeypatch.delenv(key, raising=False)
+        fake_user = {
+            "id": 1,
+            "email": "test@test.com",
+            "name": "Test",
+            "avatar": None,
+            "role": "admin",
+            "username": "admin",
+            "password_hash": "$2b$12$realhashdoesntmatterhere",
+        }
+        fake_session = {
+            "id": "sess-123",
+            "expires_at": datetime.now(timezone.utc).isoformat(),
+        }
+        with (
+            patch("crate.api.auth.get_user_by_email", return_value=fake_user),
+            patch("crate.api.auth.get_setting", return_value=None),
+            patch("crate.api.auth.verify_password", return_value=True),
+            patch("crate.api.auth.update_user_last_login"),
+            patch(
+                "crate.api.auth._create_login_session",
+                return_value=("fake-jwt", fake_session, None),
+            ),
+        ):
+            resp = test_app.post(
+                "/api/auth/login",
+                json={"email": "test@test.com", "password": "pass"},
+                headers={
+                    "x-forwarded-host": "admin.lespedants.org",
+                    "x-forwarded-proto": "https",
+                },
+            )
+
+        assert resp.status_code == 200
+        session_cookies = [
+            value
+            for value in resp.headers.get_list("set-cookie")
+            if value.startswith("crate_session=fake-jwt")
+        ]
+        assert len(session_cookies) == 1
+        assert "Secure" in session_cookies[0]
+        assert "SameSite=lax" in session_cookies[0]
 
     def test_set_login_cookies_clears_stale_auth_cookie_variants(self):
         from crate.api import auth
@@ -2788,6 +3114,21 @@ class TestRequestAwareAuthCookies:
 
         (cookie,) = _set_cookie_headers(response)
         assert "Domain=.dev.lespedants.org" in cookie
+        assert "Secure" in cookie
+        assert "SameSite=lax" in cookie
+
+    def test_secure_cookies_use_none_only_when_explicitly_configured(self, monkeypatch):
+        from crate.api import auth
+
+        monkeypatch.setenv("CRATE_AUTH_COOKIE_SAMESITE", "none")
+        response = Response()
+        auth._set_auth_cookie(
+            response,
+            "token",
+            request=_cookie_request("listen.dev.lespedants.org", proto="https"),
+        )
+
+        (cookie,) = _set_cookie_headers(response)
         assert "Secure" in cookie
         assert "SameSite=none" in cookie
 

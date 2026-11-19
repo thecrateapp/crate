@@ -13,7 +13,7 @@ this file only covers what you need when editing `app/crate/api/`.
 - `schemas/` — Pydantic v2 request/response models; `schemas/__init__.py` re-exports them; shared models in `schemas/common.py` (`ApiErrorResponse`, `TaskEnqueueResponse`).
 - `auth.py` (`AuthMiddleware`, `_require_admin`, `_require_users_*`), `auth_dependencies.py` (`require_auth`), `permissions.py` (roles -> capabilities, `require_permission`).
 - `openapi.py` (security attachment, tag metadata, variants), `openapi_responses.py` (`AUTH_ERROR_RESPONSES`, `COMMON_ERROR_RESPONSES`, `error_response`, `merge_responses`).
-- `cache_events.py` (`CacheInvalidationMiddleware`, `_INVALIDATION_RULES`), `metrics_middleware.py`, `trace_middleware.py`, `cast_cors.py`, `redis_sse.py` (pub/sub helpers for SSE).
+- `cache_events.py` (`CacheInvalidationMiddleware`, `_INVALIDATION_RULES`), `metrics_middleware.py`, `trace_middleware.py`, `cast_cors.py`, `csrf.py` (`CookieCsrfMiddleware`: rejects cross-site unsafe requests authenticated by the session cookie or the trusted proxy headers), `redis_sse.py` (pub/sub helpers for SSE).
 - `_deps.py` — `json_dumps`, `library_path()`, `safe_path()`, batched ref helpers (`enrich_radio_tracks`).
 
 ## Conventions (taken from existing routers)
@@ -44,7 +44,7 @@ return {"task_id": task_id}
 
 (`tags.py`; `create_task` / `create_task_dedup` come from `crate.db.repositories.tasks`. `create_task_dedup` returns `None` when deduplicated.)
 
-- Auth: `AuthMiddleware` only resolves `request.state.user` (Bearer -> `?token=` -> `media_ticket` -> cookies -> trusted `Remote-User`). It never rejects anything. Every non-public handler MUST call a guard itself.
+- Auth: `AuthMiddleware` only resolves `request.state.user` (Bearer -> `media_ticket` -> cookies -> trusted `Remote-User`). Session JWTs and access tokens are never read from the query string. It does not authorize routes; the only rejections are MCP credentials on human routes and, while a user has `password_change_required`, every `/api/` request outside `_PASSWORD_CHANGE_ALLOWED_REQUESTS` (403). Every non-public handler MUST call a guard itself.
   - Logged-in user: `_require_auth(request)`
   - Privileged action: `require_permission(request, "<capability>")` with a capability from `permissions.ALL_CAPABILITIES`
   - `_require_admin` is just `require_permission(request, "admin.access")`. Prefer the narrowest capability (`library.metadata.write`, `ops.tasks.manage`, ...).

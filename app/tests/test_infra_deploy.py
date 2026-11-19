@@ -93,6 +93,52 @@ def test_metadata_only_selection_prediction_matches_real_deploy_shell(
         )
 
 
+@pytest.mark.parametrize("change", ["image", "sentry"])
+def test_api_release_also_starts_the_docker_proxy_in_shell_and_prediction(
+    tmp_path, change
+):
+    manifest = sentry_contract._manifest()
+    candidate = sentry_contract.manifest_module.render_release_env(manifest)
+    api = manifest["images"]["api"]
+    if change == "image":
+        current = api["repository"] + "@" + api["digest"]
+        old = candidate.replace(current, api["repository"] + "@sha256:" + "e" * 64)
+    else:
+        key = "CRATE_API_SENTRY_RELEASE"
+        old = candidate.replace(key + "=crate-" + "a" * 40, key + "=crate-" + "f" * 40)
+    assert old != candidate
+    (tmp_path / ".env").write_text(old)
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / ".env").write_text(old)
+    deployment = tmp_path / ".deploy"
+    deployment.mkdir()
+    (deployment / "release.env.candidate").write_text(candidate)
+    original = {".env": hashlib.sha256(old.encode()).hexdigest()}
+    for name in ("docker-compose.yaml", "docker-compose.project.yaml"):
+        content = b"services: {}\n"
+        (tmp_path / name).write_bytes(content)
+        (backup / name).write_bytes(content)
+        original[name] = hashlib.sha256(content).hexdigest()
+    _, predicted = generated_backup_inputs(
+        original, dict(original), old.encode(), manifest, "api-companion"
+    )
+
+    result = sentry_contract._shell(
+        tmp_path, "\nBACKUP_DIR=backup\nrecord_changed_release_services\n"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert set((backup / "changed_services").read_text().splitlines()) == {
+        "crate-docker-proxy",
+        "crate-api",
+    }
+    assert (
+        predicted["changed_services"]
+        == hashlib.sha256((backup / "changed_services").read_bytes()).hexdigest()
+    )
+
+
 @pytest.mark.parametrize(
     "relative",
     [

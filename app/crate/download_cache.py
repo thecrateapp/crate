@@ -21,6 +21,7 @@ _DEFAULT_MAX_BYTES = 50 * 1024**3
 _DEFAULT_ALBUM_TTL_SECONDS = 7 * 86400
 _DEFAULT_TRACK_TTL_SECONDS = 2 * 86400
 _DEFAULT_CRATE_TTL_SECONDS = _DEFAULT_ALBUM_TTL_SECONDS
+_DEFAULT_ACCOUNT_EXPORT_TTL_SECONDS = 86400
 _DEFAULT_LOCK_TIMEOUT_SECONDS = 900
 _DEFAULT_STALE_TMP_SECONDS = 3 * 3600
 _DISK_FREE_MARGIN_BYTES = 512 * 1024**2
@@ -101,11 +102,19 @@ def crate_cache_ttl_seconds() -> int:
     )
 
 
+def account_export_ttl_seconds() -> int:
+    return _parse_int(
+        "CRATE_ACCOUNT_EXPORT_TTL_SECONDS", _DEFAULT_ACCOUNT_EXPORT_TTL_SECONDS
+    )
+
+
 def _cache_ttl_seconds_for_kind(kind: str) -> int:
     if kind == "album":
         return album_cache_ttl_seconds()
     if kind == "crate":
         return crate_cache_ttl_seconds()
+    if kind == "account-export":
+        return account_export_ttl_seconds()
     return track_cache_ttl_seconds()
 
 
@@ -620,6 +629,7 @@ def prune_download_cache(*, max_bytes: int | None = None) -> dict[str, Any]:
 __all__ = [
     "CachedDownload",
     "DownloadCacheCapacityError",
+    "account_export_ttl_seconds",
     "album_cache_ttl_seconds",
     "album_download_cache_key",
     "cached_download_artifact_path",

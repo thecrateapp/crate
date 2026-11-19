@@ -90,19 +90,6 @@ class OrganizePreviewResponse(BaseModel):
     changes: int
 
 
-class OrganizeApplyErrorResponse(BaseModel):
-    file: str
-    error: str
-
-
-class OrganizeApplyResponse(BaseModel):
-    renamed_tracks: int
-    total: int
-    errors: list[OrganizeApplyErrorResponse] = Field(default_factory=list)
-    folder_renamed: str | None = None
-    folder_error: str | None = None
-
-
 class StackContainerResponse(BaseModel):
     id: str
     name: str

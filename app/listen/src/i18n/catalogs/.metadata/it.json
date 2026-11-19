@@ -5919,6 +5919,70 @@
     "sourceHash": "sha256:74208ca2c2b7c5e6eb2da6b8fae387106ae81baaa98f8f7076b54b03489d97e2",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "settings.account.dataTitle": {
+    "sourceHash": "sha256:97fc9fc277a21a2a645f4ac7779b0724bf89c7ae9793a318ea6a60152fd4d940",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.action": {
+    "sourceHash": "sha256:301f92779b41fd1426383148f5ccbd5806ccfc1a3e1022828751c42b66334c77",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.confirmAction": {
+    "sourceHash": "sha256:f75c7b13a3241495d896c1f4e56230d9a4e66aa7c50caef1e656f1c6b38fa84d",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.confirmDescription": {
+    "sourceHash": "sha256:0ac47f7ecd5b19b236b10172360743b8065a4cedcfada8e440a64d4c67e049f1",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.confirmTitle": {
+    "sourceHash": "sha256:d07cb84808c3206e3eeb0d0eaec20aae372be69cbc53b039a0e4297d073b08e5",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.description": {
+    "sourceHash": "sha256:435f86a485783dbf1f86fc01bb0e24364e577b89056694b7479770b8b88a8d43",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.password": {
+    "sourceHash": "sha256:48f115c4b0665a6d766965acb5e92b140d6ced83f9c1fcab8274e917ba1e4033",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.recentSignInRequired": {
+    "sourceHash": "sha256:1c7354a179bfb82a2f206afc6a3d3795cdc51b2f91469f96dad9bff5e63e4c57",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.title": {
+    "sourceHash": "sha256:c2347ca2849d627ec01f23e10ba455710ec3578027c77809efc81b63d35011d1",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.toasts.deleted": {
+    "sourceHash": "sha256:7799b5dada5d52b2e810ac24a2cdff13f2448f883c1fb50128d0a82b97fc6226",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.toasts.failed": {
+    "sourceHash": "sha256:dcf7123e72bc21f4e2454cc3b79c952094112be5b11c2fd1dcee7dda9384ae06",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.toasts.incorrectPassword": {
+    "sourceHash": "sha256:7f07210859e600c922ea514d9eacf923e4731a07f200e43470e61e5305fb740a",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.toasts.lastAdmin": {
+    "sourceHash": "sha256:0a3609c388d300f7e24e21ade72db62e923c1f8490b646161ccbfdf5d3e60843",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.toasts.passwordRequired": {
+    "sourceHash": "sha256:ea1e90641a9f14d09a8cc98554df48fc1d6e2f4b94304c6c412d8b53820dd80c",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.toasts.signInAgain": {
+    "sourceHash": "sha256:d01bbdc2db1a1d78be239c8137e1ac459d3d36716f0fb304e1ec59f69ad38f47",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.delete.toasts.tooManyAttempts": {
+    "sourceHash": "sha256:ad1a79d996e358c8d4cefae0409d0729f3f9f5610a3fb0c0a617b0d86b5371b4",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
   "settings.account.description": {
     "sourceHash": "sha256:79577b69f7668564a39de6b293cc1ce717984852eaff663ef363f3c90b2b9d69",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -5926,6 +5990,58 @@
   "settings.account.displayName": {
     "sourceHash": "sha256:3636d078b4c37d11667d7309b5be371ea16c1ab6625b41b1680aa44f1d31e0dd",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.account.export.description": {
+    "sourceHash": "sha256:54a8e79a9c3a8ade2bbf626ab74be0a6d4d6e295f5d9704ab0c109c7745b46f0",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.download": {
+    "sourceHash": "sha256:cb17f1ad545f7a8fd980d7d504ead00117049fea31b399bc7e8b0e11f91ddbcb",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.expired": {
+    "sourceHash": "sha256:b17e557f793e02ebafa04ab6a5a0710a685a24f5129709114889eb89f08dc91d",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.failed": {
+    "sourceHash": "sha256:2c191fc0f9760056a899b9affa1cd706289722b9866c5343ced99653c44f7a01",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.pending": {
+    "sourceHash": "sha256:aec716acad5fbb51f72ec39722981c79abf99498ad41581a83436539be8b2541",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.preparing": {
+    "sourceHash": "sha256:e68a424d62baddc516a6325189c656246dce5b538a2dea8adb3e991dd9b732fc",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.ready": {
+    "sourceHash": "sha256:68950bf7bc4eeace482b89526b7db30d17ec105eb129f505f6107cfa7351ed17",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.request": {
+    "sourceHash": "sha256:e5bcd76043cf7e3bca8b3f2fbbcdd53c2fddd6302152f1a45f5130e9c17c3841",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.requestAgain": {
+    "sourceHash": "sha256:e7dfdc491f15e59b5f8e993080eb8c16d9818fc3d1ef9c97ae10be2332de4abc",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.title": {
+    "sourceHash": "sha256:14dc14e2badc84ff855babeb3203145358cd1bdfc242c8f0a55ce0a832a99ddc",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.toasts.downloadFailed": {
+    "sourceHash": "sha256:e04d9de76f0fe35107d89ac3095787fc4c12fa085511c4429d73cccf49a5ae9c",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.toasts.requested": {
+    "sourceHash": "sha256:7dec3a097f03caf8aa6e85fc174ec1cb69b13eaa175c99fe03be7c6cce3c0a45",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
+  },
+  "settings.account.export.toasts.requestFailed": {
+    "sourceHash": "sha256:09b6fab48535b45b3e65deb210afdd2abd3ab8f2731eaf17b8d00e686d078223",
+    "reviewedAt": "2026-11-18T17:28:59.277Z"
   },
   "settings.account.instagram": {
     "sourceHash": "sha256:0b5ff566b766929cb57cac41511c1ad7f856d23d71f269fa78e2fa257a4ab6a5",

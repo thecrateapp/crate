@@ -64,6 +64,7 @@ from crate.db.repositories.tasks import (
     find_active_task_by_type_params,
 )
 from crate.db.tidal import get_tidal_downloads
+from crate.storage_layout import upload_staging_root
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/acquisition", tags=["acquisition"])
@@ -204,7 +205,7 @@ async def _stream_new_releases_surface():
 
 
 def _upload_staging_root() -> Path:
-    return Path(os.environ.get("DATA_DIR", "/data")) / "uploads"
+    return upload_staging_root()
 
 
 def _upload_manifest_path(staging_dir: Path) -> Path:

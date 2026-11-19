@@ -809,7 +809,10 @@ def test_resolved_app_metrics_keep_networks_and_publish_nothing(tmp_path):
 
     app = PYTHON_METRIC_SERVICES | {"crate-readplane", "crate-media-worker"}
     for name in app:
-        assert set(services[name]["networks"]) == {"crate", "app-metrics"}, name
+        private = {"docker-api"} if name == "crate-api" else set()
+        assert set(services[name]["networks"]) == {"crate", "app-metrics"} | private, (
+            name
+        )
         assert services[name].get("ports") == base[name].get("ports"), name
     sharing = {
         name

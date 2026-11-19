@@ -367,11 +367,9 @@ def _start(request: Request, *, return_to, challenge=CHALLENGE, state=STATE):
         patch("crate.api.auth._provider_available", return_value=True),
         patch(
             "crate.api.auth._build_oauth_state",
-            side_effect=lambda **kwargs: captured.update(kwargs) or "state-token",
-        ),
-        patch(
-            "crate.api.auth._parse_oauth_state",
-            return_value={"verifier": "provider-verifier"},
+            side_effect=lambda **kwargs: (
+                captured.update(kwargs) or ("state-token", "provider-verifier")
+            ),
         ),
     ):
         result = oauth_start(
@@ -481,7 +479,7 @@ def _decks_state(**overrides) -> dict[str, Any]:
         "provider": "google",
         "return_to": LOOPBACK_CALLBACK,
         "mode": "login",
-        "verifier": "provider-verifier",
+        "nonce": "oauth-nonce",
         "app_id": "crate-decks",
         "native_code_challenge": CHALLENGE,
         "native_state": STATE,
@@ -489,6 +487,7 @@ def _decks_state(**overrides) -> dict[str, Any]:
     }
 
 
+@pytest.mark.usefixtures("pending_oauth_verifier")
 def test_native_oauth_callback_sends_only_a_code_to_the_decks_loopback():
     from crate.api.auth import oauth_callback
 

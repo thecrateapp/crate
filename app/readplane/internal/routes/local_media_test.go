@@ -49,7 +49,7 @@ func TestServeLocalMediaNativeRange(t *testing.T) {
 	assert.Equal(t, "hit", rec.Header().Get("X-Crate-Readplane"))
 }
 
-func TestTrackStreamAcceptsNativeQueryToken(t *testing.T) {
+func TestTrackStreamAcceptsMediaTicket(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(
 		t,
@@ -61,7 +61,7 @@ func TestTrackStreamAcceptsNativeQueryToken(t *testing.T) {
 			LocalMediaEnabled: true,
 			MusicRoot:         root,
 		},
-		auth:    queryTokenAuthenticator{},
+		auth:    mediaTicketAuthenticator{},
 		catalog: catalog.NewStore(nil, 0),
 		localMedia: stubLocalMediaCatalog{descriptor: catalog.LocalMediaDescriptor{
 			StoredPath: "track.mp3", Root: "music", RequestedPolicy: "original",
@@ -71,7 +71,7 @@ func TestTrackStreamAcceptsNativeQueryToken(t *testing.T) {
 	}
 	request := httptest.NewRequest(
 		http.MethodGet,
-		"/api/tracks/1/stream?token=native-token",
+		"/api/tracks/1/stream?media_ticket=native-ticket",
 		nil,
 	)
 	response := httptest.NewRecorder()
@@ -131,7 +131,7 @@ func TestTrackStreamWithAccessTokenFallsBackToFastAPI(t *testing.T) {
 	require.NoError(t, err)
 	server := &Server{
 		cfg:      config.Config{Version: "test", LocalMediaEnabled: true},
-		auth:     queryTokenAuthenticator{},
+		auth:     mediaTicketAuthenticator{},
 		catalog:  catalog.NewStore(nil, 0),
 		fallback: fallback,
 		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),

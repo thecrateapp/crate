@@ -32,7 +32,13 @@ from crate.entity_ids import album_entity_uid
 from crate.library_sync import LibrarySync
 from crate.storage_import import infer_album_identity, move_album_tree
 from crate.storage_layout import album_dir as managed_album_dir
-from crate.storage_layout import entity_uid_for, looks_like_entity_uid
+from crate.storage_layout import (
+    UnsafeMutationPathError,
+    ensure_within_roots,
+    entity_uid_for,
+    library_mutation_roots,
+    looks_like_entity_uid,
+)
 from crate.worker_handlers import TaskHandler, is_cancelled
 
 log = logging.getLogger(__name__)
@@ -87,6 +93,12 @@ def _migrate_album(
         return {"status": "skipped", "reason": "source_missing", "album_id": album_id}
 
     target_album_dir = target_artist_dir / album_entity_uid
+    try:
+        ensure_within_roots(old_album_path, library_mutation_roots(lib))
+        ensure_within_roots(target_album_dir, library_mutation_roots(lib))
+    except UnsafeMutationPathError as error:
+        log.warning("Not migrating album %s: %s", album_id, error)
+        return {"status": "error", "reason": "outside_library", "album_id": album_id}
 
     if (
         target_album_dir.exists()
@@ -133,6 +145,15 @@ def _migrate_album(
         new_track_path = target_album_dir / new_filename
 
         try:
+            ensure_within_roots(old_track_path, library_mutation_roots(lib))
+        except UnsafeMutationPathError:
+            tracks_failed += 1
+            log.warning(
+                "Track outside the library during migration: %s", old_track_path
+            )
+            continue
+
+        try:
             os.rename(str(old_track_path), str(new_track_path))
         except OSError:
             # Cross-device fallback (shouldn't happen on same mount)
@@ -172,7 +193,7 @@ def _migrate_album(
     # Clean up empty source directory (only if different from target)
     if old_album_path.resolve() != target_album_dir.resolve():
         try:
-            _rmdir_if_empty(old_album_path)
+            _rmdir_if_empty(old_album_path, lib)
         except Exception:
             pass
 
@@ -184,9 +205,13 @@ def _migrate_album(
     }
 
 
-def _rmdir_if_empty(path: Path):
+def _rmdir_if_empty(path: Path, lib: Path):
     """Remove directory and empty parents up to 2 levels."""
     for _ in range(3):
+        try:
+            ensure_within_roots(path, library_mutation_roots(lib))
+        except UnsafeMutationPathError:
+            break
         if not path.is_dir():
             break
         if any(path.iterdir()):
@@ -198,10 +223,11 @@ def _rmdir_if_empty(path: Path):
 AUDIO_EXTS = {".flac", ".mp3", ".m4a", ".ogg", ".opus", ".wav", ".aac"}
 
 
-def _rmtree_if_no_audio(path: Path):
+def _rmtree_if_no_audio(path: Path, lib: Path):
     """Remove directory tree if it contains no audio files."""
     if not path.is_dir():
         return
+    ensure_within_roots(path, library_mutation_roots(lib))
     has_audio = any(
         f.suffix.lower() in AUDIO_EXTS for f in path.rglob("*") if f.is_file()
     )
@@ -560,6 +586,8 @@ def _fix_artist(
 
     target_artist_dir = Path(str(preview.get("target_artist_dir")))
     candidate_dirs = [Path(path) for path in preview.get("candidate_dirs", [])]
+    for path in (target_artist_dir, *candidate_dirs):
+        ensure_within_roots(path, library_mutation_roots(lib))
 
     set_cache(f"processing:{artist_name.lower()}", True, ttl=3600)
 
@@ -650,10 +678,10 @@ def _fix_artist(
                     )
 
             before_cleanup = candidate_dir.exists()
-            _rmtree_if_no_audio(candidate_dir)
+            _rmtree_if_no_audio(candidate_dir, lib)
             if candidate_dir.exists():
                 try:
-                    _rmdir_if_empty(candidate_dir)
+                    _rmdir_if_empty(candidate_dir, lib)
                 except Exception:
                     pass
             if before_cleanup and not candidate_dir.exists():
@@ -699,6 +727,10 @@ def _migrate_artist(
     artist_name = artist["name"]
     artist_entity_uid = _uid(artist)
     target_artist_dir = lib / artist_entity_uid
+    old_folder = artist.get("folder_name") or artist_name
+    old_artist_dir = lib / old_folder
+    for path in (target_artist_dir, old_artist_dir, lib / artist_name):
+        ensure_within_roots(path, library_mutation_roots(lib))
 
     # Suppress the library watcher for this artist during migration
     set_cache(f"processing:{artist_name.lower()}", True, ttl=3600)
@@ -736,8 +768,6 @@ def _migrate_artist(
     update_artist_folder_name(artist_name, artist_entity_uid)
 
     # Move artist-level files (artist.jpg, background.jpg) to new dir
-    old_folder = artist.get("folder_name") or artist_name
-    old_artist_dir = lib / old_folder
     if (
         old_artist_dir.is_dir()
         and old_artist_dir.resolve() != target_artist_dir.resolve()
@@ -755,7 +785,7 @@ def _migrate_artist(
                         except Exception:
                             log.debug("Failed to move artist file %s", item)
         # Clean up legacy artist dir if no audio remains
-        _rmtree_if_no_audio(old_artist_dir)
+        _rmtree_if_no_audio(old_artist_dir, lib)
 
     if old_folder != artist_name:
         name_dir = lib / artist_name
@@ -768,7 +798,7 @@ def _migrate_artist(
                             os.rename(str(item), str(dest))
                         except OSError:
                             pass
-            _rmtree_if_no_audio(name_dir)
+            _rmtree_if_no_audio(name_dir, lib)
 
     # Release watcher suppression
     delete_cache(f"processing:{artist_name.lower()}")
@@ -869,6 +899,11 @@ def _handle_migrate_storage_v2(task_id: str, params: dict, config: dict) -> dict
                 if looks_like_entity_uid(item.name):
                     continue
                 # This is a legacy name-based directory
+                try:
+                    ensure_within_roots(item, library_mutation_roots(lib))
+                except UnsafeMutationPathError:
+                    orphaned_dirs.append(item.name)
+                    continue
                 has_audio = any(
                     f.suffix.lower()
                     in {".flac", ".mp3", ".m4a", ".ogg", ".opus", ".wav"}

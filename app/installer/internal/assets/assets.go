@@ -23,6 +23,7 @@ const (
 	OperatorOverlay  = "compose.operator.yaml"
 	OperatorExample  = "config.operator.example.json"
 	ProvenanceProxy  = "provenance-docker.haproxy.cfg"
+	DockerProxy      = "docker-proxy.haproxy.cfg"
 
 	ObservabilitySetup     = "observability_setup.py"
 	ObservabilityPreflight = "observability_preflight.py"
@@ -68,6 +69,7 @@ var Sources = withObservability(map[string]string{
 	OperatorOverlay:  "deploy/operator/compose.operator.yaml",
 	OperatorExample:  "deploy/operator/config.operator.example.json",
 	ProvenanceProxy:  "deploy/operator/provenance-docker.haproxy.cfg",
+	DockerProxy:      "deploy/docker-proxy/haproxy.cfg",
 
 	ObservabilitySetup:     "scripts/observability_setup.py",
 	ObservabilityPreflight: "scripts/observability_preflight.py",
@@ -92,6 +94,7 @@ var Deployed = withObservability(map[string]string{
 	OperatorOverlay:  "deploy/operator/compose.operator.yaml",
 	OperatorExample:  "deploy/operator/config.operator.example.json",
 	ProvenanceProxy:  "deploy/operator/provenance-docker.haproxy.cfg",
+	DockerProxy:      "deploy/docker-proxy/haproxy.cfg",
 
 	ObservabilitySetup:     "scripts/observability_setup.py",
 	ObservabilityPreflight: "scripts/observability_preflight.py",

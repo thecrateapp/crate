@@ -27,6 +27,7 @@ def docker_socket(monkeypatch):
     server = socketserver.UnixStreamServer(path, _Responder)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
+    monkeypatch.delenv("DOCKER_HOST", raising=False)
     monkeypatch.setattr(docker_ctl, "DOCKER_SOCKET", path)
     yield _Responder.responses
     server.shutdown()
@@ -47,6 +48,7 @@ def test_call_returns_the_real_status_and_body(docker_socket):
 
 
 def test_call_raises_when_docker_is_unreachable(monkeypatch):
+    monkeypatch.delenv("DOCKER_HOST", raising=False)
     monkeypatch.setattr(docker_ctl, "DOCKER_SOCKET", "/tmp/crate-missing-docker.sock")
 
     with pytest.raises(docker_ctl.DockerUnavailableError):

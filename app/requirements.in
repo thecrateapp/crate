@@ -1,0 +1,2 @@
+# Full backend dependency set kept for local/test compatibility.
+-r requirements-worker.in

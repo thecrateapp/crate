@@ -362,7 +362,6 @@ def create_app() -> FastAPI:
                 "metadata",
                 "imports",
                 "scanner",
-                "organizer",
                 "matcher",
                 "duplicates",
                 "batch",
@@ -467,7 +466,9 @@ def create_app() -> FastAPI:
         install_trace_id_log_record_factory,
     )
     from crate.api.cast_cors import CastReceiverCorsMiddleware
+    from crate.api.csrf import CookieCsrfMiddleware
 
+    app.add_middleware(CookieCsrfMiddleware, allowed_origins=allowed_origins)
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CacheInvalidationMiddleware)
     app.add_middleware(MetricsMiddleware)
@@ -485,7 +486,6 @@ def create_app() -> FastAPI:
     from crate.api.matcher import router as matcher_router
     from crate.api.duplicates import router as duplicates_router
     from crate.api.artwork import router as artwork_router
-    from crate.api.organizer import router as organizer_router
     from crate.api.imports import router as imports_router
     from crate.api.batch import router as batch_router
     from crate.api.analytics import router as analytics_router
@@ -508,6 +508,7 @@ def create_app() -> FastAPI:
     from crate.api.bandcamp import router as bandcamp_router
     from crate.api.acquisition import router as acquisition_router
     from crate.api.me import router as me_router
+    from crate.api.me_account import router as me_account_router
     from crate.api.playback_state import router as playback_state_router
     from crate.api.connect import router as connect_router
     from crate.api.connect_ws import router as connect_ws_router
@@ -561,6 +562,7 @@ def create_app() -> FastAPI:
     app.include_router(decks_cues_router)
     app.include_router(media_access_router)
     app.include_router(admin_auth_router)
+    app.include_router(me_account_router)
     app.include_router(me_router)
     app.include_router(playback_state_router)
     app.include_router(connect_router)
@@ -607,7 +609,6 @@ def create_app() -> FastAPI:
     app.include_router(artist_research_router)
     app.include_router(browse_router)
     app.include_router(tags_router)
-    app.include_router(organizer_router)
     app.include_router(imports_router)
     app.include_router(batch_router)
     app.include_router(events_router)

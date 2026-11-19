@@ -339,7 +339,7 @@ def test_catalog_track_stream_endpoint_redirects_to_resolved_stream(test_app):
     assert response.headers["location"] == "/api/federation/remote/streams/ticket-1"
 
 
-def test_catalog_track_stream_preserves_native_query_token_on_internal_redirect(
+def test_catalog_track_stream_never_copies_query_credentials_into_redirects(
     test_app,
 ):
     global_uid = str(uuid.uuid4())
@@ -362,8 +362,7 @@ def test_catalog_track_stream_preserves_native_query_token_on_internal_redirect(
 
     assert response.status_code == 307
     assert response.headers["location"] == (
-        "/api/tracks/by-entity/track-local-1/stream"
-        "?delivery=balanced&token=native-token"
+        "/api/tracks/by-entity/track-local-1/stream?delivery=balanced"
     )
 
 

@@ -35,7 +35,13 @@ from crate.db.repositories.library import (
 from crate.provider_rate_limits import wait_for_provider_slot
 from crate.release_dates import normalize_release_date
 from crate.release_track_matching import match_release_track
-from crate.storage_layout import looks_like_entity_uid, resolve_artist_dir
+from crate.storage_layout import (
+    UnsafeMutationPathError,
+    ensure_within_roots,
+    library_mutation_roots,
+    looks_like_entity_uid,
+    resolve_artist_dir,
+)
 from crate.task_progress import (
     TaskProgress,
     emit_item_event,
@@ -509,8 +515,9 @@ def _handle_reset_enrichment(task_id: str, params: dict, config: dict) -> dict:
         photo_path = artist_dir / photo
         if photo_path.exists():
             try:
+                ensure_within_roots(artist_dir, library_mutation_roots(lib))
                 photo_path.unlink()
-            except OSError:
+            except (OSError, UnsafeMutationPathError):
                 log.debug("Failed to delete photo %s", photo_path, exc_info=True)
 
     emit_task_event(task_id, "info", {"message": f"Reset enrichment for: {name}"})
@@ -951,6 +958,11 @@ def _reorganize_artist_folders(
         )
         return
     if not artist_dir or not artist_dir.is_dir():
+        return
+    try:
+        ensure_within_roots(artist_dir, library_mutation_roots(lib))
+    except UnsafeMutationPathError:
+        log.warning("Skip folder reorganization outside the library: %s", artist_dir)
         return
     if any(
         looks_like_entity_uid(part.name)

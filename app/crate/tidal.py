@@ -14,6 +14,7 @@ from pathlib import Path
 import requests
 
 from crate.db.cache_settings import get_setting
+from crate.storage_layout import UnsafeMutationPathError, ensure_within_roots
 from crate.storage_import import (
     DEFAULT_AUDIO_EXTENSIONS,
     infer_album_identity,
@@ -952,7 +953,11 @@ def move_to_library_detailed(
                     authorize()
                 if placement is None:
                     apply(
-                        lambda: move_file(file_path, target_album_dir / file_path.name)
+                        lambda: move_file(
+                            file_path,
+                            target_album_dir / file_path.name,
+                            library_root=dst,
+                        )
                     )
                 else:
                     apply(
@@ -1058,7 +1063,9 @@ def move_to_library_detailed(
                     if placement is None:
                         apply(
                             lambda: move_file(
-                                album_item, target_album_dir / album_item.name
+                                album_item,
+                                target_album_dir / album_item.name,
+                                library_root=dst,
                             )
                         )
                     else:
@@ -1097,7 +1104,12 @@ def move_to_library_detailed(
 
     # Clean up processing dir (best-effort — it may still contain files
     # we couldn't move, and those will be cleaned on retry / manually).
-    shutil.rmtree(str(src), ignore_errors=True)
+    try:
+        ensure_within_roots(src, (PROCESSING_DIR,))
+    except UnsafeMutationPathError:
+        log.warning("Not removing processing dir outside %s: %s", PROCESSING_DIR, src)
+    else:
+        shutil.rmtree(str(src), ignore_errors=True)
 
     return list(imported_targets.values())
 

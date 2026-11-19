@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -95,19 +94,14 @@ func (c Client) Get(ctx context.Context, path string, token string) ([]byte, htt
 
 // FirstSSEData opens an SSE stream and returns the first data event payload.
 func (c Client) FirstSSEData(ctx context.Context, path string, token string) ([]byte, error) {
-	parsed, err := url.Parse(c.url(path))
-	if err != nil {
-		return nil, err
-	}
-	query := parsed.Query()
-	query.Set("token", token)
-	parsed.RawQuery = query.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url(path), nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Accept", "text/event-stream")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err

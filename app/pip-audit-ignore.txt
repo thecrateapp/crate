@@ -1,0 +1,4 @@
+# Advisories accepted by `make python-audit` (CI: Backend Tests, dependency audit).
+# One advisory ID (PYSEC-, GHSA- or CVE-) per line, followed by a comment with the
+# affected package, why it does not apply or cannot be fixed yet, who accepted it and
+# when to review it again. Remove the line as soon as a fixed release is locked.
