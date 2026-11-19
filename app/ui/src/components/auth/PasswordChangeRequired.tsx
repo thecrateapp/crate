@@ -62,8 +62,8 @@ export function PasswordChangeRequired() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-app-surface px-4">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
-        <div className="flex flex-col items-center pb-4 text-center">
-          <CrateLogo title="Crate" className="mb-2 h-16 w-16" />
+        <div className="flex flex-col items-center gap-2 pb-4 text-center">
+          <CrateLogo title="Crate" size={64} />
           <h1 className="text-2xl font-bold text-text-primary font-display">
             Choose a new password
           </h1>
