@@ -75,7 +75,9 @@ def write_wav(path: Path, audio: np.ndarray) -> None:
     soundfile.write(str(path), audio, RATE, subtype="FLOAT")
 
 
-def transition_times(report: dict[str, Any], trace: dict[str, np.ndarray]) -> tuple[float, float]:
+def transition_times(
+    report: dict[str, Any], trace: dict[str, np.ndarray]
+) -> tuple[float, float]:
     """Start and end of the transition as played, in the render's time (ms)."""
     events = {event["state"]: event["tMs"] for event in report["events"]}
     t = trace["tMs"]
@@ -84,7 +86,8 @@ def transition_times(report: dict[str, Any], trace: dict[str, np.ndarray]) -> tu
         ends = [
             event["tMs"]
             for event in report["events"]
-            if event["state"] in ("Completed", "FellBack", "Cancelled") and event["tMs"] >= start
+            if event["state"] in ("Completed", "FellBack", "Cancelled")
+            and event["tMs"] >= start
         ]
         end = ends[0] if ends else start + report["durationMs"]
         return start, end
@@ -96,7 +99,9 @@ def transition_times(report: dict[str, Any], trace: dict[str, np.ndarray]) -> tu
     return start, end
 
 
-def alignment(report: dict[str, Any], trace: dict[str, np.ndarray], start: float, end: float) -> dict:
+def alignment(
+    report: dict[str, Any], trace: dict[str, np.ndarray], start: float, end: float
+) -> dict:
     """Where the incoming deck is against where the plan puts it, in output ms.
 
     ``offset(t) = (pos2 - startIncomingCue) / ratio - (pos1 - plannedStart) / rate1``:
@@ -123,7 +128,9 @@ def alignment(report: dict[str, Any], trace: dict[str, np.ndarray], start: float
     }
 
 
-def measure_decks(run: Path, beat_model: Any, voice_model: Any, ffmpeg: str) -> dict[str, Any]:
+def measure_decks(
+    run: Path, beat_model: Any, voice_model: Any, ffmpeg: str
+) -> dict[str, Any]:
     from crate.smart_mix.beat_model import track_beats
     from crate.smart_mix.vocals import voice_window_bytes
 
@@ -142,7 +149,9 @@ def measure_decks(run: Path, beat_model: Any, voice_model: Any, ffmpeg: str) -> 
 
     audio = {}
     for name in ("mix", "outgoing", "incoming"):
-        data, rate = soundfile.read(str(run / f"{name}.wav"), dtype="float32", always_2d=True)
+        data, rate = soundfile.read(
+            str(run / f"{name}.wav"), dtype="float32", always_2d=True
+        )
         assert rate == RATE
         clip = np.zeros((last - first, 2), dtype=np.float32)
         lo, hi = max(0, first), min(len(data), last)
@@ -165,7 +174,9 @@ def measure_decks(run: Path, beat_model: Any, voice_model: Any, ffmpeg: str) -> 
     report_duration = report["durationMs"] if report.get("mixed") else duration
     progress = (centres - start) * rate1 / max(report_duration, 1.0)
     within = (centres >= start) & (centres < end)
-    incoming_db = float(report.get("incomingStagingDb", min(0.0, plan.incoming_gain_db)))
+    incoming_db = float(
+        report.get("incomingStagingDb", min(0.0, plan.incoming_gain_db))
+    )
     fade_gain = {}
     for index, role in ((1, 0), (2, 1)):
         applied = at(f"xfGain{index}") * at(f"pregain{index}")
@@ -174,13 +185,19 @@ def measure_decks(run: Path, beat_model: Any, voice_model: Any, ffmpeg: str) -> 
                 [
                     # The director only attenuates (curves::stagingGain), and with
                     # ReplayGain stages the incoming deck's residual (G4 finding 3)
-                    staging_gains(float(p), min(0.0, plan.outgoing_gain_db), incoming_db)[role]
+                    staging_gains(
+                        float(p), min(0.0, plan.outgoing_gain_db), incoming_db
+                    )[role]
                     for p in progress
                 ]
             )
             applied = applied / np.maximum(staging, 1e-6)
         fade_gain[index] = applied
-    mask = within & (fade_gain[1] >= OVERLAP_FLOOR_GAIN) & (fade_gain[2] >= OVERLAP_FLOOR_GAIN)
+    mask = (
+        within
+        & (fade_gain[1] >= OVERLAP_FLOOR_GAIN)
+        & (fade_gain[2] >= OVERLAP_FLOOR_GAIN)
+    )
 
     with tempfile.TemporaryDirectory(prefix="decks-g4-") as scratch:
         paths = {}
@@ -193,8 +210,12 @@ def measure_decks(run: Path, beat_model: Any, voice_model: Any, ffmpeg: str) -> 
             track = track_beats(mono, RATE, model=beat_model)
             beats[name] = list(track.beats_ms) if track else []
             if name != "mix":
-                windows = voice_model.voice_windows(lm._resample(mono, RATE, lm.YAMNET_RATE))
-                levels = np.frombuffer(voice_window_bytes(windows).scores, dtype=np.uint8)
+                windows = voice_model.voice_windows(
+                    lm._resample(mono, RATE, lm.YAMNET_RATE)
+                )
+                levels = np.frombuffer(
+                    voice_window_bytes(windows).scores, dtype=np.uint8
+                )
                 voices[name] = (np.asarray(windows.centres_ms), levels)
                 low_end[name] = lm.low_band_db(mono, RATE, steps)
         loudness = lm.loudness_jumps(
@@ -207,13 +228,18 @@ def measure_decks(run: Path, beat_model: Any, voice_model: Any, ffmpeg: str) -> 
         if audible.size == 0:
             return np.zeros(levels.size, dtype=bool)
         reference = float(np.percentile(audible, 90))
-        return (levels >= reference - lm.BASS_PLAYING_DROP_DB) & (levels > lm.BASS_SILENCE_DB)
+        return (levels >= reference - lm.BASS_PLAYING_DROP_DB) & (
+            levels > lm.BASS_SILENCE_DB
+        )
 
     both = playing(low_end["outgoing"]) & playing(low_end["incoming"]) & within
     with np.errstate(divide="ignore"):
         out_db = 20 * np.log10(np.maximum(fade_gain[1], 0)) + at("lowCut1Db")
         in_db = 20 * np.log10(np.maximum(fade_gain[2], 0)) + at("lowCut2Db")
-    bass = int(np.sum(both & (out_db >= OVERLAP_FLOOR_DB) & (in_db >= OVERLAP_FLOOR_DB))) * lm.STEP_MS
+    bass = (
+        int(np.sum(both & (out_db >= OVERLAP_FLOOR_DB) & (in_db >= OVERLAP_FLOOR_DB)))
+        * lm.STEP_MS
+    )
     excerpt_start = pre
     beat = lm.beat_agreement(
         [b for b in beats["outgoing"]],
@@ -234,13 +260,19 @@ def measure_decks(run: Path, beat_model: Any, voice_model: Any, ffmpeg: str) -> 
         "curve": plan_dict["curve"],
         "durationMs": int(duration),
         "plannedDurationMs": plan_dict["durationMs"],
-        "render": {"durationMs": total_ms, "transitionStartMs": pre, "transitionEndMs": pre + int(duration)},
+        "render": {
+            "durationMs": total_ms,
+            "transitionStartMs": pre,
+            "transitionEndMs": pre + int(duration),
+        },
         "mixed": report.get("mixed"),
         "reason": report.get("reason"),
         "passGapMs": round(pass_gap, 3),
         **beat,
         "mixIbiCv": lm.ibi_cv(beats["mix"], excerpt_start, excerpt_start + duration),
-        "voiceOnVoiceMs": lm.voice_on_voice_ms(voices["outgoing"], voices["incoming"], mask),
+        "voiceOnVoiceMs": lm.voice_on_voice_ms(
+            voices["outgoing"], voices["incoming"], mask
+        ),
         "bassOnBassMs": bass,
         "fullLevelMs": int(mask.sum()) * lm.STEP_MS,
         **loudness,
@@ -248,7 +280,9 @@ def measure_decks(run: Path, beat_model: Any, voice_model: Any, ffmpeg: str) -> 
     }
 
 
-def measure_android(plan_dict: dict, outgoing: str, incoming: str, beat_model, voice_model, ffmpeg):
+def measure_android(
+    plan_dict: dict, outgoing: str, incoming: str, beat_model, voice_model, ffmpeg
+):
     plan = plan_from_dict(plan_dict)
     with tempfile.TemporaryDirectory(prefix="decks-g4-android-") as scratch:
         result = lm.measure_plan(
@@ -277,14 +311,21 @@ def _job(job: tuple) -> tuple[str, dict]:
     key, kind, payload, ffmpeg = job
     try:
         if kind == "decks":
-            result = measure_decks(Path(payload), _MODELS["beat"], _MODELS["voice"], ffmpeg)
+            result = measure_decks(
+                Path(payload), _MODELS["beat"], _MODELS["voice"], ffmpeg
+            )
         else:
             plan, outgoing, incoming = payload
-            result = measure_android(plan, outgoing, incoming, _MODELS["beat"], _MODELS["voice"], ffmpeg)
+            result = measure_android(
+                plan, outgoing, incoming, _MODELS["beat"], _MODELS["voice"], ffmpeg
+            )
     except Exception as error:  # one broken render must not stop the run
         import traceback
 
-        result = {"error": f"{type(error).__name__}: {error}", "trace": traceback.format_exc()}
+        result = {
+            "error": f"{type(error).__name__}: {error}",
+            "trace": traceback.format_exc(),
+        }
     return key, result
 
 
@@ -318,7 +359,10 @@ def main(argv: list[str] | None = None) -> int:
     layout: dict[str, dict[str, str]] = {}
     for pair in pairs:
         layout[pair["id"]] = {}
-        outgoing, incoming = local_path(pair["outgoingPath"]), local_path(pair["incomingPath"])
+        outgoing, incoming = (
+            local_path(pair["outgoingPath"]),
+            local_path(pair["incomingPath"]),
+        )
         for variant in DECKS_VARIANTS:
             run = args.runs / pair["id"] / variant
             if not (run / "report.json").is_file():
@@ -339,13 +383,19 @@ def main(argv: list[str] | None = None) -> int:
     todo = [job for key, job in jobs.items() if not (cache / f"{key}.json").is_file()]
     print(f"{len(todo)} of {len(jobs)} renders to measure", file=sys.stderr)
     if todo:
-        with ProcessPoolExecutor(max_workers=args.jobs, initializer=_init_worker) as pool:
+        with ProcessPoolExecutor(
+            max_workers=args.jobs, initializer=_init_worker
+        ) as pool:
             for done, (key, result) in enumerate(pool.map(_job, todo), 1):
                 (cache / f"{key}.json").write_text(json.dumps(result))
-                print(f"  {done}/{len(todo)} {'error' if 'error' in result else 'ok'}", file=sys.stderr)
+                print(
+                    f"  {done}/{len(todo)} {'error' if 'error' in result else 'ok'}",
+                    file=sys.stderr,
+                )
     measures = {
         pair_id: {
-            name: json.loads((cache / f"{key}.json").read_text()) for name, key in names.items()
+            name: json.loads((cache / f"{key}.json").read_text())
+            for name, key in names.items()
         }
         for pair_id, names in layout.items()
     }

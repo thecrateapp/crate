@@ -146,12 +146,16 @@ def autodj_fade_begin_s(outgoing: dict, incoming: dict) -> dict[str, float]:
             end = (profile.get("activeEndMs") or profile["durationMs"]) / 1000.0
             return start, None, None, end
         intro_end = profile.get("introCueMs")
-        intro_end_s = intro_end / 1000.0 if intro_end and intro_end / 1000.0 > start else None
+        intro_end_s = (
+            intro_end / 1000.0 if intro_end and intro_end / 1000.0 > start else None
+        )
         active_end = profile.get("activeEndMs")
         end = active_end / 1000.0 if active_end else duration
         outro_cue = profile.get("outroCueMs")
         outro_start = (
-            outro_cue / 1000.0 if outro_cue is not None and outro_cue / 1000.0 < end else None
+            outro_cue / 1000.0
+            if outro_cue is not None and outro_cue / 1000.0 < end
+            else None
         )
         return start, intro_end_s, outro_start, end
 
@@ -204,7 +208,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--url", default="http://127.0.0.1:8585")
     parser.add_argument("--email", default=os.environ.get("CRATE_DECKS_LIVE_EMAIL"))
-    parser.add_argument("--password", default=os.environ.get("CRATE_DECKS_LIVE_PASSWORD"))
+    parser.add_argument(
+        "--password", default=os.environ.get("CRATE_DECKS_LIVE_PASSWORD")
+    )
     parser.add_argument("--music-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -238,7 +244,9 @@ def main(argv: list[str] | None = None) -> int:
     containers = server.request("GET", "/api/decks/containers")["containers"]
     edges: dict[tuple[str, str], dict[str, Any]] = {}
     for container in containers:
-        if container["kind"] != "playlist" or not container["name"].startswith(PLAYLIST_PREFIX):
+        if container["kind"] != "playlist" or not container["name"].startswith(
+            PLAYLIST_PREFIX
+        ):
             continue
         listing = server.request(
             "GET", f"/api/decks/containers/playlist/{container['id']}/tracks?limit=500"
@@ -250,7 +258,9 @@ def main(argv: list[str] | None = None) -> int:
             )
         for first, second in zip(playable, playable[1:]):
             key = (first["entity_uid"], second["entity_uid"])
-            edges.setdefault(key, {"playlists": []})["playlists"].append(container["name"])
+            edges.setdefault(key, {"playlists": []})["playlists"].append(
+                container["name"]
+            )
 
     profiles = {
         uid: server.request("GET", f"/api/tracks/by-entity/{uid}/mix-profile")
@@ -341,7 +351,9 @@ def main(argv: list[str] | None = None) -> int:
                 "lateByMs": handover_s * 1000.0 - start_ms,
             }
         survey.append(entry)
-    args.output.write_text(json.dumps({"context": AUTO_DJ_CONTEXT, "edges": survey}, indent=1))
+    args.output.write_text(
+        json.dumps({"context": AUTO_DJ_CONTEXT, "edges": survey}, indent=1)
+    )
     print(f"{len(survey)} edges -> {args.output}", file=sys.stderr)
     return 0
 

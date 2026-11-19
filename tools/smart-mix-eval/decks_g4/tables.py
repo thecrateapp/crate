@@ -71,7 +71,9 @@ def short(uid: str) -> str:
     return uid[:8]
 
 
-def compare(current: dict, baseline: dict, metrics=tuple(SAME_WITHIN)) -> dict[str, int]:
+def compare(
+    current: dict, baseline: dict, metrics=tuple(SAME_WITHIN)
+) -> dict[str, int]:
     """+1 better, -1 worse, 0 same for each metric of one pair."""
     out = {}
     for metric in metrics:
@@ -79,7 +81,11 @@ def compare(current: dict, baseline: dict, metrics=tuple(SAME_WITHIN)) -> dict[s
         if a is None or b is None:
             continue
         delta = (a - b) * (1 if metric in HIGHER_IS_BETTER else -1)
-        out[metric] = 1 if delta > SAME_WITHIN[metric] else (-1 if delta < -SAME_WITHIN[metric] else 0)
+        out[metric] = (
+            1
+            if delta > SAME_WITHIN[metric]
+            else (-1 if delta < -SAME_WITHIN[metric] else 0)
+        )
     return out
 
 
@@ -88,7 +94,9 @@ def net(signs: dict[str, int]) -> int:
     return 1 if total > 0 else (-1 if total < 0 else 0)
 
 
-def comparison_table(measures: dict, pairs: list, current: str, baseline: str) -> list[str]:
+def comparison_table(
+    measures: dict, pairs: list, current: str, baseline: str
+) -> list[str]:
     lines = [
         f"| Metric | {current} mean | {baseline} mean | better / same / worse | sign test p |",
         "| --- | ---: | ---: | ---: | ---: |",
@@ -99,7 +107,9 @@ def comparison_table(measures: dict, pairs: list, current: str, baseline: str) -
         b = [measures[p["id"]][baseline].get(metric) for p in pairs]
         counts = Counter()
         for pair in pairs:
-            sign = compare(measures[pair["id"]][current], measures[pair["id"]][baseline], (metric,))
+            sign = compare(
+                measures[pair["id"]][current], measures[pair["id"]][baseline], (metric,)
+            )
             if metric in sign:
                 counts[sign[metric]] += 1
         a_values = [value for value in a if value is not None]
@@ -111,7 +121,9 @@ def comparison_table(measures: dict, pairs: list, current: str, baseline: str) -
             f" {sign_test(counts[1], counts[-1]):.2f} |"
         )
     for pair in pairs:
-        nets[net(compare(measures[pair["id"]][current], measures[pair["id"]][baseline]))] += 1
+        nets[
+            net(compare(measures[pair["id"]][current], measures[pair["id"]][baseline]))
+        ] += 1
     lines.append(
         f"| **Net, SM5's four** | | | {nets[1]} / {nets[0]} / {nets[-1]} |"
         f" {sign_test(nets[1], nets[-1]):.2f} |"
@@ -131,7 +143,9 @@ def main(argv: list[str] | None = None) -> int:
     measures = json.loads((root / args.metrics).read_text())
     survey = json.loads((root / "survey.json").read_text())["edges"]
     reports = {
-        (pair["id"], variant): json.loads((runs / pair["id"] / variant / "report.json").read_text())
+        (pair["id"], variant): json.loads(
+            (runs / pair["id"] / variant / "report.json").read_text()
+        )
         for pair in pairs
         for variant in ("v3", "v2", "v3-norg")
         if (runs / pair["id"] / variant / "report.json").is_file()
@@ -173,10 +187,21 @@ def main(argv: list[str] | None = None) -> int:
             if not report:
                 continue
             armed = next((e for e in report["events"] if e["state"] == "Armed"), None)
-            align = measures[pair["id"]].get(f"decks-{variant}", {}).get("alignment", {}) or {}
+            align = (
+                measures[pair["id"]].get(f"decks-{variant}", {}).get("alignment", {})
+                or {}
+            )
             handover = armed["outgoingMs"] / 1000 if armed else None
-            planned = report["plannedStartOutgoingMs"] / 1000 if report.get("playedPlan") else None
-            short_by = None if handover is None or planned is None else max(0.0, handover - planned)
+            planned = (
+                report["plannedStartOutgoingMs"] / 1000
+                if report.get("playedPlan")
+                else None
+            )
+            short_by = (
+                None
+                if handover is None or planned is None
+                else max(0.0, handover - planned)
+            )
             out.append(
                 f"| {pair['id']} | {variant} | {cell(handover)} | {cell(pair['autoDj']['handoverS'])} |"
                 f" {cell(planned)} | {cell(short_by)} | `{report['reason']}` |"
@@ -190,34 +215,81 @@ def main(argv: list[str] | None = None) -> int:
 
     def per_pair(metric_names, columns, title):
         lines = [f"### {title}", ""]
-        header = "| Pair | " + " | ".join(f"{LABELS[m]}: {' / '.join(c for c, _ in columns)}" for m in metric_names) + " |"
+        header = (
+            "| Pair | "
+            + " | ".join(
+                f"{LABELS[m]}: {' / '.join(c for c, _ in columns)}"
+                for m in metric_names
+            )
+            + " |"
+        )
         lines += [header, "| --- |" + " ---: |" * len(metric_names)]
         for pair in pairs:
             cells = []
             for metric in metric_names:
-                values = [measures[pair["id"]].get(source, {}).get(metric) for _, source in columns]
-                cells.append(" / ".join(cell(v, 2 if metric in ("mixIbiCv", "lockedShare") else 1) for v in values))
+                values = [
+                    measures[pair["id"]].get(source, {}).get(metric)
+                    for _, source in columns
+                ]
+                cells.append(
+                    " / ".join(
+                        cell(v, 2 if metric in ("mixIbiCv", "lockedShare") else 1)
+                        for v in values
+                    )
+                )
             lines.append(f"| {pair['id']} | " + " | ".join(cells) + " |")
         return lines + [""]
 
     out += ["## Per pair", ""]
     g4_columns = [("A", "android-v3"), ("D", "decks-v3"), ("D-rg off", "decks-v3-norg")]
-    out += per_pair(("beatClashMs", "phaseErrorMsMedian", "voiceOnVoiceMs", "bassOnBassMs"), g4_columns, "G4 rhythm, voice and bass: Android (A) and Decks (D), same v3 plan")
-    out += per_pair(("levelStepLuAbs", "dipLu", "bumpLu", "maxShortTermSlopeLuPerS"), g4_columns, "G4 loudness (EBU R128): Android and Decks, same v3 plan")
+    out += per_pair(
+        ("beatClashMs", "phaseErrorMsMedian", "voiceOnVoiceMs", "bassOnBassMs"),
+        g4_columns,
+        "G4 rhythm, voice and bass: Android (A) and Decks (D), same v3 plan",
+    )
+    out += per_pair(
+        ("levelStepLuAbs", "dipLu", "bumpLu", "maxShortTermSlopeLuPerS"),
+        g4_columns,
+        "G4 loudness (EBU R128): Android and Decks, same v3 plan",
+    )
     g4b_columns = [("v2", "decks-v2"), ("v3", "decks-v3")]
-    out += per_pair(("beatClashMs", "phaseErrorMsMedian", "voiceOnVoiceMs", "bassOnBassMs"), g4b_columns, "G4b rhythm, voice and bass: Decks with v2 and v3")
-    out += per_pair(("levelStepLuAbs", "dipLu", "bumpLu", "maxShortTermSlopeLuPerS"), g4b_columns, "G4b loudness: Decks with v2 and v3")
+    out += per_pair(
+        ("beatClashMs", "phaseErrorMsMedian", "voiceOnVoiceMs", "bassOnBassMs"),
+        g4b_columns,
+        "G4b rhythm, voice and bass: Decks with v2 and v3",
+    )
+    out += per_pair(
+        ("levelStepLuAbs", "dipLu", "bumpLu", "maxShortTermSlopeLuPerS"),
+        g4b_columns,
+        "G4b loudness: Decks with v2 and v3",
+    )
     listen_columns = [("Listen", "android-listen"), ("D", "decks-v3")]
-    out += per_pair(("beatClashMs", "voiceOnVoiceMs", "levelStepLuAbs", "dipLu"), listen_columns, "Android's own Listen plan against Decks Auto DJ")
+    out += per_pair(
+        ("beatClashMs", "voiceOnVoiceMs", "levelStepLuAbs", "dipLu"),
+        listen_columns,
+        "Android's own Listen plan against Decks Auto DJ",
+    )
 
     out += ["## Aggregates", ""]
     for current, baseline, title in (
         ("decks-v3", "android-v3", "G4: Decks against Android, same v3 plan"),
-        ("decks-v3-norg", "android-v3", "G4: Decks without ReplayGain against Android, same v3 plan"),
+        (
+            "decks-v3-norg",
+            "android-v3",
+            "G4: Decks without ReplayGain against Android, same v3 plan",
+        ),
         ("decks-v3", "decks-v3-norg", "Decks: ReplayGain on against off"),
-        ("decks-v3", "android-listen", "Decks Auto DJ against Android's own Listen plan"),
+        (
+            "decks-v3",
+            "android-listen",
+            "Decks Auto DJ against Android's own Listen plan",
+        ),
         ("decks-v3", "decks-v2", "G4b: Decks with v3 against v2"),
-        ("android-v3", "android-v2", "G4b reference: the same plans on the Android renderer, v3 against v2"),
+        (
+            "android-v3",
+            "android-v2",
+            "G4b reference: the same plans on the Android renderer, v3 against v2",
+        ),
     ):
         out += [f"### {title}", ""]
         out += comparison_table(measures, pairs, current, baseline)
@@ -236,7 +308,10 @@ def main(argv: list[str] | None = None) -> int:
         ]
         out.append(
             f"- **{variant}:** {len(chosen)} runs; reasons "
-            + ", ".join(f"`{k}` {v}" for k, v in Counter(row["reason"] for row in chosen).items())
+            + ", ".join(
+                f"`{k}` {v}"
+                for k, v in Counter(row["reason"] for row in chosen).items()
+            )
             + f"; mixed {sum(row['mixed'] == '1' for row in chosen)}; beat clock"
             f" {sum(row['usedBeatClock'] == '1' for row in chosen)}; late starts"
             f" {sum(v > 5 for v in late)} (late {', '.join(f'{v / 1000:.1f} s' for v in late if v > 5) or 'none'});"
@@ -258,7 +333,9 @@ def main(argv: list[str] | None = None) -> int:
             f" over 10 s: {sum(v > 10 for v in late)}, over 30 s: {sum(v > 30 for v in late)}."
         )
         lead = sorted(
-            edge["autoDj"]["fadeBeginS"] - edge["plans"][planner]["directorStartMs"] / 1000 for edge in survey
+            edge["autoDj"]["fadeBeginS"]
+            - edge["plans"][planner]["directorStartMs"] / 1000
+            for edge in survey
         )
         out.append(
             f"  Lead the plan needs (Auto DJ's fade start minus the plan's start): p50 {lead[len(lead) // 2]:.1f} s,"
@@ -270,21 +347,34 @@ def main(argv: list[str] | None = None) -> int:
     out += ["## Bass handoff over the survey", ""]
     for planner in ("smart-mix-v3", "smart-mix-v2"):
         counter = Counter(
-            (edge["plans"][planner]["mode"], edge["plans"][planner]["bassHandoff"], edge["plans"][planner]["fallbackReason"])
+            (
+                edge["plans"][planner]["mode"],
+                edge["plans"][planner]["bassHandoff"],
+                edge["plans"][planner]["fallbackReason"],
+            )
             for edge in survey
         )
         out.append(
             f"- **{planner}:** "
-            + "; ".join(f"{mode}, bass {bass}, `{reason}`: {count}" for (mode, bass, reason), count in counter.most_common())
+            + "; ".join(
+                f"{mode}, bass {bass}, `{reason}`: {count}"
+                for (mode, bass, reason), count in counter.most_common()
+            )
         )
-    industrial = [edge for edge in survey if any("industrial" in name for name in edge["playlists"])]
+    industrial = [
+        edge
+        for edge in survey
+        if any("industrial" in name for name in edge["playlists"])
+    ]
     out.append(
         f"- **G3 · Auto DJ (industrial EBM):** {len(industrial)} edges; v3 beatmatch"
         f" {sum(e['plans']['smart-mix-v3']['mode'] == 'beatmatch' for e in industrial)}, with bass swap"
         f" {sum(e['plans']['smart-mix-v3']['bassHandoff'] == 'balanced' for e in industrial)}; fallback reasons "
         + ", ".join(
             f"`{k}` {v}"
-            for k, v in Counter(e["plans"]["smart-mix-v3"]["fallbackReason"] for e in industrial).items()
+            for k, v in Counter(
+                e["plans"]["smart-mix-v3"]["fallbackReason"] for e in industrial
+            ).items()
         )
     )
     out.append("")
@@ -306,7 +396,9 @@ def main(argv: list[str] | None = None) -> int:
         ]
         disagreements = [r for r in results if not r.get("agrees", False)]
         for result in disagreements:
-            out.append(f"  - `{result['name']}`: Decks {result.get('decksCodes')}, server {result.get('serverCodes')}")
+            out.append(
+                f"  - `{result['name']}`: Decks {result.get('decksCodes')}, server {result.get('serverCodes')}"
+            )
     print("\n".join(out))
     return 0
 

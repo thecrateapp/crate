@@ -50,7 +50,10 @@ def offsets(measures: dict, pairs: list[str], variants=("v3", "v2")) -> list[flo
     values = []
     for pair in pairs:
         for variant in variants:
-            alignment = measures.get(pair, {}).get(f"decks-{variant}", {}).get("alignment") or {}
+            alignment = (
+                measures.get(pair, {}).get(f"decks-{variant}", {}).get("alignment")
+                or {}
+            )
             if "offsetAtStartMs" in alignment:
                 values.append(alignment["offsetAtStartMs"])
     return values
@@ -63,10 +66,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--after", default="renders-after")
     parser.add_argument("--before-metrics", default="metrics/metrics.json")
     parser.add_argument("--after-metrics", default="metrics-after/metrics.json")
-    parser.add_argument("--buffers", nargs="*", default=[], metavar="FRAMES=RUNS:METRICS")
+    parser.add_argument(
+        "--buffers", nargs="*", default=[], metavar="FRAMES=RUNS:METRICS"
+    )
     args = parser.parse_args(argv)
     root = args.g4
-    pairs = [pair["id"] for pair in json.loads((root / "pairs.json").read_text())["pairs"]]
+    pairs = [
+        pair["id"] for pair in json.loads((root / "pairs.json").read_text())["pairs"]
+    ]
     before = load_reports(root / args.before, pairs)
     after = load_reports(root / args.after, pairs)
     measures_before = json.loads((root / args.before_metrics).read_text())
@@ -86,7 +93,14 @@ def main(argv: list[str] | None = None) -> int:
             if not b or not a:
                 continue
             handover = [
-                next((e["outgoingMs"] / 1000 for e in r["events"] if e["state"] == "Armed"), None)
+                next(
+                    (
+                        e["outgoingMs"] / 1000
+                        for e in r["events"]
+                        if e["state"] == "Armed"
+                    ),
+                    None,
+                )
                 for r in (b, a)
             ]
             out.append(
@@ -102,11 +116,20 @@ def main(argv: list[str] | None = None) -> int:
         "| Run | Buffer (frames) | Starts | Offset at start, ms: median / min / max | Within 1 ms |",
         "| --- | ---: | ---: | ---: | ---: |",
     ]
-    rows = [("before", 1024, offsets(measures_before, pairs)), ("after", 1024, offsets(measures_after, pairs))]
+    rows = [
+        ("before", 1024, offsets(measures_before, pairs)),
+        ("after", 1024, offsets(measures_after, pairs)),
+    ]
     for spec in args.buffers:
         frames, _, rest = spec.partition("=")
         _, _, metrics_path = rest.partition(":")
-        rows.append(("after", int(frames), offsets(json.loads((root / metrics_path).read_text()), pairs)))
+        rows.append(
+            (
+                "after",
+                int(frames),
+                offsets(json.loads((root / metrics_path).read_text()), pairs),
+            )
+        )
     for name, frames, values in rows:
         if not values:
             continue

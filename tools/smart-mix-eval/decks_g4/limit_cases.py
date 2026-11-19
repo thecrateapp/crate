@@ -50,21 +50,30 @@ def main(argv: list[str] | None = None) -> int:
         limits = served["policyLimits"]
         for candidate in served["candidates"]:
             cases.append(
-                tool.case(f"{pair_id}-candidate-{candidate['index']}", candidate["plan"], limits)
+                tool.case(
+                    f"{pair_id}-candidate-{candidate['index']}",
+                    candidate["plan"],
+                    limits,
+                )
             )
         first = served["candidates"][0]["plan"]
         variations = (
-            tool.beatmatch_variations if first["mode"] == "beatmatch" else tool.adaptive_variations
+            tool.beatmatch_variations
+            if first["mode"] == "beatmatch"
+            else tool.adaptive_variations
         )
         for name, plan_changes, limit_changes in variations(first, limits):
             cases.append(
                 tool.case(
-                    f"{pair_id}-{name}", *tool.varied(first, limits, plan_changes, limit_changes)
+                    f"{pair_id}-{name}",
+                    *tool.varied(first, limits, plan_changes, limit_changes),
                 )
             )
     args.output.write_text(json.dumps({"cases": cases}, indent=1))
     with_codes = sum(1 for case in cases if case["codes"])
-    print(f"{len(cases)} cases, {with_codes} with codes -> {args.output}", file=sys.stderr)
+    print(
+        f"{len(cases)} cases, {with_codes} with codes -> {args.output}", file=sys.stderr
+    )
     return 0
 
 

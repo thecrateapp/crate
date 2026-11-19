@@ -36,17 +36,21 @@ def test_autodj_fade_takes_the_shorter_of_intro_and_outro():
 
 def test_autodj_fade_of_partial_profiles_uses_the_transition_time():
     # AnalysisImporter skips partial profiles: only the first and last sound
-    fade = survey.autodj_fade_begin_s(_profile(quality="partial"), _profile(quality="partial"))
+    fade = survey.autodj_fade_begin_s(
+        _profile(quality="partial"), _profile(quality="partial")
+    )
     assert fade["fadeBeginS"] == pytest.approx(295.0 - survey.AUTO_DJ_TRANSITION_S)
 
 
 def test_director_start_is_the_cue_or_earlier_to_end_in_time():
     plan = {"durationMs": 10_000, "outgoingCueMs": 100_000}
     assert survey.director_start_ms(plan, 300_000) == 100_000
-    assert survey.director_start_ms(plan, 105_000) == pytest.approx(105_000 - 10_000 - 50)
-    assert survey.director_start_ms({"durationMs": 10_000, "outgoingCueMs": 0}, 60_000) == (
-        pytest.approx(60_000 - 10_000 - 50)
+    assert survey.director_start_ms(plan, 105_000) == pytest.approx(
+        105_000 - 10_000 - 50
     )
+    assert survey.director_start_ms(
+        {"durationMs": 10_000, "outgoingCueMs": 0}, 60_000
+    ) == (pytest.approx(60_000 - 10_000 - 50))
 
 
 def test_voiced_share_reads_the_phrases_at_each_end():
@@ -58,11 +62,17 @@ def test_voiced_share_reads_the_phrases_at_each_end():
 
 
 def test_tempo_gap_folds_half_and_double_time():
-    assert select_pairs.tempo_gap({"outgoingBpm": 170, "incomingBpm": 85}) == pytest.approx(0.0)
-    assert select_pairs.tempo_gap({"outgoingBpm": 120, "incomingBpm": 126}) == pytest.approx(0.05)
+    assert select_pairs.tempo_gap(
+        {"outgoingBpm": 170, "incomingBpm": 85}
+    ) == pytest.approx(0.0)
+    assert select_pairs.tempo_gap(
+        {"outgoingBpm": 120, "incomingBpm": 126}
+    ) == pytest.approx(0.05)
 
 
-def _edge(uid_out, uid_in, mode="adaptive", reason="incompatible_tempo", late=0.0, **extra):
+def _edge(
+    uid_out, uid_in, mode="adaptive", reason="incompatible_tempo", late=0.0, **extra
+):
     plan = {
         "mode": mode,
         "bassHandoff": "balanced" if mode == "beatmatch" else "none",
@@ -132,11 +142,18 @@ def test_transition_times_follow_the_director_or_auto_dj():
         ],
     }
     assert metrics.transition_times(mixed, trace) == (9.0, 29.0)
-    assert metrics.transition_times({"mixed": False, "events": []}, trace) == (10.0, 30.0)
+    assert metrics.transition_times({"mixed": False, "events": []}, trace) == (
+        10.0,
+        30.0,
+    )
 
 
 def test_alignment_is_zero_where_the_plan_puts_the_decks():
-    plan = {"mode": "beatmatch", "incomingTempoRatio": 1.02, "startIncomingCueMs": 5_000}
+    plan = {
+        "mode": "beatmatch",
+        "incomingTempoRatio": 1.02,
+        "startIncomingCueMs": 5_000,
+    }
     report = {
         "mixed": True,
         "playedPlan": plan,
@@ -162,7 +179,10 @@ def test_short_by_is_the_handover_past_the_plans_start():
 
     report = {
         "plannedStartOutgoingMs": 100_000,
-        "events": [{"state": "Armed", "outgoingMs": 145_800}, {"state": "Running", "outgoingMs": 145_800}],
+        "events": [
+            {"state": "Armed", "outgoingMs": 145_800},
+            {"state": "Running", "outgoingMs": 145_800},
+        ],
     }
     assert compare_runs.short_by(report) == pytest.approx(45.8)
     report["events"][0]["outgoingMs"] = 90_000
@@ -174,7 +194,13 @@ def test_offsets_collect_the_decks_starts():
     import compare_runs
 
     measures = {
-        "p01": {"decks-v3": {"alignment": {"offsetAtStartMs": 17.4}}, "decks-v2": {"alignment": {}}},
-        "p02": {"decks-v3": {"alignment": None}, "decks-v2": {"alignment": {"offsetAtStartMs": 0.0}}},
+        "p01": {
+            "decks-v3": {"alignment": {"offsetAtStartMs": 17.4}},
+            "decks-v2": {"alignment": {}},
+        },
+        "p02": {
+            "decks-v3": {"alignment": None},
+            "decks-v2": {"alignment": {"offsetAtStartMs": 0.0}},
+        },
     }
     assert compare_runs.offsets(measures, ["p01", "p02"]) == [17.4, 0.0]

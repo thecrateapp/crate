@@ -40,7 +40,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--url", default="http://127.0.0.1:8585")
     parser.add_argument("--email", default=os.environ.get("CRATE_DECKS_LIVE_EMAIL"))
-    parser.add_argument("--password", default=os.environ.get("CRATE_DECKS_LIVE_PASSWORD"))
+    parser.add_argument(
+        "--password", default=os.environ.get("CRATE_DECKS_LIVE_PASSWORD")
+    )
     parser.add_argument("--pairs", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -48,7 +50,9 @@ def main(argv: list[str] | None = None) -> int:
     server = Server(args.url)
     server.sign_in(args.email, args.password)
     capabilities = server.request("GET", "/api/capabilities")
-    listen_planner = capabilities["smart_mix"].get("listen_planner_version") or "smart-mix-v2"
+    listen_planner = (
+        capabilities["smart_mix"].get("listen_planner_version") or "smart-mix-v2"
+    )
     pairs = json.loads(args.pairs.read_text())["pairs"]
 
     def ask(planner: str, context: dict) -> list[dict]:

@@ -53,24 +53,33 @@ def tempo_gap(edge: dict[str, Any]) -> float:
 
 
 def voiced(edge: dict[str, Any]) -> float:
-    return (edge.get("outgoingVoicedEnd") or 0.0) + (edge.get("incomingVoicedStart") or 0.0)
+    return (edge.get("outgoingVoicedEnd") or 0.0) + (
+        edge.get("incomingVoicedStart") or 0.0
+    )
 
 
-Rule = tuple[str, int, Callable[[dict[str, Any]], bool], Callable[[dict[str, Any]], Any]]
+Rule = tuple[
+    str, int, Callable[[dict[str, Any]], bool], Callable[[dict[str, Any]], Any]
+]
 
 RULES: list[Rule] = [
     (
         "bass",
         2,
-        lambda e: e["plans"][V3]["mode"] == "beatmatch"
-        and e["plans"][V3]["bassHandoff"] == "balanced"
-        and e["plans"][V3]["curve"] == "equal-power",
+        lambda e: (
+            e["plans"][V3]["mode"] == "beatmatch"
+            and e["plans"][V3]["bassHandoff"] == "balanced"
+            and e["plans"][V3]["curve"] == "equal-power"
+        ),
         lambda e: tempo_gap(e),
     ),
     (
         "long-blend",
         1,
-        lambda e: e["plans"][V3]["mode"] == "beatmatch" and e["plans"][V3]["curve"] == "dj-blend",
+        lambda e: (
+            e["plans"][V3]["mode"] == "beatmatch"
+            and e["plans"][V3]["curve"] == "dj-blend"
+        ),
         lambda e: -e["plans"][V3]["durationMs"],
     ),
     (
@@ -82,7 +91,10 @@ RULES: list[Rule] = [
     (
         "vocal",
         2,
-        lambda e: (e.get("outgoingVoicedEnd") or 0) > 0 and (e.get("incomingVoicedStart") or 0) > 0,
+        lambda e: (
+            (e.get("outgoingVoicedEnd") or 0) > 0
+            and (e.get("incomingVoicedStart") or 0) > 0
+        ),
         lambda e: -voiced(e),
     ),
     (
@@ -94,7 +106,9 @@ RULES: list[Rule] = [
     (
         "unstable",
         1,
-        lambda e: e["plans"][V3]["fallbackReason"] in ("low_confidence", "unstable_tempo"),
+        lambda e: (
+            e["plans"][V3]["fallbackReason"] in ("low_confidence", "unstable_tempo")
+        ),
         lambda e: -e["plans"][V3]["lateByMs"],
     ),
 ]
@@ -147,7 +161,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     survey = json.loads(args.survey.read_text())
     pairs = select(survey["edges"])
-    args.output.write_text(json.dumps({"context": survey["context"], "pairs": pairs}, indent=1))
+    args.output.write_text(
+        json.dumps({"context": survey["context"], "pairs": pairs}, indent=1)
+    )
     for pair in pairs:
         plan = pair["plans"][V3]
         print(
