@@ -72,6 +72,59 @@ def test_bearer_requests_from_other_origins_are_not_affected(client):
     assert response.json() == {"email": "bearer@test"}
 
 
+@pytest.fixture
+def proxy_client(client, monkeypatch):
+    monkeypatch.setenv("FORWARD_AUTH_SECRET", "proxy-secret")
+    return TestClient(
+        client.app,
+        client=("172.18.0.5", 50000),
+        headers={"Remote-User": "proxy@test", "X-Forward-Auth-Secret": "proxy-secret"},
+    )
+
+
+@pytest.mark.parametrize(
+    ("method", "headers", "expected_status"),
+    [
+        ("POST", {"Origin": FOREIGN_ORIGIN}, 403),
+        ("PUT", {"Origin": FOREIGN_ORIGIN}, 403),
+        ("PATCH", {"Origin": FOREIGN_ORIGIN}, 403),
+        ("DELETE", {"Origin": FOREIGN_ORIGIN}, 403),
+        ("POST", {"Sec-Fetch-Site": "cross-site"}, 403),
+        ("POST", {"Origin": ALLOWED_ORIGIN}, 200),
+        ("POST", {"Sec-Fetch-Site": "same-origin"}, 200),
+        ("GET", {"Origin": FOREIGN_ORIGIN}, 200),
+    ],
+)
+def test_proxy_authenticated_requests(proxy_client, method, headers, expected_status):
+    response = proxy_client.request(method, "/api/thing", headers=headers)
+
+    assert response.status_code == expected_status
+    if expected_status == 403:
+        assert response.json() == {"detail": "Cross-site request rejected"}
+    else:
+        assert response.json() == {"email": "proxy@test"}
+
+
+def test_proxy_headers_without_the_secret_are_not_checked(proxy_client):
+    response = proxy_client.post(
+        "/api/thing",
+        headers={"Origin": FOREIGN_ORIGIN, "X-Forward-Auth-Secret": "wrong"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"email": None}
+
+
+def test_bearer_requests_through_the_proxy_are_not_affected(proxy_client):
+    response = proxy_client.post(
+        "/api/thing",
+        headers={"Origin": FOREIGN_ORIGIN, "Authorization": "Bearer bearer-jwt"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"email": "bearer@test"}
+
+
 def test_unauthenticated_requests_are_left_to_the_route(client):
     client.cookies.set("crate_session", "expired-jwt")
 

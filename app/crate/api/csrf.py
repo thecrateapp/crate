@@ -26,10 +26,11 @@ class CookieCsrfMiddleware:
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        state = scope.get("state", {})
         if (
             scope["type"] == "http"
             and scope["method"] not in SAFE_METHODS
-            and scope.get("state", {}).get("cookie_authenticated")
+            and (state.get("cookie_authenticated") or state.get("proxy_authenticated"))
             and is_cross_site_request(Headers(scope=scope), self.allowed_origins)
         ):
             response = JSONResponse(

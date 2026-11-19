@@ -1844,6 +1844,7 @@ class AuthMiddleware:
                     if role == "admin" or "admins" in groups
                     else "user",
                 }
+                request.state.proxy_authenticated = True
 
         if user and user.get("auth_type") == "access_token":
             if not _is_access_token_request(user, request.method, request.url.path):
