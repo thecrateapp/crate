@@ -346,10 +346,13 @@ def _fetch(provider: str, name: str, facets: list[str]):
         if not isinstance(artist, dict):
             return None
         bio = artist.get("bio") or {}
+        bio_text = bio.get("content") or bio.get("summary")
+        if "biography" in facets and not normalize_artist_bio(bio_text or ""):
+            bio_text = lastfm.fetch_localized_bio(name, api_key=key) or bio_text
         stats = artist.get("stats") or {}
         raw_tags = artist.get("tags") or {}
         return {
-            "bio": bio.get("content") or bio.get("summary"),
+            "bio": bio_text,
             "mbid": artist.get("mbid"),
             "tags": [
                 tag["name"]

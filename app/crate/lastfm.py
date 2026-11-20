@@ -15,6 +15,9 @@ from crate.slugs import slugify
 LASTFM_BASE = "http://ws.audioscrobbler.com/2.0/"
 FANART_BASE = "https://webservice.fanart.tv/v3/music/"
 LASTFM_PLACEHOLDER_HASH = "2a96cbd8b46e442fc41c2b86b821562f"
+# Languages tried, in order, when Last.fm has no English biography. Many
+# artists in this library only have a wiki in Spanish.
+BIO_FALLBACK_LANGS = ("es",)
 log = logging.getLogger(__name__)
 
 
@@ -64,6 +67,8 @@ def get_artist_info(artist_name: str) -> dict | None:
     bio = artist.get("bio", {}) or {}
     bio_content = bio.get("content") or bio.get("summary", "")
     bio_content = normalize_artist_bio(bio_content)
+    if not bio_content:
+        bio_content = fetch_localized_bio(artist_name, api_key=api_key)
 
     image_url = _lastfm_image_url(artist.get("image", []))
 
@@ -86,8 +91,46 @@ def get_artist_info(artist_name: str) -> dict | None:
     return result
 
 
+def fetch_localized_bio(
+    artist_name: str,
+    *,
+    api_key: str,
+    langs: tuple[str, ...] = BIO_FALLBACK_LANGS,
+) -> str:
+    """Return the first non-empty Last.fm biography among ``langs``.
+
+    Last.fm answers ``artist.getinfo`` with only a "Read more" link when the
+    English wiki is empty, even if another language has one. A failed lookup
+    yields an empty string, so the rest of the profile is still used.
+    """
+    for lang in langs:
+        try:
+            resp = requests.get(
+                LASTFM_BASE,
+                params={
+                    "method": "artist.getinfo",
+                    "artist": artist_name,
+                    "lang": lang,
+                    "api_key": api_key,
+                    "format": "json",
+                },
+                timeout=10,
+            )
+            resp.raise_for_status()
+            artist = resp.json().get("artist") or {}
+        except Exception:
+            log.debug("Last.fm %s bio lookup failed for %s", lang, artist_name)
+            continue
+        bio = artist.get("bio") or {}
+        content = normalize_artist_bio(bio.get("content") or bio.get("summary") or "")
+        if content:
+            return content
+    return ""
+
+
 def _artist_info_cache_key(artist_name: str) -> str:
-    return f"lastfm:artist:v3:{artist_name.lower()}"
+    # v4: entries cached before the localized bio fallback lack it.
+    return f"lastfm:artist:v4:{artist_name.lower()}"
 
 
 def get_cached_artist_info(artist_name: str) -> dict | None:

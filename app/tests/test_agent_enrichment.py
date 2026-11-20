@@ -948,6 +948,47 @@ def test_lastfm_biography_does_not_fetch_similarities_or_full_artist_enrichment(
     )
 
 
+def test_lastfm_biography_falls_back_to_spanish_when_english_is_empty(
+    enrichment_artist, monkeypatch
+):
+    import requests
+    from crate import lastfm
+
+    monkeypatch.setattr(
+        "crate.agent_enrichment.wait_for_provider_slot", lambda *_: None
+    )
+    monkeypatch.setattr(lastfm, "get_cached_artist_info", lambda *_: None)
+    monkeypatch.setattr(lastfm, "_lastfm_key", lambda: "test-key")
+    bios = {
+        None: '<a href="https://www.last.fm/music/X">Read more on Last.fm</a>',
+        "es": "Biografía en español",
+    }
+    langs = []
+
+    class Response:
+        def __init__(self, lang):
+            self.lang = lang
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"artist": {"bio": {"content": bios[self.lang]}}}
+
+    def get(url, **kwargs):
+        langs.append(kwargs["params"].get("lang"))
+        return Response(kwargs["params"].get("lang"))
+
+    monkeypatch.setattr(requests, "get", get)
+    monkeypatch.setattr(lastfm, "_get_similar_artists", lambda *a, **k: [])
+    result = _apply(_plan(enrichment_artist, mode="refresh"))
+    assert result["execution"]["status"] == "completed"
+    assert langs == [None, "es"]
+    assert read_enrichment_state(enrichment_artist["uid"])["artist"]["bio"] == (
+        "Biografía en español"
+    )
+
+
 def test_maximum_batch_plan_remains_bounded_and_keeps_all_target_versions(monkeypatch):
     uids = [str(uuid4()) for _ in range(20)]
     monkeypatch.setattr(
