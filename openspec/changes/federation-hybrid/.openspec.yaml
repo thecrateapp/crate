@@ -1,0 +1,7 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Federación híbrida: búsqueda bajo demanda, resúmenes por peer, índice de fuentes, deltas, identidad de fuente, consolidación e integridad."
+affected_areas:
+  - "app/crate/federation"
+  - "app/readplane"
+  - "app/listen"

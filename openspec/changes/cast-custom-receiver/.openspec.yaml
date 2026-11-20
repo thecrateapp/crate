@@ -1,0 +1,7 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Activar el receiver Cast propio tras su gate de release, la aceptación en hardware y el registro."
+affected_areas:
+  - "app/cast-receiver"
+  - "app/shared/cast"
+  - "app/crate/api/cast.py"

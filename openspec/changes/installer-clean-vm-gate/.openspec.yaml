@@ -1,0 +1,6 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Probar el instalador de extremo a extremo en VM limpia Linux y macOS."
+affected_areas:
+  - "app/installer"
+skip_specs: true

@@ -1,0 +1,10 @@
+schema: spec-driven
+created: "2026-11-18"
+goal: "Resolver los hallazgos de calidad abiertos verificados el 2026-11-18."
+affected_areas:
+  - "app/crate"
+  - "app/readplane"
+  - "app/media-worker"
+  - "app/shared/web"
+  - "app/listen"
+skip_specs: true
