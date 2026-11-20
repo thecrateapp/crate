@@ -451,6 +451,84 @@ class TestLastfmGetArtistInfo:
             assert result["bio"] == "English rock band"
             mock_set.assert_called_once()
 
+    @staticmethod
+    def _lastfm_by_lang(bios: dict):
+        """Fake ``requests.get`` answering artist.getinfo per ``lang``."""
+        calls = []
+
+        def get(url, params=None, timeout=None):
+            calls.append(params.get("lang"))
+            if isinstance(bios.get(params.get("lang")), Exception):
+                raise bios[params.get("lang")]
+            response = MagicMock()
+            response.raise_for_status = MagicMock()
+            response.json.return_value = {
+                "artist": {
+                    "name": "MDE Click",
+                    "bio": {"content": bios.get(params.get("lang"), "")},
+                    "tags": {"tag": []},
+                    "stats": {"listeners": "2805", "playcount": "70139"},
+                    "url": "https://www.last.fm/music/MDE+Click",
+                }
+            }
+            return response
+
+        return get, calls
+
+    def test_get_artist_info_falls_back_to_spanish_bio_when_english_is_empty(self):
+        link_only = (
+            ' <a href="https://www.last.fm/music/MDE+Click">Read more on Last.fm</a>'
+        )
+        get, calls = self._lastfm_by_lang(
+            {None: link_only, "es": "MDE Click es un grupo de Madrid."}
+        )
+        with (
+            patch("crate.lastfm.get_cache", return_value=None),
+            patch("crate.lastfm._lastfm_key", return_value="test_key"),
+            patch("crate.lastfm.requests.get", side_effect=get),
+            patch("crate.lastfm._get_similar_artists", return_value=[]),
+            patch("crate.lastfm.set_cache"),
+        ):
+            from crate.lastfm import get_artist_info
+
+            result = get_artist_info("MDE Click")
+
+        assert result["bio"] == "MDE Click es un grupo de Madrid."
+        assert calls == [None, "es"]
+
+    def test_get_artist_info_skips_fallback_when_english_bio_exists(self):
+        get, calls = self._lastfm_by_lang({None: "English bio.", "es": "Bio."})
+        with (
+            patch("crate.lastfm.get_cache", return_value=None),
+            patch("crate.lastfm._lastfm_key", return_value="test_key"),
+            patch("crate.lastfm.requests.get", side_effect=get),
+            patch("crate.lastfm._get_similar_artists", return_value=[]),
+            patch("crate.lastfm.set_cache"),
+        ):
+            from crate.lastfm import get_artist_info
+
+            result = get_artist_info("MDE Click")
+
+        assert result["bio"] == "English bio."
+        assert calls == [None]
+
+    def test_get_artist_info_keeps_profile_when_fallback_fails(self):
+        get, calls = self._lastfm_by_lang({None: "", "es": RuntimeError("boom")})
+        with (
+            patch("crate.lastfm.get_cache", return_value=None),
+            patch("crate.lastfm._lastfm_key", return_value="test_key"),
+            patch("crate.lastfm.requests.get", side_effect=get),
+            patch("crate.lastfm._get_similar_artists", return_value=[]),
+            patch("crate.lastfm.set_cache"),
+        ):
+            from crate.lastfm import get_artist_info
+
+            result = get_artist_info("MDE Click")
+
+        assert result["bio"] == ""
+        assert result["listeners"] == 2805
+        assert calls == [None, "es"]
+
     def test_get_artist_info_no_api_key(self):
         with (
             patch("crate.lastfm.get_cache", return_value=None),
