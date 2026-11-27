@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from crate.db.tx import optional_scope
@@ -66,7 +69,7 @@ def delete_catalog_summaries_except(
             ),
             {"digests": list(scope_digests)},
         )
-        return int(result.rowcount or 0)
+        return int(cast(CursorResult, result).rowcount or 0)
 
     with optional_scope(session) as current:
         return _impl(current)
