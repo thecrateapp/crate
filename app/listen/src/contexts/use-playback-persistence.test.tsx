@@ -102,3 +102,20 @@ it("keeps source metadata in checkpoints and unload snapshots without writing on
   });
   expect(getStoredQueue().playSource).toBeNull();
 });
+
+it("records the native queue revision as soon as a native queue load installs it", async () => {
+  const { androidNativeEngine, NATIVE_QUEUE_REVISION_EVENT } =
+    await import("@/lib/android-native-engine");
+  const revision = vi
+    .spyOn(androidNativeEngine, "currentQueueRevision")
+    .mockReturnValue("rev-before");
+  renderHook(useSession);
+  expect(getStoredQueue().nativeRevision).toBe("rev-before");
+
+  revision.mockReturnValue("rev-after");
+  act(() => {
+    window.dispatchEvent(new Event(NATIVE_QUEUE_REVISION_EVENT));
+  });
+
+  expect(getStoredQueue().nativeRevision).toBe("rev-after");
+});

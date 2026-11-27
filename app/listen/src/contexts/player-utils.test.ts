@@ -167,6 +167,21 @@ describe("getStoredQueue / saveQueue round-trip", () => {
     expect(stored.savedAt).toEqual(expect.any(String));
   });
 
+  it("persists the native queue revision the saved queue was loaded under", () => {
+    saveQueue([TRACK_A, TRACK_B], 1, { nativeRevision: "rev-1" });
+    expect(getStoredQueue().nativeRevision).toBe("rev-1");
+  });
+
+  it("restores sessions without a native revision as null", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ queue: [TRACK_A], currentIndex: 0, nativeRevision: 7 }),
+    );
+    expect(getStoredQueue().nativeRevision).toBeNull();
+    saveQueue([TRACK_A], 0, { nativeRevision: "" });
+    expect(getStoredQueue().nativeRevision).toBeNull();
+  });
+
   it("restores the play source without the radio session", () => {
     const source = {
       type: "playlist",

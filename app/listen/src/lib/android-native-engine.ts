@@ -77,6 +77,8 @@ type CrateNativePlaybackPlugin = {
   }): Promise<NativePlaybackPermissionStatus>;
   getState(): Promise<EngineState>;
   drainEvents(): Promise<{ events?: NativeEventEnvelope[] }>;
+  getDurableEvents(): Promise<{ events?: NativeEventEnvelope[] }>;
+  ackEvents(options: { sequence: number }): Promise<void>;
   setQueue(options: EngineQueueSnapshot): Promise<EngineState>;
   setTransitionPlans(options: {
     revision: string;
@@ -154,6 +156,12 @@ type CrateNativePlaybackPlugin = {
     listener: EngineEventListener<K>,
   ): Promise<PluginListenerHandle>;
 };
+
+/**
+ * Dispatched on window after a queue load installs a new native revision,
+ * so the persisted queue snapshot can record which native queue it is.
+ */
+export const NATIVE_QUEUE_REVISION_EVENT = "crate:native-queue-revision";
 
 const nativePlayback = registerPlugin<CrateNativePlaybackPlugin>(
   "CrateNativePlayback",
@@ -478,6 +486,9 @@ export class AndroidNativeEngine implements PlaybackEngine {
     });
     if (generation !== this.queueGeneration)
       throw new Error("Native queue load superseded");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(NATIVE_QUEUE_REVISION_EVENT));
+    }
     if (pendingTransitionPlans) {
       void this.installTransitionPlans(
         queue.revision,
@@ -815,6 +826,51 @@ export class AndroidNativeEngine implements PlaybackEngine {
       };
     } catch {
       return null;
+    }
+  }
+
+  currentQueueRevision(): string {
+    return this.queueRevision;
+  }
+
+  /**
+   * On a cold start the WebView knows which native queue its persisted
+   * snapshot came from before anything is loaded. Adopting that revision
+   * makes state reads and events from any other native queue stale, so the
+   * native checkpoint can only win when it describes the same queue.
+   */
+  adoptPersistedQueueRevision(revision: string): void {
+    if (!revision || this.queueRevision) return;
+    this.queueRevision = revision;
+  }
+
+  /**
+   * Play-relevant events native kept on disk because the WebView may never
+   * have processed them (frozen in the background, then the process died).
+   * They survive until acknowledged, so a cold start can replay them.
+   */
+  async getDurableEvents(): Promise<
+    Array<{ event: EngineEventName; payload: EngineEventMap[EngineEventName] }>
+  > {
+    try {
+      await this.ensureReady();
+      const response = await nativePlayback.getDurableEvents();
+      return (response.events ?? []).flatMap((event) => {
+        if (!event.event || !event.payload) return [];
+        return [{ event: event.event, payload: event.payload }];
+      });
+    } catch {
+      // Older native shells have no durable log.
+      return [];
+    }
+  }
+
+  async acknowledgeEvents(sequence: number): Promise<void> {
+    if (!Number.isFinite(sequence) || sequence <= 0) return;
+    try {
+      await nativePlayback.ackEvents({ sequence });
+    } catch {
+      // Older native shells have no durable log to prune.
     }
   }
 
