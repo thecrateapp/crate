@@ -46,6 +46,7 @@ test("all Media3 artifacts share the central version", () => {
     [
       'implementation "androidx.media3:media3-common:$androidxMedia3Version"',
       'implementation "androidx.media3:media3-datasource:$androidxMedia3Version"',
+      'implementation "androidx.media3:media3-database:$androidxMedia3Version"',
       'implementation "androidx.media3:media3-exoplayer:$androidxMedia3Version"',
       'implementation "androidx.media3:media3-session:$androidxMedia3Version"',
     ].sort(),
