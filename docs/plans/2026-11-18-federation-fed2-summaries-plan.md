@@ -27,7 +27,7 @@
 - Requests never build a summary (FED-D3, root `AGENTS.md`). `GET /catalog/summary` returns 404 `summary_pending` and enqueues the build with `create_task_dedup`.
 - Query text is never logged or stored (FED-D16). Summaries hold hashed bits and hashed artist keys only.
 - *k* = 5 for "too few local results" (`FanoutSettings.min_local_results`, unchanged).
-- New migration `167` (origin/main head is `166_decks_cues`). Renumber after the head at merge time (db `AGENTS.md` rule 7).
+- New migration `169` (written as `167` against `166_decks_cues`, renumbered after `168_account_data` when rebasing; db `AGENTS.md` rule 7).
 - The db layer only through `crate.db.queries|repositories|jobs.*`; `async def` routes in `api/federation.py` wrap sync calls in `asyncio.to_thread` (`tests/test_federation_async_boundaries.py`).
 - One branch `feat/fed2-summaries` cut from `origin/main`, one PR (memory: one integration PR).
 - During development run only the scoped tests. Run the full validation once, in Task 9.
@@ -117,11 +117,11 @@ A behaviour-preserving move, so the worker can compute the same scope the API en
 - [ ] **Step 4: Run them; all green.**
 - [ ] **Step 5: Commit** `feat(federation): add the summary tokenizer and Bloom filter`
 
-### Task 4: Migration 167 and summary storage
+### Task 4: Migration 169 and summary storage
 
 **Files:**
-- Create: `app/crate/db/schema_sections/federation_catalog_summaries_v167.py`, `app/crate/db/migrations/versions/167_federation_catalog_summaries.py`, `app/crate/db/jobs/federation_catalog_summaries.py`, `app/crate/db/queries/federation_catalog_summaries.py`, `app/crate/db/repositories/federation_peer_summaries.py`
-- Modify: `app/crate/db/schema_bootstrap.py` (after `decks_cues_v166`), `app/tests/test_crate_schema_definition.py` (`get_heads() == ["167"]`)
+- Create: `app/crate/db/schema_sections/federation_catalog_summaries_v169.py`, `app/crate/db/migrations/versions/169_federation_catalog_summaries.py`, `app/crate/db/jobs/federation_catalog_summaries.py`, `app/crate/db/queries/federation_catalog_summaries.py`, `app/crate/db/repositories/federation_peer_summaries.py`
+- Modify: `app/tests/test_crate_schema_definition.py` (`get_heads() == ["169"]`). No `schema_bootstrap.py` change: the bootstrap runs in `001_baseline` and FED2 references `federation_nodes` from migration 050.
 - Test: `app/tests/test_federation_summaries_storage.py` (`pg_db`), `app/tests/test_federation_summaries_migration.py`
 
 **Interfaces:**
@@ -138,7 +138,7 @@ A behaviour-preserving move, so the worker can compute the same scope the API en
 - [ ] **Step 2: Run them; they fail.** `pytest tests/test_federation_summaries_storage.py tests/test_federation_summaries_migration.py tests/test_crate_schema_definition.py -q`
 - [ ] **Step 3: Implement the DDL, the migration, the bootstrap call and the functions.** Each module ends with `__all__`.
 - [ ] **Step 4: Run them plus `tests/test_db_access_boundaries.py tests/test_runtime_boundaries.py`; all green.**
-- [ ] **Step 5: Commit** `feat(federation): store catalog and peer summaries (migration 167)`
+- [ ] **Step 5: Commit** `feat(federation): store catalog and peer summaries (migration 169)`
 
 ### Task 5: Owner build task
 
