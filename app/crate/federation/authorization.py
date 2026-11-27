@@ -71,14 +71,46 @@ def _is_active(grant: dict, *, now: datetime) -> bool:
     return not (valid_until is not None and valid_until <= now)
 
 
+def user_scoped_grant_permits(
+    grants: list[dict],
+    *,
+    peer_uid: str,
+    capability: str,
+    now: datetime | None = None,
+) -> bool:
+    """True when an active grant that is not node-level permits the capability.
+
+    Node-level selectors are the ones that match with no subject and no roles
+    (``*``, ``peer``, ``peer:<uid>``, ``peer_users:<uid>``). Any other grant
+    (``role:``, ``subject:``) applies to some users only and can give them
+    more than the node-level decision does.
+    """
+    current_time = now or datetime.now(UTC)
+    for grant in grants:
+        selector = str(
+            grant.get("subject_selector") or grant.get("principal_selector") or ""
+        )
+        if _selector_matches(
+            selector, peer_uid=peer_uid, subject_hash=None, roles=set()
+        ):
+            continue
+        if not _is_active(grant, now=current_time):
+            continue
+        if capability in _json_value(grant.get("capabilities_json"), []):
+            return True
+    return False
+
+
 def _deny(
     code: str,
     *,
     revision: int = 0,
     peer_uid: str | None = None,
     subject_hash: str | None = None,
+    observe: bool = True,
 ) -> AuthorizationDecision:
-    if peer_uid is not None:
+    # observe=False: a background check (no request), so no risk signal/metric.
+    if observe and peer_uid is not None:
         from crate.federation.abuse import observe_risk_signal
 
         observe_risk_signal(
@@ -106,14 +138,35 @@ def authorize(
     roles: set[str],
     subject_blocked: bool = False,
     now: datetime | None = None,
+    observe: bool = True,
 ) -> AuthorizationDecision:
+    """Decide one capability for one peer (and subject).
+
+    ``observe=False`` is for background checks: a denial is returned the same
+    way but records no risk observation and no metric.
+    """
     peer_uid = str(peer.get("node_uid") or "") or None
     if peer.get("trust_state") != "approved":
-        return _deny("peer_not_approved", peer_uid=peer_uid, subject_hash=subject_hash)
+        return _deny(
+            "peer_not_approved",
+            peer_uid=peer_uid,
+            subject_hash=subject_hash,
+            observe=observe,
+        )
     if peer.get("disabled_at") is not None:
-        return _deny("peer_disabled", peer_uid=peer_uid, subject_hash=subject_hash)
+        return _deny(
+            "peer_disabled",
+            peer_uid=peer_uid,
+            subject_hash=subject_hash,
+            observe=observe,
+        )
     if subject_blocked:
-        return _deny("subject_blocked", peer_uid=peer_uid, subject_hash=subject_hash)
+        return _deny(
+            "subject_blocked",
+            peer_uid=peer_uid,
+            subject_hash=subject_hash,
+            observe=observe,
+        )
 
     current_time = now or datetime.now(UTC)
     peer_uid = str(peer["node_uid"])
@@ -129,7 +182,12 @@ def authorize(
         )
     ]
     if not matching:
-        return _deny("no_matching_grant", peer_uid=peer_uid, subject_hash=subject_hash)
+        return _deny(
+            "no_matching_grant",
+            peer_uid=peer_uid,
+            subject_hash=subject_hash,
+            observe=observe,
+        )
     matching.sort(
         key=lambda grant: (
             int(grant.get("priority") or 0),
@@ -149,6 +207,7 @@ def authorize(
             revision=revision,
             peer_uid=peer_uid,
             subject_hash=subject_hash,
+            observe=observe,
         )
 
     grant = permitted[0]
@@ -164,6 +223,7 @@ def authorize(
             revision=int(grant.get("policy_revision") or 0),
             peer_uid=peer_uid,
             subject_hash=subject_hash,
+            observe=observe,
         )
     raw_uid = grant.get("grant_uid")
     return AuthorizationDecision(

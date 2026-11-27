@@ -93,6 +93,86 @@ def _load_context() -> tuple[dict | None, list[dict]]:
     return local_node, _get_approved_peers_for_search()
 
 
+def _load_summaries(node_uids: list[str]) -> dict[str, Any]:
+    from crate.federation.peer_summaries import load_peer_summaries
+
+    try:
+        return load_peer_summaries(node_uids)
+    except Exception:
+        # Routing is an optimisation: without summaries every peer is asked.
+        log.warning("Peer summaries unavailable; asking every peer", exc_info=True)
+        return {}
+
+
+def _load_album_counts(names: list[str]) -> dict[str, int]:
+    from crate.db.queries.federation_search import local_artist_album_counts
+
+    return local_artist_album_counts(names)
+
+
+def _has_album_count(artist: dict) -> bool:
+    count = artist.get("album_count")
+    return isinstance(count, int) and not isinstance(count, bool)
+
+
+def _artists_with_album_counts(
+    artists: list[dict],
+    album_counts: Callable[[list[str]], dict[str, int]],
+) -> list[dict]:
+    """The top local artists, with the local album count where it is missing.
+
+    The global-catalog search rows carry no ``album_count``; ``peer_has_more``
+    needs it for the first three artists. One batched read, never in a loop.
+    """
+    top = list(artists[:3])
+    names = [
+        str(artist["name"])
+        for artist in top
+        if artist.get("name") and not _has_album_count(artist)
+    ]
+    if not names:
+        return top
+    try:
+        counts = album_counts(names)
+    except Exception:
+        # Routing is an optimisation: without counts peer_has_more stays off.
+        log.warning("Local album counts unavailable", exc_info=True)
+        return top
+    enriched = []
+    for artist in top:
+        count = None
+        if artist.get("name") and not _has_album_count(artist):
+            count = counts.get(str(artist["name"]).lower())
+        enriched.append(artist if count is None else {**artist, "album_count": count})
+    return enriched
+
+
+def _routing_decision(
+    query: str,
+    local: dict[str, list[dict]],
+    peers: list[dict],
+    *,
+    summaries: Callable[[list[str]], dict[str, Any]],
+    stale_node_uids: Callable[[list[str]], set[str]],
+    album_counts: Callable[[list[str]], dict[str, int]],
+    settings: FanoutSettings,
+):
+    local_total = _local_total(local)
+    artists = local.get("artists") or []
+    if peers and local_total >= settings.min_local_results:
+        # Only this branch of decide_fanout reads the artists' album counts.
+        artists = _artists_with_album_counts(artists, album_counts)
+    return decide_fanout(
+        query,
+        local_total=local_total,
+        peers=peers,
+        local_artists=artists,
+        summaries=summaries,
+        stale_node_uids=stale_node_uids,
+        settings=settings,
+    )
+
+
 def _local_total(results: dict[str, list[dict]]) -> int:
     return sum(len(results.get(group) or []) for group in SEARCH_GROUPS)
 
@@ -107,6 +187,8 @@ async def federated_search_events(
     settings: FanoutSettings = DEFAULT_SETTINGS,
     cache: FanoutCache | None = None,
     stale_node_uids: Callable[[list[str]], set[str]] | None = None,
+    summaries: Callable[[list[str]], dict[str, Any]] | None = None,
+    local_album_counts: Callable[[list[str]], dict[str, int]] | None = None,
 ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
     window_ms = int(settings.deadline_s * 1000)
     local = await asyncio.to_thread(local_search)
@@ -128,11 +210,13 @@ async def federated_search_events(
             yield skipped("federation_unavailable")
             return
         decision = await asyncio.to_thread(
-            decide_fanout,
+            _routing_decision,
             query,
-            local_total=_local_total(local),
-            peers=peers,
+            local,
+            peers,
+            summaries=summaries or _load_summaries,
             stale_node_uids=stale_node_uids or _stale_replica_node_uids,
+            album_counts=local_album_counts or _load_album_counts,
             settings=settings,
         )
         if not decision.fans_out:

@@ -76,6 +76,35 @@ Capacity, fallback and reconciliation details are in
 [Federation capacity](federation-capacity.md) and
 [Production acceptance](federation-production-acceptance.md).
 
+### Per-peer summaries and search routing
+
+A federated search should ask only the peers that can answer it. Each owner
+publishes one compact Bloom-filter summary per catalog scope (the digest of the
+`catalog.search` policy), so a peer receives only a summary of what it may see.
+A worker rebuilds summaries every five minutes; a request never builds one. The
+summary travels with the delta feed as a descriptor and is fetched, conditionally,
+from `GET /api/federation/v1/catalog/summary` (capability `catalog.summary`).
+It holds hashed word tokens, their prefixes and hashed artist keys, never names
+or query text.
+
+The receiver stores the latest summary per peer and uses it in the fan-out
+decision. A peer whose filter cannot contain the query's words is skipped
+(`no_summary_match`). A peer that holds more albums for an artist than the local
+catalog is asked even when local results are plentiful (`peer_has_more`). A
+peer without a fresh summary (none stored, refused, or not confirmed for
+1800 s), or a summary store that fails, is always asked. A query that matches
+only the middle of a word is not routed by summaries. The precise guarantee and
+its known gaps are in the [Protocol](federation-protocol.md).
+
+Peers paired before FED2 keep the `capabilities_json` stored at pairing, which
+does not list `catalog.summary`, so the 900 s summary poll skips them until they
+are re-paired or their capabilities are refreshed. The delta path still keeps
+their summaries current: every delta page announces the summary etag and the
+receiver fetches it when it changes. See the
+[Protocol](federation-protocol.md) for the `crate.federation.summary/1`
+contract and [Federation capacity](federation-capacity.md) for its measured
+size.
+
 ### Playback and import
 
 Remote playback uses short-lived owner tickets plus an opaque local relay

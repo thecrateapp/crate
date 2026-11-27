@@ -89,6 +89,10 @@ Design: `2026-11-10-federation-hybrid-design.md` (decisions FED-D1…D18). Branc
 
 **Goal:** route queries and decide the triggers from summaries (FED-D3).
 
+**Status: done.** Shipped on branch `feat/fed2-summaries`; task plan in [`2026-11-18-federation-fed2-summaries-plan.md`](2026-11-18-federation-fed2-summaries-plan.md).
+- Along the way, the owner's search now applies the `catalog.search` scope; before, FED1 remote search could return rows outside it (a scope leak, fixed in the first tasks of the FED2 branch).
+- Accepted gap: a query that matches only the middle of a word (for example `head` against Radiohead, found by the owner's `ILIKE` substring) is not routed, because summaries index word tokens and their prefixes. The peer without a summary, or with a fetch error, is still always asked.
+
 1. **FED2.1 · Generation on the owner.** Bloom filters of normalised artist, album and track keys, with versioned parameters and about 1 % false positives. A worker keeps them up to date from catalogue changes; requests never rebuild them.
    - **Red:** no false negatives on a fixture set; the measured false-positive rate.
 2. **FED2.2 · Transport.** Summaries travel in the delta feed (v159), with a fetch endpoint for bootstrap. They are scoped: a peer gets only the summary of what it may see.

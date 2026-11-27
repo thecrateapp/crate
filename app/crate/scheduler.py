@@ -25,6 +25,8 @@ DEFAULT_SCHEDULES = {
     "federation_health_poll": 60,  # 1min — poll approved peers for health
     "federation_sync_catalog": 120,  # 2min — consume peer catalog deltas
     "federation_directory_refresh": 300,  # 5min — refresh due signed directories
+    "federation_build_catalog_summaries": 300,  # 5min — rebuild stale per-scope summaries
+    "federation_fetch_peer_summaries": 900,  # 15min — refresh peer summaries (conditional GET)
     "global_catalog_reconcile_incremental": 300,  # 5min — drain dirty sources
     "global_catalog_reconcile_full": 43200,  # 12h — verify canonical catalog
     "refresh_dirty_listening_stats": 300,  # 5min — trailing edge for debounced plays
@@ -49,6 +51,8 @@ SCHEDULED_TASKS = [
 FEDERATION_SCHEDULED_TASKS = {
     "federation_health_poll",
     "federation_sync_catalog",
+    "federation_build_catalog_summaries",
+    "federation_fetch_peer_summaries",
 }
 
 DIRECTORY_SCHEDULED_TASKS = {"federation_directory_refresh"}

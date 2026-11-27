@@ -21,7 +21,7 @@ import hashlib
 import logging
 import threading
 import time
-from collections.abc import AsyncIterator, Callable, Iterable
+from collections.abc import AsyncIterator, Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal, Protocol
@@ -81,6 +81,8 @@ FanoutReason = Literal[
     "query_too_short",
     "no_peers",
     "few_local_results",
+    "no_summary_match",
+    "peer_has_more",
     "stale_replica",
     "enough_local_results",
 ]
@@ -108,25 +110,59 @@ def decide_fanout(
     *,
     local_total: int,
     peers: list[dict],
+    local_artists: Sequence[dict] = (),
+    summaries: Callable[[list[str]], dict[str, Any]] | None = None,
     stale_node_uids: Callable[[list[str]], set[str]] | None = None,
     settings: FanoutSettings | None = None,
 ) -> FanoutDecision:
-    """FED-D14 on the server: fewer than k local results, or a stale replica.
+    """FED-D14 on the server, routed by the peers' summaries (FED2).
 
-    Summary routing ("the peer has more of this artist") comes with FED2.
+    Peers whose summary cannot contain the query are never asked; peers without
+    a summary always are. Fan out when there are fewer than k local results,
+    when a candidate has more albums of a top local artist, or when a candidate
+    replica is stale.
     """
     active = settings or DEFAULT_SETTINGS
     if not query_is_long_enough(query, active):
         return FanoutDecision("query_too_short", [])
     if not peers:
         return FanoutDecision("no_peers", [])
+    stored = summaries([str(peer["node_uid"]) for peer in peers]) if summaries else {}
+    candidates = [
+        peer
+        for peer in peers
+        if str(peer["node_uid"]) not in stored
+        or stored[str(peer["node_uid"])].may_match(query)
+    ]
     if local_total < active.min_local_results:
-        return FanoutDecision("few_local_results", list(peers))
+        if not candidates:
+            return FanoutDecision("no_summary_match", [])
+        return FanoutDecision("few_local_results", list(candidates))
+    if not candidates:
+        return FanoutDecision("enough_local_results", [])
+    more_uids: set[str] = set()
+    for artist in list(local_artists)[:3]:
+        raw_count = artist.get("album_count")
+        if isinstance(raw_count, bool) or raw_count is None:
+            continue
+        try:
+            local_count = int(raw_count)
+        except (TypeError, ValueError):
+            continue
+        for peer in candidates:
+            summary = stored.get(str(peer["node_uid"]))
+            remote_count = summary.album_count(artist.get("name")) if summary else None
+            if isinstance(remote_count, int) and remote_count > local_count:
+                more_uids.add(str(peer["node_uid"]))
     lookup = stale_node_uids or _stale_replica_node_uids
-    stale = lookup([str(peer["node_uid"]) for peer in peers])
-    stale_peers = [peer for peer in peers if str(peer["node_uid"]) in stale]
-    if stale_peers:
-        return FanoutDecision("stale_replica", stale_peers)
+    stale = lookup([str(peer["node_uid"]) for peer in candidates])
+    stale_uids = {str(peer["node_uid"]) for peer in candidates} & set(stale)
+    chosen = more_uids | stale_uids
+    if chosen:
+        reason: FanoutReason = "peer_has_more" if more_uids else "stale_replica"
+        return FanoutDecision(
+            reason, [p for p in peers if str(p["node_uid"]) in chosen]
+        )
     return FanoutDecision("enough_local_results", [])
 
 

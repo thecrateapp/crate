@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from crate.db.tx import read_scope
 
@@ -309,7 +311,66 @@ def get_federation_manifest_revision_row(
     return dict(row)
 
 
+def _uuid_strings(values: list[str]) -> list[str]:
+    valid: list[str] = []
+    for value in values:
+        try:
+            valid.append(str(UUID(str(value))))
+        except (TypeError, ValueError):
+            continue
+    return valid
+
+
+# Mirrors the WHERE clauses of _ENTITY_SELECTS: an album leaves the manifest
+# when it is quarantined, an artist when its name or folder starts with ".".
+# Tracks are excluded only for a missing entity_uid (checked by the caller).
+_SEARCH_EXCLUDED_SQL = """
+    SELECT entity_uid::text AS uid
+    FROM library_albums
+    WHERE entity_uid = ANY(CAST(:album_uids AS uuid[]))
+      AND quarantined_at IS NOT NULL
+    UNION ALL
+    SELECT entity_uid::text AS uid
+    FROM library_artists
+    WHERE entity_uid = ANY(CAST(:artist_uids AS uuid[]))
+      AND (name LIKE '.%' OR (folder_name IS NOT NULL AND folder_name LIKE '.%'))
+"""
+
+
+def federation_search_excluded_uids(
+    album_uids: list[str],
+    artist_uids: list[str],
+    track_uids: list[str],
+    *,
+    session: Session | None = None,
+) -> set[str]:
+    """The given uids the manifest would leave out (one read per search).
+
+    ``track_uids`` is accepted for symmetry: the manifest keeps every track
+    that has an entity_uid, so no track is ever returned here.
+    """
+    del track_uids
+    params = {
+        "album_uids": _uuid_strings(album_uids),
+        "artist_uids": _uuid_strings(artist_uids),
+    }
+    if not params["album_uids"] and not params["artist_uids"]:
+        return set()
+
+    def _impl(current: Session) -> set[str]:
+        return {
+            str(uid)
+            for uid in current.execute(text(_SEARCH_EXCLUDED_SQL), params).scalars()
+        }
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 __all__ = [
+    "federation_search_excluded_uids",
     "get_federation_manifest_revision_row",
     "list_federation_manifest_rows",
 ]
