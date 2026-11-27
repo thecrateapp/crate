@@ -1792,6 +1792,8 @@
   "player.native.stuckBuffering": "La riproduzione nativa è bloccata nel buffering",
   "player.native.streamProbe": "Verifica dello stream: {status}",
   "player.native.playbackFailed": "La riproduzione nativa non è riuscita",
+  "player.native.networkLostTitle": "Connessione persa",
+  "player.native.networkLostDescription": "La riproduzione riprenderà quando tornerà la rete.",
   "player.native.resumeTitle": "Apri Crate per riprendere la riproduzione",
   "player.native.resumeDescription": "La coda salvata richiede una nuova autorizzazione del server.",
   "playlistComposer.toasts.created": "Playlist creata",

@@ -1792,6 +1792,8 @@
   "player.native.stuckBuffering": "Jatorrizko erreprodukzioa kargatzen geratu da",
   "player.native.streamProbe": "Stream-aren proba: {status}",
   "player.native.playbackFailed": "Jatorrizko erreprodukzioak huts egin du",
+  "player.native.networkLostTitle": "Konexioa galdu da",
+  "player.native.networkLostDescription": "Erreprodukzioak jarraituko du sarea itzultzen denean.",
   "player.native.resumeTitle": "Ireki Crate erreprodukzioari berriro ekiteko",
   "player.native.resumeDescription": "Gordetako ilarak zerbitzariaren baimen berria behar du.",
   "playlistComposer.toasts.created": "Playlista sortu da",

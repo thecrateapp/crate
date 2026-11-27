@@ -8,6 +8,9 @@ const subscriptions: Array<{
   dispose: ReturnType<typeof vi.fn>;
 }> = [];
 
+const notifyMock = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn() }));
+vi.mock("@crate/ui/lib/notify", () => ({ notify: notifyMock }));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
@@ -397,6 +400,75 @@ describe("useNativePlaybackEventBridge subscription", () => {
     expect(
       androidNativeEngine.acknowledgeEvents,
     ).toHaveBeenCalledExactlyOnceWith(52);
+    unmount();
+  });
+
+  it("tells the listener native resumes after a lost network instead of failing", async () => {
+    const { useNativePlaybackEventBridge } =
+      await import("./use-native-playback-event-bridge");
+    notifyMock.error.mockClear();
+    notifyMock.info.mockClear();
+    const beginSoftInterruption = vi.fn();
+    const commitIsPlaying = vi.fn();
+    const { unmount } = renderHook(() =>
+      useNativePlaybackEventBridge(
+        params({ beginSoftInterruption, commitIsPlaying }),
+      ),
+    );
+    await vi.waitFor(() => expect(subscriptions).toHaveLength(1));
+
+    act(() => {
+      subscriptions[0]?.handlers.error?.({
+        revision: "queue-a",
+        nativeSequence: 70,
+        code: 2001,
+        message: "Source error",
+        cause: "java.net.UnknownHostException",
+        causeMessage:
+          "Unable to resolve host: android_getaddrinfo failed: EAI_NODATA",
+        networkRecoverable: true,
+      });
+    });
+
+    expect(notifyMock.error).not.toHaveBeenCalled();
+    expect(notifyMock.info).toHaveBeenCalledWith(
+      "player.native.networkLostTitle",
+      expect.objectContaining({
+        id: "native-network-lost",
+        description: "player.native.networkLostDescription",
+      }),
+    );
+    expect(beginSoftInterruption).not.toHaveBeenCalled();
+    expect(commitIsPlaying).toHaveBeenCalledWith(false);
+    unmount();
+  });
+
+  it("still reports other native failures and recovers them from JS", async () => {
+    const { useNativePlaybackEventBridge } =
+      await import("./use-native-playback-event-bridge");
+    notifyMock.error.mockClear();
+    notifyMock.info.mockClear();
+    const beginSoftInterruption = vi.fn();
+    const { unmount } = renderHook(() =>
+      useNativePlaybackEventBridge(params({ beginSoftInterruption })),
+    );
+    await vi.waitFor(() => expect(subscriptions).toHaveLength(1));
+
+    act(() => {
+      subscriptions[0]?.handlers.error?.({
+        revision: "queue-a",
+        nativeSequence: 71,
+        code: 4001,
+        message: "Decoder failed",
+      });
+    });
+
+    expect(notifyMock.info).not.toHaveBeenCalled();
+    expect(notifyMock.error).toHaveBeenCalledWith(
+      "player.native.playbackFailed",
+      expect.objectContaining({ description: "Decoder failed" }),
+    );
+    expect(beginSoftInterruption).toHaveBeenCalledWith("stream");
     unmount();
   });
 });

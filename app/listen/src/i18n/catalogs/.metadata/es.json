@@ -4427,6 +4427,14 @@
     "sourceHash": "sha256:d6afd2a3edd8655ba0ed2cc478de8f262f0f85d7ac289912005f4cbac1be592b",
     "reviewedAt": "2026-10-24T10:26:55.354Z"
   },
+  "player.native.networkLostDescription": {
+    "sourceHash": "sha256:dc0081e7d9e2532076177246465a1e88b99a6844294166b2a3d031aa973aa4ad",
+    "reviewedAt": "2026-11-27T21:49:16.169Z"
+  },
+  "player.native.networkLostTitle": {
+    "sourceHash": "sha256:4513b8c62fe24ec7fc6b3defd92a00b74bc39b15e62e2fc2b84c7adac17c2ea6",
+    "reviewedAt": "2026-11-27T21:49:16.169Z"
+  },
   "player.native.playbackFailed": {
     "sourceHash": "sha256:2c75fe0b4f3fb350ba53a6cb37a4a77329f0bf6df1b88077ac39d470edc37258",
     "reviewedAt": "2026-10-07T13:21:25.887Z"

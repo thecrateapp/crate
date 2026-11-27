@@ -1800,6 +1800,8 @@
   "player.native.stuckBuffering": "La reproducción nativa se ha quedado cargando",
   "player.native.streamProbe": "Prueba del stream: {status}",
   "player.native.playbackFailed": "La reproducción nativa ha fallado",
+  "player.native.networkLostTitle": "Se ha perdido la conexión",
+  "player.native.networkLostDescription": "La reproducción seguirá cuando vuelva la red.",
   "player.native.resumeTitle": "Abre Crate para reanudar la reproducción",
   "player.native.resumeDescription": "La cola guardada necesita una nueva autorización del servidor.",
   "playlistComposer.toasts.created": "Playlist creada",

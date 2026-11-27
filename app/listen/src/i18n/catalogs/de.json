@@ -1792,6 +1792,8 @@
   "player.native.stuckBuffering": "Native Wiedergabe hängt beim Puffern",
   "player.native.streamProbe": "Stream-Prüfung: {status}",
   "player.native.playbackFailed": "Native Wiedergabe fehlgeschlagen",
+  "player.native.networkLostTitle": "Verbindung verloren",
+  "player.native.networkLostDescription": "Die Wiedergabe geht weiter, sobald das Netzwerk zurück ist.",
   "player.native.resumeTitle": "Öffne Crate, um die Wiedergabe fortzusetzen",
   "player.native.resumeDescription": "Die gespeicherte Warteschlange braucht eine neue Server-Autorisierung.",
   "playlistComposer.toasts.created": "Playlist erstellt",

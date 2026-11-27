@@ -61,6 +61,7 @@ const DURABLE_NATIVE_EVENTS = new Set<string>([
   "playEventCheckpoint",
 ]);
 const NATIVE_EVENT_ACK_DELAY_MS = 2000;
+const NATIVE_NETWORK_LOST_NOTICE_ID = "native-network-lost";
 
 type RecoverNativeBuffering = (options: {
   forceRefresh: boolean;
@@ -402,6 +403,21 @@ export function useNativePlaybackEventBridge({
         clearNativeBufferingWatchdog();
         console.error("[native-player] playback error:", payload);
         if (retryNativePlaybackAfterAuthError(nativeError)) {
+          return;
+        }
+        if (nativeError.networkRecoverable) {
+          // Native re-prepares the stream itself once the network is back
+          // (also with the WebView frozen), so JS neither shows the raw
+          // resolver error nor starts a competing recovery. The fixed id
+          // keeps one notice through repeated failures of one outage.
+          notify.info(tRef.current("player.native.networkLostTitle"), {
+            id: NATIVE_NETWORK_LOST_NOTICE_ID,
+            description: tRef.current("player.native.networkLostDescription"),
+            duration: 9000,
+          });
+          bufferingIntentRef.current = false;
+          commitIsPlaying(false);
+          commitIsBuffering(false);
           return;
         }
         notify.error(tRef.current("player.native.playbackFailed"), {

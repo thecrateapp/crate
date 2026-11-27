@@ -1800,6 +1800,8 @@
   "player.native.stuckBuffering": "Native playback is stuck buffering",
   "player.native.streamProbe": "Stream probe: {status}",
   "player.native.playbackFailed": "Native playback failed",
+  "player.native.networkLostTitle": "Connection lost",
+  "player.native.networkLostDescription": "Playback will continue when the network is back.",
   "player.native.resumeTitle": "Open Crate to resume playback",
   "player.native.resumeDescription": "The saved queue needs fresh server authorization.",
   "playlistComposer.toasts.created": "Playlist created",

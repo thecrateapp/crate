@@ -1792,6 +1792,8 @@
   "player.native.stuckBuffering": "La reproducció nativa s'ha quedat carregant",
   "player.native.streamProbe": "Prova del stream: {status}",
   "player.native.playbackFailed": "La reproducció nativa ha fallat",
+  "player.native.networkLostTitle": "S'ha perdut la connexió",
+  "player.native.networkLostDescription": "La reproducció continuarà quan torni la xarxa.",
   "player.native.resumeTitle": "Obre Crate per reprendre la reproducció",
   "player.native.resumeDescription": "La cua desada necessita una nova autorització del servidor.",
   "playlistComposer.toasts.created": "Playlist creada",
