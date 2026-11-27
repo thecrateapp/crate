@@ -59,6 +59,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -81,6 +82,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     private static final int PLAY_EVENT_CHECKPOINT_MS = 5000;
     private static final int MAX_BUFFERED_EVENTS = 1000;
+    // About two hours of 5 s play checkpoints with the WebView frozen.
+    private static final int MAX_DURABLE_EVENTS = 1500;
+    private static final String DURABLE_EVENTS_FILE = "native_playback_events.jsonl";
     private static final long MIX_PROGRESS_EVENT_INTERVAL_MS = 250L;
 
     private final IBinder binder = new LocalBinder();
@@ -155,6 +159,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private AudioFocusRequest audioFocusRequest;
     private MediaSession mediaSession;
     private PlaybackCheckpointStore checkpointStore;
+    @Nullable
+    private NativeDurableEventLog durableEventLog;
     private int crossfadeMs = 0;
     private boolean positionTickerStarted = false;
     private boolean nativeMixTickerStarted = false;
@@ -562,6 +568,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 emit("error", payload);
             }
         });
+        durableEventLog = new NativeDurableEventLog(
+            new File(getFilesDir(), DURABLE_EVENTS_FILE),
+            MAX_DURABLE_EVENTS
+        );
+        NativeEventSequence.advanceTo(durableEventLog.maxSequence());
         checkpointStore = new PlaybackCheckpointStore(this);
         restoreCheckpoint();
         MediaSession.Builder sessionBuilder = new MediaSession.Builder(this, player)
@@ -1285,6 +1296,21 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     public JSArray drainEvents() {
         return telemetry.drain();
+    }
+
+    public JSArray getDurableEvents() {
+        JSArray events = new JSArray();
+        if (durableEventLog == null) return events;
+        JSONArray pending = durableEventLog.pendingEvents();
+        for (int index = 0; index < pending.length(); index++) {
+            JSONObject event = pending.optJSONObject(index);
+            if (event != null) events.put(event);
+        }
+        return events;
+    }
+
+    public void acknowledgeDurableEvents(long sequence) {
+        if (durableEventLog != null) durableEventLog.acknowledge(sequence);
     }
 
     public JSObject getSnapshot() {
@@ -2563,6 +2589,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void emit(String eventName, JSObject payload) {
+        if (durableEventLog != null) durableEventLog.append(eventName, payload);
         telemetry.emit(eventName, payload);
     }
 

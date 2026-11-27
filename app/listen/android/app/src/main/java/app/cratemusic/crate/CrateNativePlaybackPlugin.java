@@ -84,6 +84,27 @@ public class CrateNativePlaybackPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getDurableEvents(PluginCall call) {
+        mainHandler.post(() -> {
+            JSObject payload = new JSObject();
+            payload.put("events", service == null ? new JSArray() : service.getDurableEvents());
+            call.resolve(payload);
+        });
+    }
+
+    @PluginMethod
+    public void ackEvents(PluginCall call) {
+        // getLong() ignores numbers small enough to arrive as Integer.
+        long sequence = call.getData().optLong("sequence", 0L);
+        mainHandler.post(() -> {
+            if (service != null && sequence > 0L) {
+                service.acknowledgeDurableEvents(sequence);
+            }
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
     public void setQueue(PluginCall call) {
         if (!ensureService(call)) return;
         JSArray tracks = call.getArray("tracks");

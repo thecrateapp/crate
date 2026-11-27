@@ -486,11 +486,46 @@ export function useNativePlaybackReconciliation({
     ],
   );
 
+  // Durable events replayed on a cold start describe the past. Without
+  // nativeTimeMs nothing projects them forward to now (which would jump the
+  // position to the end of each track). The play session that was counting
+  // the track playing when the WebView froze died with that WebView, so the
+  // first checkpoint for the current track opens a new one.
+  const applyReplayedNativeEvent = useCallback(
+    (eventName: string, payload: EnginePositionEvent & { reason?: string }) => {
+      const event = { ...payload, nativeTimeMs: undefined };
+      if (eventName === "trackChanged") {
+        applyNativeTrackChange(event);
+        return;
+      }
+      if (eventName !== "playEventCheckpoint") return;
+      const track = queueRef.current[event.index];
+      if (
+        track &&
+        event.isPlaying &&
+        event.index === currentIndexRef.current &&
+        androidNativeEngine.isCurrentQueueRevision?.(event.revision) !== false
+      ) {
+        ensureTrackerSession(track, playSourceRef.current);
+      }
+      applyNativePosition(event);
+    },
+    [
+      applyNativePosition,
+      applyNativeTrackChange,
+      currentIndexRef,
+      ensureTrackerSession,
+      playSourceRef,
+      queueRef,
+    ],
+  );
+
   return {
     applyNativePosition,
     applyNativeState,
     applyNativeTrackChange,
     applyNativeMixState,
+    applyReplayedNativeEvent,
     isNativeEventStale,
   };
 }

@@ -27,7 +27,9 @@ vi.mock("@/lib/android-native-engine", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/android-native-engine")>()),
   shouldUseAndroidNativePlayer: () => true,
   androidNativeEngine: {
+    acknowledgeEvents: vi.fn().mockResolvedValue(undefined),
     drainEvents: vi.fn().mockResolvedValue([]),
+    getDurableEvents: vi.fn().mockResolvedValue([]),
     getState: vi.fn().mockResolvedValue(null),
     planAhead: vi.fn(),
     isCurrentQueueRevision: (revision: string) => revision === "queue-a",
@@ -78,7 +80,7 @@ describe("useNativePlaybackEventBridge subscription", () => {
     rerender(params({ applyNativeTrackChange: latestTrackChange }));
     rerender(params({ applyNativeTrackChange: latestTrackChange }));
 
-    expect(subscriptions).toHaveLength(1);
+    await vi.waitFor(() => expect(subscriptions).toHaveLength(1));
     subscriptions[0]?.handlers.trackChanged?.({ index: 3 });
     expect(latestTrackChange).toHaveBeenCalledWith({ index: 3 });
     const { androidNativeEngine } = await import("@/lib/android-native-engine");
@@ -122,8 +124,7 @@ describe("useNativePlaybackEventBridge subscription", () => {
     };
     const original = engine.isCurrentQueueRevision;
     let known = "";
-    engine.isCurrentQueueRevision = (revision) =>
-      !known || revision === known;
+    engine.isCurrentQueueRevision = (revision) => !known || revision === known;
     vi.mocked(androidNativeEngine.drainEvents).mockResolvedValueOnce([
       {
         event: "playEventCheckpoint",
@@ -134,12 +135,10 @@ describe("useNativePlaybackEventBridge subscription", () => {
         payload: { revision: "queue-a", nativeSequence: 2, index: 1 },
       },
     ] as never);
-    vi.mocked(androidNativeEngine.getState).mockImplementationOnce(
-      async () => {
-        known = "queue-a";
-        return null;
-      },
-    );
+    vi.mocked(androidNativeEngine.getState).mockImplementationOnce(async () => {
+      known = "queue-a";
+      return null;
+    });
     const applyNativePosition = vi.fn();
     const applyNativeTrackChange = vi.fn();
     const { unmount } = renderHook(() =>
@@ -296,6 +295,108 @@ describe("useNativePlaybackEventBridge subscription", () => {
       mixState: null,
     });
     expect(subscriptions).toHaveLength(1);
+    unmount();
+  });
+
+  it("replays durable events from a previous process before any live listener attaches", async () => {
+    const { useNativePlaybackEventBridge } =
+      await import("./use-native-playback-event-bridge");
+    const { androidNativeEngine } = await import("@/lib/android-native-engine");
+    const checkpoint = {
+      revision: "queue-a",
+      nativeSequence: 40,
+      index: 0,
+      positionMs: 65000,
+      isPlaying: true,
+    };
+    const trackChanged = {
+      revision: "queue-a",
+      nativeSequence: 41,
+      index: 1,
+      positionMs: 0,
+      isPlaying: true,
+    };
+    vi.mocked(androidNativeEngine.getDurableEvents).mockResolvedValueOnce([
+      { event: "playEventCheckpoint", payload: checkpoint },
+      { event: "trackChanged", payload: trackChanged },
+    ] as never);
+    const order: string[] = [];
+    const applyReplayedNativeEvent = vi.fn((eventName: string) => {
+      order.push(`replay:${eventName}:${subscriptions.length}`);
+    });
+
+    const { unmount } = renderHook(() =>
+      useNativePlaybackEventBridge(params({ applyReplayedNativeEvent })),
+    );
+
+    await vi.waitFor(() => expect(subscriptions).toHaveLength(1));
+    expect(order).toEqual([
+      "replay:playEventCheckpoint:0",
+      "replay:trackChanged:0",
+    ]);
+    expect(applyReplayedNativeEvent).toHaveBeenCalledWith(
+      "trackChanged",
+      trackChanged,
+    );
+    expect(androidNativeEngine.acknowledgeEvents).toHaveBeenCalledWith(41);
+    unmount();
+  });
+
+  it("still attaches live listeners when the durable log cannot be read", async () => {
+    const { useNativePlaybackEventBridge } =
+      await import("./use-native-playback-event-bridge");
+    const { androidNativeEngine } = await import("@/lib/android-native-engine");
+    vi.mocked(androidNativeEngine.getDurableEvents).mockRejectedValueOnce(
+      new Error("bridge down"),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { unmount } = renderHook(() =>
+      useNativePlaybackEventBridge(params()),
+    );
+
+    await vi.waitFor(() => expect(subscriptions).toHaveLength(1));
+    warn.mockRestore();
+    unmount();
+  });
+
+  it("acknowledges handled live play events before the WebView is hidden", async () => {
+    const { useNativePlaybackEventBridge } =
+      await import("./use-native-playback-event-bridge");
+    const { androidNativeEngine } = await import("@/lib/android-native-engine");
+    vi.mocked(androidNativeEngine.acknowledgeEvents).mockClear();
+    const { unmount } = renderHook(() =>
+      useNativePlaybackEventBridge(params()),
+    );
+    await vi.waitFor(() => expect(subscriptions).toHaveLength(1));
+
+    act(() => {
+      subscriptions[0]?.handlers.playEventCheckpoint?.({
+        revision: "queue-a",
+        nativeSequence: 52,
+        index: 0,
+        positionMs: 5000,
+        isPlaying: true,
+      });
+      subscriptions[0]?.handlers.positionChanged?.({
+        revision: "queue-a",
+        nativeSequence: 53,
+        index: 0,
+        positionMs: 5100,
+        isPlaying: true,
+      });
+    });
+    const visibility = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("hidden");
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    visibility.mockRestore();
+
+    expect(
+      androidNativeEngine.acknowledgeEvents,
+    ).toHaveBeenCalledExactlyOnceWith(52);
     unmount();
   });
 });

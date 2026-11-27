@@ -8,4 +8,12 @@ final class NativeEventSequence {
     long next() {
         return value.incrementAndGet();
     }
+
+    /**
+     * Keeps sequences monotonic across process restarts: events replayed from
+     * the durable log must stay older than anything this process emits.
+     */
+    static void advanceTo(long floor) {
+        value.accumulateAndGet(floor, Math::max);
+    }
 }
