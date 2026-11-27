@@ -39,6 +39,7 @@ import androidx.media3.datasource.DataSourceBitmapLoader;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.datasource.ResolvingDataSource;
+import androidx.media3.datasource.cache.Cache;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -167,6 +168,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private PlaybackCheckpointStore checkpointStore;
     @Nullable
     private NativeDurableEventLog durableEventLog;
+    @Nullable
+    private Cache streamCache;
+    @Nullable
+    private NativeStreamCache.Prefetcher streamPrefetcher;
     private final NativeNetworkRecoveryPolicy networkRecovery =
         new NativeNetworkRecoveryPolicy(
             NETWORK_RECOVERY_WINDOW_MS,
@@ -242,6 +247,13 @@ public class CrateNativePlaybackService extends MediaSessionService {
     public void onCreate() {
         super.onCreate();
         stopLegacyPlaybackService();
+        streamCache = NativeStreamCache.shared(this);
+        if (streamCache != null) {
+            streamPrefetcher = new NativeStreamCache.Prefetcher(
+                streamCache,
+                authorizedStreamDataSourceFactory()
+            );
+        }
         createNotificationChannel();
         DefaultMediaNotificationProvider notificationProvider =
             new DefaultMediaNotificationProvider.Builder(this)
@@ -459,6 +471,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 if (playbackState == Player.STATE_READY) {
                     applyEqForCurrentTrack();
                     if (networkRecovery.isArmed()) disarmNetworkRecovery();
+                    // Retries a prefetch a lost network failed.
+                    schedulePrefetch();
                 }
                 if (
                     playbackState == Player.STATE_BUFFERING ||
@@ -779,17 +793,6 @@ public class CrateNativePlaybackService extends MediaSessionService {
             }
                 .setEnableDecoderFallback(true)
                 .setEnableAudioTrackPlaybackParams(true);
-        DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(false)
-            .setConnectTimeoutMs(10_000)
-            .setReadTimeoutMs(30_000);
-        DefaultDataSource.Factory dataSourceFactory =
-            new DefaultDataSource.Factory(this, httpDataSourceFactory);
-        ResolvingDataSource.Factory authorizedDataSourceFactory =
-            new ResolvingDataSource.Factory(
-                dataSourceFactory,
-                this::authorizeStream
-            );
         DefaultHttpDataSource.Factory artworkHttpDataSourceFactory =
             new DefaultHttpDataSource.Factory()
                 .setAllowCrossProtocolRedirects(false)
@@ -800,7 +803,12 @@ public class CrateNativePlaybackService extends MediaSessionService {
             dataSpec -> withAuthorization(dataSpec, artworkAuthorizationByOrigin)
         );
         DefaultMediaSourceFactory mediaSourceFactory =
-            new DefaultMediaSourceFactory(authorizedDataSourceFactory)
+            new DefaultMediaSourceFactory(
+                NativeStreamCache.readThrough(
+                    streamCache,
+                    authorizedStreamDataSourceFactory()
+                )
+            )
                 .setLoadErrorHandlingPolicy(new ConnectivityTolerantLoadErrorPolicy());
         return new ExoPlayer.Builder(
             this,
@@ -814,6 +822,19 @@ public class CrateNativePlaybackService extends MediaSessionService {
             )
             .experimentalSetDynamicSchedulingEnabled(USE_PCM_BUS)
             .build();
+    }
+
+    // Streams with the listener's authorization; the decks and the prefetcher
+    // share it.
+    private DataSource.Factory authorizedStreamDataSourceFactory() {
+        DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(false)
+            .setConnectTimeoutMs(10_000)
+            .setReadTimeoutMs(30_000);
+        return new ResolvingDataSource.Factory(
+            new DefaultDataSource.Factory(this, httpDataSourceFactory),
+            this::authorizeStream
+        );
     }
 
     private void watchDeckErrors(ExoPlayer physicalPlayer, NativePlaybackDeck deck) {
@@ -1209,6 +1230,35 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
     }
 
+    // Downloads the current track, the next one and, on an unmetered network,
+    // one more into the stream cache, so a dropped connection does not stop
+    // playback. A restored checkpoint has no stream URLs until JS re-supplies
+    // the queue.
+    private void schedulePrefetch() {
+        if (streamPrefetcher == null || player == null) return;
+        if (resumeAuthorizationPending) {
+            streamPrefetcher.cancel();
+            return;
+        }
+        List<String> urls = new ArrayList<>();
+        for (NativeTrack track : queueState.snapshot()) {
+            urls.add(track.url);
+        }
+        streamPrefetcher.prefetch(
+            NativeStreamPrefetchPlan.select(
+                urls,
+                player.getCurrentMediaItemIndex(),
+                isUnmeteredNetwork()
+            )
+        );
+    }
+
+    private boolean isUnmeteredNetwork() {
+        ConnectivityManager connectivity = getSystemService(ConnectivityManager.class);
+        // No active network also reports metered.
+        return connectivity != null && !connectivity.isActiveNetworkMetered();
+    }
+
     private void restoreCheckpoint() {
         if (checkpointStore == null || player == null) return;
         PlaybackCheckpointStore.Checkpoint checkpoint = checkpointStore.load();
@@ -1237,6 +1287,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     private void persistCheckpoint() {
         if (checkpointStore == null || player == null) return;
+        // Every queue or cursor change checkpoints, so the prefetch plan
+        // follows the same moments.
+        schedulePrefetch();
         if (queueState.isEmpty()) {
             checkpointStore.clear();
             return;
@@ -1329,6 +1382,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
     @Override
     public void onDestroy() {
         disarmNetworkRecovery();
+        if (streamPrefetcher != null) {
+            streamPrefetcher.release();
+            streamPrefetcher = null;
+        }
         cancelContinuationRequests();
         continuationConfig = null;
         continuationExecutor.shutdownNow();
