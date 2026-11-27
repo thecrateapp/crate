@@ -4,6 +4,8 @@ import type { MutableRefObject } from "react";
 
 const nativePlayerMock = vi.hoisted(() => ({
   shouldUseAndroidNativePlayer: vi.fn(() => false),
+  adoptPersistedQueueRevision: vi.fn(),
+  getState: vi.fn(),
 }));
 
 vi.mock("@/lib/gapless-player", () => ({
@@ -20,6 +22,10 @@ vi.mock("@/lib/gapless-player", () => ({
 
 vi.mock("@/lib/android-native-engine", () => ({
   shouldUseAndroidNativePlayer: nativePlayerMock.shouldUseAndroidNativePlayer,
+  androidNativeEngine: {
+    adoptPersistedQueueRevision: nativePlayerMock.adoptPersistedQueueRevision,
+    getState: nativePlayerMock.getState,
+  },
 }));
 
 import * as gaplessPlayer from "@/lib/gapless-player";
@@ -39,7 +45,11 @@ function setStored(
   currentIndex = 0,
   currentTime = 0,
   wasPlaying = false,
-  extras: { shuffle?: boolean; unshuffledQueue?: Track[] | null } = {},
+  extras: {
+    shuffle?: boolean;
+    unshuffledQueue?: Track[] | null;
+    nativeRevision?: string;
+  } = {},
 ) {
   localStorage.setItem(
     STORAGE_KEY,
@@ -50,6 +60,7 @@ function setStored(
       wasPlaying,
       shuffle: extras.shuffle ?? false,
       unshuffledQueue: extras.unshuffledQueue ?? null,
+      nativeRevision: extras.nativeRevision,
     }),
   );
 }
@@ -100,6 +111,8 @@ beforeEach(() => {
       (fn as { mockClear: () => void }).mockClear();
   });
   nativePlayerMock.shouldUseAndroidNativePlayer.mockReturnValue(false);
+  nativePlayerMock.adoptPersistedQueueRevision.mockClear();
+  nativePlayerMock.getState.mockReset();
 });
 
 afterEach(() => {
@@ -151,6 +164,95 @@ describe("useRestoreOnMount", () => {
       positionMs: 12_000,
     });
     expect(result.current.resumeAfterReloadRef.current).toBe(false);
+  });
+
+  describe("Android cold start", () => {
+    const TRACK_C: Track = { id: "c", title: "C", artist: "Z" };
+    const nativeState = (overrides: Record<string, unknown> = {}) => ({
+      revision: "rev-1",
+      playbackState: "idle",
+      isPlaying: false,
+      index: 2,
+      positionMs: 61_000,
+      durationMs: 200_000,
+      queueSize: 3,
+      crossfadeMs: 0,
+      eqEnabled: false,
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      nativePlayerMock.shouldUseAndroidNativePlayer.mockReturnValue(true);
+    });
+
+    it("leaves the queue to native when its checkpoint is the persisted queue", async () => {
+      // The WebView froze on track A while native played on to C.
+      setStored([TRACK_A, TRACK_B, TRACK_C], 0, 12, true, {
+        nativeRevision: "rev-1",
+      });
+      nativePlayerMock.getState.mockResolvedValue(nativeState());
+      const opts = createOptions({ queue: [TRACK_A, TRACK_B, TRACK_C] });
+
+      renderHook(() => useRestoreOnMount(opts));
+      await flushPlaybackResolution();
+
+      expect(nativePlayerMock.adoptPersistedQueueRevision).toHaveBeenCalledWith(
+        "rev-1",
+      );
+      expect(nativePlayerMock.getState).toHaveBeenCalledTimes(1);
+      expect(opts.pushToEngine).not.toHaveBeenCalled();
+    });
+
+    it("pushes the persisted queue when native holds another queue", async () => {
+      setStored([TRACK_A, TRACK_B, TRACK_C], 1, 12, true, {
+        nativeRevision: "rev-1",
+      });
+      // getState() answers null for a revision other than the adopted one.
+      nativePlayerMock.getState.mockResolvedValue(null);
+      const opts = createOptions({ queue: [TRACK_A, TRACK_B, TRACK_C] });
+
+      renderHook(() => useRestoreOnMount(opts));
+      await flushPlaybackResolution();
+
+      expect(opts.pushToEngine).toHaveBeenCalledWith(
+        [TRACK_A, TRACK_B, TRACK_C],
+        1,
+        { autoplay: true, positionMs: 12_000 },
+      );
+    });
+
+    it("pushes the persisted queue when native kept no checkpoint", async () => {
+      setStored([TRACK_A, TRACK_B], 1, 0, false, { nativeRevision: "rev-1" });
+      nativePlayerMock.getState.mockResolvedValue(
+        nativeState({ queueSize: 0, index: -1 }),
+      );
+      const opts = createOptions({ queue: [TRACK_A, TRACK_B] });
+
+      renderHook(() => useRestoreOnMount(opts));
+      await flushPlaybackResolution();
+
+      expect(opts.pushToEngine).toHaveBeenCalledWith([TRACK_A, TRACK_B], 1, {
+        autoplay: false,
+        positionMs: 0,
+      });
+    });
+
+    it("does not overwrite a queue the listener started while native answered", async () => {
+      setStored([TRACK_A, TRACK_B], 1, 0, false, { nativeRevision: "rev-1" });
+      let answer!: (state: null) => void;
+      nativePlayerMock.getState.mockReturnValue(
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+      );
+      const opts = createOptions({ queue: [TRACK_A, TRACK_B] });
+
+      renderHook(() => useRestoreOnMount(opts));
+      opts.queueRef.current = [TRACK_C];
+      await act(async () => answer(null));
+
+      expect(opts.pushToEngine).not.toHaveBeenCalled();
+    });
   });
 
   it("seeks to stored position and reflects it in React state", async () => {

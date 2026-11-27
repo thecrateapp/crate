@@ -168,6 +168,11 @@ export interface EngineErrorEvent extends NativeEventMetadata {
   cause?: string;
   causeMessage?: string;
   httpStatus?: number;
+  /**
+   * The network was gone (no DNS answer, no route). Native keeps retrying and
+   * resumes on its own once Android reports a network; older shells omit it.
+   */
+  networkRecoverable?: boolean;
 }
 
 export interface EngineTransitionCancelledEvent extends NativeEventMetadata {

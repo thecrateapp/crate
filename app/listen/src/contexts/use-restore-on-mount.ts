@@ -15,7 +15,10 @@ import {
   setSingleMode as gpSetSingleMode,
   stop as gpStop,
 } from "@/lib/gapless-player";
-import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
+import {
+  androidNativeEngine,
+  shouldUseAndroidNativePlayer,
+} from "@/lib/android-native-engine";
 
 const SOFT_PAUSE_FADE_MS = 220;
 const AUTOPLAY_TIMEOUT_MS = 2500;
@@ -168,11 +171,37 @@ export function useRestoreOnMount({
       gpStop();
       gpLoadQueue([], 0);
       resumeAfterReloadRef.current = false;
-      // Mount restoration must push the recovered queue into the player engine.
-      // react-doctor-disable-next-line no-pass-data-to-parent, no-pass-live-state-to-parent
-      pushToEngine(restoredQueue, restoredIndex, {
-        autoplay: allowAutoplayRestore && stored.wasPlaying,
-        positionMs: Math.max(0, pendingRestoreTimeRef.current * 1000),
+      const pushStoredQueue = () => {
+        // Mount restoration must push the recovered queue into the player engine.
+        // react-doctor-disable-next-line no-pass-data-to-parent, no-pass-live-state-to-parent
+        pushToEngine(restoredQueue, restoredIndex, {
+          autoplay: allowAutoplayRestore && stored.wasPlaying,
+          positionMs: Math.max(0, pendingRestoreTimeRef.current * 1000),
+        });
+      };
+      const nativeRevision = stored.nativeRevision;
+      if (!nativeRevision) {
+        pushStoredQueue();
+        return;
+      }
+
+      // The persisted cursor goes stale whenever the WebView freezes in the
+      // background: native keeps playing and checkpointing its own cursor,
+      // but JS never sees the track changes. When native still holds this
+      // same queue, its cursor is the truth: a live service just keeps
+      // playing, and a restored checkpoint asks JS for fresh stream
+      // authorization (resumeAuthorizationRequired), which re-supplies this
+      // queue at native's index and position. Pushing the persisted cursor
+      // here would rewind the listener to the track the screen went off on.
+      androidNativeEngine.adoptPersistedQueueRevision(nativeRevision);
+      const queueAtMount = queueRef.current;
+      void androidNativeEngine.getState().then((state) => {
+        // The listener started something else while native answered.
+        if (queueRef.current !== queueAtMount) return;
+        if (state && state.revision === nativeRevision && state.queueSize > 0) {
+          return;
+        }
+        pushStoredQueue();
       });
       return;
     }
@@ -209,6 +238,7 @@ export function useRestoreOnMount({
     markSeekPosition,
     pullFromEngine,
     pushToEngine,
+    queueRef,
     repeatRef,
     stored,
     allowAutoplayRestore,

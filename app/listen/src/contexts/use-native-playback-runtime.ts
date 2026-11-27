@@ -115,6 +115,7 @@ export function useNativePlaybackRuntime({
     applyNativePosition,
     applyNativeState,
     applyNativeTrackChange,
+    applyReplayedNativeEvent,
     isNativeEventStale,
     applyNativeMixState,
   } = useNativePlaybackReconciliation({
@@ -146,6 +147,7 @@ export function useNativePlaybackRuntime({
     applyNativePosition,
     applyNativeState,
     applyNativeTrackChange,
+    applyReplayedNativeEvent,
     beginSoftInterruption,
     bufferingIntentRef,
     clearNativeBufferingWatchdog,

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { CrossfadeTransition } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
+import { createNativeEventAcknowledger } from "@/contexts/native-event-acknowledger";
 import { subscribeNativePlayerEvents } from "@/contexts/subscribe-native-player-events";
 import {
   androidNativeEngine,
@@ -53,6 +54,14 @@ export function shouldHandleNativeSideEffectEvent(
 // nothing surfaced it): retry a few times as the queue catches up
 // before giving up and telling the user to open the app.
 const RESUME_AUTHORIZATION_RETRY_DELAYS_MS = [0, 500, 1500, 3000];
+
+// Play-relevant events native keeps on disk until JS acknowledges them.
+const DURABLE_NATIVE_EVENTS = new Set<string>([
+  "trackChanged",
+  "playEventCheckpoint",
+]);
+const NATIVE_EVENT_ACK_DELAY_MS = 2000;
+const NATIVE_NETWORK_LOST_NOTICE_ID = "native-network-lost";
 
 type RecoverNativeBuffering = (options: {
   forceRefresh: boolean;
@@ -191,6 +200,11 @@ export interface UseNativePlaybackEventBridgeParams {
   applyNativeTrackChange: (
     event: EnginePositionEvent & { reason?: string },
   ) => void;
+  /** Applies a durable event replayed from a previous process. */
+  applyReplayedNativeEvent?: (
+    eventName: string,
+    event: EnginePositionEvent & { reason?: string },
+  ) => void;
   beginSoftInterruption: (reason: "stream") => void;
   bufferingIntentRef: MutableValueRef<boolean>;
   clearNativeBufferingWatchdog: () => void;
@@ -223,6 +237,7 @@ export function useNativePlaybackEventBridge({
   applyNativePosition,
   applyNativeState,
   applyNativeTrackChange,
+  applyReplayedNativeEvent,
   beginSoftInterruption,
   bufferingIntentRef,
   clearNativeBufferingWatchdog,
@@ -390,6 +405,21 @@ export function useNativePlaybackEventBridge({
         if (retryNativePlaybackAfterAuthError(nativeError)) {
           return;
         }
+        if (nativeError.networkRecoverable) {
+          // Native re-prepares the stream itself once the network is back
+          // (also with the WebView frozen), so JS neither shows the raw
+          // resolver error nor starts a competing recovery. The fixed id
+          // keeps one notice through repeated failures of one outage.
+          notify.info(tRef.current("player.native.networkLostTitle"), {
+            id: NATIVE_NETWORK_LOST_NOTICE_ID,
+            description: tRef.current("player.native.networkLostDescription"),
+            duration: 9000,
+          });
+          bufferingIntentRef.current = false;
+          commitIsPlaying(false);
+          commitIsBuffering(false);
+          return;
+        }
         notify.error(tRef.current("player.native.playbackFailed"), {
           description: summary,
           duration: 9000,
@@ -467,6 +497,10 @@ export function useNativePlaybackEventBridge({
     (...args: Parameters<typeof handleNativeEvent>) =>
       handleNativeEvent(...args),
   );
+  const onReplayedNativeEvent = useEffectEvent(
+    (eventName: string, payload: EnginePositionEvent & { reason?: string }) =>
+      applyReplayedNativeEvent?.(eventName, payload),
+  );
   const onAdoptAppended = useEffectEvent(() => adoptNativeAppendedTracks?.());
   const onReconcile = useEffectEvent(
     (...args: Parameters<typeof reconcileNativePlayback>) =>
@@ -489,88 +523,128 @@ export function useNativePlaybackEventBridge({
           onRecoverBuffering(...args),
       );
     resumeAuthorizationCoordinatorRef.current = resumeAuthorizationCoordinator;
-    const subscription = subscribeNativePlayerEvents(androidNativeEngine, {
-      positionChanged: (event) => {
-        if (disposed) return;
-        onNativePosition(event);
-      },
-      playEventCheckpoint: (event) => {
-        if (disposed) return;
-        onNativePosition(event);
-      },
-      stateChanged: (event) => {
-        if (disposed) return;
-        onNativeState(event);
-      },
-      mixStateChanged: (event) => {
-        if (disposed) return;
-        onNativeEvent("mixStateChanged", event);
-      },
-      trackChanged: (event) => {
-        if (disposed) return;
-        onNativeTrackChange(event);
-        androidNativeEngine.planAhead(event.index);
-      },
-      transitionStarted: (event) => {
-        if (disposed) return;
-        onNativeEvent("transitionStarted", event);
-      },
-      transitionProgress: (event) => {
-        if (disposed) return;
-        onNativeEvent("transitionProgress", event);
-      },
-      transitionEnded: (event) => {
-        if (disposed) return;
-        onNativeEvent("transitionEnded", event);
-      },
-      transitionCancelled: (event) => {
-        if (disposed) return;
-        onNativeEvent("transitionCancelled", event);
-      },
-      bufferingChanged: (event) => {
-        if (disposed) return;
-        onNativeEvent("bufferingChanged", event);
-      },
-      nearQueueEnd: (event) => {
-        if (disposed) return;
-        onNativeEvent("nearQueueEnd", event);
-      },
-      queueEnded: (event) => {
-        if (disposed) return;
-        onNativeEvent("queueEnded", event);
-      },
-      resumeAuthorizationRequired: (event) => {
-        if (disposed) return;
-        onNativeEvent("resumeAuthorizationRequired", event);
-      },
-      error: (event) => {
-        if (disposed) return;
-        onNativeEvent("error", event);
-      },
-    });
+    const acknowledger = createNativeEventAcknowledger((sequence) => {
+      void androidNativeEngine.acknowledgeEvents(sequence);
+    }, NATIVE_EVENT_ACK_DELAY_MS);
+    const observeDurable = (eventName: string, payload: unknown) => {
+      if (DURABLE_NATIVE_EVENTS.has(eventName)) {
+        acknowledger.observe(payload as NativeEventMetadata);
+      }
+    };
+    let subscription: ReturnType<typeof subscribeNativePlayerEvents> | null =
+      null;
+    const attach = () =>
+      subscribeNativePlayerEvents(androidNativeEngine, {
+        positionChanged: (event) => {
+          if (disposed) return;
+          onNativePosition(event);
+        },
+        playEventCheckpoint: (event) => {
+          if (disposed) return;
+          onNativePosition(event);
+          observeDurable("playEventCheckpoint", event);
+        },
+        stateChanged: (event) => {
+          if (disposed) return;
+          onNativeState(event);
+        },
+        mixStateChanged: (event) => {
+          if (disposed) return;
+          onNativeEvent("mixStateChanged", event);
+        },
+        trackChanged: (event) => {
+          if (disposed) return;
+          onNativeTrackChange(event);
+          androidNativeEngine.planAhead(event.index);
+          observeDurable("trackChanged", event);
+        },
+        transitionStarted: (event) => {
+          if (disposed) return;
+          onNativeEvent("transitionStarted", event);
+        },
+        transitionProgress: (event) => {
+          if (disposed) return;
+          onNativeEvent("transitionProgress", event);
+        },
+        transitionEnded: (event) => {
+          if (disposed) return;
+          onNativeEvent("transitionEnded", event);
+        },
+        transitionCancelled: (event) => {
+          if (disposed) return;
+          onNativeEvent("transitionCancelled", event);
+        },
+        bufferingChanged: (event) => {
+          if (disposed) return;
+          onNativeEvent("bufferingChanged", event);
+        },
+        nearQueueEnd: (event) => {
+          if (disposed) return;
+          onNativeEvent("nearQueueEnd", event);
+        },
+        queueEnded: (event) => {
+          if (disposed) return;
+          onNativeEvent("queueEnded", event);
+        },
+        resumeAuthorizationRequired: (event) => {
+          if (disposed) return;
+          onNativeEvent("resumeAuthorizationRequired", event);
+        },
+        error: (event) => {
+          if (disposed) return;
+          onNativeEvent("error", event);
+        },
+      });
 
-    // Listeners attach one event at a time (subscription.ready), each a
-    // native round trip — draining or reconciling before that finishes
-    // could ask native to flush events into a listener that isn't wired up
-    // yet and silently lose them. Reconciling (getState) only after the
-    // drain also ensures the freshest snapshot is applied last, instead of
-    // racing a stale buffered event for who gets applied second.
-    void subscription.ready
-      .then(() => {
+    // Durable events from a previous process (the WebView froze, then the
+    // process died) replay before any live listener exists. Capacitor holds
+    // live events until a listener attaches, so nothing newer can advance
+    // the sequence watermark or replace the queue revision under them.
+    void androidNativeEngine
+      .getDurableEvents()
+      .then((events) => {
         if (disposed) return;
-        return androidNativeEngine
-          .drainEvents()
-          .then((events) => {
-            if (disposed) return;
-            for (const event of events) {
-              onNativeEvent(event.event, event.payload);
-            }
-          })
-          .catch(() => {});
+        for (const event of events) {
+          onReplayedNativeEvent(
+            event.event,
+            event.payload as EnginePositionEvent & { reason?: string },
+          );
+          observeDurable(event.event, event.payload);
+        }
+        acknowledger.flush();
+      })
+      .catch((error) => {
+        console.warn("[native-player] durable events not replayed:", error);
       })
       .then(() => {
         if (disposed) return;
-        onReconcile();
+        const attached = attach();
+        subscription = attached;
+        // Listeners attach one event at a time (subscription.ready), each a
+        // native round trip — draining or reconciling before that finishes
+        // could ask native to flush events into a listener that isn't wired
+        // up yet and silently lose them. Reconciling (getState) only after
+        // the drain also ensures the freshest snapshot is applied last,
+        // instead of racing a stale buffered event for who gets applied
+        // second.
+        return attached.ready
+          .then(() => {
+            if (disposed) return;
+            return androidNativeEngine
+              .drainEvents()
+              .then((events) => {
+                if (disposed) return;
+                for (const event of events) {
+                  onNativeEvent(event.event, event.payload);
+                  observeDurable(event.event, event.payload);
+                }
+              })
+              .catch(() => {});
+          })
+          .then(() => {
+            if (disposed) return;
+            onReconcile();
+          });
       })
       .catch((error) => {
         console.error("[native-player] failed to attach listeners:", error);
@@ -595,6 +669,10 @@ export function useNativePlaybackEventBridge({
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         adoptThenReconcile();
+      } else {
+        // The WebView may freeze next: acknowledge what was handled so a
+        // later cold start does not replay (and double count) it.
+        acknowledger.flush();
       }
     };
     window.addEventListener("crate:app-resumed", onNativeResume);
@@ -612,7 +690,8 @@ export function useNativePlaybackEventBridge({
       window.removeEventListener("crate:app-resumed", onNativeResume);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       onClearBufferingWatchdog();
-      subscription.dispose();
+      acknowledger.dispose();
+      subscription?.dispose();
     };
   }, []);
 }

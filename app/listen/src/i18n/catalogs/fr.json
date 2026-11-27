@@ -1792,6 +1792,8 @@
   "player.native.stuckBuffering": "La lecture native est bloquée en chargement",
   "player.native.streamProbe": "Test du flux : {status}",
   "player.native.playbackFailed": "La lecture native a échoué",
+  "player.native.networkLostTitle": "Connexion perdue",
+  "player.native.networkLostDescription": "La lecture reprendra au retour du réseau.",
   "player.native.resumeTitle": "Ouvre Crate pour reprendre la lecture",
   "player.native.resumeDescription": "La file enregistrée a besoin d'une nouvelle autorisation du serveur.",
   "playlistComposer.toasts.created": "Playlist créée",

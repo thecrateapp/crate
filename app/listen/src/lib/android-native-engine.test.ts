@@ -49,9 +49,8 @@ describe("android native engine flags", () => {
 
   it("uses the native player by default on Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-    const { shouldUseAndroidNativePlayer } = await import(
-      "@/lib/android-native-engine"
-    );
+    const { shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     expect(shouldUseAndroidNativePlayer()).toBe(true);
   });
@@ -72,9 +71,8 @@ describe("android native engine flags", () => {
 
   it("ignores the flag outside Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: false }));
-    const { shouldUseAndroidNativePlayer } = await import(
-      "@/lib/android-native-engine"
-    );
+    const { shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     expect(shouldUseAndroidNativePlayer()).toBe(false);
   });
@@ -83,9 +81,8 @@ describe("android native engine flags", () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
     localStorage.setItem("listen-player-crossfade-seconds", "4");
     localStorage.setItem("crate-native-player-crossfade-enabled", "true");
-    const { shouldUseAndroidNativePlayer } = await import(
-      "@/lib/android-native-engine"
-    );
+    const { shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     expect(shouldUseAndroidNativePlayer()).toBe(true);
     expect(
@@ -777,6 +774,140 @@ describe("android native engine flags", () => {
     vi.useRealTimers();
   });
 
+  describe("cold-start resume", () => {
+    const nativeState = {
+      revision: "persisted-rev",
+      playbackState: "paused",
+      isPlaying: false,
+      index: 4,
+      positionMs: 61_000,
+      durationMs: 200_000,
+      queueSize: 6,
+      crossfadeMs: 0,
+      eqEnabled: false,
+    };
+    const pluginMock = nativePlaybackMock as unknown as Record<
+      string,
+      ReturnType<typeof vi.fn>
+    >;
+
+    it("adopts the persisted revision so only that queue's native state is read", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(nativeState);
+      const { AndroidNativeEngine } =
+        await import("@/lib/android-native-engine");
+      const engine = new AndroidNativeEngine();
+
+      engine.adoptPersistedQueueRevision("other-rev");
+
+      expect(engine.currentQueueRevision()).toBe("other-rev");
+      await expect(engine.getState()).resolves.toBeNull();
+      expect(engine.isCurrentQueueRevision("persisted-rev")).toBe(false);
+    });
+
+    it("never replaces a revision the engine already owns", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(nativeState);
+      nativePlaybackMock.setQueue.mockResolvedValue({
+        ...nativeState,
+        revision: "live-rev",
+      });
+      const { AndroidNativeEngine } =
+        await import("@/lib/android-native-engine");
+      const engine = new AndroidNativeEngine();
+      await engine.loadQueue({
+        revision: "live-rev",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs: 0,
+        volume: 1,
+      });
+
+      engine.adoptPersistedQueueRevision("persisted-rev");
+
+      expect(engine.currentQueueRevision()).toBe("live-rev");
+    });
+
+    it("announces each loaded native revision so it can be persisted", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(nativeState);
+      nativePlaybackMock.setQueue.mockResolvedValue({
+        ...nativeState,
+        revision: "live-rev",
+      });
+      const { AndroidNativeEngine, NATIVE_QUEUE_REVISION_EVENT } =
+        await import("@/lib/android-native-engine");
+      const engine = new AndroidNativeEngine();
+      const listener = vi.fn();
+      window.addEventListener(NATIVE_QUEUE_REVISION_EVENT, listener);
+
+      await engine.loadQueue({
+        revision: "live-rev",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs: 0,
+        volume: 1,
+      });
+      window.removeEventListener(NATIVE_QUEUE_REVISION_EVENT, listener);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads the durable native events and acknowledges them by sequence", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(nativeState);
+      const trackChanged = {
+        revision: "persisted-rev",
+        nativeSequence: 12,
+        index: 1,
+        positionMs: 0,
+        durationMs: 1,
+        isPlaying: true,
+      };
+      pluginMock.getDurableEvents = vi.fn().mockResolvedValue({
+        events: [
+          { event: "trackChanged", payload: trackChanged },
+          { event: "trackChanged" },
+        ],
+      });
+      const ackEvents = vi.fn().mockResolvedValue(undefined);
+      pluginMock.ackEvents = ackEvents;
+      const { AndroidNativeEngine } =
+        await import("@/lib/android-native-engine");
+      const engine = new AndroidNativeEngine();
+
+      await expect(engine.getDurableEvents()).resolves.toEqual([
+        { event: "trackChanged", payload: trackChanged },
+      ]);
+      await engine.acknowledgeEvents(12);
+
+      expect(ackEvents).toHaveBeenCalledWith({ sequence: 12 });
+    });
+
+    it("treats a native shell without durable events as having none", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(nativeState);
+      pluginMock.getDurableEvents = vi
+        .fn()
+        .mockRejectedValue(new Error("not implemented"));
+      pluginMock.ackEvents = vi
+        .fn()
+        .mockRejectedValue(new Error("not implemented"));
+      const { AndroidNativeEngine } =
+        await import("@/lib/android-native-engine");
+      const engine = new AndroidNativeEngine();
+
+      await expect(engine.getDurableEvents()).resolves.toEqual([]);
+      await expect(engine.acknowledgeEvents(3)).resolves.toBeUndefined();
+    });
+  });
+
   describe("native continuation", () => {
     const state = {
       revision: "queue-rev-1",
@@ -851,9 +982,8 @@ describe("android native engine flags", () => {
 
     it("follows Smart Mix mode changes in the continuation context", async () => {
       vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-      const { continuationWithModes } = await import(
-        "@/lib/android-native-engine"
-      );
+      const { continuationWithModes } =
+        await import("@/lib/android-native-engine");
       const capabilities = {
         available: true,
         androidNativeCrossfade: true,
@@ -881,9 +1011,8 @@ describe("android native engine flags", () => {
 
     it("continuationWithModes follows a planner change", async () => {
       vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-      const { continuationWithModes } = await import(
-        "@/lib/android-native-engine"
-      );
+      const { continuationWithModes } =
+        await import("@/lib/android-native-engine");
       const v3Context = { ...context, plannerVersion: "smart-mix-v3" as const };
       // Same beatmatch, bass and long modes as the context: only the planner differs.
       const capabilitiesResolvingV2 = {

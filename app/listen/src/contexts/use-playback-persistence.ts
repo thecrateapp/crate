@@ -3,6 +3,10 @@ import type { MutableRefObject } from "react";
 
 import type { PlaySource, Track } from "@/contexts/player-types";
 import { saveQueue } from "@/contexts/player-utils";
+import {
+  androidNativeEngine,
+  NATIVE_QUEUE_REVISION_EVENT,
+} from "@/lib/android-native-engine";
 
 const CHECKPOINT_INTERVAL_MS = 5000;
 
@@ -36,6 +40,9 @@ interface UsePlaybackPersistenceOptions {
  *   3. pagehide / beforeunload — final snapshot on tab close or SPA
  *      navigation away (pagehide covers iOS Safari; beforeunload covers
  *      most desktop browsers).
+ *   4. A native queue load — records the Android native revision the
+ *      snapshot belongs to, so a cold start can tell whether the native
+ *      service's checkpoint describes this same queue.
  *
  * Critically does NOT write on currentTime changes (fires ~37 times/sec
  * from Gapless ontimeupdate) — serializing the full queue that often
@@ -62,6 +69,7 @@ export function usePlaybackPersistence({
       shuffle: shuffleRef.current,
       unshuffledQueue: unshuffledQueueRef.current,
       playSource: playSourceRef.current,
+      nativeRevision: androidNativeEngine.currentQueueRevision(),
     });
   });
 
@@ -78,6 +86,18 @@ export function usePlaybackPersistence({
       persistNow(isPlayingRef.current);
     }, CHECKPOINT_INTERVAL_MS);
     return () => window.clearInterval(id);
+  }, [isPlayingRef, queueRef]);
+
+  // A native queue load finishes after the structural write above, so the
+  // revision it installed is recorded once it exists.
+  useEffect(() => {
+    const handler = () => {
+      if (!queueRef.current.length) return;
+      persistNow(isPlayingRef.current);
+    };
+    window.addEventListener(NATIVE_QUEUE_REVISION_EVENT, handler);
+    return () =>
+      window.removeEventListener(NATIVE_QUEUE_REVISION_EVENT, handler);
   }, [isPlayingRef, queueRef]);
 
   // Unload: final snapshot for resume on next session. Both events fire

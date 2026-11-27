@@ -55,6 +55,65 @@ function render(options = params()) {
 }
 
 describe("native play sessions", () => {
+  it("replays a frozen session as plays without projecting old events to now", () => {
+    const { options, result } = render();
+    sequence += 1;
+    const checkpoint = {
+      revision: "queue-a",
+      nativeSequence: sequence,
+      // An hour ago: projecting it would clamp the position to the track end.
+      nativeTimeMs: Date.now() - 3_600_000,
+      index: 0,
+      positionMs: 65_000,
+      durationMs: 200_000,
+      isPlaying: true,
+      checkpointMs: 5000,
+    };
+
+    act(() =>
+      result.current.applyReplayedNativeEvent(
+        "playEventCheckpoint",
+        checkpoint,
+      ),
+    );
+    act(() =>
+      result.current.applyReplayedNativeEvent("trackChanged", {
+        ...trackChange(1, "auto"),
+        nativeTimeMs: Date.now() - 3_500_000,
+      }),
+    );
+
+    expect(options.ensureTrackerSession).toHaveBeenCalledWith(A, null);
+    expect(options.recordProgress).toHaveBeenCalledWith(65, 6.5);
+    expect(options.commitCurrentTime).toHaveBeenCalledWith(65);
+    expect(options.rotateTrackerSession).toHaveBeenCalledWith(
+      "completed",
+      A,
+      B,
+      null,
+    );
+    expect(options.commitCurrentIndex).toHaveBeenCalledWith(1);
+    expect(options.commitCurrentTime).toHaveBeenLastCalledWith(0);
+  });
+
+  it("does not open a replay session for a track JS is not on", () => {
+    const { options, result } = render();
+    sequence += 1;
+
+    act(() =>
+      result.current.applyReplayedNativeEvent("playEventCheckpoint", {
+        revision: "queue-a",
+        nativeSequence: sequence,
+        index: 1,
+        positionMs: 10_000,
+        durationMs: 200_000,
+        isPlaying: true,
+      }),
+    );
+
+    expect(options.ensureTrackerSession).not.toHaveBeenCalled();
+  });
+
   it("ends the outgoing play when native replaces the item without JS", () => {
     const { options, result } = render();
 

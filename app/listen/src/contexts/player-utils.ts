@@ -52,6 +52,12 @@ export interface StoredQueue {
   unshuffledQueue: Track[] | null;
   playSource: PlaySource | null;
   savedAt: string | null;
+  /**
+   * Revision of the Android native queue this snapshot was loaded under.
+   * On a cold start it tells whether the native service's own checkpoint
+   * describes the same queue, so its fresher cursor can win over this one.
+   */
+  nativeRevision: string | null;
 }
 
 export function getStoredQueue(): StoredQueue {
@@ -77,6 +83,7 @@ export function getStoredQueue(): StoredQueue {
           unshuffledQueue,
           playSource: persistablePlaySource(parsed.playSource),
           savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
+          nativeRevision: nonEmptyString(parsed.nativeRevision),
         };
         if (fromLegacy) {
           try {
@@ -101,7 +108,12 @@ export function getStoredQueue(): StoredQueue {
     unshuffledQueue: null,
     playSource: null,
     savedAt: null,
+    nativeRevision: null,
   };
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 const PERSISTED_PLAY_SOURCE_TYPES = new Set<PlaySource["type"]>([
@@ -157,6 +169,7 @@ export interface SaveQueueOptions {
   shuffle?: boolean;
   unshuffledQueue?: Track[] | null;
   playSource?: PlaySource | null;
+  nativeRevision?: string | null;
 }
 
 export function saveQueue(
@@ -182,6 +195,7 @@ export function saveQueue(
           ? persistablePlaySource(options.playSource)
           : null,
         savedAt: new Date().toISOString(),
+        nativeRevision: nonEmptyString(options.nativeRevision),
       }),
     );
   } catch {

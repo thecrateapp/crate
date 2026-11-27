@@ -10,6 +10,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Binder;
@@ -59,6 +61,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -81,6 +84,13 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     private static final int PLAY_EVENT_CHECKPOINT_MS = 5000;
     private static final int MAX_BUFFERED_EVENTS = 1000;
+    // About two hours of 5 s play checkpoints with the WebView frozen.
+    private static final int MAX_DURABLE_EVENTS = 1500;
+    private static final String DURABLE_EVENTS_FILE = "native_playback_events.jsonl";
+    // After the load policy's own retries give up, keep trying to resume for
+    // this long, at most once per interval.
+    private static final long NETWORK_RECOVERY_WINDOW_MS = 15 * 60_000L;
+    private static final long NETWORK_RECOVERY_INTERVAL_MS = 5_000L;
     private static final long MIX_PROGRESS_EVENT_INTERVAL_MS = 250L;
 
     private final IBinder binder = new LocalBinder();
@@ -155,6 +165,16 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private AudioFocusRequest audioFocusRequest;
     private MediaSession mediaSession;
     private PlaybackCheckpointStore checkpointStore;
+    @Nullable
+    private NativeDurableEventLog durableEventLog;
+    private final NativeNetworkRecoveryPolicy networkRecovery =
+        new NativeNetworkRecoveryPolicy(
+            NETWORK_RECOVERY_WINDOW_MS,
+            NETWORK_RECOVERY_INTERVAL_MS
+        );
+    private final Runnable networkRecoveryAttempt = this::attemptNetworkRecovery;
+    @Nullable
+    private ConnectivityManager.NetworkCallback networkRecoveryCallback;
     private int crossfadeMs = 0;
     private boolean positionTickerStarted = false;
     private boolean nativeMixTickerStarted = false;
@@ -438,6 +458,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 syncNativeMixTicker();
                 if (playbackState == Player.STATE_READY) {
                     applyEqForCurrentTrack();
+                    if (networkRecovery.isArmed()) disarmNetworkRecovery();
                 }
                 if (
                     playbackState == Player.STATE_BUFFERING ||
@@ -540,7 +561,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 NativeTrack currentTrack = getCurrentNativeTrack();
                 Throwable rootCause = rootCause(error);
                 Integer httpStatus = httpStatus(error);
+                boolean networkRecoverable = NativeNetworkErrors.isConnectivityError(error);
                 payload.put("code", error.errorCode);
+                payload.put("networkRecoverable", networkRecoverable);
                 payload.put("message", error.getMessage());
                 payload.put("trackId", currentTrack == null ? "" : currentTrack.id);
                 payload.put("index", player.getCurrentMediaItemIndex());
@@ -560,8 +583,14 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     error
                 );
                 emit("error", payload);
+                if (networkRecoverable) armNetworkRecovery();
             }
         });
+        durableEventLog = new NativeDurableEventLog(
+            new File(getFilesDir(), DURABLE_EVENTS_FILE),
+            MAX_DURABLE_EVENTS
+        );
+        NativeEventSequence.advanceTo(durableEventLog.maxSequence());
         checkpointStore = new PlaybackCheckpointStore(this);
         restoreCheckpoint();
         MediaSession.Builder sessionBuilder = new MediaSession.Builder(this, player)
@@ -771,7 +800,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
             dataSpec -> withAuthorization(dataSpec, artworkAuthorizationByOrigin)
         );
         DefaultMediaSourceFactory mediaSourceFactory =
-            new DefaultMediaSourceFactory(authorizedDataSourceFactory);
+            new DefaultMediaSourceFactory(authorizedDataSourceFactory)
+                .setLoadErrorHandlingPolicy(new ConnectivityTolerantLoadErrorPolicy());
         return new ExoPlayer.Builder(
             this,
             renderersFactory,
@@ -1110,6 +1140,75 @@ public class CrateNativePlaybackService extends MediaSessionService {
         );
     }
 
+    // The player gave up on a stream because the network was gone (Wi-Fi to
+    // mobile handover, a tunnel, Doze). Nothing in JS can retry while the
+    // screen is off, so the service re-prepares the same item and position
+    // once Android reports a network, or every interval, until playback is
+    // ready again, the listener pauses or the window ends.
+    private void armNetworkRecovery() {
+        if (player == null || resumeAuthorizationPending) return;
+        networkRecovery.arm(SystemClock.elapsedRealtime());
+        registerNetworkRecoveryCallback();
+        mainHandler.removeCallbacks(networkRecoveryAttempt);
+        mainHandler.postDelayed(networkRecoveryAttempt, NETWORK_RECOVERY_INTERVAL_MS);
+    }
+
+    private void attemptNetworkRecovery() {
+        mainHandler.removeCallbacks(networkRecoveryAttempt);
+        if (player == null || !networkRecovery.isArmed()) return;
+        long now = SystemClock.elapsedRealtime();
+        if (
+            networkRecovery.isExpired(now) ||
+            resumeAuthorizationPending ||
+            !player.getPlayWhenReady() ||
+            player.getPlayerError() == null
+        ) {
+            disarmNetworkRecovery();
+            return;
+        }
+        long waitMs = networkRecovery.delayUntilNextAttemptMs(now);
+        if (waitMs > 0L) {
+            mainHandler.postDelayed(networkRecoveryAttempt, waitMs);
+            return;
+        }
+        networkRecovery.markAttempt(now);
+        Log.i(TAG, "Re-preparing playback after a network failure");
+        player.prepare();
+    }
+
+    private void registerNetworkRecoveryCallback() {
+        if (networkRecoveryCallback != null) return;
+        ConnectivityManager connectivity = getSystemService(ConnectivityManager.class);
+        if (connectivity == null) return;
+        ConnectivityManager.NetworkCallback callback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                mainHandler.post(networkRecoveryAttempt);
+            }
+        };
+        try {
+            connectivity.registerDefaultNetworkCallback(callback);
+            networkRecoveryCallback = callback;
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Network recovery callback not registered", error);
+        }
+    }
+
+    private void disarmNetworkRecovery() {
+        networkRecovery.disarm();
+        mainHandler.removeCallbacks(networkRecoveryAttempt);
+        ConnectivityManager.NetworkCallback callback = networkRecoveryCallback;
+        networkRecoveryCallback = null;
+        if (callback == null) return;
+        ConnectivityManager connectivity = getSystemService(ConnectivityManager.class);
+        if (connectivity == null) return;
+        try {
+            connectivity.unregisterNetworkCallback(callback);
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Network recovery callback not unregistered", error);
+        }
+    }
+
     private void restoreCheckpoint() {
         if (checkpointStore == null || player == null) return;
         PlaybackCheckpointStore.Checkpoint checkpoint = checkpointStore.load();
@@ -1229,6 +1328,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     @Override
     public void onDestroy() {
+        disarmNetworkRecovery();
         cancelContinuationRequests();
         continuationConfig = null;
         continuationExecutor.shutdownNow();
@@ -1287,6 +1387,21 @@ public class CrateNativePlaybackService extends MediaSessionService {
         return telemetry.drain();
     }
 
+    public JSArray getDurableEvents() {
+        JSArray events = new JSArray();
+        if (durableEventLog == null) return events;
+        JSONArray pending = durableEventLog.pendingEvents();
+        for (int index = 0; index < pending.length(); index++) {
+            JSONObject event = pending.optJSONObject(index);
+            if (event != null) events.put(event);
+        }
+        return events;
+    }
+
+    public void acknowledgeDurableEvents(long sequence) {
+        if (durableEventLog != null) durableEventLog.acknowledge(sequence);
+    }
+
     public JSObject getSnapshot() {
         JSObject payload = basePayload();
         payload.put("isPlaying", player != null && player.isPlaying());
@@ -1328,6 +1443,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         cancelNativeTransition("queue_replaced");
         resumeAuthorizationPending = false;
         resumeAuthorizationIntent = null;
+        disarmNetworkRecovery();
         this.crossfadeMs = Math.max(0, crossfadeMs);
         resetPlayEventCheckpoint();
 
@@ -2011,6 +2127,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     public void stopPlayback() {
         cancelContinuationRequests();
+        disarmNetworkRecovery();
         restoredPlayWhenReady = false;
         if (resumeAuthorizationPending) {
             resumeAuthorizationIntent = currentResumeAuthorizationIntent()
@@ -2563,6 +2680,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void emit(String eventName, JSObject payload) {
+        if (durableEventLog != null) durableEventLog.append(eventName, payload);
         telemetry.emit(eventName, payload);
     }
 
