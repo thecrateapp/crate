@@ -1,12 +1,12 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 9616,
-  "vitest": 7565,
+  "pytest": 9710,
+  "vitest": 7566,
   "goTests": 441,
   "rustTests": 459,
-  "taskTypes": 173,
-  "migrations": 168,
+  "taskTypes": 175,
+  "migrations": 169,
   "taskQueues": {
     "ai": [
       "ai_catalog_refresh",
@@ -111,6 +111,8 @@
       "federation_sync_catalog",
       "federation_health_poll",
       "federation_directory_refresh",
+      "federation_build_catalog_summaries",
+      "federation_fetch_peer_summaries",
       "global_catalog_reconcile_incremental",
       "global_catalog_reconcile_full",
       "backfill_instance_listening_rollups",
