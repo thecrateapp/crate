@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -123,14 +124,28 @@ _DECKS_PATHS = (
 )
 
 
-def test_decks_library_routes_stay_on_fastapi():
+# AA3: the device browse, search and queue API validates native device tokens
+# in FastAPI; the read plane has no handler for /api/me/device, so a session JWT
+# there must reach FastAPI too.
+_DEVICE_PATHS = (
+    "/api/me/device/browse/root",
+    "/api/me/device/browse/playlist:1",
+    "/api/me/device/search",
+    "/api/me/device/queue",
+)
+
+
+@pytest.mark.parametrize(
+    "fastapi_paths", [_DECKS_PATHS, _DEVICE_PATHS], ids=["decks", "device"]
+)
+def test_fastapi_only_routes_stay_off_the_readplane(fastapi_paths):
     # S3 checks audio files and session auth in FastAPI; the read plane has no
     # handler for /api/decks, so no edge may route it there.
     import fnmatch
     import re
 
     def matched(pattern_matches) -> list[str]:
-        return [path for path in _DECKS_PATHS if pattern_matches(path)]
+        return [path for path in fastapi_paths if pattern_matches(path)]
 
     for route in _manifest()["routes"]:
         exact, prefix = route.get("path"), route.get("path_prefix")
@@ -167,3 +182,4 @@ def test_decks_library_routes_stay_on_fastapi():
 
     server = (ROOT / "app/readplane/internal/routes/server.go").read_text()
     assert '"/api/decks' not in server
+    assert '"/api/me/device' not in server

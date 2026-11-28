@@ -151,6 +151,32 @@ def get_cached_home_discovery(user_id: int, *, fresh: bool = False) -> dict:
         return _cold_home_payload(user_id)
 
 
+def get_home_discovery_snapshot(user_id: int) -> dict:
+    """The warmed home payload without ever building it in the caller.
+
+    For the device API (AA3): a fresh snapshot, else a stale one (up to an
+    hour) with a deduplicated refresh, else the empty cold payload with a
+    refresh. Unlike `get_cached_home_discovery`, a cold read never builds the
+    payload inline, and the hero is not rotated (the car does not show it).
+    """
+    cached = get_ui_snapshot(
+        "home:discovery",
+        str(user_id),
+        max_age_seconds=_HOME_MAX_AGE_SECONDS,
+    )
+    if cached:
+        return _merge_recently_played(user_id, decorate_snapshot(cached))
+    stale = get_ui_snapshot(
+        "home:discovery",
+        str(user_id),
+        max_age_seconds=_HOME_STALE_MAX_AGE_SECONDS,
+    )
+    _schedule_home_refresh(user_id)
+    if stale:
+        return _merge_recently_played(user_id, decorate_snapshot(stale, stale=True))
+    return _merge_recently_played(user_id, _cold_home_payload(user_id))
+
+
 def refresh_home_recently_played_snapshot(user_id: int) -> dict:
     saved = upsert_ui_snapshot(
         "home:recently-played",
@@ -174,6 +200,7 @@ def get_home_discovery_debug(user_id: int) -> dict:
 __all__ = [
     "get_cached_home_discovery",
     "get_home_discovery",
+    "get_home_discovery_snapshot",
     "get_home_discovery_debug",
     "refresh_home_recently_played_snapshot",
 ]

@@ -244,8 +244,10 @@ _NATIVE_DEVICE_ACCESS_TOKEN_ROUTES: tuple[
     for methods, pattern in (
         ({"GET"}, r"/api/auth/me"),
         ({"GET"}, r"/api/capabilities"),
-        # Device browse, search and queue reads (AA3).
+        # Device browse and search reads, and queue resolution (AA3). The
+        # queue only reads: it turns a container into stream URLs.
         ({"GET"}, rf"/api/me/device(?:/{_SAFE_SEGMENT})+"),
+        ({"POST"}, r"/api/me/device/queue"),
         # Streams.
         ({"GET", "HEAD"}, rf"/api/tracks/by-entity/{_ENTITY_SEGMENT}/stream"),
         ({"GET", "HEAD"}, rf"/api/catalog/tracks/{_ENTITY_SEGMENT}/stream"),

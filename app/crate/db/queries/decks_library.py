@@ -883,6 +883,9 @@ def _track_payload(row: Mapping[Any, Any]) -> dict[str, Any]:
             if album_id is not None and row["has_cover"]
             else None
         ),
+        # The device API (AA3) builds its own artwork URL from it; the Decks
+        # response model does not list it.
+        "album_id": album_id,
         "path": row["path"],
     }
 

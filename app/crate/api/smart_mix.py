@@ -346,7 +346,16 @@ def playback_continuation(
     )
 
 
-def _continuation_track(row: dict, delivery: str) -> ContinuationTrackResponse | None:
+def native_track_fields(
+    row: dict, delivery: str, *, delivery_in_url_when_original: bool = True
+) -> dict | None:
+    """The native-ready fields of a track row, or None when it cannot be streamed.
+
+    Shared by the playback continuation and the device queue (AA3): `id`,
+    `entityUid`, the entity stream `url`, `title`, `artist`, `album` and
+    `durationMs`. The device queue leaves `delivery` out of the URL for
+    `original`, where the stream already serves the source file.
+    """
     if row.get("playable") is False:
         return None
     entity_uid = row.get("track_entity_uid") or row.get("entity_uid")
@@ -361,19 +370,25 @@ def _continuation_track(row: dict, delivery: str) -> ContinuationTrackResponse |
         or (str(track_id) if track_id is not None else None)
     )
     duration = row.get("duration")
-    return ContinuationTrackResponse(
-        id=str(playable_id),
-        entityUid=entity_uid,
-        url=(
-            f"/api/tracks/by-entity/{quote(str(entity_uid), safe='')}/stream"
-            f"?delivery={quote(delivery, safe='')}"
-        ),
-        title=row.get("title") or "Unknown",
-        artist=row.get("artist") or "",
-        album=row.get("album") or None,
-        durationMs=round(float(duration) * 1000) if duration else None,
-        source=row,
-    )
+    url = f"/api/tracks/by-entity/{quote(str(entity_uid), safe='')}/stream"
+    if delivery_in_url_when_original or delivery != "original":
+        url = f"{url}?delivery={quote(delivery, safe='')}"
+    return {
+        "id": str(playable_id),
+        "entityUid": entity_uid,
+        "url": url,
+        "title": row.get("title") or "Unknown",
+        "artist": row.get("artist") or "",
+        "album": row.get("album") or None,
+        "durationMs": round(float(duration) * 1000) if duration else None,
+    }
+
+
+def _continuation_track(row: dict, delivery: str) -> ContinuationTrackResponse | None:
+    fields = native_track_fields(row, delivery)
+    if fields is None:
+        return None
+    return ContinuationTrackResponse(**fields, source=row)
 
 
 @router.post(
@@ -991,4 +1006,4 @@ def _plan_cache_key(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-__all__ = ["full_mix_profile_response", "router"]
+__all__ = ["full_mix_profile_response", "native_track_fields", "router"]

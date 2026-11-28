@@ -479,6 +479,7 @@ def create_app() -> FastAPI:
     from crate.api.auth import router as auth_router, admin_router as admin_auth_router
     from crate.api.access_tokens import router as access_tokens_router
     from crate.api.device_tokens import router as device_tokens_router
+    from crate.api.device_library import router as device_library_router
     from crate.api.media_access import router as media_access_router
     from crate.api.browse import router as browse_router
     from crate.api.tags import router as tags_router
@@ -559,6 +560,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(access_tokens_router)
     app.include_router(device_tokens_router)
+    app.include_router(device_library_router)
     app.include_router(capabilities_router)
     app.include_router(decks_router)
     app.include_router(decks_cues_router)
