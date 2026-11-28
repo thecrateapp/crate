@@ -72,18 +72,17 @@ class CrateCastPlugin: CAPPlugin, CAPBridgedPlugin {
         let context = GCKCastContext.sharedInstance()
         let session = context.sessionManager.currentCastSession
         let active = session != nil
-        let available = active || context.castState != .noDevicesAvailable
+        // The SDK discovers receivers only once the Cast dialog is opened, so
+        // "no devices yet" must not disable the target that opens it.
         var payload: [String: Any] = [
             "platform": "native",
             "visible": true,
-            "available": available,
+            "available": true,
+            "devicesKnown": active || context.castState != .noDevicesAvailable,
             "activeSession": active,
             "targetName": session?.device.friendlyName as Any,
             "receiverApplicationId": configuredReceiverApplicationID()
         ]
-        if !available {
-            payload["reason"] = "No Cast receivers found on this network."
-        }
         if let session {
             bindSession(session)
             addSessionMetadata(to: &payload, from: session)

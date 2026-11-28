@@ -29,7 +29,6 @@ import com.google.android.gms.cast.CastDevice;
 import com.google.android.gms.cast.framework.CastButtonFactory;
 import com.google.android.gms.cast.framework.CastContext;
 import com.google.android.gms.cast.framework.CastSession;
-import com.google.android.gms.cast.framework.CastState;
 import com.google.android.gms.cast.framework.SessionManager;
 import com.google.android.gms.cast.framework.SessionManagerListener;
 import com.google.android.gms.cast.framework.media.RemoteMediaClient;
@@ -187,15 +186,16 @@ public class CrateCastPlugin extends Plugin {
                 CastContext context = castContext();
                 CastSession session = currentSession(context);
                 boolean active = session != null && session.isConnected();
-                boolean permissionRequired = !hasCastDiscoveryPermission();
-                int state = context.getCastState();
+                NativeCastAvailability availability = NativeCastAvailability.describe(
+                    active,
+                    !hasCastDiscoveryPermission(),
+                    context.getCastState()
+                );
                 JSObject payload = new JSObject();
                 payload.put("platform", "native");
                 payload.put("visible", true);
-                payload.put(
-                    "available",
-                    permissionRequired || active || state != CastState.NO_DEVICES_AVAILABLE
-                );
+                payload.put("available", availability.available);
+                payload.put("devicesKnown", availability.devicesKnown);
                 payload.put("activeSession", active);
                 payload.put("targetName", active ? session.getCastDevice().getFriendlyName() : null);
                 payload.put(
@@ -206,10 +206,8 @@ public class CrateCastPlugin extends Plugin {
                     bindSession(session);
                     putCrateSessionMetadata(payload, session);
                 }
-                if (permissionRequired) {
-                    payload.put("reason", "Nearby-device permission is required for Cast discovery.");
-                } else if (!active && state == CastState.NO_DEVICES_AVAILABLE) {
-                    payload.put("reason", "No Cast receivers found on this network.");
+                if (availability.reason != null) {
+                    payload.put("reason", availability.reason);
                 }
                 call.resolve(payload);
             } catch (RuntimeException error) {
