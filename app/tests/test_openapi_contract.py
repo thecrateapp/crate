@@ -242,6 +242,24 @@ def test_openapi_types_auth_routes_and_only_secures_protected_endpoints(test_app
     ]["$ref"].endswith("/AuthInviteResponse")
 
 
+def test_openapi_types_native_device_token_routes(test_app):
+    data = test_app.get("/openapi.json").json()
+    collection = data["paths"]["/api/auth/device-tokens"]
+    item = data["paths"]["/api/auth/device-tokens/{token_id}"]
+
+    for operation in (collection["post"], collection["get"], item["delete"]):
+        assert operation["tags"] == ["auth"]
+        assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+        assert "403" in operation["responses"]
+    assert collection["post"]["responses"]["201"]["content"]["application/json"][
+        "schema"
+    ]["$ref"].endswith("/DeviceTokenCreatedResponse")
+    assert collection["get"]["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["items"]["$ref"].endswith("/DeviceTokenResponse")
+    assert "404" in item["delete"]["responses"]
+
+
 def test_openapi_types_playlist_routes_and_keeps_filter_options_public(test_app):
     data = test_app.get("/openapi.json").json()
     list_operation = data["paths"]["/api/playlists"]["get"]

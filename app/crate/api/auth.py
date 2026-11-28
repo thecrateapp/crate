@@ -232,24 +232,98 @@ _CONTINUATION_ACCESS_TOKEN_ROUTES: tuple[
 )
 
 
-def _is_vdj_access_token_request(method: str, path: str) -> bool:
+# A path segment other than "." or "..", for the open-ended device prefix.
+_SAFE_SEGMENT = r"(?!\.\.?(?:/|$))[^/]+"
+# The native device credential (scope device.native, AA2). It reads and streams
+# the owner's library, writes their plays and asks for Cast tickets; nothing
+# here writes settings, the library or other users.
+_NATIVE_DEVICE_ACCESS_TOKEN_ROUTES: tuple[
+    tuple[frozenset[str], re.Pattern[str]], ...
+] = tuple(
+    (frozenset(methods), re.compile(pattern))
+    for methods, pattern in (
+        ({"GET"}, r"/api/auth/me"),
+        ({"GET"}, r"/api/capabilities"),
+        # Device browse, search and queue reads (AA3).
+        ({"GET"}, rf"/api/me/device(?:/{_SAFE_SEGMENT})+"),
+        # Streams.
+        ({"GET", "HEAD"}, rf"/api/tracks/by-entity/{_ENTITY_SEGMENT}/stream"),
+        ({"GET", "HEAD"}, rf"/api/catalog/tracks/{_ENTITY_SEGMENT}/stream"),
+        ({"GET", "HEAD"}, r"/api/tracks/\d+/stream"),
+        ({"GET", "HEAD"}, r"/api/stream/.+"),
+        ({"GET", "HEAD"}, rf"/api/playback/variants/{_ENTITY_SEGMENT}/stream"),
+        # Playback resolution.
+        ({"GET"}, rf"/api/tracks/by-entity/{_ENTITY_SEGMENT}/playback"),
+        ({"GET"}, r"/api/tracks/\d+/playback"),
+        ({"GET"}, rf"/api/catalog/tracks/{_ENTITY_SEGMENT}/playback"),
+        # Album and artist artwork.
+        ({"GET", "HEAD"}, r"/api/albums/\d+/cover"),
+        ({"GET", "HEAD"}, rf"/api/albums/by-entity/{_ENTITY_SEGMENT}/cover"),
+        ({"GET", "HEAD"}, rf"/api/catalog/albums/{_ENTITY_SEGMENT}/cover"),
+        ({"GET", "HEAD"}, r"/api/artists/\d+/(?:photo|background)"),
+        (
+            {"GET", "HEAD"},
+            rf"/api/artists/by-entity/{_ENTITY_SEGMENT}/(?:photo|background)",
+        ),
+        (
+            {"GET", "HEAD"},
+            rf"/api/catalog/artists/{_ENTITY_SEGMENT}/(?:photo|background)",
+        ),
+        # The owner's plays, transitions, continuation and Cast.
+        ({"POST"}, r"/api/me/play-events"),
+        ({"POST"}, r"/api/playback/transition-plans"),
+        ({"POST"}, r"/api/playback/continuation"),
+        ({"POST"}, r"/api/me/cast/tickets"),
+    )
+)
+
+NATIVE_DEVICE_ROUTE_REFUSED_DETAIL = "This device token cannot be used on this route"
+
+
+def _matches_routes(
+    routes: tuple[tuple[frozenset[str], re.Pattern[str]], ...],
+    method: str,
+    path: str,
+) -> bool:
     normalized_method = method.upper()
     return any(
         normalized_method in methods and pattern.fullmatch(path)
-        for methods, pattern in _VDJ_ACCESS_TOKEN_ROUTES
+        for methods, pattern in routes
+    )
+
+
+def _is_vdj_access_token_request(method: str, path: str) -> bool:
+    return _matches_routes(_VDJ_ACCESS_TOKEN_ROUTES, method, path)
+
+
+def _is_native_device_token_user(user: dict | None) -> bool:
+    from crate.db.repositories.access_tokens import NATIVE_DEVICE_TOKEN_TYPE
+
+    return bool(
+        user
+        and user.get("auth_type") == "access_token"
+        and user.get("token_type") == NATIVE_DEVICE_TOKEN_TYPE
     )
 
 
 def _is_access_token_request(user: dict, method: str, path: str) -> bool:
-    from crate.db.repositories.access_tokens import PLAYBACK_CONTINUATION_TOKEN_TYPE
-
-    if user.get("token_type") != PLAYBACK_CONTINUATION_TOKEN_TYPE:
-        return _is_vdj_access_token_request(method, path)
-    normalized_method = method.upper()
-    return any(
-        normalized_method in methods and pattern.fullmatch(path)
-        for methods, pattern in _CONTINUATION_ACCESS_TOKEN_ROUTES
+    from crate.db.repositories.access_tokens import (
+        NATIVE_DEVICE_TOKEN_TYPE,
+        PLAYBACK_CONTINUATION_TOKEN_TYPE,
     )
+
+    token_type = user.get("token_type")
+    if token_type == PLAYBACK_CONTINUATION_TOKEN_TYPE:
+        return _matches_routes(_CONTINUATION_ACCESS_TOKEN_ROUTES, method, path)
+    if token_type == NATIVE_DEVICE_TOKEN_TYPE:
+        return _matches_routes(_NATIVE_DEVICE_ACCESS_TOKEN_ROUTES, method, path)
+    return _is_vdj_access_token_request(method, path)
+
+
+def _refuse_access_token_user(request: Request, user: dict) -> None:
+    """Remember that a device token was refused so the middleware answers 403."""
+    if _is_native_device_token_user(user):
+        request.state.native_device_token_refused = True
 
 
 def _parse_allowed_email_domains() -> list[str]:
@@ -1888,6 +1962,7 @@ class AuthMiddleware:
 
         if user and user.get("auth_type") == "access_token":
             if not _is_access_token_request(user, request.method, request.url.path):
+                _refuse_access_token_user(request, user)
                 return None
         return user
 
@@ -1909,7 +1984,15 @@ class AuthMiddleware:
         user = await self.resolve_user(request)
         if user and user.get("auth_type") == "access_token":
             if not _is_access_token_request(user, request.method, request.url.path):
+                _refuse_access_token_user(request, user)
                 user = None
+        if getattr(request.state, "native_device_token_refused", False):
+            # A device token is refused outright, never downgraded to anonymous.
+            response = JSONResponse(
+                {"detail": NATIVE_DEVICE_ROUTE_REFUSED_DETAIL}, status_code=403
+            )
+            await response(scope, receive, send)
+            return
         if _password_change_blocks(user, request.method, request.url.path):
             response = JSONResponse(
                 {"detail": PASSWORD_CHANGE_REQUIRED_DETAIL}, status_code=403
@@ -2017,14 +2100,37 @@ def _require_continuation_token(request: Request) -> dict:
     return user
 
 
+def _native_device_token_user(request: Request) -> dict | None:
+    """The caller when it holds a native device token, else None."""
+    from crate.db.repositories.access_tokens import NATIVE_DEVICE_SCOPE
+
+    user = _require_auth(request)
+    if not _is_native_device_token_user(user):
+        return None
+    if NATIVE_DEVICE_SCOPE not in set(user.get("scopes") or []):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access token is missing required scope: {NATIVE_DEVICE_SCOPE}",
+        )
+    return user
+
+
+def _require_vdj_scope_or_native_device(request: Request, scope: str) -> dict:
+    """A session, a native device token, or a VirtualDJ token holding `scope`.
+
+    The middleware already limits device tokens to their route allowlist.
+    """
+    return _native_device_token_user(request) or _require_vdj_scope(request, scope)
+
+
 def _require_stream_access(request: Request) -> dict:
-    return _continuation_token_user(request) or _require_vdj_scope(
+    return _continuation_token_user(request) or _require_vdj_scope_or_native_device(
         request, "vdj.media.read"
     )
 
 
 def _require_transition_plan_access(request: Request) -> dict:
-    return _continuation_token_user(request) or _require_vdj_scope(
+    return _continuation_token_user(request) or _require_vdj_scope_or_native_device(
         request, "vdj.smart_mix.read"
     )
 
@@ -2424,6 +2530,9 @@ def auth_revoke_session(request: Request, session_id: str):
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     revoke_session(session_id)
+    # Drop the cached row now so the session and the tokens bound to it
+    # (continuation, native device) stop working on this worker immediately.
+    _invalidate_auth_session(session_id)
     response = JSONResponse({"ok": True})
     if user.get("session_id") == session_id:
         _clear_auth_cookie(response, _cookie_name_for_request(request), request=request)
@@ -2439,7 +2548,7 @@ def auth_revoke_session(request: Request, session_id: str):
 )
 def auth_revoke_all_sessions(request: Request):
     user = _require_auth(request)
-    revoked = revoke_other_sessions(user["id"], user.get("session_id"))
+    revoked = _revoke_user_sessions(user["id"], user.get("session_id"))
     return {"ok": True, "revoked": revoked}
 
 

@@ -161,7 +161,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/artist-slugs/", s.route(http.MethodGet, s.artistSlugRoute))
 	mux.HandleFunc("/api/artists/", s.routeGetHead(s.artistRoute))
 	mux.HandleFunc("/api/tracks/", s.routeGetHead(s.trackRoute))
-	return s.withCommonHeaders(s.withTraceID(s.withAccessLog(s.withCORS(mux))))
+	return s.withCommonHeaders(s.withTraceID(s.withAccessLog(s.withCORS(s.withAccessTokenFallback(mux)))))
 }
 
 func (s *Server) fallbackOnly(w http.ResponseWriter, r *http.Request) {

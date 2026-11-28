@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -15,6 +16,10 @@ ACCESS_TOKEN_TYPE = "virtualdj"
 PLAYBACK_CONTINUATION_TOKEN_TYPE = "playback_continuation"
 PLAYBACK_CONTINUATION_SCOPE = "playback.continuation"
 PLAYBACK_CONTINUATION_TTL = timedelta(hours=12)
+NATIVE_DEVICE_TOKEN_TYPE = "native_device"
+NATIVE_DEVICE_SCOPE = "device.native"
+NATIVE_DEVICE_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{8,128}")
+NATIVE_DEVICE_LABEL_MAX_LENGTH = 80
 ACCESS_TOKEN_BYTES = 32
 ACCESS_TOKEN_PREFIX_LENGTH = 12
 LAST_USED_UPDATE_INTERVAL = timedelta(minutes=5)
@@ -76,6 +81,7 @@ def _insert_token(
     token_type: str = ACCESS_TOKEN_TYPE,
     session_id: str | None = None,
     continuation_descriptor: dict[str, Any] | None = None,
+    device_id: str | None = None,
 ) -> dict[str, Any]:
     secret = _generate_secret()
     token_prefix = secret[:ACCESS_TOKEN_PREFIX_LENGTH]
@@ -86,15 +92,16 @@ def _insert_token(
                 INSERT INTO user_access_tokens (
                     user_id, name, token_type, token_digest, token_prefix,
                     scopes, expires_at, created_at, session_id,
-                    continuation_descriptor
+                    continuation_descriptor, device_id
                 ) VALUES (
                     :user_id, :name, :token_type, :token_digest, :token_prefix,
                     CAST(:scopes AS jsonb), :expires_at, :created_at,
-                    :session_id, CAST(:continuation_descriptor AS jsonb)
+                    :session_id, CAST(:continuation_descriptor AS jsonb),
+                    :device_id
                 )
                 RETURNING id, user_id, name, token_type, token_digest,
                           token_prefix, scopes, expires_at, revoked_at,
-                          created_at, last_used_at, session_id
+                          created_at, last_used_at, session_id, device_id
                 """
             ),
             {
@@ -112,6 +119,7 @@ def _insert_token(
                     if continuation_descriptor is not None
                     else None
                 ),
+                "device_id": device_id,
             },
         )
         .mappings()
@@ -182,6 +190,156 @@ def issue_playback_continuation_token(
         )
 
 
+def _normalize_native_device(device_id: str, label: str) -> tuple[str, str]:
+    normalized_device_id = (device_id or "").strip()
+    if not NATIVE_DEVICE_ID_PATTERN.fullmatch(normalized_device_id):
+        raise ValueError(
+            "device_id must be 8-128 characters of letters, digits, '_' or '-'"
+        )
+    normalized_label = " ".join((label or "").split())
+    if not normalized_label:
+        raise ValueError("A device label is required")
+    if len(normalized_label) > NATIVE_DEVICE_LABEL_MAX_LENGTH:
+        raise ValueError(
+            f"The device label is longer than {NATIVE_DEVICE_LABEL_MAX_LENGTH} characters"
+        )
+    return normalized_device_id, normalized_label
+
+
+def issue_native_device_token(
+    *,
+    user_id: int,
+    session_id: str,
+    device_id: str,
+    label: str,
+    now: datetime | None = None,
+    session=None,
+) -> dict[str, Any]:
+    """Mint the device credential of one phone for one interactive session.
+
+    The token expires with the session and replaces any earlier token of the
+    same (session, device_id). Raises ValueError for an invalid device id or
+    label and LookupError when the session is not active for this user.
+    """
+    if not session_id:
+        raise ValueError("A session is required for a device token")
+    normalized_device_id, normalized_label = _normalize_native_device(device_id, label)
+    issued_at = now or datetime.now(timezone.utc)
+    with optional_scope(session) as current:
+        # Locking the session row serializes concurrent mints for it, so the
+        # replace below never races the partial unique index.
+        session_expires_at = current.execute(
+            text(
+                """
+                SELECT expires_at
+                FROM sessions
+                WHERE id = :session_id
+                  AND user_id = :user_id
+                  AND revoked_at IS NULL
+                  AND expires_at > :now
+                FOR UPDATE
+                """
+            ),
+            {"session_id": session_id, "user_id": user_id, "now": issued_at},
+        ).scalar_one_or_none()
+        if session_expires_at is None:
+            raise LookupError("The session is no longer active")
+        current.execute(
+            text(
+                """
+                DELETE FROM user_access_tokens
+                WHERE session_id = :session_id
+                  AND token_type = :token_type
+                  AND device_id = :device_id
+                """
+            ),
+            {
+                "session_id": session_id,
+                "token_type": NATIVE_DEVICE_TOKEN_TYPE,
+                "device_id": normalized_device_id,
+            },
+        )
+        return _insert_token(
+            current,
+            user_id=user_id,
+            name=normalized_label,
+            scopes=[NATIVE_DEVICE_SCOPE],
+            expires_at=session_expires_at,
+            now=issued_at,
+            token_type=NATIVE_DEVICE_TOKEN_TYPE,
+            session_id=session_id,
+            device_id=normalized_device_id,
+        )
+
+
+def list_native_device_tokens(
+    user_id: int,
+    *,
+    now: datetime | None = None,
+    session=None,
+) -> list[dict[str, Any]]:
+    """Active device tokens of one user whose parent session is still alive."""
+    checked_at = now or datetime.now(timezone.utc)
+
+    def _impl(current) -> list[dict[str, Any]]:
+        rows = (
+            current.execute(
+                text(
+                    """
+                    SELECT t.id, t.device_id, t.name AS label, t.created_at,
+                           t.last_used_at, t.expires_at, t.session_id
+                    FROM user_access_tokens AS t
+                    JOIN sessions AS s ON s.id = t.session_id
+                    WHERE t.user_id = :user_id
+                      AND t.token_type = :token_type
+                      AND t.revoked_at IS NULL
+                      AND (t.expires_at IS NULL OR t.expires_at > :now)
+                      AND s.revoked_at IS NULL
+                      AND s.expires_at > :now
+                    ORDER BY t.created_at DESC, t.id DESC
+                    """
+                ),
+                {
+                    "user_id": user_id,
+                    "token_type": NATIVE_DEVICE_TOKEN_TYPE,
+                    "now": checked_at,
+                },
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(row) for row in rows]
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def revoke_native_device_token(user_id: int, token_id: int, *, session=None) -> bool:
+    now = datetime.now(timezone.utc)
+    with optional_scope(session) as current:
+        result = current.execute(
+            text(
+                """
+                UPDATE user_access_tokens
+                SET revoked_at = :now
+                WHERE user_id = :user_id
+                  AND id = :token_id
+                  AND token_type = :token_type
+                  AND revoked_at IS NULL
+                """
+            ),
+            {
+                "now": now,
+                "user_id": user_id,
+                "token_id": token_id,
+                "token_type": NATIVE_DEVICE_TOKEN_TYPE,
+            },
+        )
+        return bool(getattr(result, "rowcount", 0))
+
+
 def get_continuation_descriptor(
     token_id: int,
     *,
@@ -215,7 +373,7 @@ def _token_query(where: str) -> str:
     return f"""
         SELECT t.id, t.user_id, t.name, t.token_type, t.token_digest,
                t.token_prefix, t.scopes, t.expires_at, t.revoked_at,
-               t.created_at, t.last_used_at, t.session_id
+               t.created_at, t.last_used_at, t.session_id, t.device_id
         FROM user_access_tokens AS t
         WHERE {where}
     """
@@ -490,6 +648,10 @@ def rotate_access_token(user_id: int, token_id: int) -> dict[str, Any]:
 __all__ = [
     "ACCESS_TOKEN_PREFIX",
     "ACCESS_TOKEN_TYPE",
+    "NATIVE_DEVICE_ID_PATTERN",
+    "NATIVE_DEVICE_LABEL_MAX_LENGTH",
+    "NATIVE_DEVICE_SCOPE",
+    "NATIVE_DEVICE_TOKEN_TYPE",
     "PLAYBACK_CONTINUATION_SCOPE",
     "PLAYBACK_CONTINUATION_TOKEN_TYPE",
     "PLAYBACK_CONTINUATION_TTL",
@@ -498,11 +660,14 @@ __all__ = [
     "get_access_token",
     "get_access_token_by_secret",
     "get_continuation_descriptor",
+    "issue_native_device_token",
     "issue_playback_continuation_token",
     "list_access_tokens",
+    "list_native_device_tokens",
     "resolve_access_token",
     "resolve_access_token_by_id",
     "revoke_access_token",
+    "revoke_native_device_token",
     "revoke_user_access_tokens",
     "rotate_access_token",
 ]

@@ -16,7 +16,7 @@ from crate.api.auth_dependencies import require_auth as _require_auth
 from crate.api.auth import (
     _ensure_required_password_change_differs,
     _invalidate_auth_user,
-    _require_vdj_scope,
+    _require_vdj_scope_or_native_device,
 )
 from crate.api._deps import (
     artist_name_from_id,
@@ -1415,7 +1415,7 @@ def _context_playlist_id(body: RecordPlayEventRequest) -> int | None:
     summary="Record a rich play event",
 )
 def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
-    user = _require_vdj_scope(request, "vdj.play_events.write")
+    user = _require_vdj_scope_or_native_device(request, "vdj.play_events.write")
     is_decks = _is_decks_request(request, user)
     content_origin = "local"
     source_node_uid = None
