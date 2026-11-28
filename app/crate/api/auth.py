@@ -2530,6 +2530,9 @@ def auth_revoke_session(request: Request, session_id: str):
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     revoke_session(session_id)
+    # Drop the cached row now so the session and the tokens bound to it
+    # (continuation, native device) stop working on this worker immediately.
+    _invalidate_auth_session(session_id)
     response = JSONResponse({"ok": True})
     if user.get("session_id") == session_id:
         _clear_auth_cookie(response, _cookie_name_for_request(request), request=request)
@@ -2545,7 +2548,7 @@ def auth_revoke_session(request: Request, session_id: str):
 )
 def auth_revoke_all_sessions(request: Request):
     user = _require_auth(request)
-    revoked = revoke_other_sessions(user["id"], user.get("session_id"))
+    revoked = _revoke_user_sessions(user["id"], user.get("session_id"))
     return {"ok": True, "revoked": revoked}
 
 

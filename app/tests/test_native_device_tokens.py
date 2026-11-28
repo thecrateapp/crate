@@ -827,6 +827,22 @@ def test_device_token_dies_with_logout(client):
     ).status_code == 401
 
 
+def test_device_token_dies_when_its_session_is_revoked(client):
+    from crate.auth import create_jwt
+
+    user, session_id, headers = _signed_in("device-http-revoke@test.com")
+    device = _bearer(_mint(client, headers).json()["token"])
+    other_session_id, _ = _session_for(user["id"])
+    other_headers = _bearer(
+        create_jwt(user["id"], user["email"], "user", session_id=other_session_id)
+    )
+
+    revoked = client.delete(f"/api/auth/sessions/{session_id}", headers=other_headers)
+
+    assert revoked.status_code == 200, revoked.text
+    assert client.get("/api/auth/me", headers=device).status_code == 401
+
+
 def test_device_token_dies_when_its_session_expires(client):
     from crate.api.auth_cache import invalidate_session
     from crate.db.tx import transaction_scope
@@ -845,3 +861,21 @@ def test_device_token_dies_when_its_session_expires(client):
 
     assert client.get("/api/auth/me", headers=device).status_code == 401
 
+
+def test_device_token_dies_when_another_session_revokes_all_others(client):
+    from crate.auth import create_jwt
+
+    user, _, headers = _signed_in("device-http-revoke-all@test.com")
+    device = _bearer(_mint(client, headers).json()["token"])
+    other_session_id, _ = _session_for(user["id"])
+    other_headers = _bearer(
+        create_jwt(user["id"], user["email"], "user", session_id=other_session_id)
+    )
+    assert client.get("/api/auth/me", headers=device).status_code == 200
+
+    response = client.post("/api/auth/sessions/revoke-all", headers=other_headers)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["revoked"] == 1
+    assert client.get("/api/auth/me", headers=device).status_code == 401
+    assert client.get("/api/auth/me", headers=other_headers).status_code == 200
