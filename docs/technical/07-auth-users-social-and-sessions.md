@@ -5,7 +5,7 @@ section: architecture
 audience: [developer]
 status: canonical
 order: 96
-verified: 2026-11-18
+verified: 2026-11-28
 sources: [app/crate/api, app/crate/db/orm]
 ---
 
@@ -85,6 +85,66 @@ Auth is hybrid by design:
 
 There are separate cookie names for admin-style and listen-style web auth so
 both surfaces can coexist cleanly.
+
+## Native device tokens
+
+A native device token is the credential the Android media service uses when the
+WebView is not running (Android Auto, Cast refill, background plays). It is a
+`crv_` access token with `token_type = "native_device"` and the single scope
+`device.native`. Server code: `app/crate/api/device_tokens.py`,
+`app/crate/db/repositories/access_tokens.py`; the allowlist is
+`_NATIVE_DEVICE_ACCESS_TOKEN_ROUTES` in `app/crate/api/auth.py`.
+
+- **Minting.** `POST /api/auth/device-tokens` with `{device_id, label}` returns
+  `{id, token, device_id, label, created_at, expires_at}`. `device_id` is
+  generated on the phone (8-128 characters of `[A-Za-z0-9_-]`); `label` is at
+  most 80 characters, for example `Android: Pixel 8`. Only an interactive
+  session can mint, list or revoke: any `crv_` bearer (VirtualDJ, continuation
+  or device token) gets 403. The secret is returned once; the table stores its
+  SHA-256 digest.
+- **One per device and session.** A token belongs to its user, the session that
+  minted it (`session_id`) and the `device_id`. Minting again for the same
+  session and device deletes the previous token (partial unique index
+  `uq_user_access_tokens_native_device`, migration 170).
+- **Lifetime.** `expires_at` is the parent session's `expires_at` at mint time.
+  The middleware also checks the parent session on every request, so the token
+  stops working as soon as that session is logged out, revoked
+  (`DELETE /api/auth/sessions/{id}`, `POST /api/auth/sessions/revoke-all`, admin
+  revocation, account deletion) or expires. There is no refresh: when the
+  session ends, the phone signs in again and JS mints a new token.
+- **Listing and revocation.** `GET /api/auth/device-tokens` lists the user's
+  active device tokens whose session is still alive, without secrets:
+  `{id, device_id, label, created_at, last_used_at, expires_at, current_session}`.
+  `DELETE /api/auth/device-tokens/{id}` revokes one of the user's own tokens
+  (404 for anyone else's). `last_used_at` is updated at most every five minutes,
+  like other access tokens.
+- **Allowlist.** Outside these routes the middleware answers 403 (other access
+  tokens are treated as anonymous instead):
+
+  - `GET /api/auth/me`, `GET /api/capabilities`, `GET /api/me/device/*`;
+  - streams: `GET|HEAD /api/tracks/by-entity/{uid}/stream`,
+    `/api/catalog/tracks/{uid}/stream`, `/api/tracks/{id}/stream`,
+    `/api/stream/{path}`, `/api/playback/variants/{id}/stream`;
+  - playback resolution: `GET /api/tracks/by-entity/{uid}/playback`,
+    `/api/tracks/{id}/playback`, `/api/catalog/tracks/{uid}/playback`;
+  - artwork: `GET|HEAD /api/albums/{id}/cover`,
+    `/api/albums/by-entity/{uid}/cover`, `/api/catalog/albums/{uid}/cover`,
+    `/api/artists/{id}/{photo|background}`,
+    `/api/artists/by-entity/{uid}/{photo|background}`,
+    `/api/catalog/artists/{uid}/{photo|background}`;
+  - `POST /api/me/play-events` (plays are written for the token's owner),
+    `POST /api/playback/transition-plans`, `POST /api/playback/continuation`,
+    `POST /api/me/cast/tickets`.
+
+  Nothing on the list writes settings, the library or other users, and a device
+  token cannot mint tokens. `POST /api/playback/continuation` still reads its
+  queue descriptor from a playback continuation token, so a device token gets
+  403 there until native-owned queues (AA4) define where that descriptor lives.
+
+- **Read plane.** The read plane never validates `crv_` tokens: every `/api/`
+  request with a `Bearer crv_` header goes to the FastAPI fallback before any
+  native handler (`withAccessTokenFallback` in
+  `app/readplane/internal/routes/access_tokens.go`).
 
 ## OAuth providers
 
