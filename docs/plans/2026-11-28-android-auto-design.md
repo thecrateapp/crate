@@ -1,6 +1,6 @@
 # Android Auto and native playback without the WebView
 
-**Status:** Draft for review
+**Status:** Approved by Diego, 2026-11-28 (open questions resolved as D6-D9)
 **Date:** 2026-11-28
 **Scope:** Listen Android app (`app/listen/android`), API (`app/crate/api`), read plane
 
@@ -83,7 +83,8 @@ play event goes through JS.
   artwork routes, `POST /api/me/play-events`, `POST /api/playback/transition-plans`,
   `POST /api/playback/continuation`, `POST /api/me/cast/tickets`, `GET /api/capabilities`,
   `GET /api/auth/me`. Nothing that writes the library, settings or other users.
-- Listed and revocable in Listen Settings > Devices, like access tokens.
+- Listed and revocable in a new Listen Settings section, **Devices** (D6), separate from the
+  existing access-token list.
 - Read plane: routes it serves must accept `native_device` tokens or fall through to FastAPI for
   them. Verify which before AA3; the read plane does not validate `crv_` today
   (`readplane/internal/routes/catalog.go:578-581`).
@@ -98,8 +99,10 @@ deliveryPolicy, offlineProfileKey})` and `clearProfile()`. JS calls it after sig
 - `DeviceApiClient`: OkHttp or `HttpURLConnection` client with the device token, timeouts, ETag
   caching for browse pages, and a 401 handler that clears the profile and shows "Open Crate on
   your phone to sign in".
-- The service authorizes streams with the device token when no fresher session bearer is known,
-  replacing the continuation-token fallback for native-owned queues.
+- The service authorizes every stream with the device token, including queues loaded by JS
+  (D7). JS stops putting the 1 h session JWT on engine tracks, and the continuation-token
+  fallback in `NativeStreamAuthorization` goes away. Builds without a device profile (older
+  servers) keep today's session bearer.
 
 ### 2. Device browse and queue API (phase AA3)
 
@@ -109,7 +112,8 @@ All under `/api/me/device/`, accepting sessions and `native_device` tokens, page
 - `GET /api/me/device/browse/{node}` returns
   `{node, title, items:[{id, kind, title, subtitle, artwork_url, playable, browsable,
 duration_ms?}], next_cursor}`. Nodes:
-  `root`, `home` (mixes and recent from the home snapshot), `recent`, `playlists`,
+  `root`, `home` (mixes, recent and radio from the home snapshot; no essentials or
+  suggestions, D8), `recent`, `playlists`,
   `playlist:{id}`, `liked`, `albums`, `album:{uid}`, `artists`, `artist:{uid}`, `radio`.
   `downloads` is built natively from the offline index, never on the server.
 - `GET /api/me/device/search?q=` returns the same item shape (local catalogue, `limit` ≤ 50).
@@ -218,11 +222,11 @@ callbacks, JUnit for pure classes, Vitest for the JS wiring.
   controls an album and a voice search; AA5 shows car plays in history after process death; CQ
   plays five tracks in a row on a Chromecast with the screen off.
 
-## Open questions
+## Resolved questions (Diego, 2026-11-28)
 
-1. Settings UI for devices: a new "Devices" section, or extend the existing access-token list?
-2. Should the device token also replace the session bearer for JS-loaded queues, so streams
-   never depend on a 1 h JWT? (Simplifies `NativeStreamAuthorization`.)
-3. Home nodes for the car: which home sections are worth showing while driving (mixes, recent,
-   radio) and which are not (essentials, suggestions)?
-4. Play Store distribution later, or keep APK plus developer setting permanently?
+| #   | Question                                                            | Decision                                                                                                                                                 |
+| --- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D6  | Settings UI for devices                                             | A new **Devices** section in Listen Settings.                                                                                                            |
+| D7  | Should the device token also authorize streams of JS-loaded queues? | **Yes.** Streams never depend on the 1 h session JWT; `NativeStreamAuthorization` loses its continuation fallback.                                       |
+| D8  | Home sections in the car                                            | Mixes, recent and radio; no essentials or suggestions.                                                                                                   |
+| D9  | Distribution                                                        | APK first (D1); Crate **will move to the Play Store** later. Build to Android for Cars quality guidelines from AA1 so the move does not need a redesign. |
