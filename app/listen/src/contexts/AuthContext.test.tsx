@@ -23,6 +23,7 @@ const {
   persistVerifiedOfflineIdentityMock,
   revokeOfflineIdentityForServerMock,
   refreshAuthTokenMock,
+  retireNativeDeviceProfileMock,
   setActiveOfflineProfileKeyMock,
   setAuthTokenMock,
   syncOfflineProfileToServiceWorkerMock,
@@ -60,6 +61,7 @@ const {
   persistVerifiedOfflineIdentityMock: vi.fn(() => null),
   revokeOfflineIdentityForServerMock: vi.fn(() => true),
   refreshAuthTokenMock: vi.fn(() => Promise.resolve(false)),
+  retireNativeDeviceProfileMock: vi.fn(() => Promise.resolve()),
   setActiveOfflineProfileKeyMock: vi.fn(),
   setAuthTokenMock: vi.fn(),
   syncOfflineProfileToServiceWorkerMock: vi.fn(),
@@ -112,6 +114,15 @@ vi.mock("@/lib/offline-identity", () => ({
   revokeOfflineIdentityForServer: revokeOfflineIdentityForServerMock,
 }));
 
+vi.mock("@/lib/native-device-profile", () => ({
+  handleNativeDeviceProfileChange: vi.fn(),
+  isNativeDeviceProfileRuntime: () => false,
+  retireNativeDeviceProfile: retireNativeDeviceProfileMock,
+  subscribeNativeDeviceProfileChanges: () => () => {},
+  syncNativeDeviceProfile: vi.fn(),
+  updateNativeDeviceProfilePreferences: vi.fn(),
+}));
+
 vi.mock("@/lib/play-event-queue", () => ({
   clearQueue: clearQueueMock,
 }));
@@ -137,6 +148,7 @@ function AuthProbe() {
 describe("AuthProvider", () => {
   beforeEach(() => {
     apiMock.mockReset();
+    retireNativeDeviceProfileMock.mockClear();
     clearQueueMock.mockReset();
     consumePendingOAuthNextMock.mockReset();
     consumePendingOAuthNextMock.mockReturnValue(null);
@@ -566,6 +578,7 @@ describe("AuthProvider", () => {
 
     expect(screen.getByText("user:42")).toBeInTheDocument();
     expect(screen.queryByText("user:41")).not.toBeInTheDocument();
+    expect(retireNativeDeviceProfileMock).toHaveBeenCalledTimes(1);
   });
 
   it("clears the old user and routes to login when switching to a tokenless server", async () => {
@@ -743,6 +756,16 @@ describe("AuthProvider", () => {
     });
     expect(revokeOfflineIdentityForServerMock).toHaveBeenCalledWith("web");
     expect(apiMock).toHaveBeenCalledWith("/api/auth/logout", "POST");
+    // The device token is revoked before the session that minted it.
+    expect(retireNativeDeviceProfileMock).toHaveBeenCalledTimes(1);
+    const retireOrder =
+      retireNativeDeviceProfileMock.mock.invocationCallOrder[0] ??
+      Number.POSITIVE_INFINITY;
+    const logoutOrder =
+      apiMock.mock.invocationCallOrder[
+        apiMock.mock.calls.findIndex(([path]) => path === "/api/auth/logout")
+      ] ?? Number.NEGATIVE_INFINITY;
+    expect(retireOrder).toBeLessThan(logoutOrder);
     expect(localStorage.getItem("listen-player-state")).toBeNull();
     expect(localStorage.getItem("listen-recently-played")).toBeNull();
     expect(localStorage.getItem("listen-player-state:v1")).toBeNull();

@@ -30,13 +30,13 @@ vi.mock("@/lib/api", () => ({
   ensureMediaAccessUrl: ensureMediaAccessUrlMock,
   apiStreamUrl: (url: string) => url,
   resolveMaybeApiStreamUrl: (url: string | null | undefined) =>
-    url?.startsWith("/api/") ? `https://listen.example${url}` : url ?? null,
+    url?.startsWith("/api/") ? `https://listen.example${url}` : (url ?? null),
   resolveMaybeApiAssetUrl: (url: string | null | undefined) =>
     url?.startsWith("/api/")
       ? `https://listen.example${url}${url.includes("?") ? "&" : "?"}token=${
           authState.token
         }`
-      : url ?? null,
+      : (url ?? null),
 }));
 
 vi.mock("@/lib/capacitor-runtime", () => ({
@@ -55,6 +55,7 @@ import {
   toStartupEngineQueueSnapshot,
   toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
+import { setActiveNativeDeviceProfile } from "@/lib/native-device-authorization";
 import { getPlaybackSession } from "@/lib/playback-provenance";
 import { setNativeBeatmatchPreference } from "@/lib/player-playback-prefs";
 import { setSmartMixCapabilities } from "@/lib/smart-mix";
@@ -178,6 +179,84 @@ describe("player engine adapter", () => {
 
     expect(track.artwork).toBe("https://covers.example.net/albums/1.jpg");
     expect(track.artworkAuthorization).toBeUndefined();
+  });
+
+  describe("with an active Android device profile (D7)", () => {
+    beforeEach(() => {
+      setActiveNativeDeviceProfile({
+        serverId: "server-1",
+        origin: "https://listen.example",
+        tokenId: 7,
+        expiresAtMs: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      });
+    });
+
+    afterEach(() => {
+      setActiveNativeDeviceProfile(null);
+    });
+
+    it("leaves the session bearer off streams and artwork the service authorizes", () => {
+      const track = toEngineTrack(
+        {
+          id: "track-1",
+          entityUid: "entity-1",
+          title: "Track One",
+          artist: "Artist",
+          albumCover: "/api/albums/1/cover?size=512",
+        },
+        undefined,
+        undefined,
+        { target: "android-native" },
+      );
+
+      expect(track.url).toContain("/api/tracks/by-entity/entity-1/stream");
+      expect(track.url).not.toContain("token=");
+      expect(track.authorization).toBeUndefined();
+      expect(track.artwork).toBe(
+        "https://listen.example/api/albums/1/cover?size=512",
+      );
+      expect(track.artworkAuthorization).toBeUndefined();
+    });
+
+    it("keeps the session bearer on routes outside the device token", () => {
+      const track = toEngineTrack(
+        { id: "remote-1", title: "Remote", artist: "Band" },
+        undefined,
+        "https://listen.example/api/federation/remote/streams/ticket-1",
+        { target: "android-native" },
+      );
+
+      expect(track.authorization).toBe("Bearer listen-token");
+    });
+
+    it("keeps the session bearer when the profile belongs to another server", () => {
+      setActiveNativeDeviceProfile({
+        serverId: "server-2",
+        origin: "https://other.example",
+        tokenId: 8,
+        expiresAtMs: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      });
+      const track = toEngineTrack(
+        { id: "track-1", entityUid: "entity-1", title: "T", artist: "A" },
+        undefined,
+        undefined,
+        { target: "android-native" },
+      );
+
+      expect(track.authorization).toBe("Bearer listen-token");
+    });
+
+    it("keeps the session bearer once the profile is cleared", () => {
+      setActiveNativeDeviceProfile(null);
+      const track = toEngineTrack(
+        { id: "track-1", entityUid: "entity-1", title: "T", artist: "A" },
+        undefined,
+        undefined,
+        { target: "android-native" },
+      );
+
+      expect(track.authorization).toBe("Bearer listen-token");
+    });
   });
 
   it("resolves global catalog playback before handing URLs to the engine", async () => {

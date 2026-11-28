@@ -11,6 +11,7 @@ import { useNavigate } from "react-router";
 import { api, revokeServerSession, setAuthToken } from "@/lib/api";
 import { AuthContext } from "@/contexts/auth-context";
 import { clearAuthRuntime } from "@/contexts/auth-runtime";
+import { retireNativeDeviceProfile } from "@/lib/native-device-profile";
 import { revokeOfflineIdentityForServer } from "@/lib/offline-identity";
 import { usesConfigurableServer } from "@/lib/platform";
 import {
@@ -19,6 +20,7 @@ import {
   SERVER_STORE_EVENT,
 } from "@/lib/server-store";
 import { useAuthHeartbeat } from "@/contexts/use-auth-heartbeat";
+import { useAuthNativeDeviceProfile } from "@/contexts/use-auth-native-device-profile";
 import { useAuthOAuthSync } from "@/contexts/use-auth-oauth-sync";
 import { useAuthSession } from "@/contexts/use-auth-session";
 import { useAuthTokenRefresh } from "@/contexts/use-auth-token-refresh";
@@ -58,6 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       currentServerId.value = nextServerId;
 
       const nextServer = getCurrentServer();
+      // The device token belongs to the previous server's session.
+      void retireNativeDeviceProfile();
       clearAuthRuntime({
         clearStoredUser: false,
         reason: "user-change",
@@ -84,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useAuthOAuthSync({ navigate, refetch });
   useAuthTokenRefresh(user);
   useAuthHeartbeat(user);
+  useAuthNativeDeviceProfile(user, accessMode);
   useListenWarmup(user);
 
   useEffect(() => {
@@ -104,6 +109,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const server = getCurrentServer();
+    // Revoke the device token while the session that minted it still works.
+    void retireNativeDeviceProfile();
     revokeOfflineIdentityForServer(getCurrentServerId() ?? "web");
     const revocation = usesConfigurableServer
       ? server

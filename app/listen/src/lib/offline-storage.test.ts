@@ -1,7 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  getActiveOfflineProfileKey,
   getOfflineCacheName,
+  OFFLINE_ACTIVE_PROFILE_EVENT,
+  setActiveOfflineProfileKey,
   getOfflineItemKey,
   isOfflineMediaCacheName,
   loadOfflineSnapshot,
@@ -15,6 +18,21 @@ beforeEach(() => {
 });
 
 describe("offline storage", () => {
+  it("announces active offline profile changes only when the key changes", () => {
+    const listener = vi.fn();
+    window.addEventListener(OFFLINE_ACTIVE_PROFILE_EVENT, listener);
+    try {
+      setActiveOfflineProfileKey("profile-a");
+      setActiveOfflineProfileKey("profile-a");
+      setActiveOfflineProfileKey(null);
+
+      expect(getActiveOfflineProfileKey()).toBeNull();
+      expect(listener).toHaveBeenCalledTimes(2);
+    } finally {
+      window.removeEventListener(OFFLINE_ACTIVE_PROFILE_EVENT, listener);
+    }
+  });
+
   it("round-trips a normalized snapshot per profile", () => {
     const snapshot: OfflineSnapshot = {
       items: {

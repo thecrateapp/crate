@@ -66,7 +66,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -162,6 +161,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private volatile Map<String, String> artworkAuthorizationByOrigin =
         Collections.emptyMap();
     private DataSource.Factory artworkDataSourceFactory;
+    @Nullable
+    private volatile DeviceProfileStore deviceProfileStore;
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
     private MediaSession mediaSession;
@@ -247,6 +248,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     public void onCreate() {
         super.onCreate();
         stopLegacyPlaybackService();
+        deviceProfileStore = DeviceProfileStore.get(this);
         streamCache = NativeStreamCache.shared(this);
         if (streamCache != null) {
             streamPrefetcher = new NativeStreamCache.Prefetcher(
@@ -800,7 +802,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 .setReadTimeoutMs(30_000);
         artworkDataSourceFactory = new ResolvingDataSource.Factory(
             new DefaultDataSource.Factory(this, artworkHttpDataSourceFactory),
-            dataSpec -> withAuthorization(dataSpec, artworkAuthorizationByOrigin)
+            this::authorizeArtwork
         );
         DefaultMediaSourceFactory mediaSourceFactory =
             new DefaultMediaSourceFactory(
@@ -1992,30 +1994,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private static String trustedOrigin(String url) {
-        try {
-            URI uri = URI.create(valueOrDefault(url, ""));
-            if (uri.getHost() == null || uri.getRawUserInfo() != null) {
-                return "";
-            }
-            String scheme = uri.getScheme();
-            if ("https".equalsIgnoreCase(scheme)) {
-                return "https://" + uri.getRawAuthority();
-            }
-            if (
-                BuildConfig.DEBUG &&
-                "http".equalsIgnoreCase(scheme) &&
-                isLoopbackHost(uri.getHost())
-            ) {
-                return "http://" + uri.getRawAuthority();
-            }
-            return "";
-        } catch (RuntimeException error) {
-            return "";
-        }
-    }
-
-    private static boolean isLoopbackHost(String host) {
-        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
+        return NativeTrustedOrigin.of(url, BuildConfig.DEBUG);
     }
 
     private static final long BEATMATCH_LOG_INTERVAL_MS = 500L;
@@ -2048,6 +2027,14 @@ public class CrateNativePlaybackService extends MediaSessionService {
         mainHandler.post(tempoRestoreTicker);
     }
 
+    // The native device token for url when the device profile belongs to its
+    // origin (D7), or null.
+    @Nullable
+    private String deviceTokenFor(String url, long nowWallMs) {
+        DeviceProfileStore store = deviceProfileStore;
+        return store == null ? null : store.tokenFor(url, nowWallMs);
+    }
+
     private DataSpec authorizeStream(DataSpec dataSpec) {
         String origin = trustedOrigin(dataSpec.uri.toString());
         NativeContinuationClient.Config config = continuationConfig;
@@ -2059,7 +2046,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
             origin.equals(trustedOrigin(config.apiBase))
                 ? config.token
                 : null;
-        String authorization = NativeStreamAuthorization.choose(
+        String url = dataSpec.uri.toString();
+        String authorization = NativeStreamAuthorization.chooseStream(
+            NativeTrustedOrigin.path(url),
+            deviceTokenFor(url, nowWallMs),
             streamAuthorizationByOrigin.get(origin),
             continuationToken,
             nowWallMs
@@ -2070,12 +2060,12 @@ public class CrateNativePlaybackService extends MediaSessionService {
         );
     }
 
-    private static DataSpec withAuthorization(
-        DataSpec dataSpec,
-        Map<String, String> authorizationByOrigin
-    ) {
-        String authorization = authorizationByOrigin.get(
-            trustedOrigin(dataSpec.uri.toString())
+    private DataSpec authorizeArtwork(DataSpec dataSpec) {
+        String url = dataSpec.uri.toString();
+        String authorization = NativeStreamAuthorization.chooseArtwork(
+            NativeTrustedOrigin.path(url),
+            deviceTokenFor(url, System.currentTimeMillis()),
+            artworkAuthorizationByOrigin.get(trustedOrigin(url))
         );
         if (authorization == null || authorization.isEmpty()) return dataSpec;
         return dataSpec.withAdditionalHeaders(
