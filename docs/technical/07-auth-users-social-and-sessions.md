@@ -146,6 +146,51 @@ WebView is not running (Android Auto, Cast refill, background plays). It is a
   native handler (`withAccessTokenFallback` in
   `app/readplane/internal/routes/access_tokens.go`).
 
+### Android device profile
+
+On the Android app, `app/listen/src/lib/native-device-profile.ts` mints the
+token and hands it to native code; web, iOS and Tauri never call it. The
+per-install `device_id` is a random id kept in `localStorage`
+(`crate-native-device-id`) and reused across sign-ins; the label is
+`Android: <model>` from the WebView user agent, or `Android` when the agent
+hides the model.
+
+- **When JS mints.** `useAuthNativeDeviceProfile` (wired in `AuthProvider`)
+  syncs after sign-in, session restore and server switch, and when the app
+  becomes visible. It mints when native code has no profile, the profile belongs
+  to another server, it expires within 24 hours, the server no longer lists it
+  (checked once per server and user per app session), a device-token endpoint
+  answered 401/403, or the service reported the token rejected (at most once a
+  minute). A 404/405 marks the server as older than AA2: nothing is stored and
+  tracks keep the session bearer.
+- **Where it lives.** `CrateDevicePlugin` (`CrateDevice`: `setProfile`,
+  `updateProfile`, `clearProfile`, `getStatus`, `profileChanged` event) writes
+  `DeviceProfileStore`: one profile `{serverUrl, serverId, deviceToken, tokenId,
+expiresAtMs, deliveryPolicy, offlineProfileKey, deviceId}` encrypted with its
+  own Android Keystore key (AES-GCM) in the `crate_device_profile`
+  SharedPreferences. The server URL must be https (http only to a loopback host
+  in debug builds). `getStatus` returns everything but the token, which never
+  comes back to JS. Delivery preference and offline profile changes go through
+  `updateProfile` without re-minting.
+- **Native client.** `DeviceApiClient` sends `Authorization: Bearer <device
+token>` to the profile's server with 10 s connect and 15 s read timeouts and
+  no redirects. A 401 clears the profile (only if it still holds that token) and
+  tells its listeners, so the service can ask the listener to open Crate on the
+  phone; the token is never logged.
+- **Streams (D7).** While the profile is active and its origin matches,
+  `CrateNativePlaybackService` authorizes the stream and artwork routes of the
+  allowlist with the device token, for native and JS-loaded queues alike
+  (`NativeStreamAuthorization.chooseStream` / `chooseArtwork`), and the player
+  adapter stops putting the 1 h session bearer on those engine tracks
+  (`lib/native-device-authorization.ts`). Other paths on the same origin, such
+  as `/api/federation/remote/streams/*`, keep the session bearer. Without a
+  profile (older servers, another origin, expired token) the service keeps the
+  session bearer and its continuation-token fallback.
+- **Retirement.** Logout and server switch revoke the token with
+  `DELETE /api/auth/device-tokens/{id}` on the server that minted it, using that
+  server's session and before the session itself is revoked, then clear the
+  profile. A session that ends unauthenticated clears the profile too.
+
 ## OAuth providers
 
 The auth layer supports:

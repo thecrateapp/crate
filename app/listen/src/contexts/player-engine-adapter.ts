@@ -14,6 +14,7 @@ import {
   resolveMaybeApiStreamUrl,
 } from "@/lib/api";
 import { fetchTrackPlayback } from "@/lib/track-playback";
+import { nativeDeviceTokenAuthorizes } from "@/lib/native-device-authorization";
 import type {
   EngineQueueSnapshot,
   EngineRepeatMode,
@@ -86,7 +87,7 @@ export function toEngineTrack(
     : null;
   const resolvedUrl = track.offlineOnly
     ? offlineUrl
-    : streamUrl ?? getStreamUrl(track, options);
+    : (streamUrl ?? getStreamUrl(track, options));
   if (!resolvedUrl) {
     throw new Error("Offline track is not available on this device");
   }
@@ -97,16 +98,24 @@ export function toEngineTrack(
     options.target === "android-native" &&
     artwork != null &&
     isTrustedNativeApiUrl(artwork, getApiBase());
+  // D7: with an active device profile the service authorizes these routes
+  // with the device token, so the 1 h session bearer stays off the track.
+  const sessionStreamAuthorization =
+    androidNativeHttp && !nativeDeviceTokenAuthorizes(resolvedUrl, "stream");
+  const sessionArtworkAuthorization =
+    androidNativeArtwork && !nativeDeviceTokenAuthorizes(artwork, "artwork");
 
   return {
     id: track.id,
     url: androidNativeHttp ? withoutCredentialQuery(resolvedUrl) : resolvedUrl,
-    authorization: androidNativeHttp ? bearerAuthorizationHeader() : undefined,
+    authorization: sessionStreamAuthorization
+      ? bearerAuthorizationHeader()
+      : undefined,
     title: track.title || "Unknown",
     artist: track.artist || "",
     album: track.album || undefined,
     artwork: androidNativeArtwork ? withoutCredentialQuery(artwork) : artwork,
-    artworkAuthorization: androidNativeArtwork
+    artworkAuthorization: sessionArtworkAuthorization
       ? bearerAuthorizationHeader()
       : undefined,
     durationMs:

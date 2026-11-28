@@ -4,6 +4,7 @@ import androidx.annotation.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -14,7 +15,66 @@ final class NativeStreamAuthorization {
     private static final String BASE64URL =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
+    // Path segments the server accepts as an entity uid or a variant id.
+    private static final String SEGMENT = "(?!\\.\\.?(?:/|$))[^/]+";
+    // The stream and artwork routes of the native device token's allowlist
+    // (_NATIVE_DEVICE_ACCESS_TOKEN_ROUTES in app/crate/api/auth.py). Other
+    // URLs on the same origin (federated streams) keep the session bearer.
+    private static final Pattern DEVICE_STREAM_PATH = Pattern.compile(
+        "^/api/(?:tracks/by-entity/" + SEGMENT + "/stream" +
+            "|catalog/tracks/" + SEGMENT + "/stream" +
+            "|tracks/\\d+/stream" +
+            "|stream/.+" +
+            "|playback/variants/" + SEGMENT + "/stream)$"
+    );
+    private static final Pattern DEVICE_ARTWORK_PATH = Pattern.compile(
+        "^/api/(?:albums/\\d+/cover" +
+            "|albums/by-entity/" + SEGMENT + "/cover" +
+            "|catalog/albums/" + SEGMENT + "/cover" +
+            "|artists/\\d+/(?:photo|background)" +
+            "|artists/by-entity/" + SEGMENT + "/(?:photo|background)" +
+            "|catalog/artists/" + SEGMENT + "/(?:photo|background))$"
+    );
+
     private NativeStreamAuthorization() {}
+
+    static boolean deviceTokenCoversStream(@Nullable String path) {
+        return path != null && DEVICE_STREAM_PATH.matcher(path).matches();
+    }
+
+    static boolean deviceTokenCoversArtwork(@Nullable String path) {
+        return path != null && DEVICE_ARTWORK_PATH.matcher(path).matches();
+    }
+
+    // D7: a stream the device token covers always uses it, for native and
+    // JS-loaded queues alike. Without a device profile (older servers, or a
+    // profile for another origin) the session bearer and its continuation
+    // fallback stay as they were.
+    @Nullable
+    static String chooseStream(
+        @Nullable String path,
+        @Nullable String deviceToken,
+        @Nullable String sessionAuthorization,
+        @Nullable String continuationToken,
+        long nowWallMs
+    ) {
+        if (deviceToken != null && !deviceToken.isEmpty() && deviceTokenCoversStream(path)) {
+            return BEARER_PREFIX + deviceToken;
+        }
+        return choose(sessionAuthorization, continuationToken, nowWallMs);
+    }
+
+    @Nullable
+    static String chooseArtwork(
+        @Nullable String path,
+        @Nullable String deviceToken,
+        @Nullable String sessionAuthorization
+    ) {
+        if (deviceToken != null && !deviceToken.isEmpty() && deviceTokenCoversArtwork(path)) {
+            return BEARER_PREFIX + deviceToken;
+        }
+        return sessionAuthorization;
+    }
 
     @Nullable
     static String choose(

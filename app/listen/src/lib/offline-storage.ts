@@ -187,9 +187,16 @@ export function getActiveOfflineProfileKey(): string | null {
   return readOfflineStoreItem(OFFLINE_ACTIVE_PROFILE_KEY);
 }
 
+/** Fired on window when the active offline profile key changes. */
+export const OFFLINE_ACTIVE_PROFILE_EVENT = "crate:offline-active-profile";
+
 export function setActiveOfflineProfileKey(profileKey: string | null): void {
+  const previous = getActiveOfflineProfileKey();
   writeOfflineStoreItem(OFFLINE_ACTIVE_PROFILE_KEY, profileKey);
   notifyOfflineArtworkChanged();
+  if (previous !== profileKey && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(OFFLINE_ACTIVE_PROFILE_EVENT));
+  }
 }
 
 function getOfflineNativeAssetStorageKey(profileKey: string): string {
