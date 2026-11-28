@@ -167,7 +167,11 @@ public class DeviceApiClientTest {
         transport.response = new DeviceApiClient.Response(401, "");
         DeviceApiClient.Transport racing = request -> {
             // JS mints a new token while the old request is in flight.
-            store.save(DeviceProfileStoreTest.profile("https://api.example", "crv_newer"));
+            try {
+                store.save(DeviceProfileStoreTest.profile("https://api.example", "crv_newer"));
+            } catch (Exception error) {
+                throw new IOException(error);
+            }
             return transport.execute(request);
         };
         DeviceApiClient racingClient = new DeviceApiClient(store, racing, () -> now);
