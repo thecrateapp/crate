@@ -310,6 +310,8 @@ HTTP_ROUTES = frozenset(
         "/api/auth/apple/callback",
         "/api/auth/change-password",
         "/api/auth/config",
+        "/api/auth/device-tokens",
+        "/api/auth/device-tokens/:param",
         "/api/auth/google",
         "/api/auth/google/callback",
         "/api/auth/heartbeat",
