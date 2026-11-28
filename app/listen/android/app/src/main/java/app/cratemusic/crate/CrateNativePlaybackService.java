@@ -801,7 +801,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 .setConnectTimeoutMs(10_000)
                 .setReadTimeoutMs(30_000);
         artworkDataSourceFactory = new ResolvingDataSource.Factory(
-            new DefaultDataSource.Factory(this, artworkHttpDataSourceFactory),
+            new DeviceTokenRejectionDataSource.Factory(
+                new DefaultDataSource.Factory(this, artworkHttpDataSourceFactory),
+                this::onDeviceTokenRejected
+            ),
             this::authorizeArtwork
         );
         DefaultMediaSourceFactory mediaSourceFactory =
@@ -834,7 +837,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
             .setConnectTimeoutMs(10_000)
             .setReadTimeoutMs(30_000);
         return new ResolvingDataSource.Factory(
-            new DefaultDataSource.Factory(this, httpDataSourceFactory),
+            new DeviceTokenRejectionDataSource.Factory(
+                new DefaultDataSource.Factory(this, httpDataSourceFactory),
+                this::onDeviceTokenRejected
+            ),
             this::authorizeStream
         );
     }
@@ -2025,6 +2031,23 @@ public class CrateNativePlaybackService extends MediaSessionService {
             }
         };
         mainHandler.post(tempoRestoreTicker);
+    }
+
+    // A stream or artwork request made with the device token was refused
+    // (401/403): the token was revoked while the session may live on. Clear
+    // the profile if it still holds that token; the store tells JS
+    // (CrateDevicePlugin profileChanged, reason "unauthorized"), which drops
+    // its mirror, so new tracks carry the session bearer, and mints again.
+    // authorizeStream reads the store per request, so the retry uses
+    // whichever credential is current.
+    private void onDeviceTokenRejected(String deviceToken) {
+        DeviceProfileStore store = deviceProfileStore;
+        if (
+            store != null &&
+            store.clearIfToken(deviceToken, DeviceProfileStore.ClearReason.UNAUTHORIZED)
+        ) {
+            Log.w(TAG, "Device token refused for a stream; cleared the device profile");
+        }
     }
 
     // The native device token for url when the device profile belongs to its

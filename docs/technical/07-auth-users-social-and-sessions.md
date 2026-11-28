@@ -185,7 +185,13 @@ token>` to the profile's server with 10 s connect and 15 s read timeouts and
   (`lib/native-device-authorization.ts`). Other paths on the same origin, such
   as `/api/federation/remote/streams/*`, keep the session bearer. Without a
   profile (older servers, another origin, expired token) the service keeps the
-  session bearer and its continuation-token fallback.
+  session bearer and its continuation-token fallback. When a stream or artwork
+  request made with the device token gets 401/403 (the token was revoked from
+  another client while the session lives on), `DeviceTokenRejectionDataSource`
+  clears the profile if it still holds that token; JS drops its mirror at once,
+  so new tracks carry the session bearer again, and mints a new token. The
+  service reads the store per request, so the retry uses whichever credential
+  is current.
 - **Retirement.** Logout and server switch revoke the token with
   `DELETE /api/auth/device-tokens/{id}` on the server that minted it, using that
   server's session and before the session itself is revoked, then clear the

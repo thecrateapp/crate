@@ -287,6 +287,50 @@ describe("native device profile", () => {
     ).resolves.toBe("inactive");
   });
 
+  it("falls back to the session bearer at once when a revoked token is refused", async () => {
+    // A stored, valid profile that the server still lists...
+    plugin.getStatus.mockResolvedValue(storedStatus());
+    apiMock.mockResolvedValueOnce([{ id: 7, current_session: true }]);
+    await expect(syncNativeDeviceProfile({ verify: true })).resolves.toBe(
+      "active",
+    );
+    const stream = "https://one.example/api/tracks/1/stream";
+    expect(nativeDeviceTokenAuthorizes(stream, "stream")).toBe(true);
+
+    // ...is revoked elsewhere; the service sees a stream refused and clears it.
+    plugin.getStatus.mockResolvedValue({ hasProfile: false });
+    let resolveMint: (value: unknown) => void = () => {};
+    apiMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveMint = resolve;
+      }),
+    );
+    const remint = handleNativeDeviceProfileChange({
+      hasProfile: false,
+      reason: "unauthorized",
+    });
+
+    // The mirror is gone before the server answers, so new engine tracks
+    // carry the session bearer again.
+    expect(getActiveNativeDeviceProfile()).toBeNull();
+    expect(nativeDeviceTokenAuthorizes(stream, "stream")).toBe(false);
+    await vi.waitFor(() =>
+      expect(apiMock).toHaveBeenLastCalledWith(
+        "/api/auth/device-tokens",
+        "POST",
+        expect.objectContaining({ device_id: expect.any(String) }),
+      ),
+    );
+
+    resolveMint(created(15));
+    await expect(remint).resolves.toBe("minted");
+    expect(plugin.setProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ tokenId: 15, deviceToken: "crv_minted_15" }),
+    );
+    expect(getActiveNativeDeviceProfile()?.tokenId).toBe(15);
+    expect(nativeDeviceTokenAuthorizes(stream, "stream")).toBe(true);
+  });
+
   it.each([404, 405])(
     "treats a %s from an older server as unsupported",
     async (status) => {

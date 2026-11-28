@@ -64,6 +64,17 @@ final class NativeStreamAuthorization {
         return choose(sessionAuthorization, continuationToken, nowWallMs);
     }
 
+    // The device token a 401/403 response refused, or null when the request
+    // was not authorized with a device-format bearer. The store clears the
+    // profile only if that token is still the active one, so a refused
+    // session bearer or continuation token never clears it.
+    @Nullable
+    static String rejectedDeviceToken(@Nullable Integer httpStatus, @Nullable String authorization) {
+        if (httpStatus == null || (httpStatus != 401 && httpStatus != 403)) return null;
+        if (authorization == null || !authorization.startsWith(BEARER_PREFIX + "crv_")) return null;
+        return authorization.substring(BEARER_PREFIX.length());
+    }
+
     @Nullable
     static String chooseArtwork(
         @Nullable String path,

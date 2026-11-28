@@ -138,4 +138,14 @@ public class NativeStreamAuthorizationTest {
             NativeStreamAuthorization.chooseArtwork("/api/me/avatar", "crv_device", "Bearer s")
         );
     }
+
+    @Test
+    public void namesTheDeviceTokenOnlyFor401And403WithADeviceBearer() {
+        assertEquals("crv_device", NativeStreamAuthorization.rejectedDeviceToken(401, "Bearer crv_device"));
+        assertEquals("crv_device", NativeStreamAuthorization.rejectedDeviceToken(403, "Bearer crv_device"));
+        assertNull(NativeStreamAuthorization.rejectedDeviceToken(404, "Bearer crv_device"));
+        assertNull(NativeStreamAuthorization.rejectedDeviceToken(null, "Bearer crv_device"));
+        assertNull(NativeStreamAuthorization.rejectedDeviceToken(401, sessionBearer(EXP_SECONDS)));
+        assertNull(NativeStreamAuthorization.rejectedDeviceToken(401, null));
+    }
 }

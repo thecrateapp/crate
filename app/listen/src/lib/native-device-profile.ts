@@ -428,8 +428,12 @@ export function retireNativeDeviceProfile(): Promise<void> {
 }
 
 /**
- * Re-mints after the native service saw the device token rejected, at most
- * once a minute.
+ * Native code cleared the profile. The mirror is dropped at once, so tracks
+ * built from now on carry the session bearer again (D7 fallback). When the
+ * service saw the device token refused (revoked from another client, or the
+ * Devices settings, while the session lives on), JS asks the server for a new
+ * token instead of trusting native state, at most once a minute; the service
+ * reads the store per request, so retries pick the new token up.
  */
 export function handleNativeDeviceProfileChange(
   status: NativeDeviceProfileStatus,
@@ -446,7 +450,7 @@ export function handleNativeDeviceProfileChange(
     return Promise.resolve("inactive");
   }
   lastForcedRemintAt = now;
-  return syncNativeDeviceProfile({ force: true });
+  return syncNativeDeviceProfile({ force: true, verify: true });
 }
 
 export function subscribeNativeDeviceProfileChanges(
