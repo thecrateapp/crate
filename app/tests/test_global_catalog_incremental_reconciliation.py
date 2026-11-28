@@ -222,3 +222,103 @@ def test_incremental_local_source_promotes_matching_remote_artist(pg_db):
     assert {source["global_entity_uid"] for source in sources} == {
         sources[0]["global_entity_uid"]
     }
+
+
+def _claimed_dirty_source(attempts: int) -> dict:
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC)
+    return {
+        "id": 41,
+        "entity_type": "track",
+        "source_kind": "local",
+        "operation": "upsert",
+        "requested_at": now,
+        "claimed_at": now,
+        "attempts": attempts,
+    }
+
+
+def test_a_source_waiting_for_its_canonical_artist_is_deferred_not_reported(
+    pg_db, monkeypatch, caplog
+):
+    """A dependency wait retries later with backoff and never logs an error.
+
+    Every error-level log reaches Sentry; reporting this expected wait on each
+    retry exhausted the monthly error quota (CRATE-WORKERS-M).
+    """
+    import logging
+
+    from crate.db.jobs import global_catalog_reconciliation as reconciliation
+    from crate.db.repositories import global_catalog_dirty_sources as dirty_sources
+
+    monkeypatch.setattr(
+        dirty_sources,
+        "claim_dirty_sources",
+        lambda limit, session: [_claimed_dirty_source(attempts=3)],
+    )
+
+    def wait_for_artist(session, dirty):
+        raise reconciliation.CanonicalDependencyPending(
+            "Track source is waiting for its canonical artist"
+        )
+
+    monkeypatch.setattr(reconciliation, "_reconcile_dirty_source", wait_for_artist)
+    failures = []
+    monkeypatch.setattr(
+        dirty_sources,
+        "fail_dirty_source",
+        lambda source_id, error, **kwargs: failures.append((source_id, kwargs)) or True,
+    )
+
+    with caplog.at_level(logging.INFO, logger=reconciliation.log.name):
+        result = reconciliation.reconcile_dirty_catalog_sources(limit=10)
+
+    assert result["failed"] == 1
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert failures[0][0] == 41
+    # Third attempt: one hour doubled twice.
+    assert failures[0][1]["retry_after_seconds"] == 4 * 3600
+
+
+def test_dependency_retries_back_off_to_a_day():
+    from crate.db.jobs.global_catalog_reconciliation import dependency_retry_seconds
+
+    assert dependency_retry_seconds(1) == 3600
+    assert dependency_retry_seconds(2) == 7200
+    assert dependency_retry_seconds(5) == 16 * 3600
+    assert dependency_retry_seconds(6) == 24 * 3600
+    assert dependency_retry_seconds(12753) == 24 * 3600
+    assert dependency_retry_seconds(0) == 3600
+
+
+def test_an_unexpected_reconciliation_failure_is_still_reported(
+    pg_db, monkeypatch, caplog
+):
+    import logging
+
+    from crate.db.jobs import global_catalog_reconciliation as reconciliation
+    from crate.db.repositories import global_catalog_dirty_sources as dirty_sources
+
+    monkeypatch.setattr(
+        dirty_sources,
+        "claim_dirty_sources",
+        lambda limit, session: [_claimed_dirty_source(attempts=1)],
+    )
+
+    def broken(session, dirty):
+        raise ValueError("Local dirty source is missing entity UID")
+
+    monkeypatch.setattr(reconciliation, "_reconcile_dirty_source", broken)
+    failures = []
+    monkeypatch.setattr(
+        dirty_sources,
+        "fail_dirty_source",
+        lambda source_id, error, **kwargs: failures.append(kwargs) or True,
+    )
+
+    with caplog.at_level(logging.INFO, logger=reconciliation.log.name):
+        reconciliation.reconcile_dirty_catalog_sources(limit=10)
+
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert failures[0]["retry_after_seconds"] is None

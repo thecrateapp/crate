@@ -45,7 +45,22 @@ from crate.slugs import build_artist_slug, build_public_album_slug
 _GLOBAL_UID_NAMESPACE = uuid.UUID("e43655c7-8af2-4c5a-92f6-a5126dff7f84")
 _RECONCILIATION_ENTITY_TYPES = ("artist", "album", "track")
 _DEPENDENCY_RETRY_SECONDS = 3600
+_DEPENDENCY_RETRY_MAX_SECONDS = 24 * 3600
 log = logging.getLogger(__name__)
+
+
+class CanonicalDependencyPending(RuntimeError):
+    """A source waits for its canonical artist; retry later, it is not a failure."""
+
+
+def dependency_retry_seconds(attempts: int) -> int:
+    """Hourly at first, doubling per attempt, at most once a day.
+
+    A source whose artist never becomes canonical would otherwise be retried
+    every hour forever.
+    """
+    exponent = min(max(0, int(attempts) - 1), 16)
+    return min(_DEPENDENCY_RETRY_SECONDS * 2**exponent, _DEPENDENCY_RETRY_MAX_SECONDS)
 
 
 def apply_federation_delta_page(
@@ -226,18 +241,23 @@ def reconcile_dirty_catalog_sources(*, limit: int = 500) -> dict[str, int]:
                 )
             completed += 1
         except Exception as exc:
-            log.exception("Catalog source %s reconciliation failed", source_id)
+            if isinstance(exc, CanonicalDependencyPending):
+                # An expected wait, not an error: every error-level log reaches
+                # Sentry, and reporting it on each retry exhausted the quota.
+                retry_after = dependency_retry_seconds(dirty.get("attempts") or 1)
+                log.info(
+                    "Catalog source %s deferred %ss: %s", source_id, retry_after, exc
+                )
+            else:
+                retry_after = None
+                log.exception("Catalog source %s reconciliation failed", source_id)
             with transaction_scope() as session:
                 fail_dirty_source(
                     source_id,
                     str(exc),
                     requested_at=dirty["requested_at"],
                     claimed_at=dirty["claimed_at"],
-                    retry_after_seconds=(
-                        _DEPENDENCY_RETRY_SECONDS
-                        if "waiting for its canonical artist" in str(exc)
-                        else None
-                    ),
+                    retry_after_seconds=retry_after,
                     session=session,
                 )
             failed += 1
@@ -331,7 +351,9 @@ def _reconcile_local_source(session, source: dict[str, Any]) -> None:
     elif entity_type == "album":
         artist_uid = _find_artist_uid(session, source["source_payload"]["artist_name"])
         if artist_uid is None:
-            raise RuntimeError("Album source is waiting for its canonical artist")
+            raise CanonicalDependencyPending(
+                "Album source is waiting for its canonical artist"
+            )
         global_uid, score = _resolve_album_target(session, source, artist_uid)
         source = _with_match(source, score)
         _upsert_album(session, source, global_uid, artist_uid)
@@ -349,7 +371,9 @@ def _reconcile_local_source(session, source: dict[str, Any]) -> None:
             track_artist_name=payload["artist_name"],
         )
         if artist_uid is None:
-            raise RuntimeError("Track source is waiting for its canonical artist")
+            raise CanonicalDependencyPending(
+                "Track source is waiting for its canonical artist"
+            )
         global_uid, score = _resolve_track_target(session, source, artist_uid)
         source = _with_match(source, score)
         _upsert_track(session, source, global_uid, artist_uid, album_uid)
@@ -376,7 +400,7 @@ def _reconcile_federated_source(session, source: dict[str, Any]) -> None:
     elif entity_type == "album":
         artist_uid = _find_artist_uid(session, source["source_payload"]["artist_name"])
         if artist_uid is None:
-            raise RuntimeError(
+            raise CanonicalDependencyPending(
                 "Federated album source is waiting for its canonical artist"
             )
         target_uid, score = _resolve_album_target(session, source, artist_uid)
@@ -389,7 +413,7 @@ def _reconcile_federated_source(session, source: dict[str, Any]) -> None:
         payload = source["source_payload"]
         artist_uid = _find_artist_uid(session, payload["artist_name"])
         if artist_uid is None:
-            raise RuntimeError(
+            raise CanonicalDependencyPending(
                 "Federated track source is waiting for its canonical artist"
             )
         album_uid = _find_album_uid(
