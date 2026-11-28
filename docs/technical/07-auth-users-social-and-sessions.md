@@ -121,7 +121,8 @@ WebView is not running (Android Auto, Cast refill, background plays). It is a
 - **Allowlist.** Outside these routes the middleware answers 403 (other access
   tokens are treated as anonymous instead):
 
-  - `GET /api/auth/me`, `GET /api/capabilities`, `GET /api/me/device/*`;
+  - `GET /api/auth/me`, `GET /api/capabilities`, `GET /api/me/device/*` and
+    `POST /api/me/device/queue` (the device API below);
   - streams: `GET|HEAD /api/tracks/by-entity/{uid}/stream`,
     `/api/catalog/tracks/{uid}/stream`, `/api/tracks/{id}/stream`,
     `/api/stream/{path}`, `/api/playback/variants/{id}/stream`;
@@ -145,6 +146,75 @@ WebView is not running (Android Auto, Cast refill, background plays). It is a
   request with a `Bearer crv_` header goes to the FastAPI fallback before any
   native handler (`withAccessTokenFallback` in
   `app/readplane/internal/routes/access_tokens.go`).
+
+## Device browse, search and queue API
+
+The compact API the Android media service (Android Auto, Assistant, Wear)
+browses and plays from while the WebView is not running (phase AA3 of
+`docs/plans/2026-11-28-android-auto-design.md`). Router:
+`app/crate/api/device_library.py`; SQL: `app/crate/db/queries/device_library.py`.
+Every route accepts an interactive session or a native device token and reads
+only the caller's own library; other access tokens get 403. The read plane has
+no handler for `/api/me/device/*` and no edge routes it there, so session JWTs
+reach FastAPI too (`tests/test_readplane_route_manifest.py`).
+
+- **Browse.** `GET /api/me/device/browse/{node}?limit=&cursor=` (`limit` 1-100,
+  default 50) returns `{node, title, items, next_cursor}`. Each item is
+  `{id, kind, title, subtitle, artwork_url, playable, browsable}` plus
+  `duration_ms` for tracks and `group` (section title) in mixed nodes. Item ids
+  encode the kind: `album:<uid>`, `artist:<uid>`, `playlist:<id>`,
+  `track:<uid>`, `mix:<id>`, `station:<artist|album>:<id>`; folders use their
+  node name. Unknown nodes, missing containers and another user's private
+  playlist answer 404; a cursor from another node answers 400.
+- **Nodes and their sources.**
+
+  | Node                | Items                                                       | Source and paging                                                     |
+  | ------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+  | `root`              | folders `home`, `library`, `radio`                          | fixed                                                                 |
+  | `library`           | folders `recent`, `playlists`, `liked`, `albums`, `artists` | fixed                                                                 |
+  | `home`              | up to 8 mixes, 8 recently played, 8 radio stations (D8)     | home snapshot, offset cursor                                          |
+  | `recent`, `radio`   | recently played albums, artists, playlists; radio stations  | home snapshot, offset cursor                                          |
+  | `playlists`         | owned, shared and followed playlists the user can play      | SQL keyset on name                                                    |
+  | `playlist:<id>`     | the playlist's local tracks in order                        | Decks playlist page (keyset on position)                              |
+  | `liked`             | liked local tracks, newest first                            | Decks likes page (keyset)                                             |
+  | `albums`, `artists` | saved albums, followed artists, newest first                | SQL keyset on save or follow time                                     |
+  | `album:<uid>`       | the album's tracks in disc and track order                  | SQL keyset                                                            |
+  | `artist:<uid>`      | 12 top tracks, then up to 200 albums                        | artist page top tracks (Redis, 5 min) and one SQL read, offset cursor |
+
+  Home nodes call `get_home_discovery_snapshot`: a fresh snapshot, else a stale
+  one (up to an hour) with a deduplicated refresh task, else an empty home and
+  a refresh. The request never builds the home. Essentials and suggestions are
+  not shown in the car. Only local items with an entity uid are listed; global
+  (federated-only) albums, artists, likes and radio seeds are skipped.
+
+- **Search.** `GET /api/me/device/search?q=&limit=` (`q` at least 2 characters,
+  `limit` up to 50 per kind) returns the same page shape (`node: "search"`)
+  with groups `Artists`, `Albums` and `Tracks` from the local catalogue search.
+- **ETags.** Browse and search pages carry a strong `ETag` and
+  `Cache-Control: private, no-cache`; `If-None-Match` answers 304.
+- **Artwork.** `artwork_url` is a canonical API path on the device token's
+  allowlist: `/api/albums/by-entity/{uid}/cover?size=512`,
+  `/api/albums/{id}/cover?size=512` or
+  `/api/artists/by-entity/{uid}/photo?size=512`.
+- **Queue.** `POST /api/me/device/queue` with either `node` (a playable
+  container: `album:`, `playlist:`, `liked`, `mix:`, `artist:` for its top
+  tracks, `station:`) or `item_ids` (up to 500 `track:` ids), plus
+  `start_item_id`, `shuffle` and `delivery` (`auto`, `original`, `balanced`,
+  `data_saver`). It returns `{tracks, start_index, continuation}` with at most
+  500 tracks in order, each with `id`, `entityUid`, `url`, `title`, `artist`,
+  `album`, `artwork` and `durationMs`, resolved with one batched `ANY(:uids)`
+  query. The stream URL is `/api/tracks/by-entity/{uid}/stream`, with
+  `?delivery=` only for `balanced` and `data_saver`: the device resolves `auto` itself
+  (unmetered: original; metered: balanced). With `shuffle`, the start track
+  plays first and `start_index` is 0. Stations and mixes return a
+  `seeded_radio` continuation descriptor (`seedType` `artist`, `album` or
+  `home_playlist`) for a later native refill; finite containers return null.
+  The queue writes nothing.
+- **Bounds that compute.** Station queues generate 50 radio tracks in the
+  request, as `/api/radio/*` does. A mix queue reads the same Redis entry as
+  Listen's mix page (`home_mix:v3:...:40`, five minutes) and builds the mix
+  only on a miss, so at most once per user and mix every five minutes, and
+  only on an explicit play, never while browsing.
 
 ## OAuth providers
 

@@ -260,6 +260,31 @@ def test_openapi_types_native_device_token_routes(test_app):
     assert "404" in item["delete"]["responses"]
 
 
+def test_openapi_types_device_browse_search_and_queue_routes(test_app):
+    data = test_app.get("/openapi.json").json()
+    browse = data["paths"]["/api/me/device/browse/{node}"]["get"]
+    search = data["paths"]["/api/me/device/search"]["get"]
+    queue = data["paths"]["/api/me/device/queue"]["post"]
+
+    for operation in (browse, search, queue):
+        assert operation["tags"] == ["me"]
+        assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+        assert "422" in operation["responses"]
+    for operation in (browse, search):
+        assert "304" in operation["responses"]
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"][
+            "$ref"
+        ].endswith("/DeviceBrowsePageResponse")
+    assert "404" in browse["responses"]
+    assert "400" in browse["responses"]
+    assert queue["requestBody"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/DeviceQueueRequest")
+    assert queue["responses"]["200"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/DeviceQueueResponse")
+
+
 def test_openapi_types_playlist_routes_and_keeps_filter_options_public(test_app):
     data = test_app.get("/openapi.json").json()
     list_operation = data["paths"]["/api/playlists"]["get"]
