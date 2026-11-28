@@ -20,6 +20,7 @@ from crate.api.auth import (
     _require_auth,
     _require_stream_access,
     _require_vdj_scope,
+    _require_vdj_scope_or_native_device,
 )
 from crate.api.permissions import require_permission
 from crate.api.openapi_responses import (
@@ -1275,7 +1276,7 @@ def api_vdj_playback_by_entity_uid(
 def api_playback_by_entity_uid(
     request: Request, entity_uid: str, delivery: str = Query("original")
 ):
-    user = _require_vdj_scope(request, "vdj.media.read")
+    user = _require_vdj_scope_or_native_device(request, "vdj.media.read")
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
